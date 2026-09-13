@@ -1,4 +1,183 @@
+use crate::resources::{Resources, RES_MAX_ZONES};
 use crate::rng::{seed_from_index, Rng};
+use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN};
+
+pub const GAME_NAME_LEN: usize = 16;
+pub const GAME_ID_LEN: usize = 24;
+pub const GAME_ARMY_SLOTS: usize = 5;
+pub const GAME_OPTIONS: usize = 7;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Mount {
+    Ride = 0,
+    Sail = 1,
+    Fly = 2,
+}
+
+impl Default for Mount {
+    fn default() -> Self {
+        Self::Ride
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TravelMode {
+    Walk = 0,
+    Boat = 1,
+}
+
+impl Default for TravelMode {
+    fn default() -> Self {
+        Self::Walk
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArmyStack {
+    pub id: FixedStr<CAT_ID_LEN>,
+    pub count: i32,
+}
+
+impl Default for ArmyStack {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            count: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ClassState {
+    pub id: FixedStr<GAME_ID_LEN>,
+    pub rank_index: i32,
+    pub rank_id: FixedStr<GAME_ID_LEN>,
+    pub rank_title: FixedStr<CAT_ID_LEN>,
+}
+
+impl Default for ClassState {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            rank_index: 0,
+            rank_id: FixedStr::empty(),
+            rank_title: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Character {
+    pub name: FixedStr<GAME_NAME_LEN>,
+    pub cls: ClassState,
+    pub difficulty: i32,
+    pub mount: Mount,
+}
+
+impl Default for Character {
+    fn default() -> Self {
+        Self {
+            name: FixedStr::empty(),
+            cls: ClassState::default(),
+            difficulty: 0,
+            mount: Mount::Ride,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Stats {
+    pub gold: i32,
+    pub commission_weekly: i32,
+    pub leadership_base: i32,
+    pub leadership_current: i32,
+    pub followers_killed: i32,
+    pub score: i32,
+    pub spell_power: i32,
+    pub max_spells: i32,
+    pub knows_magic: bool,
+    pub siege_weapons: i32,
+    pub time_stop: i32,
+    pub steps_left_today: i32,
+    pub days_left: i32,
+    pub last_commission: i32,
+    pub options: [i32; GAME_OPTIONS],
+}
+
+impl Default for Stats {
+    fn default() -> Self {
+        Self {
+            gold: 0,
+            commission_weekly: 0,
+            leadership_base: 0,
+            leadership_current: 0,
+            followers_killed: 0,
+            score: 0,
+            spell_power: 0,
+            max_spells: 0,
+            knows_magic: false,
+            siege_weapons: 0,
+            time_stop: 0,
+            steps_left_today: 40,
+            days_left: 900,
+            last_commission: 0,
+            options: [1; GAME_OPTIONS],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Position {
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+    pub last_x: i32,
+    pub last_y: i32,
+}
+
+impl Default for Position {
+    fn default() -> Self {
+        Self {
+            zone: FixedStr::empty(),
+            x: 0,
+            y: 0,
+            last_x: 0,
+            last_y: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BoatState {
+    pub has_boat: bool,
+    pub x: i32,
+    pub y: i32,
+    pub zone: FixedStr<GAME_ID_LEN>,
+}
+
+impl Default for BoatState {
+    fn default() -> Self {
+        Self {
+            has_boat: false,
+            x: -1,
+            y: -1,
+            zone: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WorldProgress {
+    pub zones_discovered: [bool; RES_MAX_ZONES],
+}
+
+impl Default for WorldProgress {
+    fn default() -> Self {
+        Self {
+            zones_discovered: [false; RES_MAX_ZONES],
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ScepterState {
@@ -21,6 +200,13 @@ pub struct Game {
     pub seed_from_catalog: bool,
     pub seed: u64,
     pub scepter: ScepterState,
+    pub character: Character,
+    pub stats: Stats,
+    pub position: Position,
+    pub travel_mode: TravelMode,
+    pub boat: BoatState,
+    pub army: [ArmyStack; GAME_ARMY_SLOTS],
+    pub world: WorldProgress,
     world_rng: Rng,
 }
 
@@ -31,6 +217,13 @@ impl Default for Game {
             seed_from_catalog: false,
             seed: 0,
             scepter: ScepterState::default(),
+            character: Character::default(),
+            stats: Stats::default(),
+            position: Position::default(),
+            travel_mode: TravelMode::Walk,
+            boat: BoatState::default(),
+            army: [ArmyStack::default(); GAME_ARMY_SLOTS],
+            world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
         }
     }
@@ -48,7 +241,29 @@ impl Game {
         &mut self,
         name: Option<&str>,
         player_class: i32,
-        _difficulty: i32,
+        difficulty: i32,
+        seed_index: i32,
+    ) {
+        self.init_seeded_inner(None, name, player_class, difficulty, seed_index);
+    }
+
+    pub fn init_seeded_with_resources(
+        &mut self,
+        resources: &Resources,
+        name: Option<&str>,
+        player_class: i32,
+        difficulty: i32,
+        seed_index: i32,
+    ) {
+        self.init_seeded_inner(Some(resources), name, player_class, difficulty, seed_index);
+    }
+
+    fn init_seeded_inner(
+        &mut self,
+        resources: Option<&Resources>,
+        name: Option<&str>,
+        player_class: i32,
+        difficulty: i32,
         seed_index: i32,
     ) {
         let seed_saved = self.seed;
@@ -71,6 +286,17 @@ impl Game {
         self.world_rng = Rng::seed(self.seed);
         self.scepter.key = self.world_rng.next(0, 255);
         self.scepter.continent = self.world_rng.next(0, 3);
+
+        self.init_character(resources, name, player_class, difficulty);
+        self.init_position(resources);
+        self.character.mount = Mount::Ride;
+        self.travel_mode = TravelMode::Walk;
+        self.boat = BoatState::default();
+        self.position.last_x = self.position.x;
+        self.position.last_y = self.position.y;
+        self.stats.time_stop = 0;
+        self.init_starting_army(resources, player_class);
+        self.init_options(resources);
     }
 
     pub fn rng_next(&mut self, min: i32, max: i32) -> i32 {
@@ -83,6 +309,164 @@ impl Game {
 
     pub fn rng_restore(&mut self, state: u64) {
         self.world_rng = Rng::from_state(state);
+    }
+
+    fn init_character(
+        &mut self,
+        resources: Option<&Resources>,
+        name: Option<&str>,
+        player_class: i32,
+        difficulty: i32,
+    ) {
+        let chosen_name = match name {
+            Some(value) if !value.is_empty() => value,
+            _ => resources
+                .map(|res| res.world.default_name.as_str())
+                .filter(|value| !value.is_empty())
+                .unwrap_or("Hero"),
+        };
+        self.character.name.copy_from_str(chosen_name);
+        capitalize_first_ascii(&mut self.character.name);
+        self.character.difficulty = difficulty;
+
+        let Some(resources) = resources else {
+            self.stats.days_left = 900;
+            self.stats.steps_left_today = 40;
+            return;
+        };
+
+        let class_index = if (0..4).contains(&player_class) {
+            player_class
+        } else {
+            0
+        };
+        if let Some(class) = resources
+            .class_by_index(class_index)
+            .or_else(|| resources.class_by_index(0))
+        {
+            self.character.cls.id.copy_from_str(class.id.as_str());
+            self.character.cls.rank_index = 0;
+            if class.rank_count > 0 {
+                self.character
+                    .cls
+                    .rank_id
+                    .copy_from_str(class.ranks[0].id.as_str());
+                self.character
+                    .cls
+                    .rank_title
+                    .copy_from_str(class.ranks[0].name.as_str());
+            }
+
+            let stats = class_stats_at_rank(class, 0);
+            self.stats.gold = class.starting_gold;
+            self.stats.commission_weekly = stats.commission;
+            self.stats.leadership_base = stats.leadership;
+            self.stats.leadership_current = stats.leadership;
+            self.stats.spell_power = stats.spell_power;
+            self.stats.max_spells = stats.max_spells;
+            self.stats.knows_magic = class.rank_count > 0 && class.ranks[0].knows_magic;
+            self.stats.siege_weapons = 0;
+        }
+
+        let difficulty_index = if (0..4).contains(&difficulty) {
+            difficulty as usize
+        } else {
+            0
+        };
+        self.stats.days_left = resources.time.days_per_difficulty[difficulty_index];
+        self.stats.steps_left_today = resources.time.day_steps;
+        self.stats.last_commission = 0;
+    }
+
+    fn init_position(&mut self, resources: Option<&Resources>) {
+        let Some(resources) = resources else {
+            return;
+        };
+
+        let mut home_zone_index = None;
+        for zi in 0..resources.zone_count() {
+            let Some(zone) = resources.zone_by_index(zi) else {
+                continue;
+            };
+            if !zone.is_home {
+                continue;
+            }
+            self.position.zone.copy_from_str(zone.id.as_str());
+            self.position.x = zone.home_spawn_x;
+            self.position.y = zone.home_spawn_y;
+            home_zone_index = Some(zi);
+            break;
+        }
+
+        if self.position.zone.is_empty() {
+            self.position
+                .zone
+                .copy_from_str(resources.world.starting_zone.as_str());
+            for zi in 0..resources.zone_count() {
+                let Some(zone) = resources.zone_by_index(zi) else {
+                    continue;
+                };
+                if zone.id.as_str() == resources.world.starting_zone.as_str() {
+                    self.position.x = zone.hero_spawn_x;
+                    self.position.y = zone.hero_spawn_y;
+                    home_zone_index = Some(zi);
+                    break;
+                }
+            }
+        }
+
+        if let Some(index) = home_zone_index {
+            if index < self.world.zones_discovered.len() {
+                self.world.zones_discovered[index] = true;
+            }
+        }
+    }
+
+    fn init_starting_army(&mut self, resources: Option<&Resources>, player_class: i32) {
+        let Some(resources) = resources else {
+            return;
+        };
+        let class_index = if (0..4).contains(&player_class) {
+            player_class
+        } else {
+            0
+        };
+        let Some(class) = resources
+            .class_by_index(class_index)
+            .or_else(|| resources.class_by_index(0))
+        else {
+            return;
+        };
+
+        for i in 0..2 {
+            let troop = class.starting_troops[i].as_str();
+            let count = class.starting_counts[i];
+            if troop.is_empty() || count <= 0 {
+                continue;
+            }
+            self.army[i].id.copy_from_str(troop);
+            self.army[i].count = count;
+        }
+    }
+
+    fn init_options(&mut self, resources: Option<&Resources>) {
+        if let Some(resources) = resources {
+            self.stats.options = resources.world.default_options;
+        }
+    }
+}
+
+fn capitalize_first_ascii<const N: usize>(value: &mut FixedStr<N>) {
+    let current = value.as_str().as_bytes().to_vec();
+    if current.is_empty() {
+        return;
+    }
+    let mut capitalized = current;
+    if capitalized[0].is_ascii_lowercase() {
+        capitalized[0] = capitalized[0].to_ascii_uppercase();
+    }
+    if let Ok(text) = std::str::from_utf8(&capitalized) {
+        value.copy_from_str(text);
     }
 }
 
@@ -102,6 +486,7 @@ fn generated_seed_index(name: Option<&str>, player_class: i32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::Game;
+    use crate::resources::Resources;
 
     #[test]
     fn init_seeded_matches_openbounty_first_world_rng_rolls() {
@@ -161,5 +546,80 @@ mod tests {
 
         game.rng_restore(snap);
         assert_eq!(game.rng_next(0, 99), first);
+    }
+
+    #[test]
+    fn init_seeded_with_resources_populates_early_game_state() {
+        let resources = Resources::from_json_str(init_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+
+        game.init_seeded_with_resources(&resources, Some("arthur"), 0, 2, 42);
+
+        assert_eq!(game.character.name.as_str(), "Arthur");
+        assert_eq!(game.character.difficulty, 2);
+        assert_eq!(game.character.cls.id.as_str(), "knight");
+        assert_eq!(game.character.cls.rank_id.as_str(), "general");
+        assert_eq!(game.character.cls.rank_title.as_str(), "General");
+        assert_eq!(game.stats.gold, 1_000);
+        assert_eq!(game.stats.commission_weekly, 100);
+        assert_eq!(game.stats.leadership_base, 120);
+        assert_eq!(game.stats.leadership_current, 120);
+        assert_eq!(game.stats.spell_power, 1);
+        assert_eq!(game.stats.max_spells, 2);
+        assert!(!game.stats.knows_magic);
+        assert_eq!(game.stats.days_left, 401);
+        assert_eq!(game.stats.steps_left_today, 33);
+        assert_eq!(game.stats.options, [4, 1, 1, 1, 1, 0, 5]);
+        assert_eq!(game.position.zone.as_str(), "home");
+        assert_eq!((game.position.x, game.position.y), (3, 4));
+        assert_eq!((game.position.last_x, game.position.last_y), (3, 4));
+        assert!(game.world.zones_discovered[0]);
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 25);
+        assert_eq!(game.army[1].id.as_str(), "militia");
+        assert_eq!(game.army[1].count, 10);
+        assert!(!game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (-1, -1));
+    }
+
+    #[test]
+    fn init_seeded_with_resources_uses_default_name_and_starting_zone_fallback() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "fallback", "default_name": "Champion"},
+              "zones": [{"id":"fallback","hero_spawn":{"x":8,"y":9}}],
+              "troops": [],
+              "classes": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+
+        game.init_seeded_with_resources(&resources, None, 0, 0, 1);
+
+        assert_eq!(game.character.name.as_str(), "Champion");
+        assert_eq!(game.position.zone.as_str(), "fallback");
+        assert_eq!((game.position.x, game.position.y), (8, 9));
+        assert!(game.world.zones_discovered[0]);
+        assert_eq!(game.stats.days_left, 900);
+        assert_eq!(game.stats.steps_left_today, 40);
+    }
+
+    fn init_fixture() -> &'static str {
+        r#"{
+          "time": {"day_steps": 33, "week_days": 6, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
+          "world": {"starting_zone": "fallback", "default_name": "Champion", "max_army_slots": 5, "default_options": [4,1,1,1,1,0,5]},
+          "zones": [
+            {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
+            {"id":"fallback","hero_spawn":{"x":8,"y":9}}
+          ],
+          "troops": [
+            {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+            {"index":1,"id":"militia","skill_level":2,"hit_points":2,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":50,"spoils_factor":5,"abilities":"","morale_group":"A"}
+          ],
+          "classes": [
+            {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":120,"max_spells":2,"spell_power":1,"commission":100,"knows_magic":false}]}
+          ]
+        }"#
     }
 }

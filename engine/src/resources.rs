@@ -1,7 +1,79 @@
-use crate::tables::{parse_troop_abilities, TroopDef, CAT_TROOPS_MAX};
+use crate::tables::{
+    parse_troop_abilities, ClassDef, FixedStr, RankDef, TroopDef, CAT_CLASSES_MAX, CAT_TROOPS_MAX,
+    CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
+};
+
+pub const RES_MAX_ZONES: usize = 8;
+pub const RES_ID_LEN: usize = 32;
+pub const RES_NAME_LEN: usize = 48;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResTime {
+    pub day_steps: i32,
+    pub week_days: i32,
+    pub days_per_difficulty: [i32; 4],
+}
+
+impl Default for ResTime {
+    fn default() -> Self {
+        Self {
+            day_steps: 40,
+            week_days: 5,
+            days_per_difficulty: [900, 600, 400, 200],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResWorld {
+    pub starting_zone: FixedStr<RES_ID_LEN>,
+    pub default_name: FixedStr<RES_NAME_LEN>,
+    pub max_army_slots: i32,
+    pub default_options: [i32; 7],
+}
+
+impl Default for ResWorld {
+    fn default() -> Self {
+        Self {
+            starting_zone: FixedStr::from_str("continentia"),
+            default_name: FixedStr::from_str("Hero"),
+            max_army_slots: 5,
+            default_options: [4, 1, 1, 1, 1, 0, 5],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResZone {
+    pub id: FixedStr<RES_ID_LEN>,
+    pub is_home: bool,
+    pub hero_spawn_x: i32,
+    pub hero_spawn_y: i32,
+    pub home_spawn_x: i32,
+    pub home_spawn_y: i32,
+}
+
+impl Default for ResZone {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            is_home: false,
+            hero_spawn_x: 0,
+            hero_spawn_y: 0,
+            home_spawn_x: -1,
+            home_spawn_y: -1,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
+    pub time: ResTime,
+    pub world: ResWorld,
+    zones: [ResZone; RES_MAX_ZONES],
+    zone_count: usize,
+    classes: [ClassDef; CAT_CLASSES_MAX],
+    classes_count: usize,
     troops: [TroopDef; CAT_TROOPS_MAX],
     troops_count: usize,
     morale_chart: [[u8; 5]; 5],
@@ -10,6 +82,12 @@ pub struct Resources {
 impl Default for Resources {
     fn default() -> Self {
         Self {
+            time: ResTime::default(),
+            world: ResWorld::default(),
+            zones: [ResZone::default(); RES_MAX_ZONES],
+            zone_count: 0,
+            classes: [ClassDef::default(); CAT_CLASSES_MAX],
+            classes_count: 0,
             troops: [TroopDef::default(); CAT_TROOPS_MAX],
             troops_count: 0,
             morale_chart: default_morale_chart(),
@@ -26,9 +104,38 @@ impl Resources {
     pub fn from_json_str(input: &str) -> Result<Self, ResourceError> {
         let root: serde_json::Value = serde_json::from_str(input).map_err(ResourceError::Json)?;
         let mut resources = Self::default();
+        resources.parse_time(&root)?;
+        resources.parse_world(&root)?;
         resources.parse_combat(&root)?;
+        resources.parse_zones(&root)?;
         resources.parse_troops(&root)?;
+        resources.parse_classes(&root)?;
         Ok(resources)
+    }
+
+    pub fn zone_count(&self) -> usize {
+        self.zone_count
+    }
+
+    pub fn zone_by_index(&self, index: usize) -> Option<&ResZone> {
+        self.zones.get(index).filter(|_| index < self.zone_count)
+    }
+
+    pub fn zone_by_id(&self, id: &str) -> Option<&ResZone> {
+        self.zones[..self.zone_count]
+            .iter()
+            .find(|zone| zone.id.as_str() == id)
+    }
+
+    pub fn classes_count(&self) -> usize {
+        self.classes_count
+    }
+
+    pub fn class_by_index(&self, index: i32) -> Option<&ClassDef> {
+        if index < 0 || index as usize >= self.classes_count {
+            return None;
+        }
+        self.classes.get(index as usize)
     }
 
     pub fn troops_count(&self) -> usize {
@@ -55,6 +162,52 @@ impl Resources {
             return b'N';
         }
         self.morale_chart[a as usize][b as usize]
+    }
+
+    fn parse_time(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(time) = root.get("time") else {
+            return Ok(());
+        };
+        self.time.day_steps = optional_i32_field(time, "day_steps", self.time.day_steps)?;
+        self.time.week_days = optional_i32_field(time, "week_days", self.time.week_days)?;
+        if let Some(days) = time.get("days_per_difficulty") {
+            self.time.days_per_difficulty[0] =
+                optional_i32_field(days, "easy", self.time.days_per_difficulty[0])?;
+            self.time.days_per_difficulty[1] =
+                optional_i32_field(days, "normal", self.time.days_per_difficulty[1])?;
+            self.time.days_per_difficulty[2] =
+                optional_i32_field(days, "hard", self.time.days_per_difficulty[2])?;
+            self.time.days_per_difficulty[3] =
+                optional_i32_field(days, "impossible", self.time.days_per_difficulty[3])?;
+        }
+        Ok(())
+    }
+
+    fn parse_world(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(world) = root.get("world") else {
+            return Ok(());
+        };
+        if let Some(value) = optional_string_field(world, "starting_zone")? {
+            self.world.starting_zone.copy_from_str(value);
+        }
+        if let Some(value) = optional_string_field(world, "default_name")? {
+            self.world.default_name.copy_from_str(value);
+        }
+        self.world.max_army_slots =
+            optional_i32_field(world, "max_army_slots", self.world.max_army_slots)?;
+        if let Some(options) = world.get("default_options") {
+            let values = options
+                .as_array()
+                .ok_or(ResourceError::InvalidField("world.default_options"))?;
+            for (idx, value) in values.iter().take(7).enumerate() {
+                let n = value
+                    .as_i64()
+                    .ok_or(ResourceError::InvalidField("world.default_options"))?;
+                self.world.default_options[idx] = i32::try_from(n)
+                    .map_err(|_| ResourceError::InvalidField("world.default_options"))?;
+            }
+        }
+        Ok(())
     }
 
     fn parse_combat(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
@@ -110,6 +263,48 @@ impl Resources {
         self.troops_count = troops.len();
         Ok(())
     }
+
+    fn parse_classes(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(classes) = root.get("classes") else {
+            return Ok(());
+        };
+        let classes = classes
+            .as_array()
+            .ok_or(ResourceError::InvalidField("classes"))?;
+        if classes.len() > CAT_CLASSES_MAX {
+            return Err(ResourceError::TooManyClasses {
+                count: classes.len(),
+                max: CAT_CLASSES_MAX,
+            });
+        }
+
+        for (slot, value) in classes.iter().enumerate() {
+            self.classes[slot] = parse_class(value)?;
+        }
+        self.classes_count = classes.len();
+        Ok(())
+    }
+
+    fn parse_zones(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(zones) = root.get("zones") else {
+            return Ok(());
+        };
+        let zones = zones
+            .as_array()
+            .ok_or(ResourceError::InvalidField("zones"))?;
+        if zones.len() > RES_MAX_ZONES {
+            return Err(ResourceError::TooManyZones {
+                count: zones.len(),
+                max: RES_MAX_ZONES,
+            });
+        }
+
+        for (slot, value) in zones.iter().enumerate() {
+            self.zones[slot] = parse_zone(value)?;
+        }
+        self.zone_count = zones.len();
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -119,6 +314,8 @@ pub enum ResourceError {
     MissingField(&'static str),
     InvalidField(&'static str),
     TooManyTroops { count: usize, max: usize },
+    TooManyClasses { count: usize, max: usize },
+    TooManyZones { count: usize, max: usize },
 }
 
 impl std::fmt::Display for ResourceError {
@@ -130,6 +327,12 @@ impl std::fmt::Display for ResourceError {
             Self::InvalidField(field) => write!(f, "invalid field `{field}`"),
             Self::TooManyTroops { count, max } => {
                 write!(f, "too many troops: got {count}, max {max}")
+            }
+            Self::TooManyClasses { count, max } => {
+                write!(f, "too many classes: got {count}, max {max}")
+            }
+            Self::TooManyZones { count, max } => {
+                write!(f, "too many zones: got {count}, max {max}")
             }
         }
     }
@@ -164,6 +367,80 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
     ))
 }
 
+fn parse_class(value: &serde_json::Value) -> Result<ClassDef, ResourceError> {
+    let mut class = ClassDef {
+        index: i32_field(value, "index")?,
+        ..ClassDef::default()
+    };
+    class.id.copy_from_str(string_field(value, "id")?);
+    if let Some(name) = optional_string_field(value, "name")? {
+        class.name.copy_from_str(name);
+    }
+    if let Some(portrait) = optional_string_field(value, "portrait")? {
+        class.portrait.copy_from_str(portrait);
+    }
+    class.starting_gold = optional_i32_field(value, "starting_gold", 0)?;
+
+    if let Some(starting_troops) = value.get("starting_troops") {
+        let entries = starting_troops
+            .as_array()
+            .ok_or(ResourceError::InvalidField("starting_troops"))?;
+        for (slot, entry) in entries.iter().take(CLASS_MAX_STARTING_TROOPS).enumerate() {
+            if let Some(id) = optional_string_field(entry, "id")? {
+                class.starting_troops[slot].copy_from_str(id);
+            }
+            class.starting_counts[slot] = optional_i32_field(entry, "count", 0)?;
+        }
+    }
+
+    if let Some(ranks) = value.get("ranks") {
+        let ranks = ranks
+            .as_array()
+            .ok_or(ResourceError::InvalidField("ranks"))?;
+        for (slot, rank) in ranks.iter().take(CLASS_MAX_RANKS).enumerate() {
+            class.ranks[slot] = parse_rank(rank)?;
+            class.rank_count += 1;
+        }
+    }
+
+    Ok(class)
+}
+
+fn parse_rank(value: &serde_json::Value) -> Result<RankDef, ResourceError> {
+    let mut rank = RankDef::default();
+    if let Some(id) = optional_string_field(value, "id")? {
+        rank.id.copy_from_str(id);
+    }
+    if let Some(name) = optional_string_field(value, "name")? {
+        rank.name.copy_from_str(name);
+    }
+    rank.villains_needed = optional_i32_field(value, "villains_needed", 0)?;
+    rank.leadership = optional_i32_field(value, "leadership", 0)?;
+    rank.max_spells = optional_i32_field(value, "max_spells", 0)?;
+    rank.spell_power = optional_i32_field(value, "spell_power", 0)?;
+    rank.commission = optional_i32_field(value, "commission", 0)?;
+    rank.knows_magic = optional_bool_field(value, "knows_magic", false)?;
+    rank.instant_army = optional_i32_field(value, "instant_army", 0)?;
+    Ok(rank)
+}
+
+fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
+    let mut zone = ResZone::default();
+    zone.id.copy_from_str(string_field(value, "id")?);
+    zone.is_home = optional_bool_field(value, "is_home", false)?;
+
+    if let Some(hero_spawn) = value.get("hero_spawn") {
+        zone.hero_spawn_x = optional_i32_field(hero_spawn, "x", 0)?;
+        zone.hero_spawn_y = optional_i32_field(hero_spawn, "y", 0)?;
+    }
+    if let Some(home_spawn) = value.get("home_spawn") {
+        zone.home_spawn_x = optional_i32_field(home_spawn, "x", -1)?;
+        zone.home_spawn_y = optional_i32_field(home_spawn, "y", -1)?;
+    }
+
+    Ok(zone)
+}
+
 fn string_field<'a>(
     value: &'a serde_json::Value,
     key: &'static str,
@@ -174,12 +451,48 @@ fn string_field<'a>(
         .ok_or(ResourceError::InvalidField(key))
 }
 
+fn optional_string_field<'a>(
+    value: &'a serde_json::Value,
+    key: &'static str,
+) -> Result<Option<&'a str>, ResourceError> {
+    match value.get(key) {
+        Some(value) => value
+            .as_str()
+            .map(Some)
+            .ok_or(ResourceError::InvalidField(key)),
+        None => Ok(None),
+    }
+}
+
 fn i32_field(value: &serde_json::Value, key: &'static str) -> Result<i32, ResourceError> {
     let n = value
         .get(key)
         .and_then(serde_json::Value::as_i64)
         .ok_or(ResourceError::InvalidField(key))?;
     i32::try_from(n).map_err(|_| ResourceError::InvalidField(key))
+}
+
+fn optional_i32_field(
+    value: &serde_json::Value,
+    key: &'static str,
+    default: i32,
+) -> Result<i32, ResourceError> {
+    let Some(value) = value.get(key) else {
+        return Ok(default);
+    };
+    let n = value.as_i64().ok_or(ResourceError::InvalidField(key))?;
+    i32::try_from(n).map_err(|_| ResourceError::InvalidField(key))
+}
+
+fn optional_bool_field(
+    value: &serde_json::Value,
+    key: &'static str,
+    default: bool,
+) -> Result<bool, ResourceError> {
+    match value.get(key) {
+        Some(value) => value.as_bool().ok_or(ResourceError::InvalidField(key)),
+        None => Ok(default),
+    }
 }
 
 fn required_i32_array2(
@@ -244,16 +557,31 @@ mod tests {
     fn parses_troop_catalog_subset() {
         let resources = Resources::from_json_str(
             r#"{
+              "time": {"day_steps": 33, "week_days": 6, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
+              "world": {"starting_zone": "fallback", "default_name": "Champion", "max_army_slots": 5, "default_options": [4,1,1,1,1,0,5]},
               "combat": {"morale_chart": [["N","N","N","N","N"],["N","N","N","N","N"],["N","N","H","N","N"],["L","N","L","H","N"],["L","L","L","N","N"]]},
+              "zones": [
+                {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
+                {"id":"fallback","hero_spawn":{"x":8,"y":9}}
+              ],
               "troops": [
                 {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
                 {"index":1,"id":"vampires","skill_level":5,"hit_points":30,"move_rate":1,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":1500,"spoils_factor":150,"abilities":"FLY|LEECH|UNDEAD","morale_group":"E"}
+              ],
+              "classes": [
+                {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":100,"max_spells":2,"spell_power":1,"commission":1000,"knows_magic":false}]}
               ]
             }"#,
         )
         .expect("fixture should parse");
 
         assert_eq!(resources.troops_count(), 2);
+        assert_eq!(resources.zone_count(), 2);
+        assert_eq!(resources.classes_count(), 1);
+        assert_eq!(resources.time.day_steps, 33);
+        assert_eq!(resources.world.default_name.as_str(), "Champion");
+        assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
+        assert_eq!(resources.class_by_index(0).unwrap().starting_gold, 1000);
         let peasants = resources.troop_by_id("peasants").unwrap();
         assert_eq!(peasants.hit_points, 1);
         assert_eq!(peasants.id.as_str(), "peasants");

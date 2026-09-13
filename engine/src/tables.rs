@@ -1,4 +1,9 @@
 pub const CAT_ID_LEN: usize = 32;
+pub const CAT_NAME_LEN: usize = 48;
+pub const CAT_PATH_LEN: usize = 128;
+pub const CLASS_MAX_RANKS: usize = 4;
+pub const CLASS_MAX_STARTING_TROOPS: usize = 2;
+pub const CAT_CLASSES_MAX: usize = 8;
 pub const CAT_TROOPS_MAX: usize = 32;
 
 pub const TROOP_ABIL_FLY: i32 = 1 << 0;
@@ -152,4 +157,91 @@ pub fn parse_troop_abilities(value: &str) -> i32 {
         }
     }
     mask
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RankDef {
+    pub id: FixedStr<CAT_ID_LEN>,
+    pub name: FixedStr<CAT_NAME_LEN>,
+    pub villains_needed: i32,
+    pub leadership: i32,
+    pub max_spells: i32,
+    pub spell_power: i32,
+    pub commission: i32,
+    pub knows_magic: bool,
+    pub instant_army: i32,
+}
+
+impl Default for RankDef {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            villains_needed: 0,
+            leadership: 0,
+            max_spells: 0,
+            spell_power: 0,
+            commission: 0,
+            knows_magic: false,
+            instant_army: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ClassDef {
+    pub index: i32,
+    pub id: FixedStr<CAT_ID_LEN>,
+    pub name: FixedStr<CAT_NAME_LEN>,
+    pub portrait: FixedStr<CAT_PATH_LEN>,
+    pub starting_gold: i32,
+    pub starting_troops: [FixedStr<CAT_ID_LEN>; CLASS_MAX_STARTING_TROOPS],
+    pub starting_counts: [i32; CLASS_MAX_STARTING_TROOPS],
+    pub rank_count: usize,
+    pub ranks: [RankDef; CLASS_MAX_RANKS],
+}
+
+impl Default for ClassDef {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            portrait: FixedStr::empty(),
+            starting_gold: 0,
+            starting_troops: [FixedStr::empty(); CLASS_MAX_STARTING_TROOPS],
+            starting_counts: [0; CLASS_MAX_STARTING_TROOPS],
+            rank_count: 0,
+            ranks: [RankDef::default(); CLASS_MAX_RANKS],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
+pub struct ClassStats {
+    pub leadership: i32,
+    pub max_spells: i32,
+    pub spell_power: i32,
+    pub commission: i32,
+}
+
+pub fn class_stats_at_rank(class: &ClassDef, mut rank_index: i32) -> ClassStats {
+    if class.rank_count == 0 {
+        return ClassStats::default();
+    }
+    if rank_index < 0 {
+        rank_index = 0;
+    }
+    if rank_index as usize >= class.rank_count {
+        rank_index = class.rank_count as i32 - 1;
+    }
+
+    let mut stats = ClassStats::default();
+    for rank in class.ranks.iter().take(rank_index as usize + 1) {
+        stats.leadership += rank.leadership;
+        stats.max_spells += rank.max_spells;
+        stats.spell_power += rank.spell_power;
+        stats.commission += rank.commission;
+    }
+    stats
 }
