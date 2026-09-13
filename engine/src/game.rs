@@ -37,6 +37,13 @@ impl Default for Game {
 }
 
 impl Game {
+    pub fn with_raw_seed(seed: u64) -> Self {
+        Self {
+            seed,
+            ..Self::default()
+        }
+    }
+
     pub fn init_seeded(
         &mut self,
         name: Option<&str>,
