@@ -1,4 +1,7 @@
 use openbounty_engine::combat::combat_test_digest;
+use openbounty_engine::resources::Resources;
+
+const COMBAT_CATALOG: &str = include_str!("fixtures/combat_catalog.json");
 
 const CASES: &[(&str, u64)] = &[
     ("12345:peasants:50:orcs:30:5", 0xa25e_1141_f58e_75d3),
@@ -30,9 +33,14 @@ const CASES: &[(&str, u64)] = &[
 
 #[test]
 fn openbounty_combat_digest_goldens() {
+    let resources =
+        Resources::from_json_str(COMBAT_CATALOG).expect("combat catalog fixture parses");
+    assert_eq!(resources.troops_count(), 25);
+
     for (spec, expected) in CASES {
         let (seed, attacker, attacker_count, defender, defender_count, rounds) = parse_spec(spec);
         let got = combat_test_digest(
+            &resources,
             seed,
             attacker,
             attacker_count,

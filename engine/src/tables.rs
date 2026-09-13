@@ -1,3 +1,6 @@
+pub const CAT_ID_LEN: usize = 32;
+pub const CAT_TROOPS_MAX: usize = 32;
+
 pub const TROOP_ABIL_FLY: i32 = 1 << 0;
 pub const TROOP_ABIL_REGEN: i32 = 1 << 1;
 pub const TROOP_ABIL_MAGIC: i32 = 1 << 2;
@@ -7,10 +10,59 @@ pub const TROOP_ABIL_LEECH: i32 = 1 << 5;
 pub const TROOP_ABIL_SCYTHE: i32 = 1 << 6;
 pub const TROOP_ABIL_UNDEAD: i32 = 1 << 7;
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct FixedStr<const N: usize> {
+    bytes: [u8; N],
+}
+
+impl<const N: usize> FixedStr<N> {
+    pub const fn empty() -> Self {
+        Self { bytes: [0; N] }
+    }
+
+    pub fn copy_from_str(&mut self, value: &str) {
+        self.bytes = [0; N];
+        if N == 0 {
+            return;
+        }
+
+        let src = value.as_bytes();
+        let len = src.len().min(N - 1);
+        self.bytes[..len].copy_from_slice(&src[..len]);
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        let mut out = Self::empty();
+        out.copy_from_str(value);
+        out
+    }
+
+    pub fn as_str(&self) -> &str {
+        let len = self.bytes.iter().position(|b| *b == 0).unwrap_or(N);
+        std::str::from_utf8(&self.bytes[..len]).unwrap_or("")
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.as_str().is_empty()
+    }
+}
+
+impl<const N: usize> Default for FixedStr<N> {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<const N: usize> std::fmt::Debug for FixedStr<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("FixedStr").field(&self.as_str()).finish()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TroopDef {
     pub index: i32,
-    pub id: &'static str,
+    pub id: FixedStr<CAT_ID_LEN>,
     pub skill_level: i32,
     pub hit_points: i32,
     pub move_rate: i32,
@@ -25,233 +77,79 @@ pub struct TroopDef {
     pub morale_group: u8,
 }
 
-// Mechanical copy of the OpenBounty kings-bounty troop catalog fields used by
-// the combat formula. The resources layer will eventually load these from
-// game.json; keeping the shape static here lets the first digest milestone stay
-// render-free and data-light.
-pub static TROOPS: [TroopDef; 25] = [
-    troop(0, "peasants", 1, 1, 1, 1, 1, 0, 0, 0, 10, 1, 0, b'A'),
-    troop(
-        1,
-        "sprites",
-        1,
-        1,
-        1,
-        1,
-        2,
-        0,
-        0,
-        0,
-        15,
-        1,
-        TROOP_ABIL_FLY,
-        b'C',
-    ),
-    troop(2, "militia", 2, 2, 2, 1, 2, 0, 0, 0, 50, 5, 0, b'A'),
-    troop(3, "wolves", 2, 3, 3, 1, 3, 0, 0, 0, 40, 4, 0, b'D'),
-    troop(
-        4,
-        "skeletons",
-        2,
-        3,
-        2,
-        1,
-        2,
-        0,
-        0,
-        0,
-        40,
-        4,
-        TROOP_ABIL_UNDEAD,
-        b'E',
-    ),
-    troop(
-        5,
-        "zombies",
-        2,
-        5,
-        1,
-        2,
-        2,
-        0,
-        0,
-        0,
-        50,
-        5,
-        TROOP_ABIL_UNDEAD,
-        b'E',
-    ),
-    troop(6, "gnomes", 2, 5, 1, 1, 3, 0, 0, 0, 60, 6, 0, b'C'),
-    troop(7, "orcs", 2, 5, 2, 2, 3, 1, 2, 10, 75, 7, 0, b'D'),
-    troop(8, "archers", 2, 10, 2, 1, 2, 1, 3, 12, 250, 25, 0, b'B'),
-    troop(9, "elves", 3, 10, 3, 1, 2, 2, 4, 24, 200, 20, 0, b'C'),
-    troop(10, "pikemen", 3, 10, 2, 2, 4, 0, 0, 0, 300, 30, 0, b'B'),
-    troop(11, "nomads", 3, 15, 2, 2, 4, 0, 0, 0, 300, 30, 0, b'C'),
-    troop(12, "dwarves", 3, 20, 1, 2, 4, 0, 0, 0, 350, 30, 0, b'C'),
-    troop(
-        13,
-        "ghosts",
-        4,
-        10,
-        3,
-        3,
-        4,
-        0,
-        0,
-        0,
-        400,
-        40,
-        TROOP_ABIL_ABSORB | TROOP_ABIL_UNDEAD,
-        b'E',
-    ),
-    troop(14, "knights", 5, 35, 1, 6, 10, 0, 0, 0, 1000, 100, 0, b'B'),
-    troop(15, "ogres", 4, 40, 1, 3, 5, 0, 0, 0, 750, 75, 0, b'D'),
-    troop(16, "barbarians", 4, 40, 3, 1, 6, 0, 0, 0, 750, 75, 0, b'C'),
-    troop(
-        17,
-        "trolls",
-        4,
-        50,
-        1,
-        2,
-        5,
-        0,
-        0,
-        0,
-        1000,
-        100,
-        TROOP_ABIL_REGEN,
-        b'D',
-    ),
-    troop(18, "cavalry", 4, 20, 4, 3, 5, 0, 0, 0, 800, 80, 0, b'B'),
-    troop(
-        19,
-        "druids",
-        5,
-        25,
-        2,
-        2,
-        3,
-        10,
-        0,
-        3,
-        700,
-        70,
-        TROOP_ABIL_MAGIC,
-        b'C',
-    ),
-    troop(
-        20,
-        "archmages",
-        5,
-        25,
-        1,
-        2,
-        3,
-        25,
-        0,
-        2,
-        1200,
-        120,
-        TROOP_ABIL_FLY | TROOP_ABIL_MAGIC,
-        b'C',
-    ),
-    troop(
-        21,
-        "vampires",
-        5,
-        30,
-        1,
-        3,
-        6,
-        0,
-        0,
-        0,
-        1500,
-        150,
-        TROOP_ABIL_FLY | TROOP_ABIL_LEECH | TROOP_ABIL_UNDEAD,
-        b'E',
-    ),
-    troop(22, "giants", 5, 60, 3, 10, 20, 5, 10, 6, 2000, 200, 0, b'C'),
-    troop(
-        23,
-        "demons",
-        6,
-        50,
-        1,
-        5,
-        7,
-        0,
-        0,
-        0,
-        3000,
-        300,
-        TROOP_ABIL_FLY | TROOP_ABIL_SCYTHE,
-        b'E',
-    ),
-    troop(
-        24,
-        "dragons",
-        6,
-        200,
-        1,
-        25,
-        50,
-        0,
-        0,
-        0,
-        5000,
-        500,
-        TROOP_ABIL_FLY | TROOP_ABIL_IMMUNE,
-        b'D',
-    ),
-];
-
-#[allow(clippy::too_many_arguments)]
-const fn troop(
-    index: i32,
-    id: &'static str,
-    skill_level: i32,
-    hit_points: i32,
-    move_rate: i32,
-    melee_min: i32,
-    melee_max: i32,
-    ranged_min: i32,
-    ranged_max: i32,
-    ranged_ammo: i32,
-    recruit_cost: i32,
-    spoils_factor: i32,
-    abilities: i32,
-    morale_group: u8,
-) -> TroopDef {
-    TroopDef {
-        index,
-        id,
-        skill_level,
-        hit_points,
-        move_rate,
-        melee_min,
-        melee_max,
-        ranged_min,
-        ranged_max,
-        ranged_ammo,
-        recruit_cost,
-        spoils_factor,
-        abilities,
-        morale_group,
+impl Default for TroopDef {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            skill_level: 0,
+            hit_points: 0,
+            move_rate: 0,
+            melee_min: 0,
+            melee_max: 0,
+            ranged_min: 0,
+            ranged_max: 0,
+            ranged_ammo: 0,
+            recruit_cost: 0,
+            spoils_factor: 0,
+            abilities: 0,
+            morale_group: b'A',
+        }
     }
 }
 
-pub fn troop_by_id(id: &str) -> Option<&'static TroopDef> {
-    TROOPS.iter().find(|troop| troop.id == id)
+impl TroopDef {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        index: i32,
+        id: &str,
+        skill_level: i32,
+        hit_points: i32,
+        move_rate: i32,
+        melee_min: i32,
+        melee_max: i32,
+        ranged_min: i32,
+        ranged_max: i32,
+        ranged_ammo: i32,
+        recruit_cost: i32,
+        spoils_factor: i32,
+        abilities: i32,
+        morale_group: u8,
+    ) -> Self {
+        Self {
+            index,
+            id: FixedStr::from_str(id),
+            skill_level,
+            hit_points,
+            move_rate,
+            melee_min,
+            melee_max,
+            ranged_min,
+            ranged_max,
+            ranged_ammo,
+            recruit_cost,
+            spoils_factor,
+            abilities,
+            morale_group,
+        }
+    }
 }
 
-pub fn troop_by_index(index: i32) -> Option<&'static TroopDef> {
-    if index < 0 {
-        return None;
+pub fn parse_troop_abilities(value: &str) -> i32 {
+    let mut mask = 0;
+    for part in value.split('|') {
+        match part {
+            "FLY" => mask |= TROOP_ABIL_FLY,
+            "REGEN" => mask |= TROOP_ABIL_REGEN,
+            "MAGIC" => mask |= TROOP_ABIL_MAGIC,
+            "IMMUNE" => mask |= TROOP_ABIL_IMMUNE,
+            "ABSORB" => mask |= TROOP_ABIL_ABSORB,
+            "LEECH" => mask |= TROOP_ABIL_LEECH,
+            "SCYTHE" => mask |= TROOP_ABIL_SCYTHE,
+            "UNDEAD" => mask |= TROOP_ABIL_UNDEAD,
+            "" => {}
+            _ => {}
+        }
     }
-
-    TROOPS
-        .get(index as usize)
-        .filter(|troop| troop.index == index)
+    mask
 }

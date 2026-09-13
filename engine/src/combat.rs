@@ -1,6 +1,6 @@
+use crate::resources::Resources;
 use crate::tables::{
-    troop_by_id, troop_by_index, TROOP_ABIL_ABSORB, TROOP_ABIL_IMMUNE, TROOP_ABIL_LEECH,
-    TROOP_ABIL_MAGIC, TROOP_ABIL_SCYTHE,
+    TROOP_ABIL_ABSORB, TROOP_ABIL_IMMUNE, TROOP_ABIL_LEECH, TROOP_ABIL_MAGIC, TROOP_ABIL_SCYTHE,
 };
 
 const MULT: u64 = 25_214_903_917;
@@ -113,6 +113,7 @@ pub fn combat_init_unit(u: &mut CombatUnit, troop_idx: i32, count: i32) {
 
 pub fn combat_deal_damage(
     c: &mut Combat,
+    resources: &Resources,
     a_side: i32,
     a_id: i32,
     t_side: usize,
@@ -122,7 +123,7 @@ pub fn combat_deal_damage(
     external_damage: i32,
     retaliation: bool,
 ) -> i32 {
-    let tt = match troop_by_index(c.units[t_side][t_id].troop_idx) {
+    let tt = match resources.troop_by_index(c.units[t_side][t_id].troop_idx) {
         Some(t) => t,
         None => return 0,
     };
@@ -143,7 +144,7 @@ pub fn combat_deal_damage(
             Some(pair) => pair,
             None => return 0,
         };
-        let ut = match troop_by_index(c.units[as_idx][ai_idx].troop_idx) {
+        let ut = match resources.troop_by_index(c.units[as_idx][ai_idx].troop_idx) {
             Some(t) => t,
             None => return 0,
         };
@@ -176,7 +177,7 @@ pub fn combat_deal_damage(
         final_damage = total.wrapping_mul(skill_diff) / 10;
 
         if c.heroes_present[as_idx] && !c.units[as_idx][ai_idx].out_of_control {
-            match troop_morale_for_unit(c, as_idx, ai_idx) {
+            match troop_morale_for_unit(c, resources, as_idx, ai_idx) {
                 CombatMorale::Low => final_damage /= 2,
                 CombatMorale::High => final_damage += final_damage / 2,
                 CombatMorale::Normal => {}
@@ -216,7 +217,7 @@ pub fn combat_deal_damage(
 
     if !is_external {
         if let Some((as_idx, ai_idx)) = attacker {
-            if let Some(ut) = troop_by_index(c.units[as_idx][ai_idx].troop_idx) {
+            if let Some(ut) = resources.troop_by_index(c.units[as_idx][ai_idx].troop_idx) {
                 if (ut.abilities & TROOP_ABIL_ABSORB) != 0 {
                     c.units[as_idx][ai_idx].count += kills;
                 }
@@ -239,6 +240,7 @@ pub fn combat_deal_damage(
                     c.units[t_side][t_id].retaliated = true;
                     combat_deal_damage(
                         c,
+                        resources,
                         t_side as i32,
                         t_id as i32,
                         as_idx,
@@ -257,6 +259,7 @@ pub fn combat_deal_damage(
 }
 
 pub fn combat_test_digest(
+    resources: &Resources,
     seed: u64,
     attacker_id: &str,
     attacker_count: i32,
@@ -269,10 +272,10 @@ pub fn combat_test_digest(
         ..Combat::default()
     };
 
-    let Some(at) = troop_by_id(attacker_id) else {
+    let Some(at) = resources.troop_by_id(attacker_id) else {
         return 0;
     };
-    let Some(dt) = troop_by_id(defender_id) else {
+    let Some(dt) = resources.troop_by_id(defender_id) else {
         return 0;
     };
 
@@ -295,7 +298,7 @@ pub fn combat_test_digest(
         c.units[0][0].turn_count = c.units[0][0].count;
         c.units[1][0].turn_count = c.units[1][0].count;
 
-        let kills = combat_deal_damage(&mut c, 0, 0, 1, 0, false, false, 0, false);
+        let kills = combat_deal_damage(&mut c, resources, 0, 0, 1, 0, false, false, 0, false);
         let fields = [
             c.units[0][0].count as u64,
             c.units[0][0].injury as u64,
@@ -339,25 +342,18 @@ fn morale_to_rank(r: u8) -> CombatMorale {
     }
 }
 
-fn morale_result(my_group: u8, their_group: u8) -> u8 {
-    const CHART: [[u8; 5]; 5] = [*b"NNNNN", *b"NNNNN", *b"NNHNN", *b"LNLHN", *b"LLLNN"];
-
-    let a = my_group.wrapping_sub(b'A');
-    let b = their_group.wrapping_sub(b'A');
-    if a > 4 || b > 4 {
-        return b'N';
-    }
-
-    CHART[a as usize][b as usize]
-}
-
-fn troop_morale_for_unit(c: &Combat, side: usize, slot: usize) -> CombatMorale {
+fn troop_morale_for_unit(
+    c: &Combat,
+    resources: &Resources,
+    side: usize,
+    slot: usize,
+) -> CombatMorale {
     let self_unit = c.units[side][slot];
     if self_unit.troop_idx < 0 {
         return CombatMorale::Normal;
     }
 
-    let Some(ts) = troop_by_index(self_unit.troop_idx) else {
+    let Some(ts) = resources.troop_by_index(self_unit.troop_idx) else {
         return CombatMorale::Normal;
     };
     let mut morale = CombatMorale::High as i32;
@@ -366,10 +362,10 @@ fn troop_morale_for_unit(c: &Combat, side: usize, slot: usize) -> CombatMorale {
         if other.troop_idx < 0 || other.count == 0 {
             continue;
         }
-        let Some(to) = troop_by_index(other.troop_idx) else {
+        let Some(to) = resources.troop_by_index(other.troop_idx) else {
             continue;
         };
-        let rank = morale_to_rank(morale_result(to.morale_group, ts.morale_group)) as i32;
+        let rank = morale_to_rank(resources.morale_result(to.morale_group, ts.morale_group)) as i32;
         if rank < morale {
             morale = rank;
         }
