@@ -100,6 +100,8 @@ pub struct Stats {
     pub time_stop: i32,
     pub steps_left_today: i32,
     pub days_left: i32,
+    pub game_over: bool,
+    pub won: bool,
     pub last_commission: i32,
     pub options: [i32; GAME_OPTIONS],
 }
@@ -120,6 +122,8 @@ impl Default for Stats {
             time_stop: 0,
             steps_left_today: 40,
             days_left: 900,
+            game_over: false,
+            won: false,
             last_commission: 0,
             options: [1; GAME_OPTIONS],
         }
