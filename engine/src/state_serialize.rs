@@ -96,6 +96,37 @@ pub fn build_snapshot_with_resources(
 
     root.insert("contract".to_owned(), contract_snapshot(game, resources));
 
+    let towns: Vec<_> = game
+        .towns
+        .iter()
+        .filter(|town| !town.id.is_empty())
+        .map(|town| {
+            let mut value = serde_json::Map::new();
+            value.insert("id".to_owned(), serde_json::json!(town.id.as_str()));
+            value.insert("visited".to_owned(), serde_json::json!(town.visited));
+            if !town.spell_for_sale.is_empty() {
+                value.insert(
+                    "spell_for_sale".to_owned(),
+                    serde_json::json!(town.spell_for_sale.as_str()),
+                );
+            }
+            if let Some(resource_town) =
+                resources.and_then(|resources| resources.town_by_id(town.id.as_str()))
+            {
+                value.insert(
+                    "zone".to_owned(),
+                    serde_json::json!(resource_town.zone.as_str()),
+                );
+                value.insert("x".to_owned(), serde_json::json!(resource_town.x));
+                value.insert("y".to_owned(), serde_json::json!(resource_town.y));
+                value.insert("gate_x".to_owned(), serde_json::json!(resource_town.gate_x));
+                value.insert("gate_y".to_owned(), serde_json::json!(resource_town.gate_y));
+            }
+            serde_json::Value::Object(value)
+        })
+        .collect();
+    root.insert("towns".to_owned(), serde_json::Value::Array(towns));
+
     let castles: Vec<_> = game
         .castles
         .iter()
@@ -289,9 +320,13 @@ mod tests {
               "world": {"starting_zone": "home", "default_options": [4,1,1,1,1,0,5]},
               "contract": {"cycle_length": 3, "initial_last_contract": 2},
               "zones": [{"id":"home","is_home":true,"home_spawn":{"x":3,"y":4}}],
+              "towns": [{"index":0,"id":"town0","zone":"home","x":1,"y":2,"gate":{"x":1,"y":3},"pinned_spell":"bridge"}],
               "castles": [{"index":0,"id":"castle0","zone":"home","x":6,"y":7}],
               "troops": [
                 {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"}
+              ],
+              "spells": [
+                {"index":0,"id":"bridge","name":"Bridge","kind":"adventure","cost":100}
               ],
               "classes": [
                 {"index":0,"id":"knight","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25}],"ranks":[{"id":"general","name":"General","leadership":120,"max_spells":2,"spell_power":1,"commission":100,"knows_magic":false}]}
@@ -305,6 +340,7 @@ mod tests {
         .expect("fixture parses");
         let mut game = Game::default();
         game.init_seeded_with_resources(&resources, Some("arthur"), 0, 2, 42);
+        game.salt_spells(&resources);
 
         let snapshot = build_snapshot_with_resources(Some(&game), Some(&resources));
         assert_eq!(snapshot["character"]["name"], "Arthur");
@@ -328,6 +364,14 @@ mod tests {
             snapshot["contract"]["villains_caught"],
             serde_json::json!([])
         );
+        assert_eq!(snapshot["towns"][0]["id"], "town0");
+        assert_eq!(snapshot["towns"][0]["visited"], false);
+        assert_eq!(snapshot["towns"][0]["spell_for_sale"], "bridge");
+        assert_eq!(snapshot["towns"][0]["zone"], "home");
+        assert_eq!(snapshot["towns"][0]["x"], 1);
+        assert_eq!(snapshot["towns"][0]["y"], 2);
+        assert_eq!(snapshot["towns"][0]["gate_x"], 1);
+        assert_eq!(snapshot["towns"][0]["gate_y"], 3);
         assert_eq!(snapshot["castles"][0]["id"], "castle0");
         assert_eq!(snapshot["castles"][0]["owner"], "monsters");
         assert_eq!(snapshot["castles"][0]["zone"], "home");
