@@ -702,6 +702,49 @@ impl Game {
         (AudienceOutcome::Promoted, 0)
     }
 
+    pub fn army_total_leadership(&self, resources: &Resources) -> i32 {
+        let mut total = 0;
+        for stack in &self.army {
+            if stack.id.is_empty() {
+                continue;
+            }
+            let Some(troop) = resources.troop_by_id(stack.id.as_str()) else {
+                continue;
+            };
+            total += troop.hit_points * stack.count;
+        }
+        total
+    }
+
+    pub fn army_stack_count(&self) -> i32 {
+        self.army
+            .iter()
+            .filter(|stack| !stack.id.is_empty())
+            .count() as i32
+    }
+
+    pub fn max_recruitable(&self, resources: &Resources, troop_id: &str) -> i32 {
+        let Some(troop) = resources.troop_by_id(troop_id) else {
+            return 0;
+        };
+        if troop.hit_points <= 0 {
+            return 0;
+        }
+
+        let mut same_troop_consumed = 0;
+        for stack in &self.army {
+            if stack.id.as_str() == troop_id {
+                same_troop_consumed += stack.count * troop.hit_points;
+            }
+        }
+
+        let free_leadership = self.stats.leadership_current - same_troop_consumed;
+        if free_leadership < 0 {
+            return 0;
+        }
+        free_leadership / troop.hit_points
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -1332,6 +1375,25 @@ mod tests {
     }
 
     #[test]
+    fn army_leadership_queries_match_openbounty_rules() {
+        let resources = Resources::from_json_str(army_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.stats.leadership_current = 100;
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+        game.army[1].id.copy_from_str("militia");
+        game.army[1].count = 30;
+        game.army[2].id.copy_from_str("archers");
+        game.army[2].count = 0;
+
+        assert_eq!(game.army_stack_count(), 3);
+        assert_eq!(game.army_total_leadership(&resources), 70);
+        assert_eq!(game.max_recruitable(&resources, "archers"), 10);
+        assert_eq!(game.max_recruitable(&resources, "militia"), 20);
+        assert_eq!(game.max_recruitable(&resources, "unknown"), 0);
+    }
+
+    #[test]
     fn init_seeded_with_resources_uses_default_name_and_starting_zone_fallback() {
         let resources = Resources::from_json_str(
             r#"{
@@ -1409,6 +1471,16 @@ mod tests {
                 {"id":"captain","name":"Captain","villains_needed":2,"leadership":50,"max_spells":2,"spell_power":3,"commission":20,"knows_magic":false}
               ]
             }
+          ]
+        }"#
+    }
+
+    fn army_fixture() -> &'static str {
+        r#"{
+          "troops": [
+            {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+            {"index":1,"id":"militia","skill_level":2,"hit_points":2,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":50,"spoils_factor":5,"abilities":"","morale_group":"A"},
+            {"index":2,"id":"archers","skill_level":3,"hit_points":10,"move_rate":2,"melee":[1,2],"ranged":[1,3,12],"recruit_cost":250,"spoils_factor":20,"abilities":"","morale_group":"B"}
           ]
         }"#
     }
