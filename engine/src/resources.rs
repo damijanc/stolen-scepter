@@ -1,7 +1,8 @@
 use crate::tables::{
-    parse_troop_abilities, ClassDef, FixedStr, RankDef, SpellDef, SpellKind, TroopDef, VillainDef,
-    CAT_CLASSES_MAX, CAT_SPELLS_MAX, CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS,
-    CLASS_MAX_STARTING_TROOPS, TROOP_TIER_COUNTS,
+    parse_troop_abilities, ArtifactDef, ArtifactPower, ClassDef, FixedStr, RankDef, SpellDef,
+    SpellKind, TroopDef, VillainDef, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX, CAT_SPELLS_MAX,
+    CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
+    TROOP_TIER_COUNTS,
 };
 
 pub const RES_MAX_CASTLES: usize = 32;
@@ -248,6 +249,8 @@ pub struct Resources {
     classes_count: usize,
     spells: [SpellDef; CAT_SPELLS_MAX],
     spells_count: usize,
+    artifacts: [ArtifactDef; CAT_ARTIFACTS_MAX],
+    artifacts_count: usize,
     troops: [TroopDef; CAT_TROOPS_MAX],
     troops_count: usize,
     villains: [VillainDef; CAT_VILLAINS_MAX],
@@ -272,6 +275,8 @@ impl Default for Resources {
             classes_count: 0,
             spells: [SpellDef::default(); CAT_SPELLS_MAX],
             spells_count: 0,
+            artifacts: [ArtifactDef::default(); CAT_ARTIFACTS_MAX],
+            artifacts_count: 0,
             troops: [TroopDef::default(); CAT_TROOPS_MAX],
             troops_count: 0,
             villains: [VillainDef::default(); CAT_VILLAINS_MAX],
@@ -300,6 +305,7 @@ impl Resources {
         resources.parse_castles(&root)?;
         resources.parse_troops(&root)?;
         resources.parse_spells(&root)?;
+        resources.parse_artifacts(&root)?;
         resources.parse_classes(&root)?;
         resources.parse_villains(&root)?;
         Ok(resources)
@@ -355,6 +361,29 @@ impl Resources {
 
     pub fn spells_count(&self) -> usize {
         self.spells_count
+    }
+
+    pub fn artifacts_count(&self) -> usize {
+        self.artifacts_count
+    }
+
+    pub fn artifact_by_index(&self, index: i32) -> Option<&ArtifactDef> {
+        if index < 0 || index as usize >= self.artifacts_count {
+            return None;
+        }
+        self.artifacts.get(index as usize)
+    }
+
+    pub fn artifact_by_id(&self, id: &str) -> Option<&ArtifactDef> {
+        self.artifacts[..self.artifacts_count]
+            .iter()
+            .find(|artifact| artifact.id.as_str() == id)
+    }
+
+    pub fn artifact_index_for_tile(&self, zone: &str, local_idx: i32) -> Option<usize> {
+        self.artifacts[..self.artifacts_count]
+            .iter()
+            .position(|artifact| artifact.zone.as_str() == zone && artifact.local_idx == local_idx)
     }
 
     pub fn spell_by_index(&self, index: i32) -> Option<&SpellDef> {
@@ -637,6 +666,20 @@ impl Resources {
         Ok(())
     }
 
+    fn parse_artifacts(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(artifacts) = root.get("artifacts") else {
+            return Ok(());
+        };
+        let artifacts = artifacts
+            .as_array()
+            .ok_or(ResourceError::InvalidField("artifacts"))?;
+        for (slot, value) in artifacts.iter().take(CAT_ARTIFACTS_MAX).enumerate() {
+            self.artifacts[slot] = parse_artifact(value)?;
+            self.artifacts_count += 1;
+        }
+        Ok(())
+    }
+
     fn parse_zones(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
         let Some(zones) = root.get("zones") else {
             return Ok(());
@@ -831,6 +874,41 @@ fn parse_spell(value: &serde_json::Value) -> Result<SpellDef, ResourceError> {
         spell.description.copy_from_str(description);
     }
     Ok(spell)
+}
+
+fn parse_artifact(value: &serde_json::Value) -> Result<ArtifactDef, ResourceError> {
+    let mut artifact = ArtifactDef {
+        index: optional_i32_field(value, "index", -1)?,
+        power: match optional_string_field(value, "power")? {
+            Some("increased_damage") => ArtifactPower::IncreasedDamage,
+            Some("quarter_protection") => ArtifactPower::QuarterProtection,
+            Some("double_leadership") => ArtifactPower::DoubleLeadership,
+            Some("increase_commission") => ArtifactPower::IncreaseCommission,
+            Some("double_spell_power") => ArtifactPower::DoubleSpellPower,
+            Some("double_max_spells") => ArtifactPower::DoubleMaxSpells,
+            Some("cheaper_boats") => ArtifactPower::CheaperBoats,
+            _ => ArtifactPower::Unknown,
+        },
+        puzzle_cell: optional_i32_field(value, "puzzle_cell", -1)?,
+        local_idx: optional_i32_field(value, "local_idx", 0)?,
+        ..ArtifactDef::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        artifact.id.copy_from_str(id);
+    }
+    if let Some(name) = optional_string_field(value, "name")? {
+        artifact.name.copy_from_str(name);
+    }
+    if let Some(icon) = optional_string_field(value, "icon")? {
+        artifact.icon.copy_from_str(icon);
+    }
+    if let Some(effect) = optional_string_field(value, "effect")? {
+        artifact.effect.copy_from_str(effect);
+    }
+    if let Some(zone) = optional_string_field(value, "zone")? {
+        artifact.zone.copy_from_str(zone);
+    }
+    Ok(artifact)
 }
 
 fn parse_class(value: &serde_json::Value) -> Result<ClassDef, ResourceError> {
@@ -1255,6 +1333,9 @@ mod tests {
                 {"index":0,"id":"bridge","name":"Bridge","kind":"adventure","cost":100,"description":"Build bridge"},
                 {"index":1,"id":"fireball","name":"Fireball","kind":"combat","cost":50}
               ],
+              "artifacts": [
+                {"index":0,"id":"sword","name":"Sword of Prowess","icon":"sword.png","power":"increased_damage","effect":"More damage","puzzle_cell":3,"zone":"home","local_idx":0}
+              ],
               "villains": [
                 {"index":0,"id":"villain0","name":"Villain Zero","portrait":"v0.png","zone":"home","reward":1000,"puzzle_cell":7,"army":[{"troop":"peasants","count":40}]},
                 {"index":1,"id":"villain1","zone":"fallback","reward":2000}
@@ -1268,6 +1349,7 @@ mod tests {
         assert_eq!(resources.zone_count(), 2);
         assert_eq!(resources.castle_count(), 2);
         assert_eq!(resources.spells_count(), 2);
+        assert_eq!(resources.artifacts_count(), 1);
         assert_eq!(resources.classes_count(), 1);
         assert_eq!(resources.villains_count(), 2);
         assert_eq!(resources.time.day_steps, 33);
@@ -1327,6 +1409,18 @@ mod tests {
         assert_eq!(bridge.kind, crate::tables::SpellKind::Adventure);
         assert_eq!(bridge.cost, 100);
         assert_eq!(bridge.description.as_str(), "Build bridge");
+        let artifact = resources.artifact_by_id("sword").unwrap();
+        assert_eq!(artifact.name.as_str(), "Sword of Prowess");
+        assert_eq!(artifact.icon.as_str(), "sword.png");
+        assert_eq!(
+            artifact.power,
+            crate::tables::ArtifactPower::IncreasedDamage
+        );
+        assert_eq!(artifact.effect.as_str(), "More damage");
+        assert_eq!(artifact.puzzle_cell, 3);
+        assert_eq!(artifact.zone.as_str(), "home");
+        assert_eq!(artifact.local_idx, 0);
+        assert_eq!(resources.artifact_index_for_tile("home", 0), Some(0));
         let villain = resources.villain_by_index(0).unwrap();
         assert_eq!(villain.id.as_str(), "villain0");
         assert_eq!(villain.reward, 1000);

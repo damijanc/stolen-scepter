@@ -8,6 +8,7 @@ pub const CAT_CLASSES_MAX: usize = 8;
 pub const CAT_SPELLS_MAX: usize = 32;
 pub const CAT_TROOPS_MAX: usize = 32;
 pub const CAT_VILLAINS_MAX: usize = 32;
+pub const CAT_ARTIFACTS_MAX: usize = 16;
 pub const TROOP_TIER_COUNTS: usize = 4;
 
 pub const TROOP_ABIL_FLY: i32 = 1 << 0;
@@ -187,6 +188,53 @@ pub struct SpellDef {
     pub kind: SpellKind,
     pub cost: i32,
     pub description: FixedStr<CAT_TEXT_LEN>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArtifactPower {
+    Unknown = 0,
+    IncreasedDamage = 1,
+    QuarterProtection = 2,
+    DoubleLeadership = 3,
+    IncreaseCommission = 4,
+    DoubleSpellPower = 5,
+    DoubleMaxSpells = 6,
+    CheaperBoats = 7,
+}
+
+impl Default for ArtifactPower {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArtifactDef {
+    pub index: i32,
+    pub id: FixedStr<CAT_ID_LEN>,
+    pub name: FixedStr<CAT_NAME_LEN>,
+    pub icon: FixedStr<CAT_PATH_LEN>,
+    pub power: ArtifactPower,
+    pub effect: FixedStr<CAT_TEXT_LEN>,
+    pub puzzle_cell: i32,
+    pub zone: FixedStr<CAT_ID_LEN>,
+    pub local_idx: i32,
+}
+
+impl Default for ArtifactDef {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            icon: FixedStr::empty(),
+            power: ArtifactPower::Unknown,
+            effect: FixedStr::empty(),
+            puzzle_cell: -1,
+            zone: FixedStr::empty(),
+            local_idx: 0,
+        }
+    }
 }
 
 impl Default for SpellDef {

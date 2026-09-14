@@ -566,12 +566,31 @@ impl Game {
         self.tag_salt_kind(&mut barrel, zone.salt.dwellings, SaltKind::Dwelling);
         self.tag_salt_kind(&mut barrel, zone.salt.friendly_foes, SaltKind::Friendly);
 
+        let mut artifact_counter = 0;
         let mut navmap_counter = 0;
         let mut orb_counter = 0;
         let mut telecave_counter = 0;
         for (index, kind) in barrel.iter().enumerate() {
             let slot = zone.chests[index];
             match kind {
+                SaltKind::Artifact => {
+                    let Some(artifact_index) =
+                        resources.artifact_index_for_tile(zone.id.as_str(), artifact_counter)
+                    else {
+                        artifact_counter += 1;
+                        continue;
+                    };
+                    if let Some(artifact) = resources.artifact_by_index(artifact_index as i32) {
+                        self.add_placement(
+                            zone.id.as_str(),
+                            slot.x,
+                            slot.y,
+                            Interact::Artifact,
+                            artifact.id.as_str(),
+                        );
+                    }
+                    artifact_counter += 1;
+                }
                 SaltKind::Navmap => {
                     let id = format!("navmap_{navmap_counter}");
                     self.add_placement(
@@ -605,7 +624,7 @@ impl Game {
                     );
                     telecave_counter += 1;
                 }
-                SaltKind::None | SaltKind::Artifact | SaltKind::Dwelling | SaltKind::Friendly => {}
+                SaltKind::None | SaltKind::Dwelling | SaltKind::Friendly => {}
             }
         }
     }
@@ -1506,10 +1525,13 @@ mod tests {
                     {"x":4,"y":4,"id":"c3"},
                     {"x":5,"y":5,"id":"c4"}
                   ],
-                  "salt":{"navmaps":1,"orbs":1,"telecaves":1}
+                  "salt":{"artifacts":1,"navmaps":1,"orbs":1,"telecaves":1}
                 }
               ],
-              "troops": []
+              "troops": [],
+              "artifacts": [
+                {"index":0,"id":"sword","zone":"home","local_idx":0}
+              ]
             }"#,
         )
         .expect("fixture parses");
@@ -1517,7 +1539,14 @@ mod tests {
 
         game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
 
-        assert_eq!(game.placement_count, 3);
+        assert_eq!(game.placement_count, 4);
+        assert!(game
+            .placements
+            .iter()
+            .take(game.placement_count)
+            .any(|placement| {
+                placement.kind == Interact::Artifact && placement.id.as_str() == "sword"
+            }));
         assert!(game
             .placements
             .iter()
