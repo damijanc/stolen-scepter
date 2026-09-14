@@ -240,6 +240,12 @@ impl Resources {
         self.classes.get(index as usize)
     }
 
+    pub fn class_by_id(&self, id: &str) -> Option<&ClassDef> {
+        self.classes[..self.classes_count]
+            .iter()
+            .find(|class| class.id.as_str() == id)
+    }
+
     pub fn troops_count(&self) -> usize {
         self.troops_count
     }

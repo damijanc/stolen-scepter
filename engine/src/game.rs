@@ -35,6 +35,13 @@ impl Default for TravelMode {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AudienceOutcome {
+    MoreNeeded = 0,
+    Promoted = 1,
+    FinalRank = 2,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArmyStack {
     pub id: FixedStr<CAT_ID_LEN>,
     pub count: i32,
@@ -635,6 +642,66 @@ impl Game {
             .count() as i32
     }
 
+    pub fn maybe_rank_up(&mut self, resources: &Resources) -> bool {
+        let Some(class) = resources.class_by_id(self.character.cls.id.as_str()) else {
+            return false;
+        };
+        let caught = self.villains_caught();
+        let mut rank = self.character.cls.rank_index;
+        let mut changed = false;
+
+        while rank < 3
+            && (rank + 1) >= 0
+            && (rank + 1) < class.rank_count as i32
+            && caught >= class.ranks[(rank + 1) as usize].villains_needed
+        {
+            rank += 1;
+            changed = true;
+        }
+
+        if !changed {
+            return false;
+        }
+
+        let old_rank = self.character.cls.rank_index;
+        self.character.cls.rank_index = rank;
+        self.character
+            .cls
+            .rank_id
+            .copy_from_str(class.ranks[rank as usize].id.as_str());
+        self.character
+            .cls
+            .rank_title
+            .copy_from_str(class.ranks[rank as usize].name.as_str());
+
+        let old_stats = class_stats_at_rank(class, old_rank);
+        let new_stats = class_stats_at_rank(class, rank);
+        self.stats.leadership_base += new_stats.leadership - old_stats.leadership;
+        self.stats.commission_weekly += new_stats.commission - old_stats.commission;
+        self.stats.max_spells += new_stats.max_spells - old_stats.max_spells;
+        self.stats.spell_power += new_stats.spell_power - old_stats.spell_power;
+        self.stats.leadership_current += new_stats.leadership - old_stats.leadership;
+        true
+    }
+
+    pub fn audience_with_king(&mut self, resources: &Resources) -> (AudienceOutcome, i32) {
+        let Some(class) = resources.class_by_id(self.character.cls.id.as_str()) else {
+            return (AudienceOutcome::FinalRank, 0);
+        };
+        let rank = self.character.cls.rank_index;
+        if rank + 1 >= class.rank_count as i32 {
+            return (AudienceOutcome::FinalRank, 0);
+        }
+
+        let needed = class.ranks[(rank + 1) as usize].villains_needed - self.villains_caught();
+        if needed > 0 {
+            return (AudienceOutcome::MoreNeeded, needed);
+        }
+
+        self.maybe_rank_up(resources);
+        (AudienceOutcome::Promoted, 0)
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -861,7 +928,7 @@ fn generated_seed_index(name: Option<&str>, player_class: i32) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{CastleOwnerKind, Game};
+    use super::{AudienceOutcome, CastleOwnerKind, Game};
     use crate::resources::Resources;
 
     #[test]
@@ -1219,6 +1286,52 @@ mod tests {
     }
 
     #[test]
+    fn maybe_rank_up_applies_rank_delta_without_wiping_bonuses() {
+        let resources = Resources::from_json_str(rank_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+        game.stats.leadership_base += 25;
+        game.stats.leadership_current += 25;
+        game.stats.spell_power += 1;
+        game.contract.villains_caught[0] = true;
+        game.contract.villains_caught[1] = true;
+
+        assert!(game.maybe_rank_up(&resources));
+
+        assert_eq!(game.character.cls.rank_index, 1);
+        assert_eq!(game.character.cls.rank_id.as_str(), "captain");
+        assert_eq!(game.character.cls.rank_title.as_str(), "Captain");
+        assert_eq!(game.stats.leadership_base, 175);
+        assert_eq!(game.stats.leadership_current, 175);
+        assert_eq!(game.stats.commission_weekly, 30);
+        assert_eq!(game.stats.max_spells, 3);
+        assert_eq!(game.stats.spell_power, 5);
+    }
+
+    #[test]
+    fn audience_with_king_reports_needed_promotes_and_final_rank() {
+        let resources = Resources::from_json_str(rank_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        assert_eq!(
+            game.audience_with_king(&resources),
+            (AudienceOutcome::MoreNeeded, 2)
+        );
+
+        game.contract.villains_caught[0] = true;
+        game.contract.villains_caught[1] = true;
+        assert_eq!(
+            game.audience_with_king(&resources),
+            (AudienceOutcome::Promoted, 0)
+        );
+        assert_eq!(
+            game.audience_with_king(&resources),
+            (AudienceOutcome::FinalRank, 0)
+        );
+    }
+
+    #[test]
     fn init_seeded_with_resources_uses_default_name_and_starting_zone_fallback() {
         let resources = Resources::from_json_str(
             r#"{
@@ -1278,6 +1391,24 @@ mod tests {
             {"index":0,"id":"villain0","zone":"home","reward":1000},
             {"index":1,"id":"villain1","zone":"home","reward":2000},
             {"index":2,"id":"villain2","zone":"home","reward":3000}
+          ]
+        }"#
+    }
+
+    fn rank_fixture() -> &'static str {
+        r#"{
+          "world": {"starting_zone": "home"},
+          "troops": [],
+          "classes": [
+            {
+              "index": 0,
+              "id": "knight",
+              "starting_gold": 1000,
+              "ranks": [
+                {"id":"general","name":"General","villains_needed":0,"leadership":100,"max_spells":1,"spell_power":1,"commission":10,"knows_magic":false},
+                {"id":"captain","name":"Captain","villains_needed":2,"leadership":50,"max_spells":2,"spell_power":3,"commission":20,"knows_magic":false}
+              ]
+            }
           ]
         }"#
     }
