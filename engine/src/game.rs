@@ -1,4 +1,4 @@
-use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_TIERS};
+use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN, CAT_VILLAINS_MAX};
 use crate::tile::Interact;
@@ -12,6 +12,8 @@ pub const GAME_TOWNS: usize = 26;
 pub const GAME_MAX_MUTATIONS: usize = 1024;
 pub const GAME_MAX_DWELLINGS: usize = 64;
 pub const GAME_MAX_PLACEMENTS: usize = 128;
+pub const GAME_MAX_HOSTILE_PER_ZONE: usize = 35;
+pub const GAME_MAX_FOES: usize = 160;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -351,6 +353,35 @@ impl Default for DwellingState {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FoeState {
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+    pub origin_x: i32,
+    pub origin_y: i32,
+    pub placement_id: FixedStr<CAT_ID_LEN>,
+    pub garrison: [Unit; GAME_ARMY_SLOTS],
+    pub alive: bool,
+    pub friendly: bool,
+}
+
+impl Default for FoeState {
+    fn default() -> Self {
+        Self {
+            zone: FixedStr::empty(),
+            x: 0,
+            y: 0,
+            origin_x: 0,
+            origin_y: 0,
+            placement_id: FixedStr::empty(),
+            garrison: [Unit::default(); GAME_ARMY_SLOTS],
+            alive: false,
+            friendly: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorldProgress {
     pub zones_discovered: [bool; RES_MAX_ZONES],
 }
@@ -399,6 +430,8 @@ pub struct Game {
     pub placement_count: usize,
     pub dwellings: [DwellingState; GAME_MAX_DWELLINGS],
     pub dwelling_count: usize,
+    pub foes: [FoeState; GAME_MAX_FOES],
+    pub foe_count: usize,
     pub world: WorldProgress,
     world_rng: Rng,
 }
@@ -425,6 +458,8 @@ impl Default for Game {
             placement_count: 0,
             dwellings: [DwellingState::default(); GAME_MAX_DWELLINGS],
             dwelling_count: 0,
+            foes: [FoeState::default(); GAME_MAX_FOES],
+            foe_count: 0,
             world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
         }
@@ -575,6 +610,26 @@ impl Game {
         let Some(zone) = resources.zone_by_index(continent) else {
             return;
         };
+        let army_cap = zone.army_count.min(GAME_MAX_HOSTILE_PER_ZONE);
+        for index in 0..army_cap {
+            let army = zone.armies[index];
+            let fallback_id = format!("static_foe_{index}");
+            let id = if army.id.is_empty() {
+                fallback_id.as_str()
+            } else {
+                army.id.as_str()
+            };
+            self.add_foe(
+                resources,
+                continent,
+                zone.id.as_str(),
+                army.x,
+                army.y,
+                id,
+                false,
+            );
+        }
+
         let barrel_len = zone.chest_count;
         let min_len = zone.salt.artifacts
             + zone.salt.navmaps
@@ -599,6 +654,7 @@ impl Game {
         let mut orb_counter = 0;
         let mut telecave_counter = 0;
         let mut dwelling_counter = 0;
+        let mut foe_counter = 0;
         for (index, kind) in barrel.iter().enumerate() {
             let slot = zone.chests[index];
             match kind {
@@ -676,7 +732,20 @@ impl Game {
                     );
                     dwelling_counter += 1;
                 }
-                SaltKind::None | SaltKind::Friendly => {}
+                SaltKind::Friendly => {
+                    let id = format!("salt_foe_friendly_{foe_counter}");
+                    self.add_foe(
+                        resources,
+                        continent,
+                        zone.id.as_str(),
+                        slot.x,
+                        slot.y,
+                        id.as_str(),
+                        true,
+                    );
+                    foe_counter += 1;
+                }
+                SaltKind::None => {}
             }
         }
     }
@@ -751,6 +820,68 @@ impl Game {
         dwelling.count = troop.max_population;
         self.dwelling_count += 1;
         Some(dwelling)
+    }
+
+    pub fn add_foe(
+        &mut self,
+        resources: &Resources,
+        continent: usize,
+        zone: &str,
+        x: i32,
+        y: i32,
+        placement_id: &str,
+        friendly: bool,
+    ) {
+        if self.foe_count >= GAME_MAX_FOES {
+            return;
+        }
+        let garrison = self.roll_hostile_garrison(resources, continent);
+        let foe = &mut self.foes[self.foe_count];
+        foe.zone.copy_from_str(zone);
+        foe.x = x;
+        foe.y = y;
+        foe.origin_x = x;
+        foe.origin_y = y;
+        foe.placement_id.copy_from_str(placement_id);
+        foe.garrison = garrison;
+        foe.alive = true;
+        foe.friendly = friendly;
+        self.foe_count += 1;
+    }
+
+    fn roll_hostile_garrison(
+        &mut self,
+        resources: &Resources,
+        continent: usize,
+    ) -> [Unit; GAME_ARMY_SLOTS] {
+        let mut out = [Unit::default(); GAME_ARMY_SLOTS];
+        let tier = continent & 3;
+        let stacks = (1 + self.rng_next(0, 2)).min(GAME_ARMY_SLOTS as i32);
+        for slot in 0..stacks as usize {
+            let kind = self.rng_next(0, 3) as usize;
+            let chance = self.rng_next(1, 100);
+            let mut pool_slot = 0;
+            while pool_slot < RES_SPAWN_POOL_N - 1
+                && chance > resources.spawn.chance_curve[tier][pool_slot]
+            {
+                pool_slot += 1;
+            }
+            let troop_id = resources.spawn.troop_pool[kind][pool_slot].as_str();
+            if troop_id.is_empty() {
+                continue;
+            }
+            let Some(troop) = resources.troop_by_id(troop_id) else {
+                continue;
+            };
+            let mut base = troop.tier_counts[tier];
+            if base < 2 {
+                base = 2;
+            }
+            let jitter = self.rng_next(0, base / 2);
+            out[slot].id.copy_from_str(troop_id);
+            out[slot].count = base + jitter;
+        }
+        out
     }
 
     fn tag_salt_kind(&mut self, barrel: &mut [SaltKind], count: i32, kind: SaltKind) {
@@ -1652,9 +1783,11 @@ mod tests {
                     {"x":2,"y":2,"id":"c1"},
                     {"x":3,"y":3,"id":"c2"},
                     {"x":4,"y":4,"id":"c3"},
-                    {"x":5,"y":5,"id":"c4"}
+                    {"x":5,"y":5,"id":"c4"},
+                    {"x":6,"y":6,"id":"c5"}
                   ],
-                  "salt":{"artifacts":1,"navmaps":1,"orbs":1,"telecaves":1,"dwellings":1,"preferred_troops":["sprites"]}
+                  "wandering_armies":[{"x":9,"y":10,"id":"static0"}],
+                  "salt":{"artifacts":1,"navmaps":1,"orbs":1,"telecaves":1,"dwellings":1,"friendly_foes":1,"preferred_troops":["sprites"]}
                 }
               ],
               "troops": [
@@ -1675,6 +1808,17 @@ mod tests {
         assert_eq!(game.dwellings[0].troop_id.as_str(), "sprites");
         assert_eq!(game.dwellings[0].count, 50);
         assert_eq!(game.dwellings[0].max_population, 50);
+        assert_eq!(game.foe_count, 2);
+        assert!(game.foes.iter().take(game.foe_count).any(|foe| {
+            !foe.friendly
+                && foe.placement_id.as_str() == "static0"
+                && (foe.x, foe.y) == (9, 10)
+                && (foe.origin_x, foe.origin_y) == (9, 10)
+                && foe.alive
+        }));
+        assert!(game.foes.iter().take(game.foe_count).any(|foe| {
+            foe.friendly && foe.placement_id.as_str() == "salt_foe_friendly_0" && foe.alive
+        }));
         assert!(game
             .placements
             .iter()

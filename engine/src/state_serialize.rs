@@ -202,6 +202,29 @@ pub fn build_snapshot_with_resources(
         serde_json::Value::Array(placements),
     );
 
+    let foes: Vec<_> = game.foes[..game.foe_count]
+        .iter()
+        .map(|foe| {
+            serde_json::json!({
+                "zone": foe.zone.as_str(),
+                "x": foe.x,
+                "y": foe.y,
+                "origin_x": foe.origin_x,
+                "origin_y": foe.origin_y,
+                "id": foe.placement_id.as_str(),
+                "alive": foe.alive,
+                "friendly": foe.friendly,
+                "garrison": foe.garrison.iter().map(|unit| {
+                    serde_json::json!({
+                        "id": unit.id.as_str(),
+                        "count": unit.count,
+                    })
+                }).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    root.insert("foes".to_owned(), serde_json::Value::Array(foes));
+
     let dwellings: Vec<_> = game.dwellings[..game.dwelling_count]
         .iter()
         .map(|dwelling| {
@@ -425,6 +448,7 @@ mod tests {
         assert_eq!(snapshot["castles"][0]["garrison"], serde_json::json!([]));
         assert_eq!(snapshot["consumed"], serde_json::json!([]));
         assert_eq!(snapshot["placements"], serde_json::json!([]));
+        assert_eq!(snapshot["foes"], serde_json::json!([]));
         assert_eq!(snapshot["dwellings"], serde_json::json!([]));
     }
 }
