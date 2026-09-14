@@ -491,7 +491,7 @@ impl Map {
         tile.id.copy_from_str(placement_id);
     }
 
-    fn tile_mut_i32(&mut self, x: i32, y: i32) -> Option<&mut Tile> {
+    pub fn tile_mut_i32(&mut self, x: i32, y: i32) -> Option<&mut Tile> {
         let x = usize::try_from(x).ok()?;
         let y = usize::try_from(y).ok()?;
         self.tile_mut(x, y)
