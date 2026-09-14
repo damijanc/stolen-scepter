@@ -190,6 +190,7 @@ impl Map {
         stamp_objects(&mut map, resources, zone, game);
         if let Some(game) = game {
             stamp_placements(&mut map, game, zone.id.as_str());
+            map.apply_consumed(game, zone.id.as_str());
         }
         Ok(map)
     }
@@ -434,6 +435,32 @@ fn stamp_castle(map: &mut Map, x: i32, y: i32, id: &str) {
 }
 
 impl Map {
+    pub fn clear_interactive(&mut self, x: i32, y: i32) {
+        let Some(tile) = self.tile_mut_i32(x, y) else {
+            return;
+        };
+        tile.interactive = Interact::None;
+        tile.id = FixedStr::empty();
+        tile.sign_title = FixedStr::empty();
+        tile.sign_body = FixedStr::empty();
+        tile.boat_spawn_x = -1;
+        tile.boat_spawn_y = -1;
+        if tile.terrain != Terrain::Water {
+            tile.terrain = Terrain::Grass;
+            tile.blocks_foot = false;
+            tile.is_bridge = false;
+        }
+    }
+
+    pub fn apply_consumed(&mut self, game: &Game, zone_id: &str) {
+        for mutation in &game.consumed[..game.consumed_count] {
+            if mutation.zone.as_str() != zone_id {
+                continue;
+            }
+            self.clear_interactive(mutation.x, mutation.y);
+        }
+    }
+
     pub fn stamp_foe(&mut self, x: i32, y: i32, placement_id: &str) {
         let Some(tile) = self.tile_mut_i32(x, y) else {
             return;
@@ -586,7 +613,8 @@ mod tests {
         let resources = Resources::from_json_str(
             r##"{
               "tile_codes": {
-                ".": {"art":"grass","terrain":"grass"}
+                ".": {"art":"grass","terrain":"grass"},
+                "W": {"art":"water","terrain":"water"}
               },
               "zones": [{
                 "id":"home",
@@ -604,6 +632,11 @@ mod tests {
         let mut game = Game::default();
         game.add_placement("home", 2, 0, Interact::Artifact, "sword");
         game.add_placement("home", 3, 0, Interact::Telecave, "telecave0");
+        game.add_placement("home", 5, 1, Interact::Orb, "orb0");
+        game.add_consumed("home", 2, 0);
+        game.add_consumed("home", 3, 0);
+        game.add_consumed("home", 5, 1);
+        game.add_consumed("away", 4, 0);
 
         game.foes[0].zone.copy_from_str("home");
         game.foes[0].x = 0;
@@ -632,7 +665,7 @@ mod tests {
         game.foe_count = 3;
 
         let map =
-            Map::load_zone_bytes_with_placements(&resources, zone, b"......\n......\n", &game)
+            Map::load_zone_bytes_with_placements(&resources, zone, b"......\n.....W\n", &game)
                 .expect("map bytes load");
 
         assert_eq!(
@@ -646,18 +679,26 @@ mod tests {
         assert_eq!(map.tile(1, 0).expect("in bounds").id.as_str(), "town0");
         assert_eq!(
             map.tile(2, 0).expect("in bounds").interactive,
-            Interact::Artifact
+            Interact::None
         );
-        assert_eq!(map.tile(2, 0).expect("in bounds").id.as_str(), "sword");
+        assert_eq!(map.tile(2, 0).expect("in bounds").id.as_str(), "");
+        assert_eq!(map.tile(2, 0).expect("in bounds").terrain, Terrain::Grass);
         assert_eq!(
             map.tile(3, 0).expect("in bounds").interactive,
-            Interact::Telecave
+            Interact::None
         );
-        assert_eq!(map.tile(3, 0).expect("in bounds").id.as_str(), "telecave0");
+        assert_eq!(map.tile(3, 0).expect("in bounds").id.as_str(), "");
+        assert_eq!(map.tile(3, 0).expect("in bounds").terrain, Terrain::Grass);
         assert_eq!(
             map.tile(4, 0).expect("in bounds").interactive,
             Interact::Foe
         );
         assert_eq!(map.tile(4, 0).expect("in bounds").id.as_str(), "hostile0");
+        assert_eq!(
+            map.tile(5, 1).expect("in bounds").interactive,
+            Interact::None
+        );
+        assert_eq!(map.tile(5, 1).expect("in bounds").id.as_str(), "");
+        assert_eq!(map.tile(5, 1).expect("in bounds").terrain, Terrain::Water);
     }
 }
