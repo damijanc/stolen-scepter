@@ -6,3 +6,4 @@ pub mod resources;
 pub mod rng;
 pub mod state_serialize;
 pub mod tables;
+pub mod tile;

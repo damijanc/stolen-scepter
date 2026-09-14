@@ -5,7 +5,9 @@ use crate::tables::{
 };
 
 pub const RES_MAX_CASTLES: usize = 32;
+pub const RES_MAX_PREFERRED_TROOPS: usize = 16;
 pub const RES_MAX_TOWNS: usize = 32;
+pub const RES_MAX_ZONE_OBJECTS: usize = 256;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
@@ -79,6 +81,54 @@ impl Default for ResSpawn {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResZoneChest {
+    pub x: i32,
+    pub y: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+}
+
+impl Default for ResZoneChest {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            id: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResZoneSalt {
+    pub artifacts: i32,
+    pub navmaps: i32,
+    pub orbs: i32,
+    pub telecaves: i32,
+    pub dwellings: i32,
+    pub friendly_foes: i32,
+    pub preferred_troop_count: usize,
+    pub preferred_troops: [FixedStr<RES_ID_LEN>; RES_MAX_PREFERRED_TROOPS],
+    pub dwelling_range_min: i32,
+    pub dwelling_range_max: i32,
+}
+
+impl Default for ResZoneSalt {
+    fn default() -> Self {
+        Self {
+            artifacts: 0,
+            navmaps: 0,
+            orbs: 0,
+            telecaves: 0,
+            dwellings: 0,
+            friendly_foes: 0,
+            preferred_troop_count: 0,
+            preferred_troops: [FixedStr::empty(); RES_MAX_PREFERRED_TROOPS],
+            dwelling_range_min: -1,
+            dwelling_range_max: -1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResZone {
     pub id: FixedStr<RES_ID_LEN>,
     pub is_home: bool,
@@ -88,6 +138,9 @@ pub struct ResZone {
     pub home_spawn_y: i32,
     pub magic_alcove_x: i32,
     pub magic_alcove_y: i32,
+    pub chest_count: usize,
+    pub chests: [ResZoneChest; RES_MAX_ZONE_OBJECTS],
+    pub salt: ResZoneSalt,
 }
 
 impl Default for ResZone {
@@ -101,6 +154,9 @@ impl Default for ResZone {
             home_spawn_y: -1,
             magic_alcove_x: -1,
             magic_alcove_y: -1,
+            chest_count: 0,
+            chests: [ResZoneChest::default(); RES_MAX_ZONE_OBJECTS],
+            salt: ResZoneSalt::default(),
         }
     }
 }
@@ -851,8 +907,70 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
         zone.magic_alcove_x = optional_i32_field(magic_alcove, "x", -1)?;
         zone.magic_alcove_y = optional_i32_field(magic_alcove, "y", -1)?;
     }
+    if let Some(chests) = value.get("chests") {
+        let chests = chests
+            .as_array()
+            .ok_or(ResourceError::InvalidField("chests"))?;
+        for (slot, chest) in chests.iter().take(RES_MAX_ZONE_OBJECTS).enumerate() {
+            zone.chests[slot] = parse_zone_chest(chest)?;
+            zone.chest_count += 1;
+        }
+    }
+    if let Some(salt) = value.get("salt") {
+        zone.salt = parse_zone_salt(salt)?;
+    }
 
     Ok(zone)
+}
+
+fn parse_zone_chest(value: &serde_json::Value) -> Result<ResZoneChest, ResourceError> {
+    let mut chest = ResZoneChest {
+        x: optional_i32_field(value, "x", 0)?,
+        y: optional_i32_field(value, "y", 0)?,
+        ..ResZoneChest::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        chest.id.copy_from_str(id);
+    }
+    Ok(chest)
+}
+
+fn parse_zone_salt(value: &serde_json::Value) -> Result<ResZoneSalt, ResourceError> {
+    let mut salt = ResZoneSalt {
+        artifacts: optional_i32_field(value, "artifacts", 0)?,
+        navmaps: optional_i32_field(value, "navmaps", 0)?,
+        orbs: optional_i32_field(value, "orbs", 0)?,
+        telecaves: optional_i32_field(value, "telecaves", 0)?,
+        dwellings: optional_i32_field(value, "dwellings", 0)?,
+        friendly_foes: optional_i32_field(value, "friendly_foes", 0)?,
+        ..ResZoneSalt::default()
+    };
+
+    if let Some(preferred) = value.get("preferred_troops") {
+        let preferred = preferred
+            .as_array()
+            .ok_or(ResourceError::InvalidField("preferred_troops"))?;
+        for (slot, troop) in preferred.iter().take(RES_MAX_PREFERRED_TROOPS).enumerate() {
+            let troop = troop
+                .as_str()
+                .ok_or(ResourceError::InvalidField("preferred_troops"))?;
+            salt.preferred_troops[slot].copy_from_str(troop);
+            salt.preferred_troop_count += 1;
+        }
+    }
+
+    if let Some(range) = value.get("dwelling_range") {
+        let range = range
+            .as_array()
+            .ok_or(ResourceError::InvalidField("dwelling_range"))?;
+        if range.len() != 2 {
+            return Err(ResourceError::InvalidField("dwelling_range"));
+        }
+        salt.dwelling_range_min = json_array_i32(range, "dwelling_range", 0)?;
+        salt.dwelling_range_max = json_array_i32(range, "dwelling_range", 1)?;
+    }
+
+    Ok(salt)
 }
 
 fn parse_town(value: &serde_json::Value) -> Result<ResTown, ResourceError> {
@@ -1099,7 +1217,23 @@ mod tests {
               },
               "combat": {"morale_chart": [["N","N","N","N","N"],["N","N","N","N","N"],["N","N","H","N","N"],["L","N","L","H","N"],["L","L","L","N","N"]]},
               "zones": [
-                {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4},"magic_alcove":{"x":5,"y":6}},
+                {
+                  "id":"home",
+                  "is_home":true,
+                  "hero_spawn":{"x":1,"y":2},
+                  "home_spawn":{"x":3,"y":4},
+                  "magic_alcove":{"x":5,"y":6},
+                  "chests":[{"x":10,"y":11,"id":"chest0"}],
+                  "salt":{
+                    "navmaps":1,
+                    "orbs":2,
+                    "telecaves":3,
+                    "dwellings":4,
+                    "friendly_foes":5,
+                    "preferred_troops":["peasants","vampires"],
+                    "dwelling_range":[0,1]
+                  }
+                },
                 {"id":"fallback","hero_spawn":{"x":8,"y":9}}
               ],
               "towns": [
@@ -1151,6 +1285,20 @@ mod tests {
         assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
         assert_eq!(resources.zone_by_id("home").unwrap().magic_alcove_x, 5);
         assert_eq!(resources.zone_by_id("home").unwrap().magic_alcove_y, 6);
+        let home = resources.zone_by_id("home").unwrap();
+        assert_eq!(home.chest_count, 1);
+        assert_eq!((home.chests[0].x, home.chests[0].y), (10, 11));
+        assert_eq!(home.chests[0].id.as_str(), "chest0");
+        assert_eq!(home.salt.navmaps, 1);
+        assert_eq!(home.salt.orbs, 2);
+        assert_eq!(home.salt.telecaves, 3);
+        assert_eq!(home.salt.dwellings, 4);
+        assert_eq!(home.salt.friendly_foes, 5);
+        assert_eq!(home.salt.preferred_troop_count, 2);
+        assert_eq!(home.salt.preferred_troops[0].as_str(), "peasants");
+        assert_eq!(home.salt.preferred_troops[1].as_str(), "vampires");
+        assert_eq!(home.salt.dwelling_range_min, 0);
+        assert_eq!(home.salt.dwelling_range_max, 1);
         let castle0 = resources.castle_by_id("castle0").unwrap();
         assert_eq!(castle0.gate_x, 4);
         assert_eq!(castle0.gate_y, 6);

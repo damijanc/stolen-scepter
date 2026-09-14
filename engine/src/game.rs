@@ -1,6 +1,7 @@
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN, CAT_VILLAINS_MAX};
+use crate::tile::Interact;
 
 pub const GAME_NAME_LEN: usize = 16;
 pub const GAME_ID_LEN: usize = 24;
@@ -9,7 +10,19 @@ pub const GAME_CASTLES: usize = 26;
 pub const GAME_OPTIONS: usize = 7;
 pub const GAME_TOWNS: usize = 26;
 pub const GAME_MAX_MUTATIONS: usize = 1024;
+pub const GAME_MAX_PLACEMENTS: usize = 128;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SaltKind {
+    None = 0,
+    Artifact = 1,
+    Navmap = 2,
+    Orb = 3,
+    Telecave = 4,
+    Dwelling = 5,
+    Friendly = 6,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mount {
@@ -293,6 +306,27 @@ impl Default for TileMutation {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SaltedPlacement {
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+    pub kind: Interact,
+    pub id: FixedStr<CAT_ID_LEN>,
+}
+
+impl Default for SaltedPlacement {
+    fn default() -> Self {
+        Self {
+            zone: FixedStr::empty(),
+            x: 0,
+            y: 0,
+            kind: Interact::None,
+            id: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorldProgress {
     pub zones_discovered: [bool; RES_MAX_ZONES],
 }
@@ -337,6 +371,8 @@ pub struct Game {
     pub castles: [CastleRecord; GAME_CASTLES],
     pub consumed: [TileMutation; GAME_MAX_MUTATIONS],
     pub consumed_count: usize,
+    pub placements: [SaltedPlacement; GAME_MAX_PLACEMENTS],
+    pub placement_count: usize,
     pub world: WorldProgress,
     world_rng: Rng,
 }
@@ -359,6 +395,8 @@ impl Default for Game {
             castles: [CastleRecord::default(); GAME_CASTLES],
             consumed: [TileMutation::default(); GAME_MAX_MUTATIONS],
             consumed_count: 0,
+            placements: [SaltedPlacement::default(); GAME_MAX_PLACEMENTS],
+            placement_count: 0,
             world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
         }
@@ -437,6 +475,7 @@ impl Game {
         if let Some(resources) = resources {
             self.salt_spells(resources);
             self.consume_magic_alcoves(resources);
+            self.salt_continents(resources);
         }
         self.init_castles(resources);
     }
@@ -482,6 +521,105 @@ impl Game {
                 continue;
             }
             self.add_consumed(zone.id.as_str(), zone.magic_alcove_x, zone.magic_alcove_y);
+        }
+    }
+
+    pub fn add_placement(&mut self, zone: &str, x: i32, y: i32, kind: Interact, id: &str) {
+        if self.placement_count >= GAME_MAX_PLACEMENTS {
+            return;
+        }
+        let placement = &mut self.placements[self.placement_count];
+        placement.zone.copy_from_str(zone);
+        placement.x = x;
+        placement.y = y;
+        placement.kind = kind;
+        placement.id.copy_from_str(id);
+        self.placement_count += 1;
+    }
+
+    pub fn salt_continents(&mut self, resources: &Resources) {
+        for index in 0..resources.zone_count() {
+            self.salt_continent(resources, index);
+        }
+    }
+
+    pub fn salt_continent(&mut self, resources: &Resources, continent: usize) {
+        let Some(zone) = resources.zone_by_index(continent) else {
+            return;
+        };
+        let barrel_len = zone.chest_count;
+        let min_len = zone.salt.artifacts
+            + zone.salt.navmaps
+            + zone.salt.orbs
+            + zone.salt.telecaves
+            + zone.salt.dwellings
+            + zone.salt.friendly_foes;
+        if min_len == 0 || barrel_len < min_len as usize {
+            return;
+        }
+
+        let mut barrel = vec![SaltKind::None; barrel_len];
+        self.tag_salt_kind(&mut barrel, zone.salt.artifacts, SaltKind::Artifact);
+        self.tag_salt_kind(&mut barrel, zone.salt.navmaps, SaltKind::Navmap);
+        self.tag_salt_kind(&mut barrel, zone.salt.orbs, SaltKind::Orb);
+        self.tag_salt_kind(&mut barrel, zone.salt.telecaves, SaltKind::Telecave);
+        self.tag_salt_kind(&mut barrel, zone.salt.dwellings, SaltKind::Dwelling);
+        self.tag_salt_kind(&mut barrel, zone.salt.friendly_foes, SaltKind::Friendly);
+
+        let mut navmap_counter = 0;
+        let mut orb_counter = 0;
+        let mut telecave_counter = 0;
+        for (index, kind) in barrel.iter().enumerate() {
+            let slot = zone.chests[index];
+            match kind {
+                SaltKind::Navmap => {
+                    let id = format!("navmap_{navmap_counter}");
+                    self.add_placement(
+                        zone.id.as_str(),
+                        slot.x,
+                        slot.y,
+                        Interact::Navmap,
+                        id.as_str(),
+                    );
+                    navmap_counter += 1;
+                }
+                SaltKind::Orb => {
+                    let id = format!("orb_{orb_counter}");
+                    self.add_placement(
+                        zone.id.as_str(),
+                        slot.x,
+                        slot.y,
+                        Interact::Orb,
+                        id.as_str(),
+                    );
+                    orb_counter += 1;
+                }
+                SaltKind::Telecave => {
+                    let id = format!("telecave_{telecave_counter}");
+                    self.add_placement(
+                        zone.id.as_str(),
+                        slot.x,
+                        slot.y,
+                        Interact::Telecave,
+                        id.as_str(),
+                    );
+                    telecave_counter += 1;
+                }
+                SaltKind::None | SaltKind::Artifact | SaltKind::Dwelling | SaltKind::Friendly => {}
+            }
+        }
+    }
+
+    fn tag_salt_kind(&mut self, barrel: &mut [SaltKind], count: i32, kind: SaltKind) {
+        let mut placed = 0;
+        let mut guard = 0;
+        while placed < count && guard < barrel.len() as i32 * 20 {
+            let index = self.rng_next(0, barrel.len() as i32 - 1) as usize;
+            if barrel[index] == SaltKind::None {
+                barrel[index] = kind;
+                placed += 1;
+            }
+            guard += 1;
         }
     }
 
@@ -1166,6 +1304,7 @@ fn generated_seed_index(name: Option<&str>, player_class: i32) -> i32 {
 mod tests {
     use super::{AudienceOutcome, CastleOwnerKind, Game, GAME_ARMY_SLOTS};
     use crate::resources::Resources;
+    use crate::tile::Interact;
 
     #[test]
     fn init_seeded_matches_openbounty_first_world_rng_rolls() {
@@ -1349,6 +1488,54 @@ mod tests {
         let mut mundane_game = Game::default();
         mundane_game.init_seeded_with_resources(&resources, Some("knight"), 1, 0, 42);
         assert_eq!(mundane_game.consumed_count, 0);
+    }
+
+    #[test]
+    fn init_salts_simple_zone_placements_from_chest_barrel() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [
+                {
+                  "id":"home",
+                  "is_home":true,
+                  "chests":[
+                    {"x":1,"y":1,"id":"c0"},
+                    {"x":2,"y":2,"id":"c1"},
+                    {"x":3,"y":3,"id":"c2"},
+                    {"x":4,"y":4,"id":"c3"},
+                    {"x":5,"y":5,"id":"c4"}
+                  ],
+                  "salt":{"navmaps":1,"orbs":1,"telecaves":1}
+                }
+              ],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        assert_eq!(game.placement_count, 3);
+        assert!(game
+            .placements
+            .iter()
+            .take(game.placement_count)
+            .any(|placement| placement.kind == Interact::Navmap
+                && placement.id.as_str() == "navmap_0"));
+        assert!(game
+            .placements
+            .iter()
+            .take(game.placement_count)
+            .any(|placement| placement.kind == Interact::Orb && placement.id.as_str() == "orb_0"));
+        assert!(game
+            .placements
+            .iter()
+            .take(game.placement_count)
+            .any(|placement| {
+                placement.kind == Interact::Telecave && placement.id.as_str() == "telecave_0"
+            }));
     }
 
     #[test]
