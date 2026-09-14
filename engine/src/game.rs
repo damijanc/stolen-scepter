@@ -214,6 +214,7 @@ pub struct Position {
     pub y: i32,
     pub last_x: i32,
     pub last_y: i32,
+    pub in_town: FixedStr<GAME_ID_LEN>,
 }
 
 impl Default for Position {
@@ -224,6 +225,7 @@ impl Default for Position {
             y: 0,
             last_x: 0,
             last_y: 0,
+            in_town: FixedStr::empty(),
         }
     }
 }
@@ -512,6 +514,110 @@ impl Game {
                 self.repopulate_castle(resources, i);
             }
         }
+    }
+
+    pub fn villain_contract_obtainable(&self, resources: &Resources, villain_id: &str) -> bool {
+        if villain_id.is_empty() {
+            return false;
+        }
+        if !self.contract.active_id.is_empty() && self.contract.active_id.as_str() == villain_id {
+            return true;
+        }
+
+        let mut cycle_len = resources.contract.cycle_length;
+        if cycle_len > CONTRACT_CYCLE_MAX as i32 {
+            cycle_len = CONTRACT_CYCLE_MAX as i32;
+        }
+        if cycle_len < 0 {
+            cycle_len = 0;
+        }
+        self.contract
+            .cycle
+            .iter()
+            .take(cycle_len as usize)
+            .any(|slot| slot.as_str() == villain_id)
+    }
+
+    pub fn take_next_contract<'a>(&'a mut self, resources: &Resources) -> Option<&'a str> {
+        if self.position.in_town.is_empty() {
+            return None;
+        }
+
+        let mut cycle_len = resources.contract.cycle_length;
+        if cycle_len < 1 {
+            cycle_len = 1;
+        }
+        if cycle_len > CONTRACT_CYCLE_MAX as i32 {
+            cycle_len = CONTRACT_CYCLE_MAX as i32;
+        }
+
+        self.contract.last_contract += 1;
+        if self.contract.last_contract > cycle_len - 1 {
+            self.contract.last_contract = 0;
+        }
+        let slot = self.contract.last_contract as usize;
+        let villain_id = self.contract.cycle[slot].as_str();
+        if villain_id.is_empty() {
+            return None;
+        }
+
+        self.contract.active_id.copy_from_str(villain_id);
+        Some(self.contract.active_id.as_str())
+    }
+
+    pub fn fulfill_contract(&mut self, resources: &Resources, villain_id: &str) -> bool {
+        if villain_id.is_empty() {
+            return false;
+        }
+        let Some(villain) = resources.villain_by_id(villain_id) else {
+            return false;
+        };
+
+        self.stats.gold += villain.reward;
+        if villain.index >= 0 && (villain.index as usize) < CAT_VILLAINS_MAX {
+            self.contract.villains_caught[villain.index as usize] = true;
+        }
+
+        let mut cycle_len = resources.contract.cycle_length;
+        if cycle_len > CONTRACT_CYCLE_MAX as i32 {
+            cycle_len = CONTRACT_CYCLE_MAX as i32;
+        }
+        if cycle_len < 1 {
+            cycle_len = 1;
+        }
+
+        let mut slot = None;
+        for i in 0..cycle_len as usize {
+            if self.contract.cycle[i].as_str() == villain_id {
+                slot = Some(i);
+                break;
+            }
+        }
+
+        if !self.contract.active_id.is_empty() && self.contract.active_id.as_str() == villain_id {
+            self.contract.active_id = FixedStr::empty();
+        }
+
+        let Some(slot) = slot else {
+            return false;
+        };
+        self.contract.cycle[slot] = FixedStr::empty();
+
+        for index in self.contract.max_contract..resources.villains_count() as i32 {
+            let Some(candidate) = resources.villain_by_index(index) else {
+                continue;
+            };
+            if candidate.index >= 0
+                && (candidate.index as usize) < CAT_VILLAINS_MAX
+                && self.contract.villains_caught[candidate.index as usize]
+            {
+                continue;
+            }
+            self.contract.cycle[slot].copy_from_str(candidate.id.as_str());
+            break;
+        }
+        self.contract.max_contract += 1;
+        true
     }
 
     fn init_character(
@@ -1018,6 +1124,70 @@ mod tests {
     }
 
     #[test]
+    fn villain_contract_obtainable_checks_active_and_cycle() {
+        let resources = Resources::from_json_str(contract_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        assert!(game.villain_contract_obtainable(&resources, "villain0"));
+        assert!(game.villain_contract_obtainable(&resources, "villain1"));
+        assert!(!game.villain_contract_obtainable(&resources, "villain2"));
+        assert!(!game.villain_contract_obtainable(&resources, ""));
+
+        game.contract.active_id.copy_from_str("villain2");
+        assert!(game.villain_contract_obtainable(&resources, "villain2"));
+    }
+
+    #[test]
+    fn take_next_contract_requires_town_and_rotates_cycle() {
+        let resources = Resources::from_json_str(contract_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        assert_eq!(game.take_next_contract(&resources), None);
+        game.position.in_town.copy_from_str("town0");
+
+        assert_eq!(game.take_next_contract(&resources), Some("villain0"));
+        assert_eq!(game.contract.last_contract, 0);
+        assert_eq!(game.contract.active_id.as_str(), "villain0");
+        assert_eq!(game.take_next_contract(&resources), Some("villain1"));
+        assert_eq!(game.contract.last_contract, 1);
+        assert_eq!(game.contract.active_id.as_str(), "villain1");
+    }
+
+    #[test]
+    fn fulfill_contract_rewards_clears_active_and_refills_cycle() {
+        let resources = Resources::from_json_str(contract_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+        game.position.in_town.copy_from_str("town0");
+        assert_eq!(game.take_next_contract(&resources), Some("villain0"));
+        let gold_before = game.stats.gold;
+
+        assert!(game.fulfill_contract(&resources, "villain0"));
+
+        assert_eq!(game.stats.gold, gold_before + 1_000);
+        assert!(game.contract.villains_caught[0]);
+        assert!(game.contract.active_id.is_empty());
+        assert_eq!(game.contract.cycle[0].as_str(), "villain2");
+        assert_eq!(game.contract.max_contract, 3);
+    }
+
+    #[test]
+    fn fulfill_contract_preserves_openbounty_reward_before_missing_slot_check() {
+        let resources = Resources::from_json_str(contract_fixture()).expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+        let gold_before = game.stats.gold;
+
+        assert!(!game.fulfill_contract(&resources, "villain2"));
+
+        assert_eq!(game.stats.gold, gold_before + 3_000);
+        assert!(game.contract.villains_caught[2]);
+        assert_eq!(game.contract.max_contract, 2);
+    }
+
+    #[test]
     fn init_seeded_with_resources_uses_default_name_and_starting_zone_fallback() {
         let resources = Resources::from_json_str(
             r#"{
@@ -1063,6 +1233,20 @@ mod tests {
           "villains": [
             {"index":0,"id":"villain0","name":"Villain Zero","zone":"home","reward":1000},
             {"index":1,"id":"villain1","name":"Villain One","zone":"fallback","reward":2000}
+          ]
+        }"#
+    }
+
+    fn contract_fixture() -> &'static str {
+        r#"{
+          "world": {"starting_zone": "home"},
+          "contract": {"cycle_length": 2, "initial_last_contract": 1},
+          "zones": [{"id":"home","is_home":true}],
+          "troops": [],
+          "villains": [
+            {"index":0,"id":"villain0","zone":"home","reward":1000},
+            {"index":1,"id":"villain1","zone":"home","reward":2000},
+            {"index":2,"id":"villain2","zone":"home","reward":3000}
           ]
         }"#
     }
