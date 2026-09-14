@@ -1,4 +1,4 @@
-use crate::game::{Game, TravelMode};
+use crate::game::{Game, Mount, TravelMode};
 use crate::map::Map;
 use crate::resources::Resources;
 use crate::tables::FixedStr;
@@ -54,13 +54,17 @@ pub fn game_step_basic(
     let prev_y = game.position.y;
     let walking = game.travel_mode == TravelMode::Walk;
     let in_boat = game.travel_mode == TravelMode::Boat;
-    let will_board = walking
+    let flying = game.character.mount == Mount::Fly;
+    let will_board = !flying
+        && walking
         && game.boat.has_boat
         && nx == game.boat.x
         && ny == game.boat.y
         && (game.boat.zone.is_empty() || game.boat.zone.as_str() == game.position.zone.as_str());
 
-    let can_move = if will_board {
+    let can_move = if flying {
+        true
+    } else if will_board {
         true
     } else if walking {
         walkable_on_foot(tile)
@@ -81,7 +85,7 @@ pub fn game_step_basic(
 
     if will_board {
         game.travel_mode = TravelMode::Boat;
-    } else if in_boat {
+    } else if in_boat && !flying {
         let still_water = tile.terrain == Terrain::Water || tile.is_bridge;
         if still_water {
             game.boat.x = nx;
@@ -93,11 +97,12 @@ pub fn game_step_basic(
         }
     }
 
-    let advance = consume_step(game, resources, tile.terrain);
+    let terrain_costs_full_day = !flying && tile.terrain == Terrain::Desert;
+    let advance = consume_step(game, resources, terrain_costs_full_day);
 
     StepResult::Moved {
         terrain: tile.terrain,
-        move_cost: step_move_cost(tile.terrain),
+        move_cost: step_move_cost(tile.terrain, flying),
         advance,
     }
 }
@@ -119,15 +124,19 @@ fn walkable_in_boat(tile: &crate::map::Tile) -> bool {
     tile.is_bridge || tile.terrain == Terrain::Water || walkable_on_foot(tile)
 }
 
-fn step_move_cost(terrain: Terrain) -> i32 {
-    if terrain == Terrain::Desert {
+fn step_move_cost(terrain: Terrain, flying: bool) -> i32 {
+    if !flying && terrain == Terrain::Desert {
         40
     } else {
         1
     }
 }
 
-fn consume_step(game: &mut Game, resources: &Resources, terrain: Terrain) -> StepAdvance {
+fn consume_step(
+    game: &mut Game,
+    resources: &Resources,
+    terrain_costs_full_day: bool,
+) -> StepAdvance {
     let mut advance = StepAdvance::default();
     if game.stats.game_over {
         return advance;
@@ -138,7 +147,7 @@ fn consume_step(game: &mut Game, resources: &Resources, terrain: Terrain) -> Ste
         return advance;
     }
 
-    if terrain == Terrain::Desert {
+    if terrain_costs_full_day {
         game.stats.steps_left_today = 0;
     } else if game.stats.steps_left_today > 0 {
         game.stats.steps_left_today -= 1;
@@ -174,7 +183,7 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
 #[cfg(test)]
 mod tests {
     use super::{game_step_basic, StepResult};
-    use crate::game::{Game, TravelMode};
+    use crate::game::{Game, Mount, TravelMode};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
@@ -423,6 +432,104 @@ mod tests {
         assert_eq!(game.travel_mode, TravelMode::Walk);
         assert_eq!((game.boat.x, game.boat.y), (2, 0));
         assert_eq!(game.stats.steps_left_today, 2);
+    }
+
+    #[test]
+    fn step_basic_flying_bypasses_terrain_and_blockers() {
+        let map = Map::from_tiles(
+            5,
+            1,
+            vec![
+                Tile::plain_grass(),
+                Tile::terrain(Terrain::Forest),
+                Tile::terrain(Terrain::Mountain),
+                Tile::terrain(Terrain::Water),
+                Tile::blocked_grass(),
+            ],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.character.mount = Mount::Fly;
+        game.stats.steps_left_today = 5;
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (1, 0));
+        assert_eq!(game.stats.steps_left_today, 4);
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (2, 0));
+        assert_eq!(game.stats.steps_left_today, 3);
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (3, 0));
+        assert_eq!(game.stats.steps_left_today, 2);
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (4, 0));
+        assert_eq!(game.stats.steps_left_today, 1);
+    }
+
+    #[test]
+    fn step_basic_flying_over_desert_costs_one_step_not_full_day() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Desert)],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.character.mount = Mount::Fly;
+        game.stats.steps_left_today = 33;
+        game.stats.days_left = 10;
+
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Desert,
+                move_cost: 1,
+                advance: Default::default()
+            }
+        );
+        assert_eq!(game.stats.steps_left_today, 32);
+        assert_eq!(game.stats.days_left, 10);
+    }
+
+    #[test]
+    fn step_basic_flying_does_not_board_boat_on_target_tile() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Water)],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.character.mount = Mount::Fly;
+        game.position.zone.copy_from_str("home");
+        game.boat.has_boat = true;
+        game.boat.zone.copy_from_str("home");
+        game.boat.x = 1;
+        game.boat.y = 0;
+        game.stats.steps_left_today = 5;
+
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Water,
+                move_cost: 1,
+                advance: Default::default()
+            }
+        );
+        assert_eq!((game.position.x, game.position.y), (1, 0));
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        assert_eq!((game.boat.x, game.boat.y), (1, 0));
+        assert_eq!(game.stats.steps_left_today, 4);
     }
 
     #[test]
