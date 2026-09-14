@@ -1,4 +1,31 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Terrain {
+    Grass = 0,
+    Forest = 1,
+    Mountain = 2,
+    Water = 3,
+    Desert = 4,
+}
+
+impl Default for Terrain {
+    fn default() -> Self {
+        Self::Grass
+    }
+}
+
+impl Terrain {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Grass => "grass",
+            Self::Forest => "forest",
+            Self::Mountain => "mountain",
+            Self::Water => "water",
+            Self::Desert => "desert",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Interact {
     None = 0,
     CastleGate = 1,

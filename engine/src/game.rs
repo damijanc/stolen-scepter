@@ -1,3 +1,4 @@
+use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN, CAT_VILLAINS_MAX};
@@ -576,6 +577,23 @@ impl Game {
             self.scepter.zone.copy_from_str(zone.id.as_str());
             self.scepter.x = -1;
             self.scepter.y = -1;
+        }
+    }
+
+    pub fn bury_scepter_in_map(&mut self, zone_id: &str, map: &Map) {
+        self.scepter.zone.copy_from_str(zone_id);
+        self.scepter.x = -1;
+        self.scepter.y = -1;
+
+        let total = map.eligible_scepter_tile_count();
+        if total == 0 {
+            return;
+        }
+
+        let target = self.world_rng.next(0, total as i32 - 1) as usize;
+        if let Some((x, y)) = map.nth_eligible_scepter_tile(target) {
+            self.scepter.x = x as i32;
+            self.scepter.y = y as i32;
         }
     }
 
@@ -1698,8 +1716,9 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{AudienceOutcome, CastleOwnerKind, Game, GAME_ARMY_SLOTS};
+    use crate::map::{Map, Tile};
     use crate::resources::Resources;
-    use crate::tile::Interact;
+    use crate::tile::{Interact, Terrain};
 
     #[test]
     fn init_seeded_matches_openbounty_first_world_rng_rolls() {
@@ -1830,6 +1849,59 @@ mod tests {
         assert_eq!(game.scepter.continent, 0);
         assert_eq!(game.scepter.zone.as_str(), "home");
         assert_eq!((game.scepter.x, game.scepter.y), (-1, -1));
+    }
+
+    #[test]
+    fn bury_scepter_in_fixture_map_uses_row_major_plain_grass_target() {
+        let mut game = Game::default();
+        game.init_seeded(Some("Hero"), 0, 0, 0);
+        assert_eq!(game.rng_snapshot(), 0x413f_5b10_e08e_6d4c);
+
+        let map = Map::from_tiles(
+            4,
+            2,
+            vec![
+                Tile::plain_grass(),
+                Tile::terrain(Terrain::Forest),
+                Tile::blocked_grass(),
+                Tile::plain_grass(),
+                Tile::interactive(Interact::TreasureChest),
+                Tile::terrain(Terrain::Water),
+                Tile::plain_grass(),
+                Tile::terrain(Terrain::Desert),
+            ],
+        )
+        .expect("fixture dimensions match");
+
+        game.bury_scepter_in_map("home", &map);
+
+        assert_eq!(game.scepter.zone.as_str(), "home");
+        assert_eq!((game.scepter.x, game.scepter.y), (3, 0));
+        assert_eq!(game.rng_snapshot(), 0xacdd_9880_3ce6_d167);
+    }
+
+    #[test]
+    fn bury_scepter_in_empty_fixture_map_does_not_advance_rng() {
+        let mut game = Game::default();
+        game.init_seeded(Some("Hero"), 0, 0, 0);
+        let rng_before = game.rng_snapshot();
+        let map = Map::from_tiles(
+            2,
+            2,
+            vec![
+                Tile::terrain(Terrain::Forest),
+                Tile::blocked_grass(),
+                Tile::interactive(Interact::Town),
+                Tile::terrain(Terrain::Desert),
+            ],
+        )
+        .expect("fixture dimensions match");
+
+        game.bury_scepter_in_map("home", &map);
+
+        assert_eq!(game.scepter.zone.as_str(), "home");
+        assert_eq!((game.scepter.x, game.scepter.y), (-1, -1));
+        assert_eq!(game.rng_snapshot(), rng_before);
     }
 
     #[test]

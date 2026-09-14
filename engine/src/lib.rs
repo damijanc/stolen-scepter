@@ -2,6 +2,7 @@
 
 pub mod combat;
 pub mod game;
+pub mod map;
 pub mod resources;
 pub mod rng;
 pub mod state_serialize;
