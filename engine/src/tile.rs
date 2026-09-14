@@ -14,6 +14,16 @@ impl Default for Terrain {
 }
 
 impl Terrain {
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "forest" => Self::Forest,
+            "mountain" => Self::Mountain,
+            "water" => Self::Water,
+            "desert" => Self::Desert,
+            _ => Self::Grass,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Grass => "grass",

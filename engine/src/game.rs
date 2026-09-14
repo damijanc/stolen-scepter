@@ -531,7 +531,7 @@ impl Game {
         self.scepter.key = self.world_rng.next(0, 255);
         self.scepter.continent = self.world_rng.next(0, 3);
         if let Some(resources) = resources {
-            self.bury_scepter_marker(resources);
+            self.bury_scepter(resources);
         }
 
         self.init_character(resources, name, player_class, difficulty);
@@ -577,6 +577,17 @@ impl Game {
             self.scepter.zone.copy_from_str(zone.id.as_str());
             self.scepter.x = -1;
             self.scepter.y = -1;
+        }
+    }
+
+    pub fn bury_scepter(&mut self, resources: &Resources) {
+        self.bury_scepter_marker(resources);
+        if self.scepter.zone.is_empty() {
+            return;
+        }
+        if let Ok(map) = Map::load_zone(resources, self.scepter.zone.as_str()) {
+            let zone = self.scepter.zone;
+            self.bury_scepter_in_map(zone.as_str(), &map);
         }
     }
 
@@ -1849,6 +1860,55 @@ mod tests {
         assert_eq!(game.scepter.continent, 0);
         assert_eq!(game.scepter.zone.as_str(), "home");
         assert_eq!((game.scepter.x, game.scepter.y), (-1, -1));
+    }
+
+    #[test]
+    fn init_with_resource_file_loads_zone_map_and_buries_scepter() {
+        let root = std::env::temp_dir().join(format!(
+            "openbounty-engine-map-fixture-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock is after epoch")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("maps")).expect("fixture directory is created");
+        std::fs::write(root.join("maps/home.dat"), b".F..\n....\n")
+            .expect("fixture map is written");
+        std::fs::write(
+            root.join("game.json"),
+            r#"{
+              "world": {"starting_zone": "home"},
+              "tile_codes": {
+                ".": {"art":"grass","terrain":"grass"},
+                "F": {"art":"forest","terrain":"forest"}
+              },
+              "zones": [{
+                "id":"home",
+                "is_home":true,
+                "map":"maps/home.dat",
+                "width":4,
+                "height":2,
+                "chests":[{"x":0,"y":1,"id":"chest0"}],
+                "dwellings":[{"x":1,"y":1,"id":"dw0","kind":"hills"}],
+                "magic_alcove":{"x":2,"y":1}
+              }],
+              "towns": [{"index":0,"id":"town0","zone":"home","x":2,"y":0}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture game.json is written");
+        let resources = Resources::from_json_file(root.join("game.json")).expect("fixture parses");
+        let mut game = Game::default();
+
+        game.init_seeded_with_resources(&resources, Some("Hero"), 0, 0, 0);
+
+        assert_eq!(game.scepter.continent, 0);
+        assert_eq!(game.scepter.zone.as_str(), "home");
+        assert_eq!((game.scepter.x, game.scepter.y), (3, 0));
+        assert_eq!(game.rng_snapshot(), 0xacdd_9880_3ce6_d167);
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

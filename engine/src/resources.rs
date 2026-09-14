@@ -1,9 +1,10 @@
 use crate::tables::{
     parse_troop_abilities, ArtifactDef, ArtifactPower, ClassDef, FixedStr, RankDef, SpellDef,
-    SpellKind, TroopDef, VillainDef, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX, CAT_SPELLS_MAX,
-    CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
+    SpellKind, TroopDef, VillainDef, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX, CAT_PATH_LEN,
+    CAT_SPELLS_MAX, CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
     TROOP_TIER_COUNTS,
 };
+use crate::tile::Terrain;
 
 pub const RES_MAX_CASTLES: usize = 32;
 pub const RES_MAX_PREFERRED_TROOPS: usize = 16;
@@ -12,8 +13,31 @@ pub const RES_MAX_ZONE_OBJECTS: usize = 256;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
+pub const RES_TILE_ART_LEN: usize = 24;
+pub const RES_TILE_CODE_COUNT: usize = 256;
 pub const RES_SPAWN_TIERS: usize = 4;
 pub const RES_SPAWN_POOL_N: usize = 5;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResTileCode {
+    pub present: bool,
+    pub art: FixedStr<RES_TILE_ART_LEN>,
+    pub terrain: Terrain,
+    pub blocks_foot: bool,
+    pub is_bridge: bool,
+}
+
+impl Default for ResTileCode {
+    fn default() -> Self {
+        Self {
+            present: false,
+            art: FixedStr::empty(),
+            terrain: Terrain::Grass,
+            blocks_foot: false,
+            is_bridge: false,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResTime {
@@ -165,9 +189,12 @@ impl Default for ResZoneSalt {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResZone {
     pub id: FixedStr<RES_ID_LEN>,
+    pub map_path: FixedStr<CAT_PATH_LEN>,
+    pub width: i32,
+    pub height: i32,
     pub is_home: bool,
     pub hero_spawn_x: i32,
     pub hero_spawn_y: i32,
@@ -176,11 +203,11 @@ pub struct ResZone {
     pub magic_alcove_x: i32,
     pub magic_alcove_y: i32,
     pub chest_count: usize,
-    pub chests: [ResZoneChest; RES_MAX_ZONE_OBJECTS],
+    pub chests: Box<[ResZoneChest; RES_MAX_ZONE_OBJECTS]>,
     pub army_count: usize,
-    pub armies: [ResZoneArmy; RES_MAX_ZONE_OBJECTS],
+    pub armies: Box<[ResZoneArmy; RES_MAX_ZONE_OBJECTS]>,
     pub dwelling_count: usize,
-    pub dwellings: [ResZoneDwelling; RES_MAX_ZONE_OBJECTS],
+    pub dwellings: Box<[ResZoneDwelling; RES_MAX_ZONE_OBJECTS]>,
     pub salt: ResZoneSalt,
 }
 
@@ -188,6 +215,9 @@ impl Default for ResZone {
     fn default() -> Self {
         Self {
             id: FixedStr::empty(),
+            map_path: FixedStr::empty(),
+            width: 64,
+            height: 64,
             is_home: false,
             hero_spawn_x: 0,
             hero_spawn_y: 0,
@@ -196,11 +226,11 @@ impl Default for ResZone {
             magic_alcove_x: -1,
             magic_alcove_y: -1,
             chest_count: 0,
-            chests: [ResZoneChest::default(); RES_MAX_ZONE_OBJECTS],
+            chests: Box::new([ResZoneChest::default(); RES_MAX_ZONE_OBJECTS]),
             army_count: 0,
-            armies: [ResZoneArmy::default(); RES_MAX_ZONE_OBJECTS],
+            armies: Box::new([ResZoneArmy::default(); RES_MAX_ZONE_OBJECTS]),
             dwelling_count: 0,
-            dwellings: [ResZoneDwelling::default(); RES_MAX_ZONE_OBJECTS],
+            dwellings: Box::new([ResZoneDwelling::default(); RES_MAX_ZONE_OBJECTS]),
             salt: ResZoneSalt::default(),
         }
     }
@@ -279,6 +309,7 @@ impl Default for ResCastle {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
+    resource_root: FixedStr<CAT_PATH_LEN>,
     pub time: ResTime,
     pub world: ResWorld,
     pub contract: ResContract,
@@ -295,6 +326,7 @@ pub struct Resources {
     spells_count: usize,
     artifacts: [ArtifactDef; CAT_ARTIFACTS_MAX],
     artifacts_count: usize,
+    tile_codes: Box<[ResTileCode; RES_TILE_CODE_COUNT]>,
     troops: [TroopDef; CAT_TROOPS_MAX],
     troops_count: usize,
     villains: [VillainDef; CAT_VILLAINS_MAX],
@@ -305,13 +337,14 @@ pub struct Resources {
 impl Default for Resources {
     fn default() -> Self {
         Self {
+            resource_root: FixedStr::empty(),
             time: ResTime::default(),
             world: ResWorld::default(),
             contract: ResContract::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
             town_count: 0,
-            zones: [ResZone::default(); RES_MAX_ZONES],
+            zones: std::array::from_fn(|_| ResZone::default()),
             zone_count: 0,
             castles: [ResCastle::default(); RES_MAX_CASTLES],
             castle_count: 0,
@@ -321,6 +354,7 @@ impl Default for Resources {
             spells_count: 0,
             artifacts: [ArtifactDef::default(); CAT_ARTIFACTS_MAX],
             artifacts_count: 0,
+            tile_codes: Box::new([ResTileCode::default(); RES_TILE_CODE_COUNT]),
             troops: [TroopDef::default(); CAT_TROOPS_MAX],
             troops_count: 0,
             villains: [VillainDef::default(); CAT_VILLAINS_MAX],
@@ -332,8 +366,15 @@ impl Default for Resources {
 
 impl Resources {
     pub fn from_json_file(path: impl AsRef<std::path::Path>) -> Result<Self, ResourceError> {
+        let path = path.as_ref();
         let input = std::fs::read_to_string(path).map_err(ResourceError::Io)?;
-        Self::from_json_str(&input)
+        let mut resources = Self::from_json_str(&input)?;
+        if let Some(parent) = path.parent() {
+            resources
+                .resource_root
+                .copy_from_str(parent.to_string_lossy().as_ref());
+        }
+        Ok(resources)
     }
 
     pub fn from_json_str(input: &str) -> Result<Self, ResourceError> {
@@ -346,6 +387,7 @@ impl Resources {
         resources.parse_combat(&root)?;
         resources.parse_towns(&root)?;
         resources.parse_zones(&root)?;
+        resources.parse_tile_codes(&root)?;
         resources.parse_castles(&root)?;
         resources.parse_troops(&root)?;
         resources.parse_spells(&root)?;
@@ -409,6 +451,25 @@ impl Resources {
 
     pub fn artifacts_count(&self) -> usize {
         self.artifacts_count
+    }
+
+    pub fn tile_code(&self, code: u8) -> Option<&ResTileCode> {
+        self.tile_codes
+            .get(code as usize)
+            .filter(|tile_code| tile_code.present)
+    }
+
+    pub fn resolve_map_path(&self, zone: &ResZone) -> Option<std::path::PathBuf> {
+        let raw = zone.map_path.as_str();
+        if raw.is_empty() {
+            return None;
+        }
+        let path = std::path::Path::new(raw);
+        if path.is_absolute() || self.resource_root.is_empty() {
+            Some(path.to_path_buf())
+        } else {
+            Some(std::path::Path::new(self.resource_root.as_str()).join(path))
+        }
     }
 
     pub fn artifact_by_index(&self, index: i32) -> Option<&ArtifactDef> {
@@ -745,6 +806,32 @@ impl Resources {
         Ok(())
     }
 
+    fn parse_tile_codes(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(tile_codes) = root.get("tile_codes") else {
+            return Ok(());
+        };
+        let tile_codes = tile_codes
+            .as_object()
+            .ok_or(ResourceError::InvalidField("tile_codes"))?;
+
+        for (key, value) in tile_codes {
+            let Some(code) = key.as_bytes().first().copied() else {
+                continue;
+            };
+            let slot = &mut self.tile_codes[code as usize];
+            slot.present = true;
+            if let Some(art) = optional_string_field(value, "art")? {
+                slot.art.copy_from_str(art);
+            }
+            let terrain = optional_string_field(value, "terrain")?.unwrap_or("grass");
+            slot.terrain = Terrain::from_name(terrain);
+            slot.blocks_foot = optional_bool_field(value, "blocks_foot", false)?;
+            slot.is_bridge = optional_bool_field(value, "is_bridge", false)?;
+        }
+
+        Ok(())
+    }
+
     fn parse_towns(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
         let Some(towns) = root.get("towns") else {
             return Ok(());
@@ -1021,6 +1108,13 @@ fn parse_rank(value: &serde_json::Value) -> Result<RankDef, ResourceError> {
 fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
     let mut zone = ResZone::default();
     zone.id.copy_from_str(string_field(value, "id")?);
+    if let Some(map) = optional_string_field(value, "map")? {
+        let legacy = "assets/kings-bounty/";
+        let map = map.strip_prefix(legacy).unwrap_or(map);
+        zone.map_path.copy_from_str(map);
+    }
+    zone.width = optional_i32_field(value, "width", 64)?;
+    zone.height = optional_i32_field(value, "height", 64)?;
     zone.is_home = optional_bool_field(value, "is_home", false)?;
 
     if let Some(hero_spawn) = value.get("hero_spawn") {
