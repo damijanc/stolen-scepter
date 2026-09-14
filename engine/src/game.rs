@@ -398,6 +398,9 @@ impl Default for WorldProgress {
 pub struct ScepterState {
     pub key: i32,
     pub continent: i32,
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl Default for ScepterState {
@@ -405,6 +408,9 @@ impl Default for ScepterState {
         Self {
             key: 0,
             continent: 0,
+            zone: FixedStr::empty(),
+            x: 0,
+            y: 0,
         }
     }
 }
@@ -523,6 +529,9 @@ impl Game {
         self.world_rng = Rng::seed(self.seed);
         self.scepter.key = self.world_rng.next(0, 255);
         self.scepter.continent = self.world_rng.next(0, 3);
+        if let Some(resources) = resources {
+            self.bury_scepter_marker(resources);
+        }
 
         self.init_character(resources, name, player_class, difficulty);
         self.init_position(resources);
@@ -557,6 +566,17 @@ impl Game {
 
     pub fn rng_restore(&mut self, state: u64) {
         self.world_rng = Rng::from_state(state);
+    }
+
+    pub fn bury_scepter_marker(&mut self, resources: &Resources) {
+        if self.scepter.continent < 0 || self.scepter.continent as usize >= resources.zone_count() {
+            return;
+        }
+        if let Some(zone) = resources.zone_by_index(self.scepter.continent as usize) {
+            self.scepter.zone.copy_from_str(zone.id.as_str());
+            self.scepter.x = -1;
+            self.scepter.y = -1;
+        }
     }
 
     pub fn add_consumed(&mut self, zone: &str, x: i32, y: i32) {
@@ -1791,6 +1811,25 @@ mod tests {
             .all(|slot| slot.id.is_empty() && slot.count == 0));
         assert!(!game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (-1, -1));
+    }
+
+    #[test]
+    fn init_records_scepter_zone_marker_when_rolled_zone_exists() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 0);
+
+        assert_eq!(game.scepter.continent, 0);
+        assert_eq!(game.scepter.zone.as_str(), "home");
+        assert_eq!((game.scepter.x, game.scepter.y), (-1, -1));
     }
 
     #[test]
