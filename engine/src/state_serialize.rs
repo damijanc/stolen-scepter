@@ -1,8 +1,18 @@
-use crate::game::{Game, Mount, TravelMode};
+use crate::game::{
+    CastleOwnerKind, Game, Mount, TravelMode, Unit, CONTRACT_CYCLE_MAX, GAME_ARMY_SLOTS,
+};
+use crate::resources::Resources;
 
 pub const SAVE_VERSION: u32 = 11;
 
 pub fn build_snapshot(game: Option<&Game>) -> serde_json::Value {
+    build_snapshot_with_resources(game, None)
+}
+
+pub fn build_snapshot_with_resources(
+    game: Option<&Game>,
+    resources: Option<&Resources>,
+) -> serde_json::Value {
     let mut root = serde_json::Map::new();
     root.insert("version".to_owned(), serde_json::json!(SAVE_VERSION));
 
@@ -84,6 +94,54 @@ pub fn build_snapshot(game: Option<&Game>) -> serde_json::Value {
         .collect();
     root.insert("army".to_owned(), serde_json::Value::Array(army));
 
+    root.insert("contract".to_owned(), contract_snapshot(game, resources));
+
+    let castles: Vec<_> = game
+        .castles
+        .iter()
+        .filter(|castle| !castle.id.is_empty())
+        .map(|castle| {
+            let mut value = serde_json::Map::new();
+            value.insert("id".to_owned(), serde_json::json!(castle.id.as_str()));
+            value.insert("visited".to_owned(), serde_json::json!(castle.visited));
+            value.insert("known".to_owned(), serde_json::json!(castle.known));
+            value.insert(
+                "owner".to_owned(),
+                serde_json::json!(castle_owner_id(castle.owner_kind)),
+            );
+            if !castle.villain_id.is_empty() {
+                value.insert(
+                    "villain".to_owned(),
+                    serde_json::json!(castle.villain_id.as_str()),
+                );
+            }
+            if let Some(resource_castle) =
+                resources.and_then(|resources| resources.castle_by_id(castle.id.as_str()))
+            {
+                value.insert(
+                    "zone".to_owned(),
+                    serde_json::json!(resource_castle.zone.as_str()),
+                );
+                value.insert("x".to_owned(), serde_json::json!(resource_castle.x));
+                value.insert("y".to_owned(), serde_json::json!(resource_castle.y));
+                value.insert(
+                    "gate_x".to_owned(),
+                    serde_json::json!(resource_castle.gate_x),
+                );
+                value.insert(
+                    "gate_y".to_owned(),
+                    serde_json::json!(resource_castle.gate_y),
+                );
+            }
+            value.insert(
+                "garrison".to_owned(),
+                serde_json::Value::Array(unit_array_snapshot(&castle.garrison)),
+            );
+            serde_json::Value::Object(value)
+        })
+        .collect();
+    root.insert("castles".to_owned(), serde_json::Value::Array(castles));
+
     serde_json::Value::Object(root)
 }
 
@@ -115,9 +173,61 @@ fn travel_mode_id(travel_mode: TravelMode) -> &'static str {
     }
 }
 
+fn castle_owner_id(owner: CastleOwnerKind) -> &'static str {
+    match owner {
+        CastleOwnerKind::Monsters => "monsters",
+        CastleOwnerKind::Villain => "villain",
+        CastleOwnerKind::Special => "special",
+        CastleOwnerKind::Player => "player",
+    }
+}
+
+fn contract_snapshot(game: &Game, resources: Option<&Resources>) -> serde_json::Value {
+    let mut cycle = Vec::with_capacity(5);
+    for slot in game.contract.cycle.iter().take(5.min(CONTRACT_CYCLE_MAX)) {
+        cycle.push(serde_json::json!(slot.as_str()));
+    }
+
+    serde_json::json!({
+        "active": game.contract.active_id.as_str(),
+        "cycle": cycle,
+        "last_contract": game.contract.last_contract,
+        "max_contract": game.contract.max_contract,
+        "villains_caught": villain_flags_snapshot(&game.contract.villains_caught, resources),
+        "villains_prefought": villain_flags_snapshot(&game.contract.villains_prefought, resources),
+    })
+}
+
+fn villain_flags_snapshot(flags: &[bool], resources: Option<&Resources>) -> serde_json::Value {
+    let ids: Vec<_> = flags
+        .iter()
+        .enumerate()
+        .filter(|(_, caught)| **caught)
+        .filter_map(|(index, _)| {
+            resources
+                .and_then(|resources| resources.villain_by_index(index as i32))
+                .map(|villain| serde_json::json!(villain.id.as_str()))
+        })
+        .collect();
+    serde_json::Value::Array(ids)
+}
+
+fn unit_array_snapshot(units: &[Unit; GAME_ARMY_SLOTS]) -> Vec<serde_json::Value> {
+    units
+        .iter()
+        .filter(|unit| !unit.id.is_empty() && unit.count != 0)
+        .map(|unit| {
+            serde_json::json!({
+                "troop": unit.id.as_str(),
+                "count": unit.count,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{build_snapshot, snapshot_to_string, SAVE_VERSION};
+    use super::{build_snapshot, build_snapshot_with_resources, snapshot_to_string, SAVE_VERSION};
     use crate::game::Game;
     use crate::resources::Resources;
 
@@ -177,12 +287,18 @@ mod tests {
             r#"{
               "time": {"day_steps": 33, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
               "world": {"starting_zone": "home", "default_options": [4,1,1,1,1,0,5]},
+              "contract": {"cycle_length": 3, "initial_last_contract": 2},
               "zones": [{"id":"home","is_home":true,"home_spawn":{"x":3,"y":4}}],
+              "castles": [{"index":0,"id":"castle0","zone":"home","x":6,"y":7}],
               "troops": [
                 {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"}
               ],
               "classes": [
                 {"index":0,"id":"knight","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25}],"ranks":[{"id":"general","name":"General","leadership":120,"max_spells":2,"spell_power":1,"commission":100,"knows_magic":false}]}
+              ],
+              "villains": [
+                {"index":0,"id":"villain0","zone":"home","reward":1000},
+                {"index":1,"id":"villain1","zone":"home","reward":2000}
               ]
             }"#,
         )
@@ -190,7 +306,7 @@ mod tests {
         let mut game = Game::default();
         game.init_seeded_with_resources(&resources, Some("arthur"), 0, 2, 42);
 
-        let snapshot = build_snapshot(Some(&game));
+        let snapshot = build_snapshot_with_resources(Some(&game), Some(&resources));
         assert_eq!(snapshot["character"]["name"], "Arthur");
         assert_eq!(snapshot["character"]["class"], "knight");
         assert_eq!(snapshot["character"]["rank_title"], "General");
@@ -203,5 +319,22 @@ mod tests {
         assert_eq!(snapshot["army"][0]["slot"], 0);
         assert_eq!(snapshot["army"][0]["troop"], "peasants");
         assert_eq!(snapshot["army"][0]["count"], 25);
+        assert_eq!(snapshot["contract"]["active"], "");
+        assert_eq!(snapshot["contract"]["cycle"][0], "villain0");
+        assert_eq!(snapshot["contract"]["cycle"][1], "villain1");
+        assert_eq!(snapshot["contract"]["last_contract"], 2);
+        assert_eq!(snapshot["contract"]["max_contract"], 3);
+        assert_eq!(
+            snapshot["contract"]["villains_caught"],
+            serde_json::json!([])
+        );
+        assert_eq!(snapshot["castles"][0]["id"], "castle0");
+        assert_eq!(snapshot["castles"][0]["owner"], "monsters");
+        assert_eq!(snapshot["castles"][0]["zone"], "home");
+        assert_eq!(snapshot["castles"][0]["x"], 6);
+        assert_eq!(snapshot["castles"][0]["y"], 7);
+        assert_eq!(snapshot["castles"][0]["gate_x"], 6);
+        assert_eq!(snapshot["castles"][0]["gate_y"], 8);
+        assert_eq!(snapshot["castles"][0]["garrison"], serde_json::json!([]));
     }
 }
