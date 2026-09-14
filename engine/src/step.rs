@@ -1,14 +1,28 @@
 use crate::game::Game;
 use crate::map::Map;
+use crate::resources::Resources;
 use crate::tables::FixedStr;
 use crate::tile::Terrain;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StepAdvance {
+    pub day_ended: bool,
+    pub week_ended: bool,
+    pub commission_paid: i32,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StepResult {
     NoDirection,
     BlockedEdge,
-    BlockedTerrain { terrain: Terrain },
-    Moved { terrain: Terrain, move_cost: i32 },
+    BlockedTerrain {
+        terrain: Terrain,
+    },
+    Moved {
+        terrain: Terrain,
+        move_cost: i32,
+        advance: StepAdvance,
+    },
 }
 
 impl StepResult {
@@ -17,7 +31,13 @@ impl StepResult {
     }
 }
 
-pub fn game_step_basic(game: &mut Game, map: &Map, dx: i32, dy: i32) -> StepResult {
+pub fn game_step_basic(
+    game: &mut Game,
+    map: &Map,
+    resources: &Resources,
+    dx: i32,
+    dy: i32,
+) -> StepResult {
     if dx == 0 && dy == 0 {
         return StepResult::NoDirection;
     }
@@ -43,28 +63,56 @@ pub fn game_step_basic(game: &mut Game, map: &Map, dx: i32, dy: i32) -> StepResu
     game.position.x = nx;
     game.position.y = ny;
 
-    consume_step(game, tile.terrain);
+    let advance = consume_step(game, resources, tile.terrain);
 
     StepResult::Moved {
         terrain: tile.terrain,
         move_cost: tile.terrain.move_cost(),
+        advance,
     }
 }
 
-fn consume_step(game: &mut Game, terrain: Terrain) {
+fn consume_step(game: &mut Game, resources: &Resources, terrain: Terrain) -> StepAdvance {
+    let mut advance = StepAdvance::default();
     if game.stats.game_over {
-        return;
+        return advance;
     }
 
     if game.stats.time_stop > 0 {
         game.stats.time_stop -= 1;
-        return;
+        return advance;
     }
 
     if terrain == Terrain::Desert {
         game.stats.steps_left_today = 0;
     } else if game.stats.steps_left_today > 0 {
         game.stats.steps_left_today -= 1;
+    }
+
+    while game.stats.steps_left_today <= 0 && !game.stats.game_over {
+        end_day(game, resources, &mut advance);
+    }
+
+    advance
+}
+
+fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
+    if game.stats.days_left > 0 {
+        game.stats.days_left -= 1;
+    }
+    game.stats.steps_left_today = resources.time.day_steps;
+    game.stats.time_stop = 0;
+    advance.day_ended = true;
+
+    if game.stats.days_left == 0 {
+        game.stats.game_over = true;
+        return;
+    }
+
+    let week_days = resources.time.week_days;
+    if week_days > 0 && game.stats.days_left % week_days == 0 {
+        advance.week_ended = true;
+        advance.commission_paid = 0;
     }
 }
 
@@ -73,6 +121,7 @@ mod tests {
     use super::{game_step_basic, StepResult};
     use crate::game::Game;
     use crate::map::{Map, Tile};
+    use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
 
     #[test]
@@ -88,6 +137,7 @@ mod tests {
         )
         .expect("fixture dimensions match");
         let mut game = Game::default();
+        let resources = time_fixture();
         game.position.x = 0;
         game.position.y = 0;
         game.position.last_x = 9;
@@ -95,13 +145,14 @@ mod tests {
         game.position.in_town.copy_from_str("town0");
         game.stats.steps_left_today = 5;
 
-        let result = game_step_basic(&mut game, &map, 1, 0);
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
 
         assert_eq!(
             result,
             StepResult::Moved {
                 terrain: Terrain::Grass,
-                move_cost: 1
+                move_cost: 1,
+                advance: Default::default()
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -119,19 +170,27 @@ mod tests {
         )
         .expect("fixture dimensions match");
         let mut game = Game::default();
+        let resources = time_fixture();
         game.stats.steps_left_today = 33;
+        game.stats.days_left = 10;
 
-        let result = game_step_basic(&mut game, &map, 1, 0);
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
 
         assert_eq!(
             result,
             StepResult::Moved {
                 terrain: Terrain::Desert,
-                move_cost: 40
+                move_cost: 40,
+                advance: super::StepAdvance {
+                    day_ended: true,
+                    week_ended: false,
+                    commission_paid: 0
+                }
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
-        assert_eq!(game.stats.steps_left_today, 0);
+        assert_eq!(game.stats.steps_left_today, 33);
+        assert_eq!(game.stats.days_left, 9);
     }
 
     #[test]
@@ -143,10 +202,11 @@ mod tests {
         )
         .expect("fixture dimensions match");
         let mut game = Game::default();
+        let resources = time_fixture();
         game.stats.steps_left_today = 33;
         game.stats.time_stop = 2;
 
-        let result = game_step_basic(&mut game, &map, 1, 0);
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
 
         assert!(result.moved());
         assert_eq!(game.stats.time_stop, 1);
@@ -162,10 +222,11 @@ mod tests {
         )
         .expect("fixture dimensions match");
         let mut game = Game::default();
+        let resources = time_fixture();
         game.stats.steps_left_today = 5;
 
         assert_eq!(
-            game_step_basic(&mut game, &map, 1, 0),
+            game_step_basic(&mut game, &map, &resources, 1, 0),
             StepResult::BlockedTerrain {
                 terrain: Terrain::Forest
             }
@@ -175,7 +236,7 @@ mod tests {
         assert_eq!(game.stats.steps_left_today, 5);
 
         assert_eq!(
-            game_step_basic(&mut game, &map, -1, 0),
+            game_step_basic(&mut game, &map, &resources, -1, 0),
             StepResult::BlockedEdge
         );
         assert_eq!((game.position.x, game.position.y), (0, 0));
@@ -186,14 +247,110 @@ mod tests {
     fn step_basic_zero_delta_is_noop() {
         let map = Map::new(1, 1);
         let mut game = Game::default();
+        let resources = time_fixture();
         game.position.in_town.copy_from_str("town0");
         game.stats.steps_left_today = 5;
 
         assert_eq!(
-            game_step_basic(&mut game, &map, 0, 0),
+            game_step_basic(&mut game, &map, &resources, 0, 0),
             StepResult::NoDirection
         );
         assert_eq!(game.position.in_town.as_str(), "town0");
         assert_eq!(game.stats.steps_left_today, 5);
+    }
+
+    #[test]
+    fn step_basic_grass_rolls_day_when_steps_reach_zero() {
+        let map = Map::from_tiles(2, 1, vec![Tile::plain_grass(), Tile::plain_grass()])
+            .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.stats.steps_left_today = 1;
+        game.stats.days_left = 10;
+
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Grass,
+                move_cost: 1,
+                advance: super::StepAdvance {
+                    day_ended: true,
+                    week_ended: false,
+                    commission_paid: 0
+                }
+            }
+        );
+        assert_eq!(game.stats.steps_left_today, 33);
+        assert_eq!(game.stats.days_left, 9);
+        assert!(!game.stats.game_over);
+    }
+
+    #[test]
+    fn step_basic_marks_week_boundary_without_economy_side_effects() {
+        let map = Map::from_tiles(2, 1, vec![Tile::plain_grass(), Tile::plain_grass()])
+            .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.stats.steps_left_today = 1;
+        game.stats.days_left = 6;
+        game.stats.gold = 100;
+        game.stats.commission_weekly = 25;
+
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Grass,
+                move_cost: 1,
+                advance: super::StepAdvance {
+                    day_ended: true,
+                    week_ended: true,
+                    commission_paid: 0
+                }
+            }
+        );
+        assert_eq!(game.stats.days_left, 5);
+        assert_eq!(game.stats.gold, 100);
+    }
+
+    #[test]
+    fn step_basic_sets_game_over_when_final_day_ends() {
+        let map = Map::from_tiles(2, 1, vec![Tile::plain_grass(), Tile::plain_grass()])
+            .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.stats.steps_left_today = 1;
+        game.stats.days_left = 1;
+
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Grass,
+                move_cost: 1,
+                advance: super::StepAdvance {
+                    day_ended: true,
+                    week_ended: false,
+                    commission_paid: 0
+                }
+            }
+        );
+        assert_eq!(game.stats.days_left, 0);
+        assert_eq!(game.stats.steps_left_today, 33);
+        assert!(game.stats.game_over);
+    }
+
+    fn time_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 33, "week_days": 5},
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses")
     }
 }
