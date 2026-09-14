@@ -1,3 +1,4 @@
+use crate::game::Game;
 use crate::resources::{ResZone, Resources};
 use crate::tables::FixedStr;
 use crate::tile::{Interact, Terrain};
@@ -100,10 +101,43 @@ impl Map {
         Self::load_zone_bytes(resources, zone, &bytes)
     }
 
+    pub fn load_zone_with_placements(
+        resources: &Resources,
+        zone_id: &str,
+        game: &Game,
+    ) -> Result<Self, MapLoadError> {
+        let zone = resources
+            .zone_by_id(zone_id)
+            .ok_or_else(|| MapLoadError::UnknownZone(zone_id.to_owned()))?;
+        let path = resources
+            .resolve_map_path(zone)
+            .ok_or_else(|| MapLoadError::MissingMapPath(zone_id.to_owned()))?;
+        let bytes = std::fs::read(&path).map_err(MapLoadError::Io)?;
+        Self::load_zone_bytes_with_placements(resources, zone, &bytes, game)
+    }
+
     pub fn load_zone_bytes(
         resources: &Resources,
         zone: &ResZone,
         bytes: &[u8],
+    ) -> Result<Self, MapLoadError> {
+        Self::load_zone_bytes_inner(resources, zone, bytes, None)
+    }
+
+    pub fn load_zone_bytes_with_placements(
+        resources: &Resources,
+        zone: &ResZone,
+        bytes: &[u8],
+        game: &Game,
+    ) -> Result<Self, MapLoadError> {
+        Self::load_zone_bytes_inner(resources, zone, bytes, Some(game))
+    }
+
+    fn load_zone_bytes_inner(
+        resources: &Resources,
+        zone: &ResZone,
+        bytes: &[u8],
+        game: Option<&Game>,
     ) -> Result<Self, MapLoadError> {
         let width = usize::try_from(zone.width).map_err(|_| MapLoadError::InvalidDimensions {
             zone_id: zone.id.as_str().to_owned(),
@@ -153,7 +187,10 @@ impl Map {
             }
         }
 
-        stamp_objects(&mut map, resources, zone);
+        stamp_objects(&mut map, resources, zone, game);
+        if let Some(game) = game {
+            stamp_placements(&mut map, game, zone.id.as_str());
+        }
         Ok(map)
     }
 
@@ -262,7 +299,7 @@ fn skip_blank_and_comments(bytes: &[u8], mut p: usize) -> usize {
     p
 }
 
-fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone) {
+fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Option<&Game>) {
     for sign in &zone.signs[..zone.sign_count] {
         if let Some(tile) = map.tile_mut_i32(sign.x, sign.y) {
             tile.interactive = Interact::Sign;
@@ -314,6 +351,12 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone) {
     }
 
     for chest in &zone.chests[..zone.chest_count] {
+        if game
+            .map(|game| game_friendly_foe_origin_at(game, zone.id.as_str(), chest.x, chest.y))
+            .unwrap_or(false)
+        {
+            continue;
+        }
         if let Some(tile) = map.tile_mut_i32(chest.x, chest.y) {
             tile.interactive = Interact::TreasureChest;
             tile.id.copy_from_str(chest.id.as_str());
@@ -343,6 +386,31 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone) {
     }
 }
 
+fn stamp_placements(map: &mut Map, game: &Game, zone_id: &str) {
+    for placement in &game.placements[..game.placement_count] {
+        if placement.zone.as_str() != zone_id {
+            continue;
+        }
+        if let Some(tile) = map.tile_mut_i32(placement.x, placement.y) {
+            tile.interactive = placement.kind;
+            tile.id.copy_from_str(placement.id.as_str());
+        }
+    }
+
+    for foe in &game.foes[..game.foe_count] {
+        if !foe.alive || foe.zone.as_str() != zone_id {
+            continue;
+        }
+        map.stamp_foe(foe.x, foe.y, foe.placement_id.as_str());
+    }
+}
+
+fn game_friendly_foe_origin_at(game: &Game, zone: &str, x: i32, y: i32) -> bool {
+    game.foes[..game.foe_count].iter().any(|foe| {
+        foe.friendly && foe.zone.as_str() == zone && foe.origin_x == x && foe.origin_y == y
+    })
+}
+
 fn stamp_castle(map: &mut Map, x: i32, y: i32, id: &str) {
     for (dx, dy, is_gate) in [
         (-1, -1, false),
@@ -366,6 +434,21 @@ fn stamp_castle(map: &mut Map, x: i32, y: i32, id: &str) {
 }
 
 impl Map {
+    pub fn stamp_foe(&mut self, x: i32, y: i32, placement_id: &str) {
+        let Some(tile) = self.tile_mut_i32(x, y) else {
+            return;
+        };
+        let spurious_chest = tile.interactive == Interact::TreasureChest;
+        if tile.interactive != Interact::None
+            && tile.interactive != Interact::Foe
+            && !spurious_chest
+        {
+            return;
+        }
+        tile.interactive = Interact::Foe;
+        tile.id.copy_from_str(placement_id);
+    }
+
     fn tile_mut_i32(&mut self, x: i32, y: i32) -> Option<&mut Tile> {
         let x = usize::try_from(x).ok()?;
         let y = usize::try_from(y).ok()?;
@@ -376,6 +459,7 @@ impl Map {
 #[cfg(test)]
 mod tests {
     use super::{Map, Tile};
+    use crate::game::Game;
     use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
 
@@ -495,5 +579,85 @@ mod tests {
         assert!(map.tile(4, 2).expect("in bounds").blocks_foot);
         assert_eq!(map.eligible_scepter_tile_count(), 10);
         assert_eq!(map.nth_eligible_scepter_tile(0), Some((0, 0)));
+    }
+
+    #[test]
+    fn load_zone_bytes_with_placements_replays_salted_state_and_live_foes() {
+        let resources = Resources::from_json_str(
+            r##"{
+              "tile_codes": {
+                ".": {"art":"grass","terrain":"grass"}
+              },
+              "zones": [{
+                "id":"home",
+                "map":"maps/home.dat",
+                "width":6,
+                "height":2,
+                "chests":[{"x":0,"y":0,"id":"spent_chest"}]
+              }],
+              "towns": [{"index":0,"id":"town0","zone":"home","x":1,"y":0}],
+              "troops": []
+            }"##,
+        )
+        .expect("fixture parses");
+        let zone = resources.zone_by_id("home").expect("zone exists");
+        let mut game = Game::default();
+        game.add_placement("home", 2, 0, Interact::Artifact, "sword");
+        game.add_placement("home", 3, 0, Interact::Telecave, "telecave0");
+
+        game.foes[0].zone.copy_from_str("home");
+        game.foes[0].x = 0;
+        game.foes[0].y = 0;
+        game.foes[0].origin_x = 0;
+        game.foes[0].origin_y = 0;
+        game.foes[0].placement_id.copy_from_str("friendly0");
+        game.foes[0].friendly = true;
+        game.foes[0].alive = false;
+
+        game.foes[1].zone.copy_from_str("home");
+        game.foes[1].x = 4;
+        game.foes[1].y = 0;
+        game.foes[1].origin_x = 4;
+        game.foes[1].origin_y = 0;
+        game.foes[1].placement_id.copy_from_str("hostile0");
+        game.foes[1].alive = true;
+
+        game.foes[2].zone.copy_from_str("home");
+        game.foes[2].x = 1;
+        game.foes[2].y = 0;
+        game.foes[2].origin_x = 1;
+        game.foes[2].origin_y = 0;
+        game.foes[2].placement_id.copy_from_str("blocked_by_town");
+        game.foes[2].alive = true;
+        game.foe_count = 3;
+
+        let map =
+            Map::load_zone_bytes_with_placements(&resources, zone, b"......\n......\n", &game)
+                .expect("map bytes load");
+
+        assert_eq!(
+            map.tile(0, 0).expect("in bounds").interactive,
+            Interact::None
+        );
+        assert_eq!(
+            map.tile(1, 0).expect("in bounds").interactive,
+            Interact::Town
+        );
+        assert_eq!(map.tile(1, 0).expect("in bounds").id.as_str(), "town0");
+        assert_eq!(
+            map.tile(2, 0).expect("in bounds").interactive,
+            Interact::Artifact
+        );
+        assert_eq!(map.tile(2, 0).expect("in bounds").id.as_str(), "sword");
+        assert_eq!(
+            map.tile(3, 0).expect("in bounds").interactive,
+            Interact::Telecave
+        );
+        assert_eq!(map.tile(3, 0).expect("in bounds").id.as_str(), "telecave0");
+        assert_eq!(
+            map.tile(4, 0).expect("in bounds").interactive,
+            Interact::Foe
+        );
+        assert_eq!(map.tile(4, 0).expect("in bounds").id.as_str(), "hostile0");
     }
 }
