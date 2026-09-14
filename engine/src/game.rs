@@ -398,6 +398,56 @@ impl Game {
         self.world_rng = Rng::from_state(state);
     }
 
+    pub fn salt_villains(&mut self, resources: &Resources) {
+        let villain_count = resources.villains_count();
+        let castle_count = resources.castle_count().min(GAME_CASTLES);
+        if villain_count == 0 || castle_count == 0 {
+            return;
+        }
+
+        for vi in 0..villain_count {
+            let Some(villain) = resources.villain_by_slot(vi) else {
+                continue;
+            };
+            if villain.zone.is_empty() {
+                continue;
+            }
+
+            let mut guard = 0;
+            while guard < castle_count * 20 {
+                let castle_index = self.rng_next(0, castle_count as i32 - 1) as usize;
+                let Some(resource_castle) = resources.castle_by_index(castle_index) else {
+                    guard += 1;
+                    continue;
+                };
+                if resource_castle.zone.as_str() != villain.zone.as_str() {
+                    guard += 1;
+                    continue;
+                }
+                if resource_castle.special.excluded_from_contract {
+                    guard += 1;
+                    continue;
+                }
+
+                let castle = &mut self.castles[castle_index];
+                if castle.owner_kind != CastleOwnerKind::Monsters {
+                    guard += 1;
+                    continue;
+                }
+
+                castle.owner_kind = CastleOwnerKind::Villain;
+                castle.villain_id.copy_from_str(villain.id.as_str());
+                for slot in 0..GAME_ARMY_SLOTS.min(5) {
+                    castle.garrison[slot]
+                        .id
+                        .copy_from_str(villain.army_troops[slot].as_str());
+                    castle.garrison[slot].count = villain.army_counts[slot];
+                }
+                break;
+            }
+        }
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -734,6 +784,58 @@ mod tests {
             .all(|slot| slot.id.is_empty() && slot.count == 0));
         assert!(!game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (-1, -1));
+    }
+
+    #[test]
+    fn salt_villains_places_declared_army_in_matching_castle() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "castles": [{"index":0,"id":"castle0","zone":"home","x":4,"y":5}],
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"}
+              ],
+              "villains": [
+                {"index":0,"id":"villain0","zone":"home","army":[{"troop":"peasants","count":40}]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        game.salt_villains(&resources);
+
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+        assert_eq!(game.castles[0].villain_id.as_str(), "villain0");
+        assert_eq!(game.castles[0].garrison[0].id.as_str(), "peasants");
+        assert_eq!(game.castles[0].garrison[0].count, 40);
+    }
+
+    #[test]
+    fn salt_villains_skips_contract_excluded_castles() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "castles": [{"index":0,"id":"castle0","zone":"home","x":4,"y":5,"special":{"excluded_from_contract":true}}],
+              "troops": [],
+              "villains": [
+                {"index":0,"id":"villain0","zone":"home","army":[{"troop":"peasants","count":40}]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        game.salt_villains(&resources);
+
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Monsters);
+        assert!(game.castles[0].villain_id.is_empty());
+        assert!(game.castles[0].garrison[0].id.is_empty());
+        assert_eq!(game.castles[0].garrison[0].count, 0);
     }
 
     #[test]

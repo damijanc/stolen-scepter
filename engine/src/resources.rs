@@ -249,6 +249,12 @@ impl Resources {
             .find(|villain| villain.index == index)
     }
 
+    pub fn villain_by_slot(&self, slot: usize) -> Option<&VillainDef> {
+        self.villains
+            .get(slot)
+            .filter(|_| slot < self.villains_count)
+    }
+
     pub fn villain_by_id(&self, id: &str) -> Option<&VillainDef> {
         self.villains[..self.villains_count]
             .iter()
