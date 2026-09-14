@@ -620,6 +620,21 @@ impl Game {
         true
     }
 
+    pub fn villains_caught(&self) -> i32 {
+        self.contract
+            .villains_caught
+            .iter()
+            .filter(|caught| **caught)
+            .count() as i32
+    }
+
+    pub fn castles_owned(&self) -> i32 {
+        self.castles
+            .iter()
+            .filter(|castle| !castle.id.is_empty() && castle.owner_kind == CastleOwnerKind::Player)
+            .count() as i32
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -1185,6 +1200,22 @@ mod tests {
         assert_eq!(game.stats.gold, gold_before + 3_000);
         assert!(game.contract.villains_caught[2]);
         assert_eq!(game.contract.max_contract, 2);
+    }
+
+    #[test]
+    fn count_helpers_match_openbounty_state_scans() {
+        let mut game = Game::default();
+        game.contract.villains_caught[0] = true;
+        game.contract.villains_caught[7] = true;
+        game.contract.villains_caught[31] = true;
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].owner_kind = CastleOwnerKind::Player;
+        game.castles[1].id.copy_from_str("castle1");
+        game.castles[1].owner_kind = CastleOwnerKind::Monsters;
+        game.castles[2].owner_kind = CastleOwnerKind::Player;
+
+        assert_eq!(game.villains_caught(), 3);
+        assert_eq!(game.castles_owned(), 1);
     }
 
     #[test]
