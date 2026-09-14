@@ -492,6 +492,28 @@ impl Game {
         }
     }
 
+    pub fn populate_castles(&mut self, resources: &Resources) {
+        self.salt_villains(resources);
+
+        for i in 0..GAME_CASTLES {
+            if self.castles[i].id.is_empty() {
+                continue;
+            }
+            if i < resources.castle_count()
+                && resources
+                    .castle_by_index(i)
+                    .map(|castle| castle.special.excluded_from_contract)
+                    .unwrap_or(false)
+            {
+                self.castles[i].owner_kind = CastleOwnerKind::Special;
+                continue;
+            }
+            if self.castles[i].owner_kind == CastleOwnerKind::Monsters {
+                self.repopulate_castle(resources, i);
+            }
+        }
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -913,6 +935,86 @@ mod tests {
             assert_eq!(slot.id.as_str(), "peasants");
             assert_eq!(slot.count, 15);
         }
+    }
+
+    #[test]
+    fn populate_castles_marks_special_and_repopulates_monsters() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "spawn": {
+                "tier_chance_curve": [[100,100,100,100],[100,100,100,100],[100,100,100,100],[100,100,100,100]],
+                "tier_troop_pool": [
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["peasants","peasants","peasants","peasants","peasants"]
+                ]
+              },
+              "castles": [
+                {"index":0,"id":"castle0","zone":"home","x":4,"y":5,"special":{"excluded_from_contract":true}},
+                {"index":1,"id":"castle1","zone":"home","x":6,"y":7,"difficulty_tier":1}
+              ],
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        game.populate_castles(&resources);
+
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Special);
+        assert!(game.castles[0]
+            .garrison
+            .iter()
+            .all(|unit| unit.id.is_empty() && unit.count == 0));
+        assert_eq!(game.castles[1].owner_kind, CastleOwnerKind::Monsters);
+        for slot in &game.castles[1].garrison {
+            assert_eq!(slot.id.as_str(), "peasants");
+            assert_eq!(slot.count, 10);
+        }
+    }
+
+    #[test]
+    fn populate_castles_keeps_villain_garrison() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "spawn": {
+                "tier_chance_curve": [[100,100,100,100],[100,100,100,100],[100,100,100,100],[100,100,100,100]],
+                "tier_troop_pool": [
+                  ["militia","militia","militia","militia","militia"],
+                  ["militia","militia","militia","militia","militia"],
+                  ["militia","militia","militia","militia","militia"],
+                  ["militia","militia","militia","militia","militia"]
+                ]
+              },
+              "castles": [{"index":0,"id":"castle0","zone":"home","x":4,"y":5}],
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20]},
+                {"index":1,"id":"militia","skill_level":2,"hit_points":2,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":50,"spoils_factor":5,"abilities":"","morale_group":"A","tier_counts":[6,11,16,21]}
+              ],
+              "villains": [
+                {"index":0,"id":"villain0","zone":"home","army":[{"troop":"peasants","count":40}]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        game.populate_castles(&resources);
+
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+        assert_eq!(game.castles[0].villain_id.as_str(), "villain0");
+        assert_eq!(game.castles[0].garrison[0].id.as_str(), "peasants");
+        assert_eq!(game.castles[0].garrison[0].count, 40);
+        assert!(game.castles[0].garrison[1].id.is_empty());
     }
 
     #[test]
