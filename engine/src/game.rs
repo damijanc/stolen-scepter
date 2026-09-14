@@ -745,6 +745,51 @@ impl Game {
         free_leadership / troop.hit_points
     }
 
+    pub fn add_troop(&mut self, troop_id: &str, count: i32) -> i32 {
+        if troop_id.is_empty() || count <= 0 {
+            return 1;
+        }
+
+        let mut slot = None;
+        for i in 0..GAME_ARMY_SLOTS {
+            if self.army[i].id.as_str() == troop_id && self.army[i].count > 0 {
+                slot = Some(i);
+                break;
+            }
+        }
+        if slot.is_none() {
+            for i in 0..GAME_ARMY_SLOTS {
+                if self.army[i].id.is_empty() || self.army[i].count == 0 {
+                    slot = Some(i);
+                    break;
+                }
+            }
+        }
+
+        let Some(slot) = slot else {
+            return 1;
+        };
+        self.army[slot].id.copy_from_str(troop_id);
+        self.army[slot].count += count;
+        0
+    }
+
+    pub fn compact_army(&mut self) {
+        let mut dst = 0;
+        for src in 0..GAME_ARMY_SLOTS {
+            if self.army[src].id.is_empty() || self.army[src].count == 0 {
+                continue;
+            }
+            if dst != src {
+                self.army[dst] = self.army[src];
+            }
+            dst += 1;
+        }
+        for i in dst..GAME_ARMY_SLOTS {
+            self.army[i] = ArmyStack::default();
+        }
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -971,7 +1016,7 @@ fn generated_seed_index(name: Option<&str>, player_class: i32) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{AudienceOutcome, CastleOwnerKind, Game};
+    use super::{AudienceOutcome, CastleOwnerKind, Game, GAME_ARMY_SLOTS};
     use crate::resources::Resources;
 
     #[test]
@@ -1391,6 +1436,57 @@ mod tests {
         assert_eq!(game.max_recruitable(&resources, "archers"), 10);
         assert_eq!(game.max_recruitable(&resources, "militia"), 20);
         assert_eq!(game.max_recruitable(&resources, "unknown"), 0);
+    }
+
+    #[test]
+    fn add_troop_stacks_or_uses_first_empty_like_openbounty() {
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 5;
+        game.army[1].id.copy_from_str("militia");
+        game.army[1].count = 0;
+
+        assert_eq!(game.add_troop("peasants", 3), 0);
+        assert_eq!(game.army[0].count, 8);
+
+        assert_eq!(game.add_troop("archers", 2), 0);
+        assert_eq!(game.army[1].id.as_str(), "archers");
+        assert_eq!(game.army[1].count, 2);
+
+        assert_eq!(game.add_troop("", 2), 1);
+        assert_eq!(game.add_troop("wolves", 0), 1);
+    }
+
+    #[test]
+    fn add_troop_fails_when_no_slot_available() {
+        let mut game = Game::default();
+        for i in 0..GAME_ARMY_SLOTS {
+            game.army[i].id.copy_from_str(&format!("troop{i}"));
+            game.army[i].count = 1;
+        }
+
+        assert_eq!(game.add_troop("new_troop", 1), 1);
+    }
+
+    #[test]
+    fn compact_army_slides_non_empty_stacks_down() {
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("empty_count");
+        game.army[0].count = 0;
+        game.army[2].id.copy_from_str("peasants");
+        game.army[2].count = 5;
+        game.army[4].id.copy_from_str("militia");
+        game.army[4].count = 3;
+
+        game.compact_army();
+
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 5);
+        assert_eq!(game.army[1].id.as_str(), "militia");
+        assert_eq!(game.army[1].count, 3);
+        assert!(game.army[2..]
+            .iter()
+            .all(|stack| stack.id.is_empty() && stack.count == 0));
     }
 
     #[test]
