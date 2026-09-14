@@ -202,6 +202,21 @@ pub fn build_snapshot_with_resources(
         serde_json::Value::Array(placements),
     );
 
+    let dwellings: Vec<_> = game.dwellings[..game.dwelling_count]
+        .iter()
+        .map(|dwelling| {
+            serde_json::json!({
+                "zone": dwelling.zone.as_str(),
+                "x": dwelling.x,
+                "y": dwelling.y,
+                "troop": dwelling.troop_id.as_str(),
+                "count": dwelling.count,
+                "max_population": dwelling.max_population,
+            })
+        })
+        .collect();
+    root.insert("dwellings".to_owned(), serde_json::Value::Array(dwellings));
+
     serde_json::Value::Object(root)
 }
 
@@ -410,5 +425,6 @@ mod tests {
         assert_eq!(snapshot["castles"][0]["garrison"], serde_json::json!([]));
         assert_eq!(snapshot["consumed"], serde_json::json!([]));
         assert_eq!(snapshot["placements"], serde_json::json!([]));
+        assert_eq!(snapshot["dwellings"], serde_json::json!([]));
     }
 }

@@ -835,7 +835,7 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
         .unwrap_or(b'A');
     let tier_counts = optional_i32_array::<TROOP_TIER_COUNTS>(value, "tier_counts")?;
 
-    Ok(TroopDef::new(
+    let mut troop = TroopDef::new(
         i32_field(value, "index")?,
         string_field(value, "id")?,
         i32_field(value, "skill_level")?,
@@ -851,7 +851,13 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
         parse_troop_abilities(string_field(value, "abilities")?),
         morale_group,
         tier_counts,
-    ))
+    );
+    if let Some(dwelling) = optional_string_field(value, "dwelling")? {
+        troop.dwelling.copy_from_str(dwelling);
+    }
+    troop.max_population = optional_i32_field(value, "max_population", 0)?;
+    troop.growth_per_week = optional_i32_field(value, "growth_per_week", 0)?;
+    Ok(troop)
 }
 
 fn parse_spell(value: &serde_json::Value) -> Result<SpellDef, ResourceError> {
@@ -1323,8 +1329,8 @@ mod tests {
                 {"index":1,"id":"castle1","zone":"fallback","x":8,"y":9,"gate":{"x":10,"y":11},"special":{"excluded_from_contract":true}}
               ],
               "troops": [
-                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20]},
-                {"index":1,"id":"vampires","skill_level":5,"hit_points":30,"move_rate":1,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":1500,"spoils_factor":150,"abilities":"FLY|LEECH|UNDEAD","morale_group":"E"}
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20],"dwelling":"plains","max_population":100,"growth_per_week":20},
+                {"index":1,"id":"vampires","skill_level":5,"hit_points":30,"move_rate":1,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":1500,"spoils_factor":150,"abilities":"FLY|LEECH|UNDEAD","morale_group":"E","dwelling":"castle"}
               ],
               "classes": [
                 {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":100,"max_spells":2,"spell_power":1,"commission":1000,"knows_magic":false}]}
@@ -1397,9 +1403,13 @@ mod tests {
         assert_eq!(peasants.hit_points, 1);
         assert_eq!(peasants.id.as_str(), "peasants");
         assert_eq!(peasants.tier_counts, [5, 10, 15, 20]);
+        assert_eq!(peasants.dwelling.as_str(), "plains");
+        assert_eq!(peasants.max_population, 100);
+        assert_eq!(peasants.growth_per_week, 20);
 
         let vampires = resources.troop_by_index(1).unwrap();
         assert_eq!(vampires.id.as_str(), "vampires");
+        assert_eq!(vampires.dwelling.as_str(), "castle");
         assert_eq!(
             vampires.abilities,
             TROOP_ABIL_FLY | TROOP_ABIL_LEECH | TROOP_ABIL_UNDEAD

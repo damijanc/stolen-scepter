@@ -84,6 +84,9 @@ pub struct TroopDef {
     pub recruit_cost: i32,
     pub spoils_factor: i32,
     pub abilities: i32,
+    pub dwelling: FixedStr<CAT_ID_LEN>,
+    pub max_population: i32,
+    pub growth_per_week: i32,
     pub morale_group: u8,
     pub tier_counts: [i32; TROOP_TIER_COUNTS],
 }
@@ -104,6 +107,9 @@ impl Default for TroopDef {
             recruit_cost: 0,
             spoils_factor: 0,
             abilities: 0,
+            dwelling: FixedStr::empty(),
+            max_population: 0,
+            growth_per_week: 0,
             morale_group: b'A',
             tier_counts: [0; TROOP_TIER_COUNTS],
         }
@@ -143,6 +149,9 @@ impl TroopDef {
             recruit_cost,
             spoils_factor,
             abilities,
+            dwelling: FixedStr::empty(),
+            max_population: 0,
+            growth_per_week: 0,
             morale_group,
             tier_counts,
         }

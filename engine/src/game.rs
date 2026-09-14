@@ -10,6 +10,7 @@ pub const GAME_CASTLES: usize = 26;
 pub const GAME_OPTIONS: usize = 7;
 pub const GAME_TOWNS: usize = 26;
 pub const GAME_MAX_MUTATIONS: usize = 1024;
+pub const GAME_MAX_DWELLINGS: usize = 64;
 pub const GAME_MAX_PLACEMENTS: usize = 128;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
 
@@ -327,6 +328,29 @@ impl Default for SaltedPlacement {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DwellingState {
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+    pub troop_id: FixedStr<CAT_ID_LEN>,
+    pub count: i32,
+    pub max_population: i32,
+}
+
+impl Default for DwellingState {
+    fn default() -> Self {
+        Self {
+            zone: FixedStr::empty(),
+            x: 0,
+            y: 0,
+            troop_id: FixedStr::empty(),
+            count: 0,
+            max_population: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorldProgress {
     pub zones_discovered: [bool; RES_MAX_ZONES],
 }
@@ -373,6 +397,8 @@ pub struct Game {
     pub consumed_count: usize,
     pub placements: [SaltedPlacement; GAME_MAX_PLACEMENTS],
     pub placement_count: usize,
+    pub dwellings: [DwellingState; GAME_MAX_DWELLINGS],
+    pub dwelling_count: usize,
     pub world: WorldProgress,
     world_rng: Rng,
 }
@@ -397,6 +423,8 @@ impl Default for Game {
             consumed_count: 0,
             placements: [SaltedPlacement::default(); GAME_MAX_PLACEMENTS],
             placement_count: 0,
+            dwellings: [DwellingState::default(); GAME_MAX_DWELLINGS],
+            dwelling_count: 0,
             world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
         }
@@ -570,6 +598,7 @@ impl Game {
         let mut navmap_counter = 0;
         let mut orb_counter = 0;
         let mut telecave_counter = 0;
+        let mut dwelling_counter = 0;
         for (index, kind) in barrel.iter().enumerate() {
             let slot = zone.chests[index];
             match kind {
@@ -624,9 +653,104 @@ impl Game {
                     );
                     telecave_counter += 1;
                 }
-                SaltKind::None | SaltKind::Dwelling | SaltKind::Friendly => {}
+                SaltKind::Dwelling => {
+                    let Some(troop_id) =
+                        self.salt_pick_dwelling_troop(resources, continent, dwelling_counter)
+                    else {
+                        dwelling_counter += 1;
+                        continue;
+                    };
+                    let Some(troop) = resources.troop_by_id(troop_id.as_str()) else {
+                        dwelling_counter += 1;
+                        continue;
+                    };
+                    let kind = Interact::from_dwelling_kind(troop.dwelling.as_str());
+                    let id = salted_dwelling_id(troop_id.as_str(), dwelling_counter);
+                    self.add_placement(zone.id.as_str(), slot.x, slot.y, kind, id.as_str());
+                    self.enforce_dwelling_pinned(
+                        resources,
+                        zone.id.as_str(),
+                        slot.x,
+                        slot.y,
+                        troop_id.as_str(),
+                    );
+                    dwelling_counter += 1;
+                }
+                SaltKind::None | SaltKind::Friendly => {}
             }
         }
+    }
+
+    fn salt_pick_dwelling_troop(
+        &mut self,
+        resources: &Resources,
+        continent: usize,
+        slot_index: i32,
+    ) -> Option<String> {
+        let zone = resources.zone_by_index(continent)?;
+        if slot_index >= 0 && (slot_index as usize) < zone.salt.preferred_troop_count {
+            let troop_id = zone.salt.preferred_troops[slot_index as usize].as_str();
+            return (!troop_id.is_empty()).then(|| troop_id.to_owned());
+        }
+
+        let lo = zone.salt.dwelling_range_min;
+        let mut hi = zone.salt.dwelling_range_max;
+        if lo < 0 || hi < 0 || lo > hi {
+            return None;
+        }
+        let total = resources.troops_count() as i32;
+        if lo >= total {
+            return None;
+        }
+        if hi >= total {
+            hi = total - 1;
+        }
+
+        for _ in 0..=((hi - lo) * 20 + 20) {
+            let index = self.rng_next(lo, hi);
+            let Some(troop) = resources.troop_by_index(index) else {
+                continue;
+            };
+            if troop.id.is_empty() || troop.dwelling.as_str() == "castle" {
+                continue;
+            }
+            return Some(troop.id.as_str().to_owned());
+        }
+        None
+    }
+
+    pub fn enforce_dwelling_pinned(
+        &mut self,
+        resources: &Resources,
+        zone: &str,
+        x: i32,
+        y: i32,
+        troop_id: &str,
+    ) -> Option<&mut DwellingState> {
+        if zone.is_empty() || troop_id.is_empty() {
+            return None;
+        }
+        if let Some(index) = self.dwellings[..self.dwelling_count]
+            .iter()
+            .position(|dwelling| {
+                dwelling.zone.as_str() == zone && dwelling.x == x && dwelling.y == y
+            })
+        {
+            return self.dwellings.get_mut(index);
+        }
+        if self.dwelling_count >= GAME_MAX_DWELLINGS {
+            return None;
+        }
+        let troop = resources.troop_by_id(troop_id)?;
+        let dwelling = &mut self.dwellings[self.dwelling_count];
+        dwelling.zone.copy_from_str(zone);
+        dwelling.x = x;
+        dwelling.y = y;
+        dwelling.troop_id.copy_from_str(troop.id.as_str());
+        dwelling.max_population = troop.max_population;
+        dwelling.count = troop.max_population;
+        self.dwelling_count += 1;
+        Some(dwelling)
     }
 
     fn tag_salt_kind(&mut self, barrel: &mut [SaltKind], count: i32, kind: SaltKind) {
@@ -1319,6 +1443,11 @@ fn generated_seed_index(name: Option<&str>, player_class: i32) -> i32 {
     (h & 0xFF) as i32
 }
 
+fn salted_dwelling_id(troop_id: &str, dwelling_counter: i32) -> String {
+    let len = troop_id.len().min(20);
+    format!("sd_{}_{}", &troop_id[..len], dwelling_counter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AudienceOutcome, CastleOwnerKind, Game, GAME_ARMY_SLOTS};
@@ -1525,10 +1654,12 @@ mod tests {
                     {"x":4,"y":4,"id":"c3"},
                     {"x":5,"y":5,"id":"c4"}
                   ],
-                  "salt":{"artifacts":1,"navmaps":1,"orbs":1,"telecaves":1}
+                  "salt":{"artifacts":1,"navmaps":1,"orbs":1,"telecaves":1,"dwellings":1,"preferred_troops":["sprites"]}
                 }
               ],
-              "troops": [],
+              "troops": [
+                {"index":0,"id":"sprites","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"forest","max_population":50,"growth_per_week":10}
+              ],
               "artifacts": [
                 {"index":0,"id":"sword","zone":"home","local_idx":0}
               ]
@@ -1539,13 +1670,25 @@ mod tests {
 
         game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
 
-        assert_eq!(game.placement_count, 4);
+        assert_eq!(game.placement_count, 5);
+        assert_eq!(game.dwelling_count, 1);
+        assert_eq!(game.dwellings[0].troop_id.as_str(), "sprites");
+        assert_eq!(game.dwellings[0].count, 50);
+        assert_eq!(game.dwellings[0].max_population, 50);
         assert!(game
             .placements
             .iter()
             .take(game.placement_count)
             .any(|placement| {
                 placement.kind == Interact::Artifact && placement.id.as_str() == "sword"
+            }));
+        assert!(game
+            .placements
+            .iter()
+            .take(game.placement_count)
+            .any(|placement| {
+                placement.kind == Interact::DwellingForest
+                    && placement.id.as_str() == "sd_sprites_0"
             }));
         assert!(game
             .placements

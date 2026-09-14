@@ -42,4 +42,13 @@ impl Interact {
             Self::None | Self::Alcove => "none",
         }
     }
+
+    pub fn from_dwelling_kind(kind: &str) -> Self {
+        match kind {
+            "forest" => Self::DwellingForest,
+            "hills" | "hill" => Self::DwellingHills,
+            "dungeon" => Self::DwellingDungeon,
+            _ => Self::DwellingPlains,
+        }
+    }
 }
