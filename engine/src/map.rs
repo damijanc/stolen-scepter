@@ -209,6 +209,15 @@ impl Map {
         self.tiles.get_mut(y * self.width + x)
     }
 
+    pub fn walkable(&self, x: i32, y: i32) -> bool {
+        let (Ok(x), Ok(y)) = (usize::try_from(x), usize::try_from(y)) else {
+            return false;
+        };
+        self.tile(x, y)
+            .map(|tile| tile.terrain.walkable())
+            .unwrap_or(false)
+    }
+
     pub fn eligible_scepter_tile_count(&self) -> usize {
         self.tiles
             .iter()
@@ -513,6 +522,31 @@ mod tests {
         assert_eq!(map.nth_eligible_scepter_tile(1), Some((3, 0)));
         assert_eq!(map.nth_eligible_scepter_tile(2), Some((2, 1)));
         assert_eq!(map.nth_eligible_scepter_tile(3), None);
+    }
+
+    #[test]
+    fn map_walkable_matches_terrain_only_openbounty_rule() {
+        let map = Map::from_tiles(
+            5,
+            1,
+            vec![
+                Tile::plain_grass(),
+                Tile::terrain(Terrain::Desert),
+                Tile::terrain(Terrain::Forest),
+                Tile::interactive(Interact::TreasureChest),
+                Tile::blocked_grass(),
+            ],
+        )
+        .expect("fixture dimensions match");
+
+        assert!(map.walkable(0, 0));
+        assert!(map.walkable(1, 0));
+        assert!(!map.walkable(2, 0));
+        assert!(map.walkable(3, 0));
+        assert!(map.walkable(4, 0));
+        assert!(!map.walkable(-1, 0));
+        assert!(!map.walkable(5, 0));
+        assert!(!map.walkable(0, 1));
     }
 
     #[test]

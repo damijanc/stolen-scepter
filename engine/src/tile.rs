@@ -33,6 +33,18 @@ impl Terrain {
             Self::Desert => "desert",
         }
     }
+
+    pub fn walkable(self) -> bool {
+        matches!(self, Self::Grass | Self::Desert)
+    }
+
+    pub fn move_cost(self) -> i32 {
+        match self {
+            Self::Grass => 1,
+            Self::Desert => 40,
+            Self::Forest | Self::Mountain | Self::Water => 0,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -86,6 +98,27 @@ impl Interact {
             "hills" | "hill" => Self::DwellingHills,
             "dungeon" => Self::DwellingDungeon,
             _ => Self::DwellingPlains,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Terrain;
+
+    #[test]
+    fn terrain_walkable_and_move_cost_match_openbounty() {
+        let cases = [
+            (Terrain::Grass, true, 1),
+            (Terrain::Desert, true, 40),
+            (Terrain::Forest, false, 0),
+            (Terrain::Mountain, false, 0),
+            (Terrain::Water, false, 0),
+        ];
+
+        for (terrain, walkable, move_cost) in cases {
+            assert_eq!(terrain.walkable(), walkable);
+            assert_eq!(terrain.move_cost(), move_cost);
         }
     }
 }
