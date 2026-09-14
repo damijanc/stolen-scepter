@@ -1,4 +1,4 @@
-use crate::game::Game;
+use crate::game::{Game, TravelMode};
 use crate::map::Map;
 use crate::resources::Resources;
 use crate::tables::FixedStr;
@@ -50,25 +50,80 @@ pub fn game_step_basic(
         return StepResult::BlockedEdge;
     };
 
-    if !tile.terrain.walkable() {
+    let prev_x = game.position.x;
+    let prev_y = game.position.y;
+    let walking = game.travel_mode == TravelMode::Walk;
+    let in_boat = game.travel_mode == TravelMode::Boat;
+    let will_board = walking
+        && game.boat.has_boat
+        && nx == game.boat.x
+        && ny == game.boat.y
+        && (game.boat.zone.is_empty() || game.boat.zone.as_str() == game.position.zone.as_str());
+
+    let can_move = if will_board {
+        true
+    } else if walking {
+        walkable_on_foot(tile)
+    } else {
+        walkable_in_boat(tile)
+    };
+
+    if !can_move {
         return StepResult::BlockedTerrain {
             terrain: tile.terrain,
         };
     }
 
-    let prev_x = game.position.x;
-    let prev_y = game.position.y;
     game.position.last_x = prev_x;
     game.position.last_y = prev_y;
     game.position.x = nx;
     game.position.y = ny;
 
+    if will_board {
+        game.travel_mode = TravelMode::Boat;
+    } else if in_boat {
+        let still_water = tile.terrain == Terrain::Water || tile.is_bridge;
+        if still_water {
+            game.boat.x = nx;
+            game.boat.y = ny;
+        } else {
+            game.travel_mode = TravelMode::Walk;
+            game.boat.x = prev_x;
+            game.boat.y = prev_y;
+        }
+    }
+
     let advance = consume_step(game, resources, tile.terrain);
 
     StepResult::Moved {
         terrain: tile.terrain,
-        move_cost: tile.terrain.move_cost(),
+        move_cost: step_move_cost(tile.terrain),
         advance,
+    }
+}
+
+fn walkable_on_foot(tile: &crate::map::Tile) -> bool {
+    if tile.interactive != crate::tile::Interact::None {
+        return true;
+    }
+    if tile.is_bridge {
+        return true;
+    }
+    if tile.blocks_foot {
+        return false;
+    }
+    tile.terrain.walkable()
+}
+
+fn walkable_in_boat(tile: &crate::map::Tile) -> bool {
+    tile.is_bridge || tile.terrain == Terrain::Water || walkable_on_foot(tile)
+}
+
+fn step_move_cost(terrain: Terrain) -> i32 {
+    if terrain == Terrain::Desert {
+        40
+    } else {
+        1
     }
 }
 
@@ -119,7 +174,7 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
 #[cfg(test)]
 mod tests {
     use super::{game_step_basic, StepResult};
-    use crate::game::Game;
+    use crate::game::{Game, TravelMode};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
@@ -241,6 +296,133 @@ mod tests {
         );
         assert_eq!((game.position.x, game.position.y), (0, 0));
         assert_eq!(game.stats.steps_left_today, 5);
+    }
+
+    #[test]
+    fn step_basic_blocks_plain_water_when_walking_without_boat() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Water)],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.stats.steps_left_today = 5;
+
+        assert_eq!(
+            game_step_basic(&mut game, &map, &resources, 1, 0),
+            StepResult::BlockedTerrain {
+                terrain: Terrain::Water
+            }
+        );
+        assert_eq!((game.position.x, game.position.y), (0, 0));
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        assert_eq!(game.stats.steps_left_today, 5);
+    }
+
+    #[test]
+    fn step_basic_boards_owned_boat_on_target_tile() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Water)],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.boat.has_boat = true;
+        game.boat.zone.copy_from_str("home");
+        game.boat.x = 1;
+        game.boat.y = 0;
+        game.stats.steps_left_today = 5;
+
+        let result = game_step_basic(&mut game, &map, &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Water,
+                move_cost: 1,
+                advance: Default::default()
+            }
+        );
+        assert_eq!((game.position.x, game.position.y), (1, 0));
+        assert_eq!(game.travel_mode, TravelMode::Boat);
+        assert_eq!((game.boat.x, game.boat.y), (1, 0));
+        assert_eq!(game.stats.steps_left_today, 4);
+    }
+
+    #[test]
+    fn step_basic_does_not_board_boat_left_in_other_zone() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Water)],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.boat.has_boat = true;
+        game.boat.zone.copy_from_str("away");
+        game.boat.x = 1;
+        game.boat.y = 0;
+        game.stats.steps_left_today = 5;
+
+        assert_eq!(
+            game_step_basic(&mut game, &map, &resources, 1, 0),
+            StepResult::BlockedTerrain {
+                terrain: Terrain::Water
+            }
+        );
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        assert_eq!(game.stats.steps_left_today, 5);
+    }
+
+    #[test]
+    fn step_basic_boat_moves_on_water_and_bridge_then_disembarks_to_land() {
+        let mut bridge = Tile::terrain(Terrain::Grass);
+        bridge.is_bridge = true;
+        let map = Map::from_tiles(
+            4,
+            1,
+            vec![
+                Tile::terrain(Terrain::Water),
+                Tile::terrain(Terrain::Water),
+                bridge,
+                Tile::plain_grass(),
+            ],
+        )
+        .expect("fixture dimensions match");
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.position.x = 0;
+        game.position.y = 0;
+        game.travel_mode = TravelMode::Boat;
+        game.boat.has_boat = true;
+        game.boat.x = 0;
+        game.boat.y = 0;
+        game.stats.steps_left_today = 5;
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (1, 0));
+        assert_eq!(game.travel_mode, TravelMode::Boat);
+        assert_eq!((game.boat.x, game.boat.y), (1, 0));
+        assert_eq!(game.stats.steps_left_today, 4);
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (2, 0));
+        assert_eq!(game.travel_mode, TravelMode::Boat);
+        assert_eq!((game.boat.x, game.boat.y), (2, 0));
+        assert_eq!(game.stats.steps_left_today, 3);
+
+        assert!(game_step_basic(&mut game, &map, &resources, 1, 0).moved());
+        assert_eq!((game.position.x, game.position.y), (3, 0));
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        assert_eq!((game.boat.x, game.boat.y), (2, 0));
+        assert_eq!(game.stats.steps_left_today, 2);
     }
 
     #[test]
