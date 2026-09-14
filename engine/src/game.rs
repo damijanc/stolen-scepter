@@ -1,11 +1,13 @@
 use crate::resources::{Resources, RES_MAX_ZONES};
 use crate::rng::{seed_from_index, Rng};
-use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN};
+use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN, CAT_VILLAINS_MAX};
 
 pub const GAME_NAME_LEN: usize = 16;
 pub const GAME_ID_LEN: usize = 24;
 pub const GAME_ARMY_SLOTS: usize = 5;
+pub const GAME_CASTLES: usize = 26;
 pub const GAME_OPTIONS: usize = 7;
+pub const CONTRACT_CYCLE_MAX: usize = 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mount {
@@ -43,6 +45,81 @@ impl Default for ArmyStack {
         Self {
             id: FixedStr::empty(),
             count: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Unit {
+    pub id: FixedStr<GAME_ID_LEN>,
+    pub count: i32,
+}
+
+impl Default for Unit {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            count: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CastleOwnerKind {
+    Player = 0,
+    Monsters = 1,
+    Villain = 2,
+    Special = 3,
+}
+
+impl Default for CastleOwnerKind {
+    fn default() -> Self {
+        Self::Player
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CastleRecord {
+    pub id: FixedStr<GAME_ID_LEN>,
+    pub visited: bool,
+    pub known: bool,
+    pub owner_kind: CastleOwnerKind,
+    pub villain_id: FixedStr<GAME_ID_LEN>,
+    pub garrison: [Unit; GAME_ARMY_SLOTS],
+}
+
+impl Default for CastleRecord {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            visited: false,
+            known: false,
+            owner_kind: CastleOwnerKind::default(),
+            villain_id: FixedStr::empty(),
+            garrison: [Unit::default(); GAME_ARMY_SLOTS],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Contract {
+    pub active_id: FixedStr<GAME_ID_LEN>,
+    pub cycle: [FixedStr<GAME_ID_LEN>; CONTRACT_CYCLE_MAX],
+    pub last_contract: i32,
+    pub max_contract: i32,
+    pub villains_caught: [bool; CAT_VILLAINS_MAX],
+    pub villains_prefought: [bool; CAT_VILLAINS_MAX],
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            active_id: FixedStr::empty(),
+            cycle: [FixedStr::empty(); CONTRACT_CYCLE_MAX],
+            last_contract: 0,
+            max_contract: 0,
+            villains_caught: [false; CAT_VILLAINS_MAX],
+            villains_prefought: [false; CAT_VILLAINS_MAX],
         }
     }
 }
@@ -210,6 +287,8 @@ pub struct Game {
     pub travel_mode: TravelMode,
     pub boat: BoatState,
     pub army: [ArmyStack; GAME_ARMY_SLOTS],
+    pub contract: Contract,
+    pub castles: [CastleRecord; GAME_CASTLES],
     pub world: WorldProgress,
     world_rng: Rng,
 }
@@ -227,6 +306,8 @@ impl Default for Game {
             travel_mode: TravelMode::Walk,
             boat: BoatState::default(),
             army: [ArmyStack::default(); GAME_ARMY_SLOTS],
+            contract: Contract::default(),
+            castles: [CastleRecord::default(); GAME_CASTLES],
             world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
         }
@@ -299,8 +380,10 @@ impl Game {
         self.position.last_x = self.position.x;
         self.position.last_y = self.position.y;
         self.stats.time_stop = 0;
+        self.init_contract(resources);
         self.init_starting_army(resources, player_class);
         self.init_options(resources);
+        self.init_castles(resources);
     }
 
     pub fn rng_next(&mut self, min: i32, max: i32) -> i32 {
@@ -458,6 +541,58 @@ impl Game {
             self.stats.options = resources.world.default_options;
         }
     }
+
+    fn init_contract(&mut self, resources: Option<&Resources>) {
+        self.contract.active_id = FixedStr::empty();
+        let mut cycle_len = resources
+            .map(|resources| resources.contract.cycle_length)
+            .unwrap_or(5);
+        if cycle_len < 1 {
+            cycle_len = 1;
+        }
+        if cycle_len > CONTRACT_CYCLE_MAX as i32 {
+            cycle_len = CONTRACT_CYCLE_MAX as i32;
+        }
+
+        self.contract.last_contract = resources
+            .map(|resources| resources.contract.initial_last_contract)
+            .unwrap_or(cycle_len - 1);
+        self.contract.max_contract = cycle_len;
+
+        let Some(resources) = resources else {
+            return;
+        };
+        for i in 0..cycle_len as usize {
+            if let Some(villain) = resources.villain_by_index(i as i32) {
+                self.contract.cycle[i].copy_from_str(villain.id.as_str());
+            } else {
+                self.contract.cycle[i] = FixedStr::empty();
+            }
+        }
+    }
+
+    fn init_castles(&mut self, resources: Option<&Resources>) {
+        let Some(resources) = resources else {
+            return;
+        };
+        let count = resources.castle_count().min(GAME_CASTLES);
+        for i in 0..count {
+            let Some(resource_castle) = resources.castle_by_index(i) else {
+                continue;
+            };
+            self.castles[i]
+                .id
+                .copy_from_str(resource_castle.id.as_str());
+            self.castles[i].visited = false;
+            self.castles[i].known = false;
+            self.castles[i].owner_kind = CastleOwnerKind::Monsters;
+            self.castles[i].villain_id = FixedStr::empty();
+            for slot in &mut self.castles[i].garrison {
+                slot.id = FixedStr::empty();
+                slot.count = 0;
+            }
+        }
+    }
 }
 
 fn capitalize_first_ascii<const N: usize>(value: &mut FixedStr<N>) {
@@ -489,7 +624,7 @@ fn generated_seed_index(name: Option<&str>, player_class: i32) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::Game;
+    use super::{CastleOwnerKind, Game};
     use crate::resources::Resources;
 
     #[test]
@@ -582,6 +717,21 @@ mod tests {
         assert_eq!(game.army[0].count, 25);
         assert_eq!(game.army[1].id.as_str(), "militia");
         assert_eq!(game.army[1].count, 10);
+        assert!(game.contract.active_id.is_empty());
+        assert_eq!(game.contract.last_contract, 2);
+        assert_eq!(game.contract.max_contract, 3);
+        assert_eq!(game.contract.cycle[0].as_str(), "villain0");
+        assert_eq!(game.contract.cycle[1].as_str(), "villain1");
+        assert_eq!(game.contract.cycle[2].as_str(), "");
+        assert_eq!(game.castles[0].id.as_str(), "castle0");
+        assert!(!game.castles[0].visited);
+        assert!(!game.castles[0].known);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Monsters);
+        assert!(game.castles[0].villain_id.is_empty());
+        assert!(game.castles[0]
+            .garrison
+            .iter()
+            .all(|slot| slot.id.is_empty() && slot.count == 0));
         assert!(!game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (-1, -1));
     }
@@ -613,9 +763,14 @@ mod tests {
         r#"{
           "time": {"day_steps": 33, "week_days": 6, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
           "world": {"starting_zone": "fallback", "default_name": "Champion", "max_army_slots": 5, "default_options": [4,1,1,1,1,0,5]},
+          "contract": {"cycle_length": 3, "initial_last_contract": 2},
           "zones": [
             {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
             {"id":"fallback","hero_spawn":{"x":8,"y":9}}
+          ],
+          "castles": [
+            {"index":0,"id":"castle0","name":"Castle Zero","zone":"home","x":4,"y":5},
+            {"index":1,"id":"castle1","name":"Castle One","zone":"fallback","x":8,"y":9}
           ],
           "troops": [
             {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
@@ -623,6 +778,10 @@ mod tests {
           ],
           "classes": [
             {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":120,"max_spells":2,"spell_power":1,"commission":100,"knows_magic":false}]}
+          ],
+          "villains": [
+            {"index":0,"id":"villain0","name":"Villain Zero","zone":"home","reward":1000},
+            {"index":1,"id":"villain1","name":"Villain One","zone":"fallback","reward":2000}
           ]
         }"#
     }

@@ -5,6 +5,7 @@ pub const CLASS_MAX_RANKS: usize = 4;
 pub const CLASS_MAX_STARTING_TROOPS: usize = 2;
 pub const CAT_CLASSES_MAX: usize = 8;
 pub const CAT_TROOPS_MAX: usize = 32;
+pub const CAT_VILLAINS_MAX: usize = 32;
 
 pub const TROOP_ABIL_FLY: i32 = 1 << 0;
 pub const TROOP_ABIL_REGEN: i32 = 1 << 1;
@@ -244,4 +245,33 @@ pub fn class_stats_at_rank(class: &ClassDef, mut rank_index: i32) -> ClassStats 
         stats.commission += rank.commission;
     }
     stats
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VillainDef {
+    pub index: i32,
+    pub id: FixedStr<CAT_ID_LEN>,
+    pub name: FixedStr<CAT_NAME_LEN>,
+    pub portrait: FixedStr<CAT_PATH_LEN>,
+    pub zone: FixedStr<CAT_ID_LEN>,
+    pub reward: i32,
+    pub puzzle_cell: i32,
+    pub army_troops: [FixedStr<CAT_ID_LEN>; 5],
+    pub army_counts: [i32; 5],
+}
+
+impl Default for VillainDef {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            portrait: FixedStr::empty(),
+            zone: FixedStr::empty(),
+            reward: 0,
+            puzzle_cell: -1,
+            army_troops: [FixedStr::empty(); 5],
+            army_counts: [0; 5],
+        }
+    }
 }

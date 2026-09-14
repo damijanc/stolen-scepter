@@ -1,8 +1,9 @@
 use crate::tables::{
-    parse_troop_abilities, ClassDef, FixedStr, RankDef, TroopDef, CAT_CLASSES_MAX, CAT_TROOPS_MAX,
-    CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
+    parse_troop_abilities, ClassDef, FixedStr, RankDef, TroopDef, VillainDef, CAT_CLASSES_MAX,
+    CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
 };
 
+pub const RES_MAX_CASTLES: usize = 32;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
@@ -44,6 +45,21 @@ impl Default for ResWorld {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResContract {
+    pub cycle_length: i32,
+    pub initial_last_contract: i32,
+}
+
+impl Default for ResContract {
+    fn default() -> Self {
+        Self {
+            cycle_length: 5,
+            initial_last_contract: 4,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResZone {
     pub id: FixedStr<RES_ID_LEN>,
     pub is_home: bool,
@@ -66,16 +82,57 @@ impl Default for ResZone {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
+pub struct ResCastleSpecial {
+    pub excluded_from_contract: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResCastle {
+    pub index: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+    pub name: FixedStr<RES_NAME_LEN>,
+    pub zone: FixedStr<RES_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+    pub gate_x: i32,
+    pub gate_y: i32,
+    pub difficulty_tier: i32,
+    pub special: ResCastleSpecial,
+}
+
+impl Default for ResCastle {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            zone: FixedStr::empty(),
+            x: -1,
+            y: -1,
+            gate_x: -1,
+            gate_y: -1,
+            difficulty_tier: 0,
+            special: ResCastleSpecial::default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
     pub time: ResTime,
     pub world: ResWorld,
+    pub contract: ResContract,
     zones: [ResZone; RES_MAX_ZONES],
     zone_count: usize,
+    castles: [ResCastle; RES_MAX_CASTLES],
+    castle_count: usize,
     classes: [ClassDef; CAT_CLASSES_MAX],
     classes_count: usize,
     troops: [TroopDef; CAT_TROOPS_MAX],
     troops_count: usize,
+    villains: [VillainDef; CAT_VILLAINS_MAX],
+    villains_count: usize,
     morale_chart: [[u8; 5]; 5],
 }
 
@@ -84,12 +141,17 @@ impl Default for Resources {
         Self {
             time: ResTime::default(),
             world: ResWorld::default(),
+            contract: ResContract::default(),
             zones: [ResZone::default(); RES_MAX_ZONES],
             zone_count: 0,
+            castles: [ResCastle::default(); RES_MAX_CASTLES],
+            castle_count: 0,
             classes: [ClassDef::default(); CAT_CLASSES_MAX],
             classes_count: 0,
             troops: [TroopDef::default(); CAT_TROOPS_MAX],
             troops_count: 0,
+            villains: [VillainDef::default(); CAT_VILLAINS_MAX],
+            villains_count: 0,
             morale_chart: default_morale_chart(),
         }
     }
@@ -106,10 +168,13 @@ impl Resources {
         let mut resources = Self::default();
         resources.parse_time(&root)?;
         resources.parse_world(&root)?;
+        resources.parse_contract(&root)?;
         resources.parse_combat(&root)?;
         resources.parse_zones(&root)?;
+        resources.parse_castles(&root)?;
         resources.parse_troops(&root)?;
         resources.parse_classes(&root)?;
+        resources.parse_villains(&root)?;
         Ok(resources)
     }
 
@@ -125,6 +190,22 @@ impl Resources {
         self.zones[..self.zone_count]
             .iter()
             .find(|zone| zone.id.as_str() == id)
+    }
+
+    pub fn castle_count(&self) -> usize {
+        self.castle_count
+    }
+
+    pub fn castle_by_index(&self, index: usize) -> Option<&ResCastle> {
+        self.castles
+            .get(index)
+            .filter(|_| index < self.castle_count)
+    }
+
+    pub fn castle_by_id(&self, id: &str) -> Option<&ResCastle> {
+        self.castles[..self.castle_count]
+            .iter()
+            .find(|castle| castle.id.as_str() == id)
     }
 
     pub fn classes_count(&self) -> usize {
@@ -155,6 +236,25 @@ impl Resources {
         self.troops.get(index as usize)
     }
 
+    pub fn villains_count(&self) -> usize {
+        self.villains_count
+    }
+
+    pub fn villain_by_index(&self, index: i32) -> Option<&VillainDef> {
+        if index < 0 {
+            return None;
+        }
+        self.villains[..self.villains_count]
+            .iter()
+            .find(|villain| villain.index == index)
+    }
+
+    pub fn villain_by_id(&self, id: &str) -> Option<&VillainDef> {
+        self.villains[..self.villains_count]
+            .iter()
+            .find(|villain| villain.id.as_str() == id)
+    }
+
     pub fn morale_result(&self, my_group: u8, their_group: u8) -> u8 {
         let a = my_group.wrapping_sub(b'A');
         let b = their_group.wrapping_sub(b'A');
@@ -180,6 +280,20 @@ impl Resources {
             self.time.days_per_difficulty[3] =
                 optional_i32_field(days, "impossible", self.time.days_per_difficulty[3])?;
         }
+        Ok(())
+    }
+
+    fn parse_contract(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(contract) = root.get("contract") else {
+            return Ok(());
+        };
+        self.contract.cycle_length =
+            optional_i32_field(contract, "cycle_length", self.contract.cycle_length)?;
+        self.contract.initial_last_contract = optional_i32_field(
+            contract,
+            "initial_last_contract",
+            self.contract.initial_last_contract,
+        )?;
         Ok(())
     }
 
@@ -305,6 +419,55 @@ impl Resources {
         self.zone_count = zones.len();
         Ok(())
     }
+
+    fn parse_castles(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(castles) = root.get("castles") else {
+            return Ok(());
+        };
+        let castles = castles
+            .as_array()
+            .ok_or(ResourceError::InvalidField("castles"))?;
+
+        for (slot, value) in castles.iter().take(RES_MAX_CASTLES).enumerate() {
+            self.castles[slot] = parse_castle(value)?;
+            self.castle_count += 1;
+        }
+        Ok(())
+    }
+
+    fn parse_villains(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(villains) = root.get("villains") else {
+            return Ok(());
+        };
+        let villains = villains
+            .as_array()
+            .ok_or(ResourceError::InvalidField("villains"))?;
+        if villains.len() > CAT_VILLAINS_MAX {
+            return Err(ResourceError::TooManyVillains {
+                count: villains.len(),
+                max: CAT_VILLAINS_MAX,
+            });
+        }
+
+        let mut seen = [false; CAT_VILLAINS_MAX];
+        for (slot, value) in villains.iter().enumerate() {
+            let villain = parse_villain(value)?;
+            if villain.index < 0
+                || villain.index as usize >= CAT_VILLAINS_MAX
+                || seen[villain.index as usize]
+            {
+                return Err(ResourceError::InvalidVillainIndex {
+                    id: villain.id.as_str().to_owned(),
+                    index: villain.index,
+                    max: CAT_VILLAINS_MAX,
+                });
+            }
+            seen[villain.index as usize] = true;
+            self.villains[slot] = villain;
+        }
+        self.villains_count = villains.len();
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -316,6 +479,8 @@ pub enum ResourceError {
     TooManyTroops { count: usize, max: usize },
     TooManyClasses { count: usize, max: usize },
     TooManyZones { count: usize, max: usize },
+    TooManyVillains { count: usize, max: usize },
+    InvalidVillainIndex { id: String, index: i32, max: usize },
 }
 
 impl std::fmt::Display for ResourceError {
@@ -333,6 +498,16 @@ impl std::fmt::Display for ResourceError {
             }
             Self::TooManyZones { count, max } => {
                 write!(f, "too many zones: got {count}, max {max}")
+            }
+            Self::TooManyVillains { count, max } => {
+                write!(f, "too many villains: got {count}, max {max}")
+            }
+            Self::InvalidVillainIndex { id, index, max } => {
+                write!(
+                    f,
+                    "villain `{id}` has invalid or duplicate index {index}, max {}",
+                    max.saturating_sub(1)
+                )
             }
         }
     }
@@ -439,6 +614,71 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
     }
 
     Ok(zone)
+}
+
+fn parse_castle(value: &serde_json::Value) -> Result<ResCastle, ResourceError> {
+    let mut castle = ResCastle {
+        index: optional_i32_field(value, "index", -1)?,
+        x: optional_i32_field(value, "x", -1)?,
+        y: optional_i32_field(value, "y", -1)?,
+        difficulty_tier: optional_i32_field(value, "difficulty_tier", 0)?,
+        ..ResCastle::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        castle.id.copy_from_str(id);
+    }
+    if let Some(name) = optional_string_field(value, "name")? {
+        castle.name.copy_from_str(name);
+    }
+    if let Some(zone) = optional_string_field(value, "zone")? {
+        castle.zone.copy_from_str(zone);
+    }
+
+    castle.gate_x = if castle.x >= 0 { castle.x } else { -1 };
+    castle.gate_y = if castle.y >= 0 { castle.y + 1 } else { -1 };
+    if let Some(gate) = value.get("gate") {
+        castle.gate_x = optional_i32_field(gate, "x", castle.gate_x)?;
+        castle.gate_y = optional_i32_field(gate, "y", castle.gate_y)?;
+    }
+    if let Some(special) = value.get("special") {
+        castle.special.excluded_from_contract =
+            optional_bool_field(special, "excluded_from_contract", false)?;
+    }
+
+    Ok(castle)
+}
+
+fn parse_villain(value: &serde_json::Value) -> Result<VillainDef, ResourceError> {
+    let mut villain = VillainDef {
+        index: optional_i32_field(value, "index", -1)?,
+        reward: optional_i32_field(value, "reward", 0)?,
+        puzzle_cell: optional_i32_field(value, "puzzle_cell", -1)?,
+        ..VillainDef::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        villain.id.copy_from_str(id);
+    }
+    if let Some(name) = optional_string_field(value, "name")? {
+        villain.name.copy_from_str(name);
+    }
+    if let Some(portrait) = optional_string_field(value, "portrait")? {
+        villain.portrait.copy_from_str(portrait);
+    }
+    if let Some(zone) = optional_string_field(value, "zone")? {
+        villain.zone.copy_from_str(zone);
+    }
+
+    if let Some(army) = value.get("army") {
+        let entries = army.as_array().ok_or(ResourceError::InvalidField("army"))?;
+        for (slot, entry) in entries.iter().take(5).enumerate() {
+            if let Some(troop) = optional_string_field(entry, "troop")? {
+                villain.army_troops[slot].copy_from_str(troop);
+            }
+            villain.army_counts[slot] = optional_i32_field(entry, "count", 0)?;
+        }
+    }
+
+    Ok(villain)
 }
 
 fn string_field<'a>(
@@ -559,10 +799,15 @@ mod tests {
             r#"{
               "time": {"day_steps": 33, "week_days": 6, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
               "world": {"starting_zone": "fallback", "default_name": "Champion", "max_army_slots": 5, "default_options": [4,1,1,1,1,0,5]},
+              "contract": {"cycle_length": 3, "initial_last_contract": 2},
               "combat": {"morale_chart": [["N","N","N","N","N"],["N","N","N","N","N"],["N","N","H","N","N"],["L","N","L","H","N"],["L","L","L","N","N"]]},
               "zones": [
                 {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
                 {"id":"fallback","hero_spawn":{"x":8,"y":9}}
+              ],
+              "castles": [
+                {"index":0,"id":"castle0","name":"Castle Zero","zone":"home","x":4,"y":5,"difficulty_tier":1},
+                {"index":1,"id":"castle1","zone":"fallback","x":8,"y":9,"gate":{"x":10,"y":11},"special":{"excluded_from_contract":true}}
               ],
               "troops": [
                 {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
@@ -570,6 +815,10 @@ mod tests {
               ],
               "classes": [
                 {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":100,"max_spells":2,"spell_power":1,"commission":1000,"knows_magic":false}]}
+              ],
+              "villains": [
+                {"index":0,"id":"villain0","name":"Villain Zero","portrait":"v0.png","zone":"home","reward":1000,"puzzle_cell":7,"army":[{"troop":"peasants","count":40}]},
+                {"index":1,"id":"villain1","zone":"fallback","reward":2000}
               ]
             }"#,
         )
@@ -577,10 +826,25 @@ mod tests {
 
         assert_eq!(resources.troops_count(), 2);
         assert_eq!(resources.zone_count(), 2);
+        assert_eq!(resources.castle_count(), 2);
         assert_eq!(resources.classes_count(), 1);
+        assert_eq!(resources.villains_count(), 2);
         assert_eq!(resources.time.day_steps, 33);
         assert_eq!(resources.world.default_name.as_str(), "Champion");
+        assert_eq!(resources.contract.cycle_length, 3);
+        assert_eq!(resources.contract.initial_last_contract, 2);
         assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
+        let castle0 = resources.castle_by_id("castle0").unwrap();
+        assert_eq!(castle0.gate_x, 4);
+        assert_eq!(castle0.gate_y, 6);
+        assert_eq!(castle0.difficulty_tier, 1);
+        assert!(
+            resources
+                .castle_by_id("castle1")
+                .unwrap()
+                .special
+                .excluded_from_contract
+        );
         assert_eq!(resources.class_by_index(0).unwrap().starting_gold, 1000);
         let peasants = resources.troop_by_id("peasants").unwrap();
         assert_eq!(peasants.hit_points, 1);
@@ -592,6 +856,12 @@ mod tests {
             vampires.abilities,
             TROOP_ABIL_FLY | TROOP_ABIL_LEECH | TROOP_ABIL_UNDEAD
         );
+        let villain = resources.villain_by_index(0).unwrap();
+        assert_eq!(villain.id.as_str(), "villain0");
+        assert_eq!(villain.reward, 1000);
+        assert_eq!(villain.puzzle_cell, 7);
+        assert_eq!(villain.army_troops[0].as_str(), "peasants");
+        assert_eq!(villain.army_counts[0], 40);
     }
 
     #[test]
