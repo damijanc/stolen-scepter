@@ -539,9 +539,12 @@ impl Game {
             self.salt_spells(resources);
             self.consume_magic_alcoves(resources);
             self.salt_continents(resources);
-            self.enforce_declared_dwellings(resources);
         }
         self.init_castles(resources);
+        if let Some(resources) = resources {
+            self.populate_castles(resources);
+            self.enforce_declared_dwellings(resources);
+        }
     }
 
     pub fn rng_next(&mut self, min: i32, max: i32) -> i32 {
@@ -1780,8 +1783,8 @@ mod tests {
         assert_eq!(game.castles[0].id.as_str(), "castle0");
         assert!(!game.castles[0].visited);
         assert!(!game.castles[0].known);
-        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Monsters);
-        assert!(game.castles[0].villain_id.is_empty());
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+        assert_eq!(game.castles[0].villain_id.as_str(), "villain0");
         assert!(game.castles[0]
             .garrison
             .iter()
@@ -1967,7 +1970,7 @@ mod tests {
     }
 
     #[test]
-    fn salt_villains_places_declared_army_in_matching_castle() {
+    fn init_places_declared_villain_army_in_matching_castle() {
         let resources = Resources::from_json_str(
             r#"{
               "world": {"starting_zone": "home"},
@@ -1985,8 +1988,6 @@ mod tests {
         let mut game = Game::default();
         game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
 
-        game.salt_villains(&resources);
-
         assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
         assert_eq!(game.castles[0].villain_id.as_str(), "villain0");
         assert_eq!(game.castles[0].garrison[0].id.as_str(), "peasants");
@@ -1994,7 +1995,7 @@ mod tests {
     }
 
     #[test]
-    fn salt_villains_skips_contract_excluded_castles() {
+    fn init_marks_contract_excluded_castles_special_without_villain() {
         let resources = Resources::from_json_str(
             r#"{
               "world": {"starting_zone": "home"},
@@ -2010,9 +2011,7 @@ mod tests {
         let mut game = Game::default();
         game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
 
-        game.salt_villains(&resources);
-
-        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Monsters);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Special);
         assert!(game.castles[0].villain_id.is_empty());
         assert!(game.castles[0].garrison[0].id.is_empty());
         assert_eq!(game.castles[0].garrison[0].count, 0);

@@ -439,7 +439,8 @@ mod tests {
         assert_eq!(snapshot["towns"][0]["gate_x"], 1);
         assert_eq!(snapshot["towns"][0]["gate_y"], 3);
         assert_eq!(snapshot["castles"][0]["id"], "castle0");
-        assert_eq!(snapshot["castles"][0]["owner"], "monsters");
+        assert_eq!(snapshot["castles"][0]["owner"], "villain");
+        assert_eq!(snapshot["castles"][0]["villain"], "villain0");
         assert_eq!(snapshot["castles"][0]["zone"], "home");
         assert_eq!(snapshot["castles"][0]["x"], 6);
         assert_eq!(snapshot["castles"][0]["y"], 7);
