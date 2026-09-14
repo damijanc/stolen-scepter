@@ -1,10 +1,11 @@
 use crate::tables::{
-    parse_troop_abilities, ClassDef, FixedStr, RankDef, TroopDef, VillainDef, CAT_CLASSES_MAX,
-    CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
-    TROOP_TIER_COUNTS,
+    parse_troop_abilities, ClassDef, FixedStr, RankDef, SpellDef, SpellKind, TroopDef, VillainDef,
+    CAT_CLASSES_MAX, CAT_SPELLS_MAX, CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS,
+    CLASS_MAX_STARTING_TROOPS, TROOP_TIER_COUNTS,
 };
 
 pub const RES_MAX_CASTLES: usize = 32;
+pub const RES_MAX_TOWNS: usize = 32;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
@@ -100,6 +101,41 @@ impl Default for ResZone {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResTown {
+    pub index: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+    pub name: FixedStr<RES_NAME_LEN>,
+    pub zone: FixedStr<RES_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+    pub boat_x: i32,
+    pub boat_y: i32,
+    pub gate_x: i32,
+    pub gate_y: i32,
+    pub intel_castle: FixedStr<RES_ID_LEN>,
+    pub pinned_spell: FixedStr<RES_ID_LEN>,
+}
+
+impl Default for ResTown {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            zone: FixedStr::empty(),
+            x: -1,
+            y: -1,
+            boat_x: -1,
+            boat_y: -1,
+            gate_x: -1,
+            gate_y: -1,
+            intel_castle: FixedStr::empty(),
+            pinned_spell: FixedStr::empty(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
 pub struct ResCastleSpecial {
     pub excluded_from_contract: bool,
@@ -142,12 +178,16 @@ pub struct Resources {
     pub world: ResWorld,
     pub contract: ResContract,
     pub spawn: ResSpawn,
+    towns: [ResTown; RES_MAX_TOWNS],
+    town_count: usize,
     zones: [ResZone; RES_MAX_ZONES],
     zone_count: usize,
     castles: [ResCastle; RES_MAX_CASTLES],
     castle_count: usize,
     classes: [ClassDef; CAT_CLASSES_MAX],
     classes_count: usize,
+    spells: [SpellDef; CAT_SPELLS_MAX],
+    spells_count: usize,
     troops: [TroopDef; CAT_TROOPS_MAX],
     troops_count: usize,
     villains: [VillainDef; CAT_VILLAINS_MAX],
@@ -162,12 +202,16 @@ impl Default for Resources {
             world: ResWorld::default(),
             contract: ResContract::default(),
             spawn: ResSpawn::default(),
+            towns: [ResTown::default(); RES_MAX_TOWNS],
+            town_count: 0,
             zones: [ResZone::default(); RES_MAX_ZONES],
             zone_count: 0,
             castles: [ResCastle::default(); RES_MAX_CASTLES],
             castle_count: 0,
             classes: [ClassDef::default(); CAT_CLASSES_MAX],
             classes_count: 0,
+            spells: [SpellDef::default(); CAT_SPELLS_MAX],
+            spells_count: 0,
             troops: [TroopDef::default(); CAT_TROOPS_MAX],
             troops_count: 0,
             villains: [VillainDef::default(); CAT_VILLAINS_MAX],
@@ -191,12 +235,28 @@ impl Resources {
         resources.parse_contract(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
+        resources.parse_towns(&root)?;
         resources.parse_zones(&root)?;
         resources.parse_castles(&root)?;
         resources.parse_troops(&root)?;
+        resources.parse_spells(&root)?;
         resources.parse_classes(&root)?;
         resources.parse_villains(&root)?;
         Ok(resources)
+    }
+
+    pub fn town_count(&self) -> usize {
+        self.town_count
+    }
+
+    pub fn town_by_index(&self, index: usize) -> Option<&ResTown> {
+        self.towns.get(index).filter(|_| index < self.town_count)
+    }
+
+    pub fn town_by_id(&self, id: &str) -> Option<&ResTown> {
+        self.towns[..self.town_count]
+            .iter()
+            .find(|town| town.id.as_str() == id)
     }
 
     pub fn zone_count(&self) -> usize {
@@ -231,6 +291,23 @@ impl Resources {
 
     pub fn classes_count(&self) -> usize {
         self.classes_count
+    }
+
+    pub fn spells_count(&self) -> usize {
+        self.spells_count
+    }
+
+    pub fn spell_by_index(&self, index: i32) -> Option<&SpellDef> {
+        if index < 0 || index as usize >= self.spells_count {
+            return None;
+        }
+        self.spells.get(index as usize)
+    }
+
+    pub fn spell_by_id(&self, id: &str) -> Option<&SpellDef> {
+        self.spells[..self.spells_count]
+            .iter()
+            .find(|spell| spell.id.as_str() == id)
     }
 
     pub fn class_by_index(&self, index: i32) -> Option<&ClassDef> {
@@ -479,6 +556,27 @@ impl Resources {
         Ok(())
     }
 
+    fn parse_spells(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(spells) = root.get("spells") else {
+            return Ok(());
+        };
+        let spells = spells
+            .as_array()
+            .ok_or(ResourceError::InvalidField("spells"))?;
+        if spells.len() > CAT_SPELLS_MAX {
+            return Err(ResourceError::TooManySpells {
+                count: spells.len(),
+                max: CAT_SPELLS_MAX,
+            });
+        }
+
+        for (slot, value) in spells.iter().enumerate() {
+            self.spells[slot] = parse_spell(value)?;
+        }
+        self.spells_count = spells.len();
+        Ok(())
+    }
+
     fn parse_zones(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
         let Some(zones) = root.get("zones") else {
             return Ok(());
@@ -497,6 +595,27 @@ impl Resources {
             self.zones[slot] = parse_zone(value)?;
         }
         self.zone_count = zones.len();
+        Ok(())
+    }
+
+    fn parse_towns(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(towns) = root.get("towns") else {
+            return Ok(());
+        };
+        let towns = towns
+            .as_array()
+            .ok_or(ResourceError::InvalidField("towns"))?;
+        if towns.len() > RES_MAX_TOWNS {
+            return Err(ResourceError::TooManyTowns {
+                count: towns.len(),
+                max: RES_MAX_TOWNS,
+            });
+        }
+
+        for (slot, value) in towns.iter().enumerate() {
+            self.towns[slot] = parse_town(value)?;
+        }
+        self.town_count = towns.len();
         Ok(())
     }
 
@@ -557,6 +676,8 @@ pub enum ResourceError {
     MissingField(&'static str),
     InvalidField(&'static str),
     TooManyTroops { count: usize, max: usize },
+    TooManyTowns { count: usize, max: usize },
+    TooManySpells { count: usize, max: usize },
     TooManyClasses { count: usize, max: usize },
     TooManyZones { count: usize, max: usize },
     TooManyVillains { count: usize, max: usize },
@@ -572,6 +693,12 @@ impl std::fmt::Display for ResourceError {
             Self::InvalidField(field) => write!(f, "invalid field `{field}`"),
             Self::TooManyTroops { count, max } => {
                 write!(f, "too many troops: got {count}, max {max}")
+            }
+            Self::TooManyTowns { count, max } => {
+                write!(f, "too many towns: got {count}, max {max}")
+            }
+            Self::TooManySpells { count, max } => {
+                write!(f, "too many spells: got {count}, max {max}")
             }
             Self::TooManyClasses { count, max } => {
                 write!(f, "too many classes: got {count}, max {max}")
@@ -622,6 +749,28 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
         morale_group,
         tier_counts,
     ))
+}
+
+fn parse_spell(value: &serde_json::Value) -> Result<SpellDef, ResourceError> {
+    let mut spell = SpellDef {
+        index: optional_i32_field(value, "index", -1)?,
+        kind: match optional_string_field(value, "kind")? {
+            Some("adventure") => SpellKind::Adventure,
+            _ => SpellKind::Combat,
+        },
+        cost: optional_i32_field(value, "cost", 0)?,
+        ..SpellDef::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        spell.id.copy_from_str(id);
+    }
+    if let Some(name) = optional_string_field(value, "name")? {
+        spell.name.copy_from_str(name);
+    }
+    if let Some(description) = optional_string_field(value, "description")? {
+        spell.description.copy_from_str(description);
+    }
+    Ok(spell)
 }
 
 fn parse_class(value: &serde_json::Value) -> Result<ClassDef, ResourceError> {
@@ -696,6 +845,39 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
     }
 
     Ok(zone)
+}
+
+fn parse_town(value: &serde_json::Value) -> Result<ResTown, ResourceError> {
+    let mut town = ResTown {
+        index: optional_i32_field(value, "index", -1)?,
+        x: optional_i32_field(value, "x", -1)?,
+        y: optional_i32_field(value, "y", -1)?,
+        ..ResTown::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        town.id.copy_from_str(id);
+    }
+    if let Some(name) = optional_string_field(value, "name")? {
+        town.name.copy_from_str(name);
+    }
+    if let Some(zone) = optional_string_field(value, "zone")? {
+        town.zone.copy_from_str(zone);
+    }
+    if let Some(boat) = value.get("boat") {
+        town.boat_x = optional_i32_field(boat, "x", -1)?;
+        town.boat_y = optional_i32_field(boat, "y", -1)?;
+    }
+    if let Some(gate) = value.get("gate") {
+        town.gate_x = optional_i32_field(gate, "x", -1)?;
+        town.gate_y = optional_i32_field(gate, "y", -1)?;
+    }
+    if let Some(intel_castle) = optional_string_field(value, "intel_castle")? {
+        town.intel_castle.copy_from_str(intel_castle);
+    }
+    if let Some(pinned_spell) = optional_string_field(value, "pinned_spell")? {
+        town.pinned_spell.copy_from_str(pinned_spell);
+    }
+    Ok(town)
 }
 
 fn parse_castle(value: &serde_json::Value) -> Result<ResCastle, ResourceError> {
@@ -912,6 +1094,10 @@ mod tests {
                 {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
                 {"id":"fallback","hero_spawn":{"x":8,"y":9}}
               ],
+              "towns": [
+                {"index":0,"id":"town0","name":"Town Zero","zone":"home","x":1,"y":2,"gate":{"x":1,"y":3},"boat":{"x":2,"y":2},"intel_castle":"castle0","pinned_spell":"bridge"},
+                {"index":1,"id":"town1","zone":"fallback","x":4,"y":5}
+              ],
               "castles": [
                 {"index":0,"id":"castle0","name":"Castle Zero","zone":"home","x":4,"y":5,"difficulty_tier":1},
                 {"index":1,"id":"castle1","zone":"fallback","x":8,"y":9,"gate":{"x":10,"y":11},"special":{"excluded_from_contract":true}}
@@ -923,6 +1109,10 @@ mod tests {
               "classes": [
                 {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":100,"max_spells":2,"spell_power":1,"commission":1000,"knows_magic":false}]}
               ],
+              "spells": [
+                {"index":0,"id":"bridge","name":"Bridge","kind":"adventure","cost":100,"description":"Build bridge"},
+                {"index":1,"id":"fireball","name":"Fireball","kind":"combat","cost":50}
+              ],
               "villains": [
                 {"index":0,"id":"villain0","name":"Villain Zero","portrait":"v0.png","zone":"home","reward":1000,"puzzle_cell":7,"army":[{"troop":"peasants","count":40}]},
                 {"index":1,"id":"villain1","zone":"fallback","reward":2000}
@@ -932,8 +1122,10 @@ mod tests {
         .expect("fixture should parse");
 
         assert_eq!(resources.troops_count(), 2);
+        assert_eq!(resources.town_count(), 2);
         assert_eq!(resources.zone_count(), 2);
         assert_eq!(resources.castle_count(), 2);
+        assert_eq!(resources.spells_count(), 2);
         assert_eq!(resources.classes_count(), 1);
         assert_eq!(resources.villains_count(), 2);
         assert_eq!(resources.time.day_steps, 33);
@@ -942,6 +1134,12 @@ mod tests {
         assert_eq!(resources.contract.initial_last_contract, 2);
         assert_eq!(resources.spawn.chance_curve[0], [50, 75, 90, 100]);
         assert_eq!(resources.spawn.troop_pool[1][0].as_str(), "vampires");
+        let town0 = resources.town_by_id("town0").unwrap();
+        assert_eq!(town0.gate_x, 1);
+        assert_eq!(town0.gate_y, 3);
+        assert_eq!(town0.boat_x, 2);
+        assert_eq!(town0.boat_y, 2);
+        assert_eq!(town0.pinned_spell.as_str(), "bridge");
         assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
         let castle0 = resources.castle_by_id("castle0").unwrap();
         assert_eq!(castle0.gate_x, 4);
@@ -966,6 +1164,11 @@ mod tests {
             vampires.abilities,
             TROOP_ABIL_FLY | TROOP_ABIL_LEECH | TROOP_ABIL_UNDEAD
         );
+        let bridge = resources.spell_by_id("bridge").unwrap();
+        assert_eq!(bridge.name.as_str(), "Bridge");
+        assert_eq!(bridge.kind, crate::tables::SpellKind::Adventure);
+        assert_eq!(bridge.cost, 100);
+        assert_eq!(bridge.description.as_str(), "Build bridge");
         let villain = resources.villain_by_index(0).unwrap();
         assert_eq!(villain.id.as_str(), "villain0");
         assert_eq!(villain.reward, 1000);

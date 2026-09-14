@@ -1,9 +1,11 @@
 pub const CAT_ID_LEN: usize = 32;
 pub const CAT_NAME_LEN: usize = 48;
 pub const CAT_PATH_LEN: usize = 128;
+pub const CAT_TEXT_LEN: usize = 160;
 pub const CLASS_MAX_RANKS: usize = 4;
 pub const CLASS_MAX_STARTING_TROOPS: usize = 2;
 pub const CAT_CLASSES_MAX: usize = 8;
+pub const CAT_SPELLS_MAX: usize = 32;
 pub const CAT_TROOPS_MAX: usize = 32;
 pub const CAT_VILLAINS_MAX: usize = 32;
 pub const TROOP_TIER_COUNTS: usize = 4;
@@ -163,6 +165,41 @@ pub fn parse_troop_abilities(value: &str) -> i32 {
         }
     }
     mask
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpellKind {
+    Combat = 0,
+    Adventure = 1,
+}
+
+impl Default for SpellKind {
+    fn default() -> Self {
+        Self::Combat
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SpellDef {
+    pub index: i32,
+    pub id: FixedStr<CAT_ID_LEN>,
+    pub name: FixedStr<CAT_NAME_LEN>,
+    pub kind: SpellKind,
+    pub cost: i32,
+    pub description: FixedStr<CAT_TEXT_LEN>,
+}
+
+impl Default for SpellDef {
+    fn default() -> Self {
+        Self {
+            index: -1,
+            id: FixedStr::empty(),
+            name: FixedStr::empty(),
+            kind: SpellKind::default(),
+            cost: 0,
+            description: FixedStr::empty(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

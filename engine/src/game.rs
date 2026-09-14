@@ -7,6 +7,7 @@ pub const GAME_ID_LEN: usize = 24;
 pub const GAME_ARMY_SLOTS: usize = 5;
 pub const GAME_CASTLES: usize = 26;
 pub const GAME_OPTIONS: usize = 7;
+pub const GAME_TOWNS: usize = 26;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -67,6 +68,23 @@ impl Default for Unit {
         Self {
             id: FixedStr::empty(),
             count: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TownRecord {
+    pub id: FixedStr<GAME_ID_LEN>,
+    pub visited: bool,
+    pub spell_for_sale: FixedStr<GAME_ID_LEN>,
+}
+
+impl Default for TownRecord {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            visited: false,
+            spell_for_sale: FixedStr::empty(),
         }
     }
 }
@@ -297,6 +315,7 @@ pub struct Game {
     pub boat: BoatState,
     pub army: [ArmyStack; GAME_ARMY_SLOTS],
     pub contract: Contract,
+    pub towns: [TownRecord; GAME_TOWNS],
     pub castles: [CastleRecord; GAME_CASTLES],
     pub world: WorldProgress,
     world_rng: Rng,
@@ -316,6 +335,7 @@ impl Default for Game {
             boat: BoatState::default(),
             army: [ArmyStack::default(); GAME_ARMY_SLOTS],
             contract: Contract::default(),
+            towns: [TownRecord::default(); GAME_TOWNS],
             castles: [CastleRecord::default(); GAME_CASTLES],
             world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
@@ -405,6 +425,76 @@ impl Game {
 
     pub fn rng_restore(&mut self, state: u64) {
         self.world_rng = Rng::from_state(state);
+    }
+
+    pub fn salt_spells(&mut self, resources: &Resources) {
+        let spells_count = resources.spells_count();
+        let towns_count = resources.town_count().min(GAME_TOWNS);
+        if spells_count == 0 || towns_count == 0 {
+            return;
+        }
+
+        for i in 0..towns_count {
+            let Some(resource_town) = resources.town_by_index(i) else {
+                continue;
+            };
+            self.towns[i].id.copy_from_str(resource_town.id.as_str());
+            self.towns[i].visited = false;
+            self.towns[i].spell_for_sale = FixedStr::empty();
+        }
+
+        let mut spell_claimed = [false; crate::tables::CAT_SPELLS_MAX];
+        for i in 0..towns_count {
+            let Some(resource_town) = resources.town_by_index(i) else {
+                continue;
+            };
+            let pin = resource_town.pinned_spell.as_str();
+            if pin.is_empty() {
+                continue;
+            }
+            let Some(spell) = resources.spell_by_id(pin) else {
+                continue;
+            };
+            self.towns[i]
+                .spell_for_sale
+                .copy_from_str(spell.id.as_str());
+            if spell.index >= 0 && (spell.index as usize) < spell_claimed.len() {
+                spell_claimed[spell.index as usize] = true;
+            }
+        }
+
+        let mut spell_index = 0;
+        while spell_index < spells_count as i32 {
+            if spell_index >= 0
+                && (spell_index as usize) < spell_claimed.len()
+                && spell_claimed[spell_index as usize]
+            {
+                spell_index += 1;
+                continue;
+            }
+
+            let town_index = self.rng_next(0, towns_count as i32 - 1) as usize;
+            if self.towns[town_index].spell_for_sale.is_empty() {
+                if let Some(spell) = resources.spell_by_index(spell_index) {
+                    self.towns[town_index]
+                        .spell_for_sale
+                        .copy_from_str(spell.id.as_str());
+                }
+                spell_index += 1;
+            }
+        }
+
+        for i in 0..towns_count {
+            if !self.towns[i].spell_for_sale.is_empty() {
+                continue;
+            }
+            let spell_index = self.rng_next(0, spells_count as i32 - 1);
+            if let Some(spell) = resources.spell_by_index(spell_index) {
+                self.towns[i]
+                    .spell_for_sale
+                    .copy_from_str(spell.id.as_str());
+            }
+        }
     }
 
     pub fn salt_villains(&mut self, resources: &Resources) {
@@ -1126,6 +1216,47 @@ mod tests {
             .all(|slot| slot.id.is_empty() && slot.count == 0));
         assert!(!game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (-1, -1));
+    }
+
+    #[test]
+    fn salt_spells_initializes_towns_pins_and_fills_empty_slots() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "towns": [
+                {"index":0,"id":"town0","zone":"home","x":1,"y":1,"pinned_spell":"bridge"},
+                {"index":1,"id":"town1","zone":"home","x":2,"y":2},
+                {"index":2,"id":"town2","zone":"home","x":3,"y":3},
+                {"index":3,"id":"town3","zone":"home","x":4,"y":4}
+              ],
+              "troops": [],
+              "spells": [
+                {"index":0,"id":"bridge","name":"Bridge","kind":"adventure","cost":100},
+                {"index":1,"id":"fireball","name":"Fireball","kind":"combat","cost":50},
+                {"index":2,"id":"clone","name":"Clone","kind":"combat","cost":75}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        game.salt_spells(&resources);
+
+        assert_eq!(game.towns[0].id.as_str(), "town0");
+        assert_eq!(game.towns[0].spell_for_sale.as_str(), "bridge");
+        assert!(!game.towns[0].visited);
+        for i in 0..resources.town_count() {
+            assert!(!game.towns[i].id.is_empty());
+            assert!(!game.towns[i].spell_for_sale.is_empty());
+        }
+        for spell_id in ["bridge", "fireball", "clone"] {
+            assert!(game
+                .towns
+                .iter()
+                .any(|town| town.spell_for_sale.as_str() == spell_id));
+        }
     }
 
     #[test]
