@@ -173,6 +173,18 @@ pub fn build_snapshot_with_resources(
         .collect();
     root.insert("castles".to_owned(), serde_json::Value::Array(castles));
 
+    let consumed: Vec<_> = game.consumed[..game.consumed_count]
+        .iter()
+        .map(|mutation| {
+            serde_json::json!({
+                "zone": mutation.zone.as_str(),
+                "x": mutation.x,
+                "y": mutation.y,
+            })
+        })
+        .collect();
+    root.insert("consumed".to_owned(), serde_json::Value::Array(consumed));
+
     serde_json::Value::Object(root)
 }
 
@@ -379,5 +391,6 @@ mod tests {
         assert_eq!(snapshot["castles"][0]["gate_x"], 6);
         assert_eq!(snapshot["castles"][0]["gate_y"], 8);
         assert_eq!(snapshot["castles"][0]["garrison"], serde_json::json!([]));
+        assert_eq!(snapshot["consumed"], serde_json::json!([]));
     }
 }

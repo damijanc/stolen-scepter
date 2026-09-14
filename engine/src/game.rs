@@ -8,6 +8,7 @@ pub const GAME_ARMY_SLOTS: usize = 5;
 pub const GAME_CASTLES: usize = 26;
 pub const GAME_OPTIONS: usize = 7;
 pub const GAME_TOWNS: usize = 26;
+pub const GAME_MAX_MUTATIONS: usize = 1024;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -275,6 +276,23 @@ impl Default for BoatState {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TileMutation {
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Default for TileMutation {
+    fn default() -> Self {
+        Self {
+            zone: FixedStr::empty(),
+            x: 0,
+            y: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorldProgress {
     pub zones_discovered: [bool; RES_MAX_ZONES],
 }
@@ -317,6 +335,8 @@ pub struct Game {
     pub contract: Contract,
     pub towns: [TownRecord; GAME_TOWNS],
     pub castles: [CastleRecord; GAME_CASTLES],
+    pub consumed: [TileMutation; GAME_MAX_MUTATIONS],
+    pub consumed_count: usize,
     pub world: WorldProgress,
     world_rng: Rng,
 }
@@ -337,6 +357,8 @@ impl Default for Game {
             contract: Contract::default(),
             towns: [TownRecord::default(); GAME_TOWNS],
             castles: [CastleRecord::default(); GAME_CASTLES],
+            consumed: [TileMutation::default(); GAME_MAX_MUTATIONS],
+            consumed_count: 0,
             world: WorldProgress::default(),
             world_rng: Rng::from_state(0),
         }
@@ -414,6 +436,7 @@ impl Game {
         self.init_options(resources);
         if let Some(resources) = resources {
             self.salt_spells(resources);
+            self.consume_magic_alcoves(resources);
         }
         self.init_castles(resources);
     }
@@ -428,6 +451,38 @@ impl Game {
 
     pub fn rng_restore(&mut self, state: u64) {
         self.world_rng = Rng::from_state(state);
+    }
+
+    pub fn add_consumed(&mut self, zone: &str, x: i32, y: i32) {
+        if self.is_consumed(zone, x, y) || self.consumed_count >= GAME_MAX_MUTATIONS {
+            return;
+        }
+        let mutation = &mut self.consumed[self.consumed_count];
+        mutation.zone.copy_from_str(zone);
+        mutation.x = x;
+        mutation.y = y;
+        self.consumed_count += 1;
+    }
+
+    pub fn is_consumed(&self, zone: &str, x: i32, y: i32) -> bool {
+        self.consumed[..self.consumed_count]
+            .iter()
+            .any(|mutation| mutation.zone.as_str() == zone && mutation.x == x && mutation.y == y)
+    }
+
+    pub fn consume_magic_alcoves(&mut self, resources: &Resources) {
+        if !self.stats.knows_magic {
+            return;
+        }
+        for index in 0..resources.zone_count() {
+            let Some(zone) = resources.zone_by_index(index) else {
+                continue;
+            };
+            if zone.magic_alcove_x < 0 || zone.magic_alcove_y < 0 {
+                continue;
+            }
+            self.add_consumed(zone.id.as_str(), zone.magic_alcove_x, zone.magic_alcove_y);
+        }
     }
 
     pub fn salt_spells(&mut self, resources: &Resources) {
@@ -1261,6 +1316,39 @@ mod tests {
                 .iter()
                 .any(|town| town.spell_for_sale.as_str() == spell_id));
         }
+    }
+
+    #[test]
+    fn init_consumes_magic_alcoves_only_when_class_knows_magic() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [
+                {"id":"home","is_home":true,"magic_alcove":{"x":5,"y":6}},
+                {"id":"away","magic_alcove":{"x":7,"y":8}},
+                {"id":"plain"}
+              ],
+              "troops": [],
+              "classes": [
+                {"index":0,"id":"sorceress","ranks":[{"id":"archmage","name":"Archmage","knows_magic":true}]},
+                {"index":1,"id":"knight","ranks":[{"id":"general","name":"General","knows_magic":false}]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+
+        let mut magic_game = Game::default();
+        magic_game.init_seeded_with_resources(&resources, Some("mage"), 0, 0, 42);
+        assert_eq!(magic_game.consumed_count, 2);
+        assert!(magic_game.is_consumed("home", 5, 6));
+        assert!(magic_game.is_consumed("away", 7, 8));
+
+        magic_game.add_consumed("home", 5, 6);
+        assert_eq!(magic_game.consumed_count, 2);
+
+        let mut mundane_game = Game::default();
+        mundane_game.init_seeded_with_resources(&resources, Some("knight"), 1, 0, 42);
+        assert_eq!(mundane_game.consumed_count, 0);
     }
 
     #[test]

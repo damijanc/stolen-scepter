@@ -86,6 +86,8 @@ pub struct ResZone {
     pub hero_spawn_y: i32,
     pub home_spawn_x: i32,
     pub home_spawn_y: i32,
+    pub magic_alcove_x: i32,
+    pub magic_alcove_y: i32,
 }
 
 impl Default for ResZone {
@@ -97,6 +99,8 @@ impl Default for ResZone {
             hero_spawn_y: 0,
             home_spawn_x: -1,
             home_spawn_y: -1,
+            magic_alcove_x: -1,
+            magic_alcove_y: -1,
         }
     }
 }
@@ -843,6 +847,10 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
         zone.home_spawn_x = optional_i32_field(home_spawn, "x", -1)?;
         zone.home_spawn_y = optional_i32_field(home_spawn, "y", -1)?;
     }
+    if let Some(magic_alcove) = value.get("magic_alcove") {
+        zone.magic_alcove_x = optional_i32_field(magic_alcove, "x", -1)?;
+        zone.magic_alcove_y = optional_i32_field(magic_alcove, "y", -1)?;
+    }
 
     Ok(zone)
 }
@@ -1091,7 +1099,7 @@ mod tests {
               },
               "combat": {"morale_chart": [["N","N","N","N","N"],["N","N","N","N","N"],["N","N","H","N","N"],["L","N","L","H","N"],["L","L","L","N","N"]]},
               "zones": [
-                {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
+                {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4},"magic_alcove":{"x":5,"y":6}},
                 {"id":"fallback","hero_spawn":{"x":8,"y":9}}
               ],
               "towns": [
@@ -1141,6 +1149,8 @@ mod tests {
         assert_eq!(town0.boat_y, 2);
         assert_eq!(town0.pinned_spell.as_str(), "bridge");
         assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
+        assert_eq!(resources.zone_by_id("home").unwrap().magic_alcove_x, 5);
+        assert_eq!(resources.zone_by_id("home").unwrap().magic_alcove_y, 6);
         let castle0 = resources.castle_by_id("castle0").unwrap();
         assert_eq!(castle0.gate_x, 4);
         assert_eq!(castle0.gate_y, 6);
