@@ -116,6 +116,25 @@ impl Default for ResZoneArmy {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResZoneDwelling {
+    pub x: i32,
+    pub y: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+    pub kind: FixedStr<RES_ID_LEN>,
+}
+
+impl Default for ResZoneDwelling {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            id: FixedStr::empty(),
+            kind: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResZoneSalt {
     pub artifacts: i32,
     pub navmaps: i32,
@@ -160,6 +179,8 @@ pub struct ResZone {
     pub chests: [ResZoneChest; RES_MAX_ZONE_OBJECTS],
     pub army_count: usize,
     pub armies: [ResZoneArmy; RES_MAX_ZONE_OBJECTS],
+    pub dwelling_count: usize,
+    pub dwellings: [ResZoneDwelling; RES_MAX_ZONE_OBJECTS],
     pub salt: ResZoneSalt,
 }
 
@@ -178,6 +199,8 @@ impl Default for ResZone {
             chests: [ResZoneChest::default(); RES_MAX_ZONE_OBJECTS],
             army_count: 0,
             armies: [ResZoneArmy::default(); RES_MAX_ZONE_OBJECTS],
+            dwelling_count: 0,
+            dwellings: [ResZoneDwelling::default(); RES_MAX_ZONE_OBJECTS],
             salt: ResZoneSalt::default(),
         }
     }
@@ -1030,6 +1053,15 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
             zone.army_count += 1;
         }
     }
+    if let Some(dwellings) = value.get("dwellings") {
+        let dwellings = dwellings
+            .as_array()
+            .ok_or(ResourceError::InvalidField("dwellings"))?;
+        for (slot, dwelling) in dwellings.iter().take(RES_MAX_ZONE_OBJECTS).enumerate() {
+            zone.dwellings[slot] = parse_zone_dwelling(dwelling)?;
+            zone.dwelling_count += 1;
+        }
+    }
     if let Some(salt) = value.get("salt") {
         zone.salt = parse_zone_salt(salt)?;
     }
@@ -1059,6 +1091,21 @@ fn parse_zone_army(value: &serde_json::Value) -> Result<ResZoneArmy, ResourceErr
         army.id.copy_from_str(id);
     }
     Ok(army)
+}
+
+fn parse_zone_dwelling(value: &serde_json::Value) -> Result<ResZoneDwelling, ResourceError> {
+    let mut dwelling = ResZoneDwelling {
+        x: optional_i32_field(value, "x", 0)?,
+        y: optional_i32_field(value, "y", 0)?,
+        ..ResZoneDwelling::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        dwelling.id.copy_from_str(id);
+    }
+    if let Some(kind) = optional_string_field(value, "kind")? {
+        dwelling.kind.copy_from_str(kind);
+    }
+    Ok(dwelling)
 }
 
 fn parse_zone_salt(value: &serde_json::Value) -> Result<ResZoneSalt, ResourceError> {
@@ -1351,6 +1398,7 @@ mod tests {
                   "magic_alcove":{"x":5,"y":6},
                   "chests":[{"x":10,"y":11,"id":"chest0"}],
                   "wandering_armies":[{"x":12,"y":13,"id":"foe0"}],
+                  "dwellings":[{"x":14,"y":15,"id":"dw0","kind":"hills"}],
                   "salt":{
                     "navmaps":1,
                     "orbs":2,
@@ -1423,6 +1471,10 @@ mod tests {
         assert_eq!(home.army_count, 1);
         assert_eq!((home.armies[0].x, home.armies[0].y), (12, 13));
         assert_eq!(home.armies[0].id.as_str(), "foe0");
+        assert_eq!(home.dwelling_count, 1);
+        assert_eq!((home.dwellings[0].x, home.dwellings[0].y), (14, 15));
+        assert_eq!(home.dwellings[0].id.as_str(), "dw0");
+        assert_eq!(home.dwellings[0].kind.as_str(), "hills");
         assert_eq!(home.salt.navmaps, 1);
         assert_eq!(home.salt.orbs, 2);
         assert_eq!(home.salt.telecaves, 3);

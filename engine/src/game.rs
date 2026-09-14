@@ -539,6 +539,7 @@ impl Game {
             self.salt_spells(resources);
             self.consume_magic_alcoves(resources);
             self.salt_continents(resources);
+            self.enforce_declared_dwellings(resources);
         }
         self.init_castles(resources);
     }
@@ -820,6 +821,90 @@ impl Game {
         dwelling.count = troop.max_population;
         self.dwelling_count += 1;
         Some(dwelling)
+    }
+
+    pub fn enforce_declared_dwellings(&mut self, resources: &Resources) {
+        for zi in 0..resources.zone_count() {
+            let Some(zone) = resources.zone_by_index(zi) else {
+                continue;
+            };
+            for di in 0..zone.dwelling_count {
+                let dwelling = zone.dwellings[di];
+                self.enforce_dwelling(
+                    resources,
+                    zone.id.as_str(),
+                    dwelling.x,
+                    dwelling.y,
+                    dwelling.kind.as_str(),
+                );
+            }
+        }
+    }
+
+    pub fn enforce_dwelling(
+        &mut self,
+        resources: &Resources,
+        zone: &str,
+        x: i32,
+        y: i32,
+        dwelling_kind: &str,
+    ) -> Option<&mut DwellingState> {
+        if zone.is_empty() || dwelling_kind.is_empty() {
+            return None;
+        }
+        if let Some(index) = self.dwellings[..self.dwelling_count]
+            .iter()
+            .position(|dwelling| {
+                dwelling.zone.as_str() == zone && dwelling.x == x && dwelling.y == y
+            })
+        {
+            return self.dwellings.get_mut(index);
+        }
+        if self.dwelling_count >= GAME_MAX_DWELLINGS {
+            return None;
+        }
+        let troop_id = self.dwelling_troop_at(resources, dwelling_kind, x, y)?;
+        self.enforce_dwelling_pinned(resources, zone, x, y, troop_id.as_str())
+    }
+
+    fn dwelling_troop_at(
+        &self,
+        resources: &Resources,
+        dwelling_kind: &str,
+        x: i32,
+        y: i32,
+    ) -> Option<String> {
+        let normalized = normalize_dwelling_kind(dwelling_kind);
+        if normalized.is_empty() {
+            return None;
+        }
+
+        let mut candidates = [0_i32; crate::tables::CAT_TROOPS_MAX];
+        let mut count = 0usize;
+        for index in 0..resources.troops_count() {
+            let Some(troop) = resources.troop_by_index(index as i32) else {
+                continue;
+            };
+            if troop.dwelling.as_str() == normalized {
+                candidates[count] = index as i32;
+                count += 1;
+                if count >= candidates.len() {
+                    break;
+                }
+            }
+        }
+        if count == 0 {
+            return None;
+        }
+
+        let mut hash = self.seed as u32;
+        hash ^= (x as u32).wrapping_mul(131);
+        hash ^= (y as u32).wrapping_mul(97);
+        hash = hash.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let pick = (hash % count as u32) as usize;
+        resources
+            .troop_by_index(candidates[pick])
+            .map(|troop| troop.id.as_str().to_owned())
     }
 
     pub fn add_foe(
@@ -1579,6 +1664,14 @@ fn salted_dwelling_id(troop_id: &str, dwelling_counter: i32) -> String {
     format!("sd_{}_{}", &troop_id[..len], dwelling_counter)
 }
 
+fn normalize_dwelling_kind(kind: &str) -> &str {
+    if kind == "hills" {
+        "hill"
+    } else {
+        kind
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AudienceOutcome, CastleOwnerKind, Game, GAME_ARMY_SLOTS};
@@ -1787,11 +1880,14 @@ mod tests {
                     {"x":6,"y":6,"id":"c5"}
                   ],
                   "wandering_armies":[{"x":9,"y":10,"id":"static0"}],
+                  "dwellings":[{"x":7,"y":8,"id":"dw0","kind":"hills"}],
                   "salt":{"artifacts":1,"navmaps":1,"orbs":1,"telecaves":1,"dwellings":1,"friendly_foes":1,"preferred_troops":["sprites"]}
                 }
               ],
               "troops": [
-                {"index":0,"id":"sprites","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"forest","max_population":50,"growth_per_week":10}
+                {"index":0,"id":"sprites","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"forest","max_population":50,"growth_per_week":10},
+                {"index":1,"id":"dwarves","skill_level":3,"hit_points":20,"move_rate":1,"melee":[2,4],"ranged":[0,0,0],"recruit_cost":350,"spoils_factor":35,"abilities":"","morale_group":"C","dwelling":"hill","max_population":12,"growth_per_week":4},
+                {"index":2,"id":"ogres","skill_level":4,"hit_points":40,"move_rate":1,"melee":[3,5],"ranged":[0,0,0],"recruit_cost":750,"spoils_factor":75,"abilities":"","morale_group":"D","dwelling":"hill","max_population":8,"growth_per_week":2}
               ],
               "artifacts": [
                 {"index":0,"id":"sword","zone":"home","local_idx":0}
@@ -1804,10 +1900,26 @@ mod tests {
         game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
 
         assert_eq!(game.placement_count, 5);
-        assert_eq!(game.dwelling_count, 1);
-        assert_eq!(game.dwellings[0].troop_id.as_str(), "sprites");
-        assert_eq!(game.dwellings[0].count, 50);
-        assert_eq!(game.dwellings[0].max_population, 50);
+        assert_eq!(game.dwelling_count, 2);
+        assert!(game
+            .dwellings
+            .iter()
+            .take(game.dwelling_count)
+            .any(|dwelling| {
+                dwelling.troop_id.as_str() == "sprites"
+                    && dwelling.count == 50
+                    && dwelling.max_population == 50
+            }));
+        assert!(game
+            .dwellings
+            .iter()
+            .take(game.dwelling_count)
+            .any(|dwelling| {
+                (dwelling.x, dwelling.y) == (7, 8)
+                    && dwelling.troop_id.as_str() == "ogres"
+                    && dwelling.count == 8
+                    && dwelling.max_population == 8
+            }));
         assert_eq!(game.foe_count, 2);
         assert!(game.foes.iter().take(game.foe_count).any(|foe| {
             !foe.friendly
