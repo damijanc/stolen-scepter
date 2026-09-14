@@ -13,6 +13,9 @@ pub const RES_MAX_ZONE_OBJECTS: usize = 256;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
+pub const RES_SIGN_BODY_LEN: usize = 128;
+pub const RES_SIGN_TITLE_LEN: usize = 64;
+pub const RES_MAX_CASTLE_DECOR: usize = 32;
 pub const RES_TILE_ART_LEN: usize = 24;
 pub const RES_TILE_CODE_COUNT: usize = 256;
 pub const RES_SPAWN_TIERS: usize = 4;
@@ -106,6 +109,65 @@ impl Default for ResSpawn {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResSign {
+    pub x: i32,
+    pub y: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+    pub title: FixedStr<RES_SIGN_TITLE_LEN>,
+    pub body: FixedStr<RES_SIGN_BODY_LEN>,
+}
+
+impl Default for ResSign {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            id: FixedStr::empty(),
+            title: FixedStr::empty(),
+            body: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResCastleDecor {
+    pub dx: i32,
+    pub dy: i32,
+    pub art: FixedStr<RES_ID_LEN>,
+}
+
+impl Default for ResCastleDecor {
+    fn default() -> Self {
+        Self {
+            dx: 0,
+            dy: 0,
+            art: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResZoneCastle {
+    pub x: i32,
+    pub y: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+    pub decor_count: usize,
+    pub decorations: [ResCastleDecor; RES_MAX_CASTLE_DECOR],
+}
+
+impl Default for ResZoneCastle {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            id: FixedStr::empty(),
+            decor_count: 0,
+            decorations: [ResCastleDecor::default(); RES_MAX_CASTLE_DECOR],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResZoneChest {
     pub x: i32,
     pub y: i32,
@@ -113,6 +175,23 @@ pub struct ResZoneChest {
 }
 
 impl Default for ResZoneChest {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            id: FixedStr::empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResZoneArtifact {
+    pub x: i32,
+    pub y: i32,
+    pub id: FixedStr<RES_ID_LEN>,
+}
+
+impl Default for ResZoneArtifact {
     fn default() -> Self {
         Self {
             x: 0,
@@ -202,8 +281,14 @@ pub struct ResZone {
     pub home_spawn_y: i32,
     pub magic_alcove_x: i32,
     pub magic_alcove_y: i32,
+    pub sign_count: usize,
+    pub signs: Box<[ResSign; RES_MAX_ZONE_OBJECTS]>,
+    pub castle_count: usize,
+    pub castles: Box<[ResZoneCastle; RES_MAX_ZONE_OBJECTS]>,
     pub chest_count: usize,
     pub chests: Box<[ResZoneChest; RES_MAX_ZONE_OBJECTS]>,
+    pub artifact_count: usize,
+    pub artifacts: Box<[ResZoneArtifact; RES_MAX_ZONE_OBJECTS]>,
     pub army_count: usize,
     pub armies: Box<[ResZoneArmy; RES_MAX_ZONE_OBJECTS]>,
     pub dwelling_count: usize,
@@ -225,8 +310,14 @@ impl Default for ResZone {
             home_spawn_y: -1,
             magic_alcove_x: -1,
             magic_alcove_y: -1,
+            sign_count: 0,
+            signs: Box::new([ResSign::default(); RES_MAX_ZONE_OBJECTS]),
+            castle_count: 0,
+            castles: Box::new([ResZoneCastle::default(); RES_MAX_ZONE_OBJECTS]),
             chest_count: 0,
             chests: Box::new([ResZoneChest::default(); RES_MAX_ZONE_OBJECTS]),
+            artifact_count: 0,
+            artifacts: Box::new([ResZoneArtifact::default(); RES_MAX_ZONE_OBJECTS]),
             army_count: 0,
             armies: Box::new([ResZoneArmy::default(); RES_MAX_ZONE_OBJECTS]),
             dwelling_count: 0,
@@ -1129,6 +1220,24 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
         zone.magic_alcove_x = optional_i32_field(magic_alcove, "x", -1)?;
         zone.magic_alcove_y = optional_i32_field(magic_alcove, "y", -1)?;
     }
+    if let Some(signs) = value.get("signs") {
+        let signs = signs
+            .as_array()
+            .ok_or(ResourceError::InvalidField("signs"))?;
+        for (slot, sign) in signs.iter().take(RES_MAX_ZONE_OBJECTS).enumerate() {
+            zone.signs[slot] = parse_sign(sign)?;
+            zone.sign_count += 1;
+        }
+    }
+    if let Some(castles) = value.get("castles") {
+        let castles = castles
+            .as_array()
+            .ok_or(ResourceError::InvalidField("castles"))?;
+        for (slot, castle) in castles.iter().take(RES_MAX_ZONE_OBJECTS).enumerate() {
+            zone.castles[slot] = parse_zone_castle(castle)?;
+            zone.castle_count += 1;
+        }
+    }
     if let Some(chests) = value.get("chests") {
         let chests = chests
             .as_array()
@@ -1136,6 +1245,15 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
         for (slot, chest) in chests.iter().take(RES_MAX_ZONE_OBJECTS).enumerate() {
             zone.chests[slot] = parse_zone_chest(chest)?;
             zone.chest_count += 1;
+        }
+    }
+    if let Some(artifacts) = value.get("artifacts") {
+        let artifacts = artifacts
+            .as_array()
+            .ok_or(ResourceError::InvalidField("artifacts"))?;
+        for (slot, artifact) in artifacts.iter().take(RES_MAX_ZONE_OBJECTS).enumerate() {
+            zone.artifacts[slot] = parse_zone_artifact(artifact)?;
+            zone.artifact_count += 1;
         }
     }
     if let Some(armies) = value.get("wandering_armies") {
@@ -1163,6 +1281,57 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
     Ok(zone)
 }
 
+fn parse_sign(value: &serde_json::Value) -> Result<ResSign, ResourceError> {
+    let mut sign = ResSign {
+        x: optional_i32_field(value, "x", 0)?,
+        y: optional_i32_field(value, "y", 0)?,
+        ..ResSign::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        sign.id.copy_from_str(id);
+    }
+    if let Some(title) = optional_string_field(value, "title")? {
+        sign.title.copy_from_str(title);
+    }
+    if let Some(body) = optional_string_field(value, "body")? {
+        sign.body.copy_from_str(body);
+    }
+    Ok(sign)
+}
+
+fn parse_zone_castle(value: &serde_json::Value) -> Result<ResZoneCastle, ResourceError> {
+    let mut castle = ResZoneCastle {
+        x: optional_i32_field(value, "x", 0)?,
+        y: optional_i32_field(value, "y", 0)?,
+        ..ResZoneCastle::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        castle.id.copy_from_str(id);
+    }
+    if let Some(decorations) = value.get("decorations") {
+        let decorations = decorations
+            .as_array()
+            .ok_or(ResourceError::InvalidField("decorations"))?;
+        for (slot, decoration) in decorations.iter().take(RES_MAX_CASTLE_DECOR).enumerate() {
+            castle.decorations[slot] = parse_castle_decor(decoration)?;
+            castle.decor_count += 1;
+        }
+    }
+    Ok(castle)
+}
+
+fn parse_castle_decor(value: &serde_json::Value) -> Result<ResCastleDecor, ResourceError> {
+    let mut decor = ResCastleDecor {
+        dx: optional_i32_field(value, "dx", 0)?,
+        dy: optional_i32_field(value, "dy", 0)?,
+        ..ResCastleDecor::default()
+    };
+    if let Some(art) = optional_string_field(value, "art")? {
+        decor.art.copy_from_str(art);
+    }
+    Ok(decor)
+}
+
 fn parse_zone_chest(value: &serde_json::Value) -> Result<ResZoneChest, ResourceError> {
     let mut chest = ResZoneChest {
         x: optional_i32_field(value, "x", 0)?,
@@ -1173,6 +1342,18 @@ fn parse_zone_chest(value: &serde_json::Value) -> Result<ResZoneChest, ResourceE
         chest.id.copy_from_str(id);
     }
     Ok(chest)
+}
+
+fn parse_zone_artifact(value: &serde_json::Value) -> Result<ResZoneArtifact, ResourceError> {
+    let mut artifact = ResZoneArtifact {
+        x: optional_i32_field(value, "x", 0)?,
+        y: optional_i32_field(value, "y", 0)?,
+        ..ResZoneArtifact::default()
+    };
+    if let Some(id) = optional_string_field(value, "id")? {
+        artifact.id.copy_from_str(id);
+    }
+    Ok(artifact)
 }
 
 fn parse_zone_army(value: &serde_json::Value) -> Result<ResZoneArmy, ResourceError> {

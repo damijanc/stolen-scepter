@@ -1,12 +1,22 @@
 use crate::resources::{ResZone, Resources};
+use crate::tables::FixedStr;
 use crate::tile::{Interact, Terrain};
+
+pub const TILE_ID_LEN: usize = 24;
+pub const TILE_SIGN_BODY_LEN: usize = 96;
+pub const TILE_SIGN_TITLE_LEN: usize = 48;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Tile {
     pub terrain: Terrain,
     pub interactive: Interact,
+    pub id: FixedStr<TILE_ID_LEN>,
     pub blocks_foot: bool,
     pub is_bridge: bool,
+    pub sign_title: FixedStr<TILE_SIGN_TITLE_LEN>,
+    pub sign_body: FixedStr<TILE_SIGN_BODY_LEN>,
+    pub boat_spawn_x: i32,
+    pub boat_spawn_y: i32,
 }
 
 impl Default for Tile {
@@ -14,8 +24,13 @@ impl Default for Tile {
         Self {
             terrain: Terrain::Grass,
             interactive: Interact::None,
+            id: FixedStr::empty(),
             blocks_foot: false,
             is_bridge: false,
+            sign_title: FixedStr::empty(),
+            sign_body: FixedStr::empty(),
+            boat_spawn_x: -1,
+            boat_spawn_y: -1,
         }
     }
 }
@@ -248,6 +263,15 @@ fn skip_blank_and_comments(bytes: &[u8], mut p: usize) -> usize {
 }
 
 fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone) {
+    for sign in &zone.signs[..zone.sign_count] {
+        if let Some(tile) = map.tile_mut_i32(sign.x, sign.y) {
+            tile.interactive = Interact::Sign;
+            tile.id.copy_from_str(sign.id.as_str());
+            tile.sign_title.copy_from_str(sign.title.as_str());
+            tile.sign_body.copy_from_str(sign.body.as_str());
+        }
+    }
+
     for index in 0..resources.town_count() {
         let Some(town) = resources.town_by_index(index) else {
             continue;
@@ -257,52 +281,86 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone) {
         }
         if let Some(tile) = map.tile_mut_i32(town.x, town.y) {
             tile.interactive = Interact::Town;
+            tile.id.copy_from_str(town.id.as_str());
+            tile.boat_spawn_x = town.boat_x;
+            tile.boat_spawn_y = town.boat_y;
         }
     }
 
-    for index in 0..resources.castle_count() {
-        let Some(castle) = resources.castle_by_index(index) else {
-            continue;
-        };
-        if castle.zone.as_str() != zone.id.as_str() {
-            continue;
+    if zone.castle_count > 0 {
+        for castle in &zone.castles[..zone.castle_count] {
+            stamp_castle(map, castle.x, castle.y, castle.id.as_str());
+            for decoration in &castle.decorations[..castle.decor_count] {
+                if decoration.art.is_empty() {
+                    continue;
+                }
+                if let Some(tile) =
+                    map.tile_mut_i32(castle.x + decoration.dx, castle.y + decoration.dy)
+                {
+                    tile.blocks_foot = true;
+                }
+            }
         }
-        for (dx, dy, is_gate) in [
-            (-1, -1, false),
-            (0, -1, false),
-            (1, -1, false),
-            (-1, 0, false),
-            (0, 0, true),
-            (1, 0, false),
-        ] {
-            let Some(tile) = map.tile_mut_i32(castle.x + dx, castle.y + dy) else {
+    } else {
+        for index in 0..resources.castle_count() {
+            let Some(castle) = resources.castle_by_index(index) else {
                 continue;
             };
-            if is_gate {
-                tile.interactive = Interact::CastleGate;
-                tile.blocks_foot = false;
-            } else {
-                tile.blocks_foot = true;
+            if castle.zone.as_str() != zone.id.as_str() {
+                continue;
             }
+            stamp_castle(map, castle.x, castle.y, castle.id.as_str());
         }
     }
 
     for chest in &zone.chests[..zone.chest_count] {
         if let Some(tile) = map.tile_mut_i32(chest.x, chest.y) {
             tile.interactive = Interact::TreasureChest;
+            tile.id.copy_from_str(chest.id.as_str());
+        }
+    }
+
+    for artifact in &zone.artifacts[..zone.artifact_count] {
+        if let Some(tile) = map.tile_mut_i32(artifact.x, artifact.y) {
+            tile.interactive = Interact::Artifact;
+            tile.id.copy_from_str(artifact.id.as_str());
         }
     }
 
     for dwelling in &zone.dwellings[..zone.dwelling_count] {
         if let Some(tile) = map.tile_mut_i32(dwelling.x, dwelling.y) {
             tile.interactive = Interact::from_dwelling_kind(dwelling.kind.as_str());
+            tile.id.copy_from_str(dwelling.id.as_str());
         }
     }
 
     if zone.magic_alcove_x >= 0 && zone.magic_alcove_y >= 0 {
         if let Some(tile) = map.tile_mut_i32(zone.magic_alcove_x, zone.magic_alcove_y) {
             tile.interactive = Interact::Alcove;
+            tile.id.copy_from_str("alcove");
             tile.blocks_foot = false;
+        }
+    }
+}
+
+fn stamp_castle(map: &mut Map, x: i32, y: i32, id: &str) {
+    for (dx, dy, is_gate) in [
+        (-1, -1, false),
+        (0, -1, false),
+        (1, -1, false),
+        (-1, 0, false),
+        (0, 0, true),
+        (1, 0, false),
+    ] {
+        let Some(tile) = map.tile_mut_i32(x + dx, y + dy) else {
+            continue;
+        };
+        if is_gate {
+            tile.interactive = Interact::CastleGate;
+            tile.id.copy_from_str(id);
+            tile.blocks_foot = false;
+        } else {
+            tile.blocks_foot = true;
         }
     }
 }
@@ -359,45 +417,83 @@ mod tests {
               "zones": [{
                 "id":"home",
                 "map":"maps/home.dat",
-                "width":4,
-                "height":2,
-                "chests":[{"x":0,"y":1,"id":"chest0"}],
-                "dwellings":[{"x":1,"y":1,"id":"dw0","kind":"hills"}],
-                "magic_alcove":{"x":2,"y":1}
+                "width":8,
+                "height":3,
+                "signs":[{"x":0,"y":1,"id":"sign0","title":"Treasure","body":"Dig here"}],
+                "castles":[{"x":6,"y":2,"id":"castle0","decorations":[{"dx":-2,"dy":0,"art":"tower"}]}],
+                "chests":[{"x":1,"y":1,"id":"chest0"}],
+                "artifacts":[{"x":3,"y":1,"id":"artifact0"}],
+                "dwellings":[{"x":2,"y":1,"id":"dw0","kind":"hills"}],
+                "magic_alcove":{"x":4,"y":1}
               }],
-              "towns": [{"index":0,"id":"town0","zone":"home","x":2,"y":0}],
-              "castles": [{"index":0,"id":"castle0","zone":"home","x":3,"y":1}],
+              "towns": [{"index":0,"id":"town0","zone":"home","x":5,"y":0,"boat":{"x":6,"y":0}}],
+              "castles": [{"index":0,"id":"fallback_castle","zone":"home","x":3,"y":1}],
               "troops": []
             }"##,
         )
         .expect("fixture parses");
         let zone = resources.zone_by_id("home").expect("zone exists");
 
-        let map = Map::load_zone_bytes(&resources, zone, b"# comment\n.F..\n....\n")
-            .expect("map bytes load");
+        let map = Map::load_zone_bytes(
+            &resources,
+            zone,
+            b"# comment\n.F......\n........\n........\n",
+        )
+        .expect("map bytes load");
 
         assert_eq!(map.tile(1, 0).expect("in bounds").terrain, Terrain::Forest);
         assert_eq!(
-            map.tile(2, 0).expect("in bounds").interactive,
+            map.tile(5, 0).expect("in bounds").interactive,
             Interact::Town
+        );
+        assert_eq!(map.tile(5, 0).expect("in bounds").id.as_str(), "town0");
+        assert_eq!(
+            (
+                map.tile(5, 0).expect("in bounds").boat_spawn_x,
+                map.tile(5, 0).expect("in bounds").boat_spawn_y
+            ),
+            (6, 0)
         );
         assert_eq!(
             map.tile(0, 1).expect("in bounds").interactive,
-            Interact::TreasureChest
+            Interact::Sign
+        );
+        assert_eq!(map.tile(0, 1).expect("in bounds").id.as_str(), "sign0");
+        assert_eq!(
+            map.tile(0, 1).expect("in bounds").sign_title.as_str(),
+            "Treasure"
+        );
+        assert_eq!(
+            map.tile(0, 1).expect("in bounds").sign_body.as_str(),
+            "Dig here"
         );
         assert_eq!(
             map.tile(1, 1).expect("in bounds").interactive,
-            Interact::DwellingHills
+            Interact::TreasureChest
         );
+        assert_eq!(map.tile(1, 1).expect("in bounds").id.as_str(), "chest0");
         assert_eq!(
             map.tile(2, 1).expect("in bounds").interactive,
-            Interact::Alcove
+            Interact::DwellingHills
         );
+        assert_eq!(map.tile(2, 1).expect("in bounds").id.as_str(), "dw0");
         assert_eq!(
             map.tile(3, 1).expect("in bounds").interactive,
+            Interact::Artifact
+        );
+        assert_eq!(map.tile(3, 1).expect("in bounds").id.as_str(), "artifact0");
+        assert_eq!(
+            map.tile(4, 1).expect("in bounds").interactive,
+            Interact::Alcove
+        );
+        assert_eq!(map.tile(4, 1).expect("in bounds").id.as_str(), "alcove");
+        assert_eq!(
+            map.tile(6, 2).expect("in bounds").interactive,
             Interact::CastleGate
         );
-        assert_eq!(map.eligible_scepter_tile_count(), 1);
+        assert_eq!(map.tile(6, 2).expect("in bounds").id.as_str(), "castle0");
+        assert!(map.tile(4, 2).expect("in bounds").blocks_foot);
+        assert_eq!(map.eligible_scepter_tile_count(), 10);
         assert_eq!(map.nth_eligible_scepter_tile(0), Some((0, 0)));
     }
 }
