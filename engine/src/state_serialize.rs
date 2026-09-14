@@ -340,7 +340,6 @@ mod tests {
         .expect("fixture parses");
         let mut game = Game::default();
         game.init_seeded_with_resources(&resources, Some("arthur"), 0, 2, 42);
-        game.salt_spells(&resources);
 
         let snapshot = build_snapshot_with_resources(Some(&game), Some(&resources));
         assert_eq!(snapshot["character"]["name"], "Arthur");

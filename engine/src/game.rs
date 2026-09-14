@@ -412,6 +412,9 @@ impl Game {
         self.init_contract(resources);
         self.init_starting_army(resources, player_class);
         self.init_options(resources);
+        if let Some(resources) = resources {
+            self.salt_spells(resources);
+        }
         self.init_castles(resources);
     }
 
@@ -1205,6 +1208,9 @@ mod tests {
         assert_eq!(game.contract.cycle[0].as_str(), "villain0");
         assert_eq!(game.contract.cycle[1].as_str(), "villain1");
         assert_eq!(game.contract.cycle[2].as_str(), "");
+        assert_eq!(game.towns[0].id.as_str(), "town0");
+        assert_eq!(game.towns[0].spell_for_sale.as_str(), "bridge");
+        assert!(!game.towns[0].visited);
         assert_eq!(game.castles[0].id.as_str(), "castle0");
         assert!(!game.castles[0].visited);
         assert!(!game.castles[0].known);
@@ -1241,8 +1247,6 @@ mod tests {
         .expect("fixture parses");
         let mut game = Game::default();
         game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
-
-        game.salt_spells(&resources);
 
         assert_eq!(game.towns[0].id.as_str(), "town0");
         assert_eq!(game.towns[0].spell_for_sale.as_str(), "bridge");
@@ -1652,6 +1656,9 @@ mod tests {
             {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
             {"id":"fallback","hero_spawn":{"x":8,"y":9}}
           ],
+          "towns": [
+            {"index":0,"id":"town0","zone":"home","x":1,"y":2,"pinned_spell":"bridge"}
+          ],
           "castles": [
             {"index":0,"id":"castle0","name":"Castle Zero","zone":"home","x":4,"y":5},
             {"index":1,"id":"castle1","name":"Castle One","zone":"fallback","x":8,"y":9}
@@ -1659,6 +1666,9 @@ mod tests {
           "troops": [
             {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
             {"index":1,"id":"militia","skill_level":2,"hit_points":2,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":50,"spoils_factor":5,"abilities":"","morale_group":"A"}
+          ],
+          "spells": [
+            {"index":0,"id":"bridge","name":"Bridge","kind":"adventure","cost":100}
           ],
           "classes": [
             {"index":0,"id":"knight","name":"Knight","portrait":"knight.png","starting_gold":1000,"starting_troops":[{"id":"peasants","count":25},{"id":"militia","count":10}],"ranks":[{"id":"general","name":"General","leadership":120,"max_spells":2,"spell_power":1,"commission":100,"knows_magic":false}]}
