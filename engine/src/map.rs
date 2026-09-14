@@ -202,6 +202,12 @@ impl Map {
         self.tiles.get(y * self.width + x)
     }
 
+    pub fn tile_i32(&self, x: i32, y: i32) -> Option<&Tile> {
+        let x = usize::try_from(x).ok()?;
+        let y = usize::try_from(y).ok()?;
+        self.tile(x, y)
+    }
+
     pub fn tile_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
         if x >= self.width || y >= self.height {
             return None;
