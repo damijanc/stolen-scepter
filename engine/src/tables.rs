@@ -6,6 +6,7 @@ pub const CLASS_MAX_STARTING_TROOPS: usize = 2;
 pub const CAT_CLASSES_MAX: usize = 8;
 pub const CAT_TROOPS_MAX: usize = 32;
 pub const CAT_VILLAINS_MAX: usize = 32;
+pub const TROOP_TIER_COUNTS: usize = 4;
 
 pub const TROOP_ABIL_FLY: i32 = 1 << 0;
 pub const TROOP_ABIL_REGEN: i32 = 1 << 1;
@@ -81,6 +82,7 @@ pub struct TroopDef {
     pub spoils_factor: i32,
     pub abilities: i32,
     pub morale_group: u8,
+    pub tier_counts: [i32; TROOP_TIER_COUNTS],
 }
 
 impl Default for TroopDef {
@@ -100,6 +102,7 @@ impl Default for TroopDef {
             spoils_factor: 0,
             abilities: 0,
             morale_group: b'A',
+            tier_counts: [0; TROOP_TIER_COUNTS],
         }
     }
 }
@@ -121,6 +124,7 @@ impl TroopDef {
         spoils_factor: i32,
         abilities: i32,
         morale_group: u8,
+        tier_counts: [i32; TROOP_TIER_COUNTS],
     ) -> Self {
         Self {
             index,
@@ -137,6 +141,7 @@ impl TroopDef {
             spoils_factor,
             abilities,
             morale_group,
+            tier_counts,
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::resources::{Resources, RES_MAX_ZONES};
+use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN, CAT_VILLAINS_MAX};
 
@@ -448,6 +448,50 @@ impl Game {
         }
     }
 
+    pub fn roll_creature(&mut self, resources: &Resources, mut tier: i32) -> Unit {
+        if tier < 0 || tier as usize >= RES_SPAWN_TIERS {
+            tier = 0;
+        }
+
+        let kind = self.rng_next(0, 3) as usize;
+        let chance = self.rng_next(1, 100);
+        let mut slot = 0;
+        while slot < 4 && chance > resources.spawn.chance_curve[tier as usize][slot] {
+            slot += 1;
+        }
+
+        let troop_id = resources.spawn.troop_pool[kind][slot].as_str();
+        if troop_id.is_empty() {
+            return Unit::default();
+        }
+
+        let mut unit = Unit::default();
+        unit.id.copy_from_str(troop_id);
+        unit.count = resources
+            .troop_by_id(troop_id)
+            .map(|troop| troop.tier_counts[tier as usize])
+            .unwrap_or(0);
+        if unit.count <= 1 {
+            unit.count = 2;
+        }
+        unit
+    }
+
+    pub fn repopulate_castle(&mut self, resources: &Resources, castle_id: usize) {
+        if castle_id >= GAME_CASTLES || castle_id >= resources.castle_count() {
+            return;
+        }
+
+        let tier = resources
+            .castle_by_index(castle_id)
+            .map(|castle| castle.difficulty_tier)
+            .unwrap_or(0);
+        for slot in 0..GAME_ARMY_SLOTS.min(5) {
+            let unit = self.roll_creature(resources, tier);
+            self.castles[castle_id].garrison[slot] = unit;
+        }
+    }
+
     fn init_character(
         &mut self,
         resources: Option<&Resources>,
@@ -836,6 +880,39 @@ mod tests {
         assert!(game.castles[0].villain_id.is_empty());
         assert!(game.castles[0].garrison[0].id.is_empty());
         assert_eq!(game.castles[0].garrison[0].count, 0);
+    }
+
+    #[test]
+    fn repopulate_castle_rolls_spawn_troops_for_difficulty_tier() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "zones": [{"id":"home","is_home":true}],
+              "spawn": {
+                "tier_chance_curve": [[100,100,100,100],[100,100,100,100],[100,100,100,100],[100,100,100,100]],
+                "tier_troop_pool": [
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["peasants","peasants","peasants","peasants","peasants"]
+                ]
+              },
+              "castles": [{"index":0,"id":"castle0","zone":"home","x":4,"y":5,"difficulty_tier":2}],
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("hero"), 0, 0, 42);
+
+        game.repopulate_castle(&resources, 0);
+
+        for slot in &game.castles[0].garrison {
+            assert_eq!(slot.id.as_str(), "peasants");
+            assert_eq!(slot.count, 15);
+        }
     }
 
     #[test]

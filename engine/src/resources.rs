@@ -1,12 +1,15 @@
 use crate::tables::{
     parse_troop_abilities, ClassDef, FixedStr, RankDef, TroopDef, VillainDef, CAT_CLASSES_MAX,
     CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
+    TROOP_TIER_COUNTS,
 };
 
 pub const RES_MAX_CASTLES: usize = 32;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
+pub const RES_SPAWN_TIERS: usize = 4;
+pub const RES_SPAWN_POOL_N: usize = 5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResTime {
@@ -55,6 +58,21 @@ impl Default for ResContract {
         Self {
             cycle_length: 5,
             initial_last_contract: 4,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResSpawn {
+    pub chance_curve: [[i32; RES_SPAWN_POOL_N - 1]; RES_SPAWN_TIERS],
+    pub troop_pool: [[FixedStr<RES_ID_LEN>; RES_SPAWN_POOL_N]; RES_SPAWN_TIERS],
+}
+
+impl Default for ResSpawn {
+    fn default() -> Self {
+        Self {
+            chance_curve: [[0; RES_SPAWN_POOL_N - 1]; RES_SPAWN_TIERS],
+            troop_pool: [[FixedStr::empty(); RES_SPAWN_POOL_N]; RES_SPAWN_TIERS],
         }
     }
 }
@@ -123,6 +141,7 @@ pub struct Resources {
     pub time: ResTime,
     pub world: ResWorld,
     pub contract: ResContract,
+    pub spawn: ResSpawn,
     zones: [ResZone; RES_MAX_ZONES],
     zone_count: usize,
     castles: [ResCastle; RES_MAX_CASTLES],
@@ -142,6 +161,7 @@ impl Default for Resources {
             time: ResTime::default(),
             world: ResWorld::default(),
             contract: ResContract::default(),
+            spawn: ResSpawn::default(),
             zones: [ResZone::default(); RES_MAX_ZONES],
             zone_count: 0,
             castles: [ResCastle::default(); RES_MAX_CASTLES],
@@ -169,6 +189,7 @@ impl Resources {
         resources.parse_time(&root)?;
         resources.parse_world(&root)?;
         resources.parse_contract(&root)?;
+        resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
         resources.parse_zones(&root)?;
         resources.parse_castles(&root)?;
@@ -300,6 +321,53 @@ impl Resources {
             "initial_last_contract",
             self.contract.initial_last_contract,
         )?;
+        Ok(())
+    }
+
+    fn parse_spawn(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(spawn) = root.get("spawn") else {
+            return Ok(());
+        };
+        let spawn = spawn
+            .as_object()
+            .ok_or(ResourceError::InvalidField("spawn"))?;
+
+        if let Some(curves) = spawn.get("tier_chance_curve") {
+            let rows = curves
+                .as_array()
+                .ok_or(ResourceError::InvalidField("spawn.tier_chance_curve"))?;
+            for (tier, row) in rows.iter().take(RES_SPAWN_TIERS).enumerate() {
+                let values = row
+                    .as_array()
+                    .ok_or(ResourceError::InvalidField("spawn.tier_chance_curve row"))?;
+                for (slot, value) in values.iter().take(RES_SPAWN_POOL_N - 1).enumerate() {
+                    let n = value
+                        .as_i64()
+                        .ok_or(ResourceError::InvalidField("spawn.tier_chance_curve value"))?;
+                    self.spawn.chance_curve[tier][slot] = i32::try_from(n).map_err(|_| {
+                        ResourceError::InvalidField("spawn.tier_chance_curve value")
+                    })?;
+                }
+            }
+        }
+
+        if let Some(pool) = spawn.get("tier_troop_pool") {
+            let rows = pool
+                .as_array()
+                .ok_or(ResourceError::InvalidField("spawn.tier_troop_pool"))?;
+            for (tier, row) in rows.iter().take(RES_SPAWN_TIERS).enumerate() {
+                let values = row
+                    .as_array()
+                    .ok_or(ResourceError::InvalidField("spawn.tier_troop_pool row"))?;
+                for (slot, value) in values.iter().take(RES_SPAWN_POOL_N).enumerate() {
+                    let troop = value
+                        .as_str()
+                        .ok_or(ResourceError::InvalidField("spawn.tier_troop_pool value"))?;
+                    self.spawn.troop_pool[tier][slot].copy_from_str(troop);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -529,6 +597,7 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
         .first()
         .copied()
         .unwrap_or(b'A');
+    let tier_counts = optional_i32_array::<TROOP_TIER_COUNTS>(value, "tier_counts")?;
 
     Ok(TroopDef::new(
         i32_field(value, "index")?,
@@ -545,6 +614,7 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
         i32_field(value, "spoils_factor")?,
         parse_troop_abilities(string_field(value, "abilities")?),
         morale_group,
+        tier_counts,
     ))
 }
 
@@ -776,6 +846,22 @@ fn required_i32_array3(
     ])
 }
 
+fn optional_i32_array<const N: usize>(
+    value: &serde_json::Value,
+    key: &'static str,
+) -> Result<[i32; N], ResourceError> {
+    let mut out = [0; N];
+    let Some(values) = value.get(key) else {
+        return Ok(out);
+    };
+    let values = values.as_array().ok_or(ResourceError::InvalidField(key))?;
+    for (index, value) in values.iter().take(N).enumerate() {
+        let n = value.as_i64().ok_or(ResourceError::InvalidField(key))?;
+        out[index] = i32::try_from(n).map_err(|_| ResourceError::InvalidField(key))?;
+    }
+    Ok(out)
+}
+
 fn json_array_i32(
     values: &[serde_json::Value],
     key: &'static str,
@@ -806,6 +892,15 @@ mod tests {
               "time": {"day_steps": 33, "week_days": 6, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
               "world": {"starting_zone": "fallback", "default_name": "Champion", "max_army_slots": 5, "default_options": [4,1,1,1,1,0,5]},
               "contract": {"cycle_length": 3, "initial_last_contract": 2},
+              "spawn": {
+                "tier_chance_curve": [[50,75,90,100],[45,70,90,100],[40,65,85,100],[35,60,80,100]],
+                "tier_troop_pool": [
+                  ["peasants","peasants","peasants","peasants","peasants"],
+                  ["vampires","peasants","peasants","peasants","peasants"],
+                  ["peasants","vampires","peasants","peasants","peasants"],
+                  ["peasants","peasants","vampires","peasants","peasants"]
+                ]
+              },
               "combat": {"morale_chart": [["N","N","N","N","N"],["N","N","N","N","N"],["N","N","H","N","N"],["L","N","L","H","N"],["L","L","L","N","N"]]},
               "zones": [
                 {"id":"home","is_home":true,"hero_spawn":{"x":1,"y":2},"home_spawn":{"x":3,"y":4}},
@@ -816,7 +911,7 @@ mod tests {
                 {"index":1,"id":"castle1","zone":"fallback","x":8,"y":9,"gate":{"x":10,"y":11},"special":{"excluded_from_contract":true}}
               ],
               "troops": [
-                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20]},
                 {"index":1,"id":"vampires","skill_level":5,"hit_points":30,"move_rate":1,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":1500,"spoils_factor":150,"abilities":"FLY|LEECH|UNDEAD","morale_group":"E"}
               ],
               "classes": [
@@ -839,6 +934,8 @@ mod tests {
         assert_eq!(resources.world.default_name.as_str(), "Champion");
         assert_eq!(resources.contract.cycle_length, 3);
         assert_eq!(resources.contract.initial_last_contract, 2);
+        assert_eq!(resources.spawn.chance_curve[0], [50, 75, 90, 100]);
+        assert_eq!(resources.spawn.troop_pool[1][0].as_str(), "vampires");
         assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
         let castle0 = resources.castle_by_id("castle0").unwrap();
         assert_eq!(castle0.gate_x, 4);
@@ -855,6 +952,7 @@ mod tests {
         let peasants = resources.troop_by_id("peasants").unwrap();
         assert_eq!(peasants.hit_points, 1);
         assert_eq!(peasants.id.as_str(), "peasants");
+        assert_eq!(peasants.tier_counts, [5, 10, 15, 20]);
 
         let vampires = resources.troop_by_index(1).unwrap();
         assert_eq!(vampires.id.as_str(), "vampires");
