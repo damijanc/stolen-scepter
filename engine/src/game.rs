@@ -1,7 +1,10 @@
 use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
-use crate::tables::{class_stats_at_rank, FixedStr, CAT_ID_LEN, CAT_VILLAINS_MAX};
+use crate::tables::{
+    class_stats_at_rank, ArtifactPower, FixedStr, CAT_ARTIFACTS_MAX, CAT_ID_LEN, CAT_SPELLS_MAX,
+    CAT_VILLAINS_MAX,
+};
 use crate::tile::Interact;
 
 pub const GAME_NAME_LEN: usize = 16;
@@ -58,6 +61,23 @@ pub enum AudienceOutcome {
     MoreNeeded = 0,
     Promoted = 1,
     FinalRank = 2,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChestOutcome {
+    Gold = 0,
+    Leadership = 1,
+    Commission = 2,
+    SpellPower = 3,
+    MaxSpells = 4,
+    NewSpell = 5,
+    Empty = 6,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ChestPending {
+    pub pending_gold: i32,
+    pub pending_leadership: i32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -251,6 +271,32 @@ impl Default for Stats {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArtifactState {
+    pub found: [bool; CAT_ARTIFACTS_MAX],
+}
+
+impl Default for ArtifactState {
+    fn default() -> Self {
+        Self {
+            found: [false; CAT_ARTIFACTS_MAX],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Spellbook {
+    pub counts: [i32; CAT_SPELLS_MAX],
+}
+
+impl Default for Spellbook {
+    fn default() -> Self {
+        Self {
+            counts: [0; CAT_SPELLS_MAX],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Position {
     pub zone: FixedStr<GAME_ID_LEN>,
     pub x: i32,
@@ -428,7 +474,9 @@ pub struct Game {
     pub travel_mode: TravelMode,
     pub boat: BoatState,
     pub army: [ArmyStack; GAME_ARMY_SLOTS],
+    pub spells: Spellbook,
     pub contract: Contract,
+    pub artifacts: ArtifactState,
     pub towns: [TownRecord; GAME_TOWNS],
     pub castles: [CastleRecord; GAME_CASTLES],
     pub consumed: [TileMutation; GAME_MAX_MUTATIONS],
@@ -456,7 +504,9 @@ impl Default for Game {
             travel_mode: TravelMode::Walk,
             boat: BoatState::default(),
             army: [ArmyStack::default(); GAME_ARMY_SLOTS],
+            spells: Spellbook::default(),
             contract: Contract::default(),
+            artifacts: ArtifactState::default(),
             towns: [TownRecord::default(); GAME_TOWNS],
             castles: [CastleRecord::default(); GAME_CASTLES],
             consumed: [TileMutation::default(); GAME_MAX_MUTATIONS],
@@ -637,6 +687,182 @@ impl Game {
                 continue;
             }
             self.add_consumed(zone.id.as_str(), zone.magic_alcove_x, zone.magic_alcove_y);
+        }
+    }
+
+    pub fn claim_artifact_by_id(&mut self, resources: &Resources, id: &str) -> bool {
+        let Some(artifact) = resources.artifact_by_id(id) else {
+            return false;
+        };
+        self.claim_artifact(resources, artifact.index)
+    }
+
+    pub fn claim_artifact(&mut self, resources: &Resources, index: i32) -> bool {
+        if index < 0 || index as usize >= CAT_ARTIFACTS_MAX {
+            return false;
+        }
+        let index = index as usize;
+        if index >= resources.artifacts_count() || self.artifacts.found[index] {
+            return false;
+        }
+        self.artifacts.found[index] = true;
+
+        let Some(artifact) = resources.artifact_by_index(index as i32) else {
+            return true;
+        };
+        match artifact.power {
+            ArtifactPower::DoubleLeadership => {
+                self.stats.leadership_base *= 2;
+                self.stats.leadership_current = self.stats.leadership_base;
+            }
+            ArtifactPower::IncreaseCommission => {
+                self.stats.commission_weekly += 2000;
+            }
+            ArtifactPower::DoubleSpellPower => {
+                self.stats.spell_power *= 2;
+            }
+            ArtifactPower::DoubleMaxSpells => {
+                self.stats.max_spells *= 2;
+            }
+            ArtifactPower::Unknown
+            | ArtifactPower::IncreasedDamage
+            | ArtifactPower::QuarterProtection
+            | ArtifactPower::CheaperBoats => {}
+        }
+        true
+    }
+
+    pub fn has_power(&self, resources: &Resources, power: ArtifactPower) -> bool {
+        for index in 0..resources.artifacts_count().min(CAT_ARTIFACTS_MAX) {
+            let Some(artifact) = resources.artifact_by_index(index as i32) else {
+                continue;
+            };
+            if self.artifacts.found[index] && artifact.power == power {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn artifacts_found(&self, resources: &Resources) -> i32 {
+        self.artifacts.found[..resources.artifacts_count().min(CAT_ARTIFACTS_MAX)]
+            .iter()
+            .filter(|found| **found)
+            .count() as i32
+    }
+
+    pub fn peek_chest(
+        &self,
+        resources: &Resources,
+        zone_index: usize,
+        x: i32,
+        y: i32,
+    ) -> (ChestOutcome, ChestPending) {
+        let mut copy = self.clone();
+        copy.chest_outcome(resources, zone_index, x, y, false)
+    }
+
+    pub fn roll_chest(
+        &mut self,
+        resources: &Resources,
+        zone_index: usize,
+        x: i32,
+        y: i32,
+    ) -> (ChestOutcome, ChestPending) {
+        self.chest_outcome(resources, zone_index, x, y, true)
+    }
+
+    fn chest_outcome(
+        &mut self,
+        resources: &Resources,
+        zone_index: usize,
+        x: i32,
+        y: i32,
+        apply: bool,
+    ) -> (ChestOutcome, ChestPending) {
+        let tier = zone_index.min(3);
+        let chest = &resources.economy.chest;
+        let chance = (chest_rand(self.seed, x, y, 1) % 100) as i32 + 1;
+
+        if chance < chest.chance_gold[tier] {
+            let max = if chest.gold_max[tier] > 0 {
+                chest.gold_max[tier] as u32
+            } else {
+                1
+            };
+            let points = (chest_rand(self.seed, x, y, 2) % max) as i32 + 1 + chest.gold_min[tier];
+            let gold = points * 100;
+            let mut leadership = gold / 50;
+            if self.has_power(resources, ArtifactPower::DoubleLeadership) {
+                leadership *= 2;
+            }
+            return (
+                ChestOutcome::Gold,
+                ChestPending {
+                    pending_gold: gold,
+                    pending_leadership: leadership,
+                },
+            );
+        }
+
+        if chance < chest.chance_commission[tier] {
+            let max = if chest.commission_max[tier] > 0 {
+                chest.commission_max[tier] as u32
+            } else {
+                1
+            };
+            let points =
+                (chest_rand(self.seed, x, y, 3) % max) as i32 + 1 + chest.commission_min[tier];
+            if apply {
+                self.stats.commission_weekly += points;
+            }
+            return (ChestOutcome::Commission, ChestPending::default());
+        }
+
+        if chance < chest.chance_spell_power[tier] {
+            if apply {
+                self.stats.spell_power += 1;
+            }
+            return (ChestOutcome::SpellPower, ChestPending::default());
+        }
+
+        if chance < chest.chance_max_spells[tier] {
+            let mut points = chest.max_spells_base[tier];
+            if self.has_power(resources, ArtifactPower::DoubleMaxSpells) {
+                points *= 2;
+            }
+            if apply {
+                self.stats.max_spells += points;
+            }
+            return (ChestOutcome::MaxSpells, ChestPending::default());
+        }
+
+        if chance < chest.chance_new_spell[tier] {
+            let spell_count = resources.spells_count();
+            if spell_count == 0 {
+                return (ChestOutcome::Empty, ChestPending::default());
+            }
+            let spell_type = (chest_rand(self.seed, x, y, 4) % spell_count as u32) as usize;
+            let spell_num = (chest_rand(self.seed, x, y, 5) % (tier as u32 + 1)) as i32 + 1;
+            if apply && spell_type < self.spells.counts.len() {
+                self.spells.counts[spell_type] += spell_num;
+            }
+            return (ChestOutcome::NewSpell, ChestPending::default());
+        }
+
+        (ChestOutcome::Empty, ChestPending::default())
+    }
+
+    pub fn accept_chest_gold(&mut self, gold: i32) {
+        if gold > 0 {
+            self.stats.gold += gold;
+        }
+    }
+
+    pub fn accept_chest_leadership(&mut self, leadership: i32) {
+        if leadership > 0 {
+            self.stats.leadership_base += leadership;
+            self.stats.leadership_current += leadership;
         }
     }
 
@@ -1716,6 +1942,14 @@ fn salted_dwelling_id(troop_id: &str, dwelling_counter: i32) -> String {
     format!("sd_{}_{}", &troop_id[..len], dwelling_counter)
 }
 
+fn chest_rand(seed: u64, x: i32, y: i32, salt: u32) -> u32 {
+    let mut h = seed as u32 ^ 0x00C0_FFEE;
+    h ^= (x as u32).wrapping_mul(131);
+    h ^= (y as u32).wrapping_mul(97);
+    h ^= salt;
+    h.wrapping_mul(1_664_525).wrapping_add(1_013_904_223)
+}
+
 fn normalize_dwelling_kind(kind: &str) -> &str {
     if kind == "hills" {
         "hill"
@@ -1726,9 +1960,10 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{AudienceOutcome, CastleOwnerKind, Game, GAME_ARMY_SLOTS};
+    use super::{AudienceOutcome, CastleOwnerKind, ChestOutcome, Game, GAME_ARMY_SLOTS};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
+    use crate::tables::ArtifactPower;
     use crate::tile::{Interact, Terrain};
 
     #[test]
@@ -1789,6 +2024,109 @@ mod tests {
 
         game.rng_restore(snap);
         assert_eq!(game.rng_next(0, 99), first);
+    }
+
+    #[test]
+    fn claim_artifact_applies_stat_powers_once_and_tracks_passive_powers() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "troops": [],
+              "artifacts": [
+                {"index":0,"id":"crown","power":"double_leadership"},
+                {"index":1,"id":"articles","power":"increase_commission"},
+                {"index":2,"id":"amulet","power":"double_spell_power"},
+                {"index":3,"id":"ring","power":"double_max_spells"},
+                {"index":4,"id":"anchor","power":"cheaper_boats"}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.stats.leadership_base = 100;
+        game.stats.leadership_current = 80;
+        game.stats.commission_weekly = 500;
+        game.stats.spell_power = 3;
+        game.stats.max_spells = 2;
+
+        assert!(game.claim_artifact_by_id(&resources, "crown"));
+        assert_eq!(game.stats.leadership_base, 200);
+        assert_eq!(game.stats.leadership_current, 200);
+        assert!(!game.claim_artifact_by_id(&resources, "crown"));
+        assert_eq!(game.stats.leadership_base, 200);
+
+        assert!(game.claim_artifact_by_id(&resources, "articles"));
+        assert_eq!(game.stats.commission_weekly, 2_500);
+        assert!(game.claim_artifact_by_id(&resources, "amulet"));
+        assert_eq!(game.stats.spell_power, 6);
+        assert!(game.claim_artifact_by_id(&resources, "ring"));
+        assert_eq!(game.stats.max_spells, 4);
+        assert!(game.claim_artifact_by_id(&resources, "anchor"));
+        assert!(game.has_power(&resources, ArtifactPower::CheaperBoats));
+        assert_eq!(game.artifacts_found(&resources), 5);
+    }
+
+    #[test]
+    fn chest_gold_roll_is_pending_until_player_accepts_choice() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "economy": {"chest": {
+                "chance_gold": [101,101,101,101],
+                "gold_min": [0,0,0,0],
+                "gold_max": [5,5,5,5]
+              }},
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game {
+            seed: 0,
+            ..Game::default()
+        };
+
+        let (peek, peek_pending) = game.peek_chest(&resources, 0, 4, 0);
+        let (rolled, pending) = game.roll_chest(&resources, 0, 4, 0);
+
+        assert_eq!(rolled, ChestOutcome::Gold);
+        assert_eq!(peek, rolled);
+        assert_eq!(peek_pending, pending);
+        assert!(pending.pending_gold > 0);
+        assert_eq!(game.stats.gold, 0);
+        assert_eq!(game.stats.leadership_base, 0);
+
+        game.accept_chest_gold(pending.pending_gold);
+        assert_eq!(game.stats.gold, pending.pending_gold);
+        game.accept_chest_leadership(pending.pending_leadership);
+        assert_eq!(game.stats.leadership_base, pending.pending_leadership);
+        assert_eq!(game.stats.leadership_current, pending.pending_leadership);
+    }
+
+    #[test]
+    fn chest_roll_applies_non_choice_rewards_eagerly() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "economy": {"chest": {
+                "chance_gold": [0,0,0,0],
+                "chance_commission": [0,0,0,0],
+                "chance_spell_power": [0,0,0,0],
+                "chance_max_spells": [0,0,0,0],
+                "chance_new_spell": [101,101,101,101]
+              }},
+              "spells": [{"index":0,"id":"bridge","name":"Bridge","kind":"adventure","cost":100}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game {
+            seed: 0,
+            ..Game::default()
+        };
+
+        let (outcome, pending) = game.roll_chest(&resources, 0, 4, 0);
+
+        assert_eq!(outcome, ChestOutcome::NewSpell);
+        assert_eq!(pending.pending_gold, 0);
+        assert_eq!(pending.pending_leadership, 0);
+        assert_eq!(game.spells.counts[0], 1);
     }
 
     #[test]

@@ -94,7 +94,38 @@ pub fn build_snapshot_with_resources(
         .collect();
     root.insert("army".to_owned(), serde_json::Value::Array(army));
 
+    if let Some(resources) = resources {
+        let mut spells = serde_json::Map::new();
+        for index in 0..resources.spells_count().min(game.spells.counts.len()) {
+            let Some(spell) = resources.spell_by_index(index as i32) else {
+                continue;
+            };
+            spells.insert(
+                spell.id.as_str().to_owned(),
+                serde_json::json!(game.spells.counts[index]),
+            );
+        }
+        root.insert("spells".to_owned(), serde_json::Value::Object(spells));
+    }
+
     root.insert("contract".to_owned(), contract_snapshot(game, resources));
+
+    if let Some(resources) = resources {
+        let found: Vec<_> = game.artifacts.found
+            [..resources.artifacts_count().min(game.artifacts.found.len())]
+            .iter()
+            .enumerate()
+            .filter(|(_, found)| **found)
+            .filter_map(|(index, _)| resources.artifact_by_index(index as i32))
+            .map(|artifact| serde_json::json!(artifact.id.as_str()))
+            .collect();
+        root.insert(
+            "artifacts".to_owned(),
+            serde_json::json!({
+                "found": found,
+            }),
+        );
+    }
 
     let towns: Vec<_> = game
         .towns
@@ -430,6 +461,8 @@ mod tests {
         assert_eq!(snapshot["army"][0]["slot"], 0);
         assert_eq!(snapshot["army"][0]["troop"], "peasants");
         assert_eq!(snapshot["army"][0]["count"], 25);
+        assert_eq!(snapshot["spells"]["bridge"], 0);
+        assert_eq!(snapshot["artifacts"]["found"], serde_json::json!([]));
         assert_eq!(snapshot["contract"]["active"], "");
         assert_eq!(snapshot["contract"]["cycle"][0], "villain0");
         assert_eq!(snapshot["contract"]["cycle"][1], "villain1");

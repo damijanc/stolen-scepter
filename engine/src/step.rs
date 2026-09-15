@@ -1,4 +1,4 @@
-use crate::game::{Game, Mount, TravelMode};
+use crate::game::{ChestOutcome, ChestPending, Game, Mount, TravelMode};
 use crate::map::{Map, Tile};
 use crate::resources::Resources;
 use crate::tables::FixedStr;
@@ -24,6 +24,8 @@ pub enum StepInteraction {
     },
     TreasureChest {
         id: String,
+        outcome: ChestOutcome,
+        pending: ChestPending,
     },
     Sign {
         id: String,
@@ -249,8 +251,14 @@ fn resolve_interaction(
             StepInteraction::Town { id, boat_x, boat_y }
         }
         Interact::TreasureChest => {
+            let zone_index = resources.zone_index_by_id(zone.as_str()).unwrap_or(0);
+            let (outcome, pending) = game.roll_chest(resources, zone_index, x, y);
             consume_tile(game, map, zone.as_str(), x, y);
-            StepInteraction::TreasureChest { id }
+            StepInteraction::TreasureChest {
+                id,
+                outcome,
+                pending,
+            }
         }
         Interact::Sign => StepInteraction::Sign {
             id,
@@ -258,6 +266,7 @@ fn resolve_interaction(
             body: tile.sign_body.as_str().to_owned(),
         },
         Interact::Artifact => {
+            game.claim_artifact_by_id(resources, id.as_str());
             consume_tile(game, map, zone.as_str(), x, y);
             StepInteraction::Artifact { id }
         }
@@ -865,10 +874,13 @@ mod tests {
             }
         );
 
+        let (chest_outcome, chest_pending) = game.peek_chest(&resources, 0, 4, 0);
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),
             StepInteraction::TreasureChest {
-                id: "chest0".to_owned()
+                id: "chest0".to_owned(),
+                outcome: chest_outcome,
+                pending: chest_pending
             }
         );
         assert_consumed(&game, &map, "home", 4, 0);
@@ -879,6 +891,7 @@ mod tests {
                 id: "sword".to_owned()
             }
         );
+        assert!(game.artifacts.found[0]);
         assert_consumed(&game, &map, "home", 5, 0);
 
         assert_eq!(
@@ -981,6 +994,9 @@ mod tests {
               "towns": [
                 {"index": 0, "id": "town0", "name": "Town", "zone": "home", "x": 1, "y": 0,
                  "boat": {"x": 20, "y": 21}}
+              ],
+              "artifacts": [
+                {"index": 0, "id": "sword", "name": "Sword", "power": "increased_damage"}
               ],
               "troops": []
             }"#,

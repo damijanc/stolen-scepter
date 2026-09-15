@@ -20,6 +20,7 @@ pub const RES_TILE_ART_LEN: usize = 24;
 pub const RES_TILE_CODE_COUNT: usize = 256;
 pub const RES_SPAWN_TIERS: usize = 4;
 pub const RES_SPAWN_POOL_N: usize = 5;
+pub const RES_CHEST_TIERS: usize = 4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResTileCode {
@@ -89,6 +90,50 @@ impl Default for ResContract {
         Self {
             cycle_length: 5,
             initial_last_contract: 4,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResChest {
+    pub chance_gold: [i32; RES_CHEST_TIERS],
+    pub chance_commission: [i32; RES_CHEST_TIERS],
+    pub chance_spell_power: [i32; RES_CHEST_TIERS],
+    pub chance_max_spells: [i32; RES_CHEST_TIERS],
+    pub chance_new_spell: [i32; RES_CHEST_TIERS],
+    pub gold_min: [i32; RES_CHEST_TIERS],
+    pub gold_max: [i32; RES_CHEST_TIERS],
+    pub commission_min: [i32; RES_CHEST_TIERS],
+    pub commission_max: [i32; RES_CHEST_TIERS],
+    pub max_spells_base: [i32; RES_CHEST_TIERS],
+}
+
+impl Default for ResChest {
+    fn default() -> Self {
+        Self {
+            chance_gold: [0x3d, 0x42, 0x4c, 0x47],
+            chance_commission: [0x51, 0x56, 0x56, 0x51],
+            chance_spell_power: [0x53, 0x59, 0x59, 0x56],
+            chance_max_spells: [0x56, 0x5c, 0x5d, 0x5b],
+            chance_new_spell: [0x65, 0x65, 0x65, 0x65],
+            gold_min: [0x00, 0x04, 0x09, 0x13],
+            gold_max: [0x05, 0x10, 0x15, 0x1f],
+            commission_min: [0x09, 0x31, 0x63, 0xc7],
+            commission_max: [0x29, 0x33, 0x65, 0x12d],
+            max_spells_base: [0x01, 0x01, 0x02, 0x02],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResEconomy {
+    pub chest: ResChest,
+}
+
+impl Default for ResEconomy {
+    fn default() -> Self {
+        Self {
+            chest: ResChest::default(),
         }
     }
 }
@@ -404,6 +449,7 @@ pub struct Resources {
     pub time: ResTime,
     pub world: ResWorld,
     pub contract: ResContract,
+    pub economy: ResEconomy,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
     town_count: usize,
@@ -432,6 +478,7 @@ impl Default for Resources {
             time: ResTime::default(),
             world: ResWorld::default(),
             contract: ResContract::default(),
+            economy: ResEconomy::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
             town_count: 0,
@@ -474,6 +521,7 @@ impl Resources {
         resources.parse_time(&root)?;
         resources.parse_world(&root)?;
         resources.parse_contract(&root)?;
+        resources.parse_economy(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
         resources.parse_towns(&root)?;
@@ -514,6 +562,12 @@ impl Resources {
         self.zones[..self.zone_count]
             .iter()
             .find(|zone| zone.id.as_str() == id)
+    }
+
+    pub fn zone_index_by_id(&self, id: &str) -> Option<usize> {
+        self.zones[..self.zone_count]
+            .iter()
+            .position(|zone| zone.id.as_str() == id)
     }
 
     pub fn castle_count(&self) -> usize {
@@ -688,6 +742,57 @@ impl Resources {
             contract,
             "initial_last_contract",
             self.contract.initial_last_contract,
+        )?;
+        Ok(())
+    }
+
+    fn parse_economy(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(economy) = root.get("economy") else {
+            return Ok(());
+        };
+        let Some(chest) = economy.get("chest") else {
+            return Ok(());
+        };
+        if !chest.is_object() {
+            return Err(ResourceError::InvalidField("economy.chest"));
+        }
+        parse_i32_array_into(chest, "chance_gold", &mut self.economy.chest.chance_gold)?;
+        parse_i32_array_into(
+            chest,
+            "chance_commission",
+            &mut self.economy.chest.chance_commission,
+        )?;
+        parse_i32_array_into(
+            chest,
+            "chance_spell_power",
+            &mut self.economy.chest.chance_spell_power,
+        )?;
+        parse_i32_array_into(
+            chest,
+            "chance_max_spells",
+            &mut self.economy.chest.chance_max_spells,
+        )?;
+        parse_i32_array_into(
+            chest,
+            "chance_new_spell",
+            &mut self.economy.chest.chance_new_spell,
+        )?;
+        parse_i32_array_into(chest, "gold_min", &mut self.economy.chest.gold_min)?;
+        parse_i32_array_into(chest, "gold_max", &mut self.economy.chest.gold_max)?;
+        parse_i32_array_into(
+            chest,
+            "commission_min",
+            &mut self.economy.chest.commission_min,
+        )?;
+        parse_i32_array_into(
+            chest,
+            "commission_max",
+            &mut self.economy.chest.commission_max,
+        )?;
+        parse_i32_array_into(
+            chest,
+            "max_spells_base",
+            &mut self.economy.chest.max_spells_base,
         )?;
         Ok(())
     }
@@ -1624,6 +1729,22 @@ fn optional_i32_array<const N: usize>(
     Ok(out)
 }
 
+fn parse_i32_array_into(
+    value: &serde_json::Value,
+    key: &'static str,
+    out: &mut [i32],
+) -> Result<(), ResourceError> {
+    let Some(values) = value.get(key) else {
+        return Ok(());
+    };
+    let values = values.as_array().ok_or(ResourceError::InvalidField(key))?;
+    for (index, value) in values.iter().take(out.len()).enumerate() {
+        let n = value.as_i64().ok_or(ResourceError::InvalidField(key))?;
+        out[index] = i32::try_from(n).map_err(|_| ResourceError::InvalidField(key))?;
+    }
+    Ok(())
+}
+
 fn json_array_i32(
     values: &[serde_json::Value],
     key: &'static str,
@@ -1654,6 +1775,7 @@ mod tests {
               "time": {"day_steps": 33, "week_days": 6, "days_per_difficulty": {"easy": 901, "normal": 601, "hard": 401, "impossible": 201}},
               "world": {"starting_zone": "fallback", "default_name": "Champion", "max_army_slots": 5, "default_options": [4,1,1,1,1,0,5]},
               "contract": {"cycle_length": 3, "initial_last_contract": 2},
+              "economy": {"chest": {"chance_gold": [1,2,3,4], "gold_min": [9]}},
               "spawn": {
                 "tier_chance_curve": [[50,75,90,100],[45,70,90,100],[40,65,85,100],[35,60,80,100]],
                 "tier_troop_pool": [
@@ -1728,6 +1850,8 @@ mod tests {
         assert_eq!(resources.world.default_name.as_str(), "Champion");
         assert_eq!(resources.contract.cycle_length, 3);
         assert_eq!(resources.contract.initial_last_contract, 2);
+        assert_eq!(resources.economy.chest.chance_gold, [1, 2, 3, 4]);
+        assert_eq!(resources.economy.chest.gold_min, [9, 4, 9, 19]);
         assert_eq!(resources.spawn.chance_curve[0], [50, 75, 90, 100]);
         assert_eq!(resources.spawn.troop_pool[1][0].as_str(), "vampires");
         let town0 = resources.town_by_id("town0").unwrap();
