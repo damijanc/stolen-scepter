@@ -95,6 +95,15 @@ pub enum BoatActionOutcome {
     CancelAtSea = 3,
 }
 
+/// Outcome of a town siege-weapons purchase, mirroring OpenBounty's
+/// `SiegeBuyResult`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SiegeBuyOutcome {
+    Ok = 0,
+    Already = 1,
+    NoGold = 2,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ChestPending {
     pub pending_gold: i32,
@@ -2117,6 +2126,26 @@ impl Game {
         BoatActionOutcome::CancelOk
     }
 
+    /// Buy siege weapons. Like the boat rental this is a town-only
+    /// transaction guarded by `gold <= cost`, and OpenBounty checks ownership
+    /// before affordability, so an owner who cannot afford a second set still
+    /// gets `Already`.
+    pub fn buy_siege(&mut self, resources: &Resources) -> SiegeBuyOutcome {
+        if self.position.in_town.is_empty() {
+            return SiegeBuyOutcome::NoGold;
+        }
+        if self.stats.siege_weapons != 0 {
+            return SiegeBuyOutcome::Already;
+        }
+        let cost = resources.economy.siege_cost;
+        if self.stats.gold <= cost {
+            return SiegeBuyOutcome::NoGold;
+        }
+        self.stats.gold = self.stats.gold.wrapping_sub(cost);
+        self.stats.siege_weapons = 1;
+        SiegeBuyOutcome::Ok
+    }
+
     pub fn week_id(&self, resources: &Resources) -> i32 {
         let difficulty = usize::try_from(self.character.difficulty)
             .ok()
@@ -2573,7 +2602,7 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 mod tests {
     use super::{
         AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome, FoeState,
-        Game, RecruitOutcome, TravelMode, GAME_ARMY_SLOTS,
+        Game, RecruitOutcome, SiegeBuyOutcome, TravelMode, GAME_ARMY_SLOTS,
     };
     use crate::combat::CombatResult;
     use crate::map::{Map, Tile};
@@ -3117,6 +3146,77 @@ mod tests {
         assert_eq!(game.cancel_boat(), BoatActionOutcome::CancelOk);
         assert!(game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (3, 4));
+    }
+
+    fn siege_fixture() -> Resources {
+        Resources::from_json_str(r#"{"economy": {"siege_cost":3000}, "troops": []}"#)
+            .expect("fixture parses")
+    }
+
+    #[test]
+    fn siege_cost_defaults_to_openbounty_value_when_unset() {
+        let resources = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
+        assert_eq!(resources.economy.siege_cost, 3_000);
+    }
+
+    #[test]
+    fn buy_siege_deducts_cost_and_sets_the_flag() {
+        let resources = siege_fixture();
+        let mut game = boat_town_game();
+        game.stats.gold = 3_001;
+
+        assert_eq!(game.buy_siege(&resources), SiegeBuyOutcome::Ok);
+        assert_eq!(game.stats.gold, 1);
+        assert_eq!(game.stats.siege_weapons, 1);
+    }
+
+    #[test]
+    fn buy_siege_refuses_when_gold_equals_cost_like_openbounty() {
+        let resources = siege_fixture();
+        let mut game = boat_town_game();
+        game.stats.gold = 3_000;
+
+        assert_eq!(game.buy_siege(&resources), SiegeBuyOutcome::NoGold);
+        assert_eq!(game.stats.gold, 3_000);
+        assert_eq!(game.stats.siege_weapons, 0);
+    }
+
+    #[test]
+    fn buy_siege_requires_the_hero_to_be_at_a_town() {
+        let resources = siege_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.stats.gold = 10_000;
+
+        assert_eq!(game.buy_siege(&resources), SiegeBuyOutcome::NoGold);
+        assert_eq!(game.stats.gold, 10_000);
+        assert_eq!(game.stats.siege_weapons, 0);
+    }
+
+    #[test]
+    fn buy_siege_reports_already_before_checking_gold() {
+        let resources = siege_fixture();
+        let mut game = boat_town_game();
+        game.stats.siege_weapons = 1;
+        game.stats.gold = 5;
+
+        // OpenBounty tests ownership ahead of affordability, so a broke owner
+        // still gets Already rather than NoGold.
+        assert_eq!(game.buy_siege(&resources), SiegeBuyOutcome::Already);
+        assert_eq!(game.stats.gold, 5);
+        assert_eq!(game.stats.siege_weapons, 1);
+    }
+
+    #[test]
+    fn buy_siege_out_of_town_outranks_the_already_owned_check() {
+        let resources = siege_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.stats.siege_weapons = 1;
+        game.stats.gold = 10_000;
+
+        // The in_town guard comes first in C, so an owner off-map sees NoGold.
+        assert_eq!(game.buy_siege(&resources), SiegeBuyOutcome::NoGold);
     }
 
     #[test]

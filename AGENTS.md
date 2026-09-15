@@ -42,17 +42,17 @@ Implemented and tested:
   dwelling recruitment.
 - Friendly foe offers/acceptance and hostile foe post-combat resolution.
 - Weekly commission/upkeep/boat handling and astrology effects.
-- Town boat rental and cancellation, with the town/location and exact-gold
-  guards.
+- Town boat rental/cancellation and siege-weapon purchase, with the
+  town/location, already-owned, and exact-gold guards.
 - Combat damage plus all 25 digest goldens. Full battle setup, turns, AI, and
   headless encounter resolution are still unported.
 
-Test coverage is 80 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 86 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The latest completed commit is `d11e32a feat: support town boat rental`. The
-working tree was clean immediately after that commit apart from this file and
-`specs/next-agent-prompt.md`, both untracked.
+The most recent slice is the town siege purchase. Run `git log --oneline -5`
+for the exact tip rather than trusting a hash written here; the working tree
+should be clean before you start.
 
 ## Parity Rules
 
@@ -103,10 +103,14 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-The most coherent next slice is the rest of the town action cores. `GameBuySiege`
-sits directly beside the boat functions in `reference/engine/game.c` and shares
-their `in_town` and `gold <= cost` guards, so it is the smallest next step;
-`GameBuySpell` and home-castle recruitment follow.
+The most coherent next slice is `GameBuySpell`, the last of the town action
+cores beside the boat and siege functions in `reference/engine/game.c`. Then
+home-castle recruitment.
+
+When porting a town core, check the guard ORDER, not just the guard set. The
+boat and siege cores both reuse their "no gold" result as a catch-all for
+illegal calls, so an out-of-town owner and a broke owner return different
+values purely because of the sequence the C tests them in.
 
 Note that the town-flow callers live in `reference/src/views.c` (for example
 `town_do_boat`), not in `flow_resolve.c` or `player_io.c`. Those callers hold

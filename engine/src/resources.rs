@@ -129,6 +129,7 @@ impl Default for ResChest {
 pub struct ResEconomy {
     pub boat_cost_normal: i32,
     pub boat_cost_cheap: i32,
+    pub siege_cost: i32,
     pub chest: ResChest,
 }
 
@@ -137,6 +138,7 @@ impl Default for ResEconomy {
         Self {
             boat_cost_normal: 500,
             boat_cost_cheap: 100,
+            siege_cost: 3_000,
             chest: ResChest::default(),
         }
     }
@@ -758,6 +760,8 @@ impl Resources {
             optional_i32_field(economy, "boat_cost_normal", self.economy.boat_cost_normal)?;
         self.economy.boat_cost_cheap =
             optional_i32_field(economy, "boat_cost_cheap", self.economy.boat_cost_cheap)?;
+        self.economy.siege_cost =
+            optional_i32_field(economy, "siege_cost", self.economy.siege_cost)?;
         let Some(chest) = economy.get("chest") else {
             return Ok(());
         };
