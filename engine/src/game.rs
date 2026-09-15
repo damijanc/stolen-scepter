@@ -4,7 +4,7 @@ use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIE
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{
     class_stats_at_rank, ArtifactPower, FixedStr, CAT_ARTIFACTS_MAX, CAT_ID_LEN, CAT_SPELLS_MAX,
-    CAT_VILLAINS_MAX,
+    CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB,
 };
 use crate::tile::Interact;
 
@@ -253,6 +253,7 @@ pub struct Stats {
     pub game_over: bool,
     pub won: bool,
     pub last_commission: i32,
+    pub last_astrology_troop: i32,
     pub options: [i32; GAME_OPTIONS],
 }
 
@@ -275,6 +276,7 @@ impl Default for Stats {
             game_over: false,
             won: false,
             last_commission: 0,
+            last_astrology_troop: 0,
             options: [1; GAME_OPTIONS],
         }
     }
@@ -2032,6 +2034,167 @@ impl Game {
         false
     }
 
+    pub fn stack_weekly_upkeep(resources: &Resources, troop_id: &str, count: i32) -> i32 {
+        let Some(troop) = resources.troop_by_id(troop_id) else {
+            return 0;
+        };
+        if count <= 0 {
+            return 0;
+        }
+        count.wrapping_mul(troop.recruit_cost / 10)
+    }
+
+    pub fn army_weekly_upkeep(&self, resources: &Resources) -> i32 {
+        self.army.iter().fold(0_i32, |total, stack| {
+            total.wrapping_add(Self::stack_weekly_upkeep(
+                resources,
+                stack.id.as_str(),
+                stack.count,
+            ))
+        })
+    }
+
+    pub fn boat_cost(&self, resources: &Resources) -> i32 {
+        if self.has_power(resources, ArtifactPower::CheaperBoats) {
+            resources.economy.boat_cost_cheap
+        } else {
+            resources.economy.boat_cost_normal
+        }
+    }
+
+    pub fn week_id(&self, resources: &Resources) -> i32 {
+        let difficulty = usize::try_from(self.character.difficulty)
+            .ok()
+            .filter(|difficulty| *difficulty < resources.time.days_per_difficulty.len())
+            .unwrap_or(0);
+        let passed =
+            resources.time.days_per_difficulty[difficulty].wrapping_sub(self.stats.days_left);
+        if resources.time.week_days > 0 {
+            passed / resources.time.week_days
+        } else {
+            0
+        }
+    }
+
+    pub fn pick_astrology_creature(&self, resources: &Resources, week_id: i32) -> i32 {
+        let troop_count = resources.troops_count().max(1);
+        if week_id & 3 == 0 {
+            return 0;
+        }
+        let hash = (self.seed as u32 ^ week_id as u32)
+            .wrapping_mul(1_664_525)
+            .wrapping_add(1_013_904_223);
+        let mut index = 1 + (hash % troop_count.saturating_sub(1).max(1) as u32) as i32;
+        if index >= troop_count as i32 {
+            index = 0;
+        }
+        index
+    }
+
+    pub fn grow_dwellings(&mut self, resources: &Resources) {
+        for dwelling in &mut self.dwellings[..self.dwelling_count] {
+            let Some(troop) = resources.troop_by_id(dwelling.troop_id.as_str()) else {
+                continue;
+            };
+            dwelling.count = dwelling.count.wrapping_add(troop.growth_per_week);
+            if dwelling.count > dwelling.max_population {
+                dwelling.count = dwelling.max_population;
+            }
+        }
+    }
+
+    pub fn apply_astrology(
+        &mut self,
+        resources: &Resources,
+        troop_index: i32,
+    ) -> Option<FixedStr<CAT_ID_LEN>> {
+        let astrology_troop = *resources.troop_by_index(troop_index)?;
+
+        for dwelling in &mut self.dwellings[..self.dwelling_count] {
+            if dwelling.troop_id == astrology_troop.id {
+                dwelling.count = dwelling.max_population;
+            }
+        }
+
+        if troop_index == 0 {
+            for stack in &mut self.army {
+                let Some(troop) = resources.troop_by_id(stack.id.as_str()) else {
+                    continue;
+                };
+                if stack.count > 0 && troop.abilities & TROOP_ABIL_ABSORB != 0 {
+                    stack.id = astrology_troop.id;
+                }
+            }
+        }
+
+        Some(astrology_troop.id)
+    }
+
+    /// Apply OpenBounty's entire week-boundary transaction and return the
+    /// commission amount reported to the caller.
+    pub fn apply_week_end(&mut self, resources: &Resources) -> i32 {
+        self.stats.time_stop = 0;
+        self.stats.leadership_current = self.stats.leadership_base;
+
+        let astrology = self.pick_astrology_creature(resources, self.week_id(resources));
+        self.stats.last_astrology_troop = astrology;
+        self.stats.gold = self.stats.gold.wrapping_add(self.stats.commission_weekly);
+        self.stats.last_commission = self.stats.commission_weekly;
+        self.stats.gold = self
+            .stats
+            .gold
+            .wrapping_sub(self.army_weekly_upkeep(resources));
+
+        if self.boat.has_boat {
+            let cost = self.boat_cost(resources);
+            if self.stats.gold >= cost {
+                self.stats.gold = self.stats.gold.wrapping_sub(cost);
+            } else {
+                self.boat.has_boat = false;
+                self.boat.x = -1;
+                self.boat.y = -1;
+            }
+        }
+        if self.stats.gold < 0 {
+            self.stats.gold = 0;
+        }
+
+        self.apply_astrology(resources, astrology);
+        let Some(astrology_troop) = resources.troop_by_index(astrology) else {
+            return self.stats.commission_weekly;
+        };
+        if astrology_troop.growth_per_week <= 0 {
+            return self.stats.commission_weekly;
+        }
+
+        for castle in &mut self.castles {
+            if castle.id.is_empty()
+                || matches!(
+                    castle.owner_kind,
+                    CastleOwnerKind::Player | CastleOwnerKind::Special
+                )
+            {
+                continue;
+            }
+            for stack in &mut castle.garrison {
+                if stack.count > 0 && stack.id.as_str() == astrology_troop.id.as_str() {
+                    stack.count = stack.count.wrapping_add(astrology_troop.growth_per_week);
+                }
+            }
+        }
+        for foe in &mut self.foes[..self.foe_count] {
+            if !foe.alive {
+                continue;
+            }
+            for stack in &mut foe.garrison {
+                if stack.count > 0 && stack.id.as_str() == astrology_troop.id.as_str() {
+                    stack.count = stack.count.wrapping_add(astrology_troop.growth_per_week);
+                }
+            }
+        }
+        self.stats.commission_weekly
+    }
+
     fn find_foe(&self, placement_id: &str) -> Option<&FoeState> {
         if placement_id.is_empty() {
             return None;
@@ -2684,6 +2847,97 @@ mod tests {
             map.tile_i32(1, 0).expect("tile exists").interactive,
             Interact::Foe
         );
+    }
+
+    #[test]
+    fn weekly_astrology_applies_economy_repopulation_and_matching_enemy_growth() {
+        let resources = weekly_fixture();
+        let mut game = Game::default();
+        game.stats.days_left = 5;
+        game.stats.gold = 50;
+        game.stats.commission_weekly = 100;
+        game.stats.leadership_base = 80;
+        game.stats.leadership_current = 125;
+        game.boat.has_boat = true;
+        game.boat.x = 4;
+        game.boat.y = 5;
+        game.army[0].id.copy_from_str("ghosts");
+        game.army[0].count = 2;
+        game.dwellings[0].troop_id.copy_from_str("peasants");
+        game.dwellings[0].count = 2;
+        game.dwellings[0].max_population = 10;
+        game.dwellings[1].troop_id.copy_from_str("ghosts");
+        game.dwellings[1].count = 2;
+        game.dwellings[1].max_population = 8;
+        game.dwelling_count = 2;
+        game.castles[0].id.copy_from_str("monster_castle");
+        game.castles[0].owner_kind = CastleOwnerKind::Monsters;
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 1;
+        game.castles[1].id.copy_from_str("player_castle");
+        game.castles[1].owner_kind = CastleOwnerKind::Player;
+        game.castles[1].garrison[0].id.copy_from_str("peasants");
+        game.castles[1].garrison[0].count = 1;
+        game.foes[0] = FoeState::default();
+        game.foes[0].alive = true;
+        game.foes[0].garrison[0].id.copy_from_str("peasants");
+        game.foes[0].garrison[0].count = 2;
+        game.foes[1] = game.foes[0];
+        game.foes[1].alive = false;
+        game.foe_count = 2;
+
+        assert_eq!(game.week_id(&resources), 4);
+        assert_eq!(game.pick_astrology_creature(&resources, 1), 1);
+        assert_eq!(game.apply_week_end(&resources), 100);
+        assert_eq!(game.stats.gold, 96);
+        assert_eq!(game.stats.last_commission, 100);
+        assert_eq!(game.stats.last_astrology_troop, 0);
+        assert_eq!(game.stats.leadership_current, 80);
+        assert!(game.boat.has_boat);
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 2);
+        assert_eq!(game.dwellings[0].count, 10);
+        assert_eq!(game.dwellings[1].count, 2);
+        assert_eq!(game.castles[0].garrison[0].count, 4);
+        assert_eq!(game.castles[1].garrison[0].count, 1);
+        assert_eq!(game.foes[0].garrison[0].count, 5);
+        assert_eq!(game.foes[1].garrison[0].count, 2);
+    }
+
+    #[test]
+    fn dwelling_growth_helper_is_separate_from_astrology_repopulation() {
+        let resources = weekly_fixture();
+        let mut game = Game::default();
+        game.dwellings[0].troop_id.copy_from_str("peasants");
+        game.dwellings[0].count = 8;
+        game.dwellings[0].max_population = 10;
+        game.dwellings[1].troop_id.copy_from_str("ghosts");
+        game.dwellings[1].count = 2;
+        game.dwellings[1].max_population = 8;
+        game.dwelling_count = 2;
+
+        game.grow_dwellings(&resources);
+
+        assert_eq!(game.dwellings[0].count, 10);
+        assert_eq!(game.dwellings[1].count, 6);
+    }
+
+    #[test]
+    fn weekly_boat_repossession_preserves_its_zone_like_openbounty() {
+        let resources = weekly_fixture();
+        let mut game = Game::default();
+        game.stats.days_left = 5;
+        game.stats.gold = 0;
+        game.boat.has_boat = true;
+        game.boat.zone.copy_from_str("home");
+        game.boat.x = 4;
+        game.boat.y = 5;
+
+        game.apply_week_end(&resources);
+
+        assert!(!game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (-1, -1));
+        assert_eq!(game.boat.zone.as_str(), "home");
     }
 
     #[test]
@@ -3551,6 +3805,22 @@ mod tests {
               },
               "troops": [
                 {"index":0,"id":"sprites","skill_level":1,"hit_points":2,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":5,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[7,8,9,10]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    fn weekly_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "time": {"week_days":5,"days_per_difficulty":{"easy":25}},
+              "economy": {"boat_cost_normal":50,"boat_cost_cheap":10},
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","growth_per_week":3},
+                {"index":1,"id":"ghosts","skill_level":2,"hit_points":2,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":20,"spoils_factor":1,"abilities":"ABSORB","morale_group":"A","growth_per_week":4},
+                {"index":2,"id":"orcs","skill_level":3,"hit_points":3,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":30,"spoils_factor":1,"abilities":"","morale_group":"A","growth_per_week":5},
+                {"index":3,"id":"ogres","skill_level":4,"hit_points":4,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":40,"spoils_factor":1,"abilities":"","morale_group":"A","growth_per_week":6}
               ]
             }"#,
         )

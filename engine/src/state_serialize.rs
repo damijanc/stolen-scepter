@@ -63,6 +63,7 @@ pub fn build_snapshot_with_resources(
             "game_over": game.stats.game_over,
             "won": game.stats.won,
             "last_commission": game.stats.last_commission,
+            "last_astrology_troop": game.stats.last_astrology_troop,
             "options": game.stats.options,
         }),
     );

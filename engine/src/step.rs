@@ -359,7 +359,7 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
     let week_days = resources.time.week_days;
     if week_days > 0 && game.stats.days_left % week_days == 0 {
         advance.week_ended = true;
-        advance.commission_paid = 0;
+        advance.commission_paid = game.apply_week_end(resources);
     }
 }
 
@@ -766,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    fn step_basic_marks_week_boundary_without_economy_side_effects() {
+    fn step_basic_applies_week_boundary_economy() {
         let mut map = Map::from_tiles(2, 1, vec![Tile::plain_grass(), Tile::plain_grass()])
             .expect("fixture dimensions match");
         let resources = time_fixture();
@@ -786,13 +786,15 @@ mod tests {
                 advance: super::StepAdvance {
                     day_ended: true,
                     week_ended: true,
-                    commission_paid: 0
+                    commission_paid: 25
                 },
                 interaction: StepInteraction::None
             }
         );
         assert_eq!(game.stats.days_left, 5);
-        assert_eq!(game.stats.gold, 100);
+        assert_eq!(game.stats.gold, 125);
+        assert_eq!(game.stats.last_commission, 25);
+        assert_eq!(game.stats.last_astrology_troop, 0);
     }
 
     #[test]

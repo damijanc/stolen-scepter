@@ -127,12 +127,16 @@ impl Default for ResChest {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResEconomy {
+    pub boat_cost_normal: i32,
+    pub boat_cost_cheap: i32,
     pub chest: ResChest,
 }
 
 impl Default for ResEconomy {
     fn default() -> Self {
         Self {
+            boat_cost_normal: 500,
+            boat_cost_cheap: 100,
             chest: ResChest::default(),
         }
     }
@@ -750,6 +754,10 @@ impl Resources {
         let Some(economy) = root.get("economy") else {
             return Ok(());
         };
+        self.economy.boat_cost_normal =
+            optional_i32_field(economy, "boat_cost_normal", self.economy.boat_cost_normal)?;
+        self.economy.boat_cost_cheap =
+            optional_i32_field(economy, "boat_cost_cheap", self.economy.boat_cost_cheap)?;
         let Some(chest) = economy.get("chest") else {
             return Ok(());
         };
