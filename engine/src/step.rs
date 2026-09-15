@@ -1,4 +1,4 @@
-use crate::game::{ChestOutcome, ChestPending, Game, Mount, TravelMode};
+use crate::game::{CastleOwnerKind, ChestOutcome, ChestPending, Game, Mount, TravelMode};
 use crate::map::{Map, Tile};
 use crate::resources::Resources;
 use crate::tables::FixedStr;
@@ -103,6 +103,7 @@ pub fn game_step_basic(
     // clear them up front and let the paths below re-set them.
     game.position.in_town = FixedStr::empty();
     game.position.home_castle = FixedStr::empty();
+    game.position.own_castle = FixedStr::empty();
     game.position.dwelling_troop = FixedStr::empty();
     game.position.dwelling_x = -1;
     game.position.dwelling_y = -1;
@@ -247,14 +248,19 @@ fn resolve_interaction(
                 castle.visited = true;
                 castle.known = true;
             }
-            // The hero is now AT the home castle: home-pool recruiting keys
-            // off this marker, set before any bounce-back so a recruit this
-            // step is legal, mirroring the town path's in_town set.
+            // The hero is now AT this castle. C tests audience first and only
+            // then player ownership, so the audience castle never sets
+            // own_castle. Both markers are set before any bounce-back so a
+            // transaction this step is legal, mirroring the in_town set.
             if resources
                 .castle_by_id(id.as_str())
                 .is_some_and(|castle| castle.is_home())
             {
                 game.position.home_castle.copy_from_str(id.as_str());
+            } else if game.castles.iter().any(|castle| {
+                castle.id.as_str() == id && castle.owner_kind == CastleOwnerKind::Player
+            }) {
+                game.position.own_castle.copy_from_str(id.as_str());
             }
             StepInteraction::CastleGate { id }
         }
@@ -379,7 +385,7 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
 #[cfg(test)]
 mod tests {
     use super::{game_step_basic, StepInteraction, StepResult};
-    use crate::game::{Game, Mount, TravelMode};
+    use crate::game::{CastleOwnerKind, Game, Mount, TravelMode};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
@@ -1071,9 +1077,50 @@ mod tests {
         move_interaction(&mut game, &mut map, &resources);
         assert!(game.position.home_castle.is_empty());
 
-        // A non-audience castle gate never sets the marker.
+        // A non-audience castle gate never sets the home marker; an owned one
+        // sets own_castle instead.
+        game.castles[1].owner_kind = CastleOwnerKind::Player;
         move_interaction(&mut game, &mut map, &resources);
         assert!(game.position.home_castle.is_empty());
+        assert_eq!(game.position.own_castle.as_str(), "outpost");
+    }
+
+    #[test]
+    fn audience_castle_never_sets_the_own_castle_marker() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 40},
+              "zones": [{"id": "home"}],
+              "castles": [
+                {"index": 0, "id": "keep", "zone": "home", "x": 1, "y": 0,
+                 "special": {"flow": "audience"}}
+              ],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut map = Map::from_tiles(
+            2,
+            1,
+            vec![
+                Tile::plain_grass(),
+                tile_with_id(Interact::CastleGate, "keep"),
+            ],
+        )
+        .expect("fixture dimensions match");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+        game.stats.steps_left_today = 40;
+        game.castles[0].id.copy_from_str("keep");
+        // Player-owned AND the audience castle: C tests audience first, so
+        // only the home marker is set.
+        game.castles[0].owner_kind = CastleOwnerKind::Player;
+
+        move_interaction(&mut game, &mut map, &resources);
+
+        assert_eq!(game.position.home_castle.as_str(), "keep");
+        assert!(game.position.own_castle.is_empty());
     }
 
     fn interaction_fixture() -> Resources {

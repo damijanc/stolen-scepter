@@ -107,6 +107,15 @@ pub enum SiegeBuyOutcome {
     NoGold = 2,
 }
 
+/// Outcome of a garrison transfer at an owned castle. OpenBounty returns bare
+/// int codes here (0/1/2) rather than a named enum.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GarrisonOutcome {
+    Ok = 0,
+    Refused = 1,
+    WouldLeaveNoArmy = 2,
+}
+
 /// Outcome of a town spell purchase, mirroring OpenBounty's `SpellBuyResult`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SpellBuyOutcome {
@@ -352,6 +361,10 @@ pub struct Position {
     /// when not on its gate. Home-pool recruiting keys off this marker, and it
     /// has the same one-step lifetime as `in_town`.
     pub home_castle: FixedStr<GAME_ID_LEN>,
+    /// Player-owned castle the hero is currently at, or empty otherwise.
+    /// Garrison transfers key off this marker, with the same one-step
+    /// lifetime as `in_town` and `home_castle`.
+    pub own_castle: FixedStr<GAME_ID_LEN>,
     pub dwelling_troop: FixedStr<CAT_ID_LEN>,
     pub dwelling_x: i32,
     pub dwelling_y: i32,
@@ -367,6 +380,7 @@ impl Default for Position {
             last_y: 0,
             in_town: FixedStr::empty(),
             home_castle: FixedStr::empty(),
+            own_castle: FixedStr::empty(),
             dwelling_troop: FixedStr::empty(),
             dwelling_x: -1,
             dwelling_y: -1,
@@ -2416,6 +2430,118 @@ impl Game {
         }
     }
 
+    /// Garrisoning is legal only at an owned castle the hero is standing at:
+    /// `position.own_castle` must name THIS castle and the castle must be
+    /// player-owned. Same contract as the `in_town` town cores.
+    fn garrison_location_ok(&self, castle_id: &str) -> bool {
+        if castle_id.is_empty() || self.position.own_castle.as_str() != castle_id {
+            return false;
+        }
+        self.castles
+            .iter()
+            .find(|castle| castle.id.as_str() == castle_id)
+            .is_some_and(|castle| castle.owner_kind == CastleOwnerKind::Player)
+    }
+
+    /// Move army slot `slot` into the castle's garrison. Ports
+    /// `GameGarrisonTroop`.
+    pub fn garrison_troop(&mut self, castle_id: &str, slot: usize) -> GarrisonOutcome {
+        if slot >= GAME_ARMY_SLOTS || !self.garrison_location_ok(castle_id) {
+            return GarrisonOutcome::Refused;
+        }
+        let src = self.army[slot];
+        if src.id.is_empty() || src.count == 0 {
+            return GarrisonOutcome::Refused;
+        }
+        // Refuse a transfer that would leave the hero with no army at all.
+        let has_other = self
+            .army
+            .iter()
+            .enumerate()
+            .any(|(index, stack)| index != slot && !stack.id.is_empty() && stack.count > 0);
+        if !has_other {
+            return GarrisonOutcome::WouldLeaveNoArmy;
+        }
+        let Some(castle) = self
+            .castles
+            .iter_mut()
+            .find(|castle| castle.id.as_str() == castle_id)
+        else {
+            return GarrisonOutcome::Refused;
+        };
+        // Destination: the first garrison stack already holding this troop,
+        // else the first empty slot.
+        let mut dst = None;
+        for i in 0..GAME_ARMY_SLOTS {
+            if castle.garrison[i].id.as_str() == src.id.as_str() && castle.garrison[i].count > 0 {
+                dst = Some(i);
+                break;
+            }
+            if (castle.garrison[i].id.is_empty() || castle.garrison[i].count == 0) && dst.is_none()
+            {
+                dst = Some(i);
+            }
+        }
+        let Some(dst) = dst else {
+            return GarrisonOutcome::Refused;
+        };
+        // The garrison id is narrower than the army id, and C's copy_id
+        // truncates to the destination here.
+        castle.garrison[dst].id.copy_from_str(src.id.as_str());
+        castle.garrison[dst].count = castle.garrison[dst].count.wrapping_add(src.count);
+
+        // Zeroing the source leaves a gap; OpenBounty compacts so the filled
+        // slots stay contiguous for the A/B/C UI rows.
+        self.army[slot] = ArmyStack::default();
+        self.compact_army();
+        GarrisonOutcome::Ok
+    }
+
+    /// Move garrison slot `slot` back into the army. Ports
+    /// `GameUngarrisonTroop`.
+    pub fn ungarrison_troop(&mut self, castle_id: &str, slot: usize) -> GarrisonOutcome {
+        if slot >= GAME_ARMY_SLOTS || !self.garrison_location_ok(castle_id) {
+            return GarrisonOutcome::Refused;
+        }
+        let Some(castle_index) = self
+            .castles
+            .iter()
+            .position(|castle| castle.id.as_str() == castle_id)
+        else {
+            return GarrisonOutcome::Refused;
+        };
+        let src = self.castles[castle_index].garrison[slot];
+        if src.id.is_empty() || src.count == 0 {
+            return GarrisonOutcome::Refused;
+        }
+        // Destination: the first army stack already holding this troop, else
+        // the first empty slot.
+        let mut dst = None;
+        for i in 0..GAME_ARMY_SLOTS {
+            if self.army[i].id.as_str() == src.id.as_str() && self.army[i].count > 0 {
+                dst = Some(i);
+                break;
+            }
+            if (self.army[i].id.is_empty() || self.army[i].count == 0) && dst.is_none() {
+                dst = Some(i);
+            }
+        }
+        let Some(dst) = dst else {
+            return GarrisonOutcome::Refused;
+        };
+        self.army[dst].id.copy_from_str(src.id.as_str());
+        self.army[dst].count = self.army[dst].count.wrapping_add(src.count);
+
+        // The garrison is shifted down from `slot` rather than compacted
+        // wholesale, which is how C writes it.
+        let garrison = &mut self.castles[castle_index].garrison;
+        for i in slot..GAME_ARMY_SLOTS - 1 {
+            garrison[i] = garrison[i + 1];
+        }
+        garrison[GAME_ARMY_SLOTS - 1] = Unit::default();
+        GarrisonOutcome::Ok
+    }
+
     pub fn compact_army(&mut self) {
         let mut dst = 0;
         for src in 0..GAME_ARMY_SLOTS {
@@ -2692,9 +2818,9 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{
-        AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome, FoeState,
-        Game, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, TravelMode, CASTLE_POOL_CAP,
-        GAME_ARMY_SLOTS,
+        ArmyStack, AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome,
+        FoeState, Game, GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
+        TravelMode, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
     };
     use crate::combat::CombatResult;
     use crate::map::{Map, Tile};
@@ -3002,6 +3128,150 @@ mod tests {
             game.buy_troop(&resources, "sprites", 1),
             RecruitOutcome::IllegalLocation
         );
+    }
+
+    /// Hero standing at owned castle "keep" with two army stacks.
+    fn garrison_game() -> Game {
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.own_castle.copy_from_str("keep");
+        game.castles[0].id.copy_from_str("keep");
+        game.castles[0].owner_kind = CastleOwnerKind::Player;
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+        game.army[1].id.copy_from_str("militia");
+        game.army[1].count = 4;
+        game
+    }
+
+    #[test]
+    fn garrison_moves_a_stack_into_the_castle_and_compacts_the_army() {
+        let mut game = garrison_game();
+
+        assert_eq!(game.garrison_troop("keep", 0), GarrisonOutcome::Ok);
+
+        assert_eq!(game.castles[0].garrison[0].id.as_str(), "peasants");
+        assert_eq!(game.castles[0].garrison[0].count, 10);
+        // The army compacts, so militia slides into slot A.
+        assert_eq!(game.army[0].id.as_str(), "militia");
+        assert_eq!(game.army[0].count, 4);
+        assert!(game.army[1].id.is_empty());
+    }
+
+    #[test]
+    fn garrison_refuses_to_leave_the_hero_with_no_army() {
+        let mut game = garrison_game();
+        game.army[1] = ArmyStack::default();
+
+        assert_eq!(
+            game.garrison_troop("keep", 0),
+            GarrisonOutcome::WouldLeaveNoArmy
+        );
+        assert_eq!(game.army[0].count, 10);
+        assert!(game.castles[0].garrison[0].id.is_empty());
+    }
+
+    #[test]
+    fn garrison_requires_standing_at_that_owned_castle() {
+        let mut game = garrison_game();
+
+        // Marker naming a different castle than the one asked for.
+        assert_eq!(game.garrison_troop("other", 0), GarrisonOutcome::Refused);
+
+        // Marker cleared: stepping away revokes the privilege.
+        game.position.own_castle.copy_from_str("");
+        assert_eq!(game.garrison_troop("keep", 0), GarrisonOutcome::Refused);
+
+        // At the castle, but it is no longer player-owned.
+        game.position.own_castle.copy_from_str("keep");
+        game.castles[0].owner_kind = CastleOwnerKind::Monsters;
+        assert_eq!(game.garrison_troop("keep", 0), GarrisonOutcome::Refused);
+
+        assert_eq!(game.army[0].count, 10);
+    }
+
+    #[test]
+    fn garrison_refuses_an_empty_slot_or_one_out_of_range() {
+        let mut game = garrison_game();
+
+        assert_eq!(game.garrison_troop("keep", 4), GarrisonOutcome::Refused);
+        assert_eq!(
+            game.garrison_troop("keep", GAME_ARMY_SLOTS),
+            GarrisonOutcome::Refused
+        );
+    }
+
+    #[test]
+    fn garrison_stacks_onto_a_matching_troop_past_an_earlier_empty_slot() {
+        let mut game = garrison_game();
+        game.castles[0].garrison[1].id.copy_from_str("peasants");
+        game.castles[0].garrison[1].count = 3;
+
+        // Slot 0 is empty but slot 1 already holds peasants: C scans for a
+        // match first and only falls back to the remembered empty slot.
+        assert_eq!(game.garrison_troop("keep", 0), GarrisonOutcome::Ok);
+
+        assert_eq!(game.castles[0].garrison[1].count, 13);
+        assert!(game.castles[0].garrison[0].id.is_empty());
+    }
+
+    #[test]
+    fn ungarrison_returns_a_stack_and_shifts_the_garrison_down() {
+        let mut game = garrison_game();
+        game.castles[0].garrison[0].id.copy_from_str("archers");
+        game.castles[0].garrison[0].count = 6;
+        game.castles[0].garrison[1].id.copy_from_str("knights");
+        game.castles[0].garrison[1].count = 2;
+
+        assert_eq!(game.ungarrison_troop("keep", 0), GarrisonOutcome::Ok);
+
+        assert_eq!(game.army[2].id.as_str(), "archers");
+        assert_eq!(game.army[2].count, 6);
+        // C shifts the garrison down from the vacated slot rather than
+        // compacting it wholesale.
+        assert_eq!(game.castles[0].garrison[0].id.as_str(), "knights");
+        assert_eq!(game.castles[0].garrison[0].count, 2);
+        assert!(game.castles[0].garrison[1].id.is_empty());
+    }
+
+    #[test]
+    fn ungarrison_merges_into_a_matching_army_stack() {
+        let mut game = garrison_game();
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 7;
+
+        assert_eq!(game.ungarrison_troop("keep", 0), GarrisonOutcome::Ok);
+
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 17);
+        assert!(game.army[2].id.is_empty());
+    }
+
+    #[test]
+    fn ungarrison_refuses_an_empty_garrison_slot_and_keeps_the_location_guard() {
+        let mut game = garrison_game();
+
+        assert_eq!(game.ungarrison_troop("keep", 0), GarrisonOutcome::Refused);
+
+        game.castles[0].garrison[0].id.copy_from_str("archers");
+        game.castles[0].garrison[0].count = 6;
+        game.position.own_castle.copy_from_str("");
+        assert_eq!(game.ungarrison_troop("keep", 0), GarrisonOutcome::Refused);
+        assert_eq!(game.castles[0].garrison[0].count, 6);
+    }
+
+    #[test]
+    fn ungarrison_is_refused_when_the_army_is_full_of_other_troops() {
+        let mut game = garrison_game();
+        for (slot, id) in ["a", "b", "c", "d", "e"].iter().enumerate() {
+            game.army[slot].id.copy_from_str(id);
+            game.army[slot].count = 1;
+        }
+        game.castles[0].garrison[0].id.copy_from_str("archers");
+        game.castles[0].garrison[0].count = 6;
+
+        assert_eq!(game.ungarrison_troop("keep", 0), GarrisonOutcome::Refused);
+        assert_eq!(game.castles[0].garrison[0].count, 6);
     }
 
     #[test]

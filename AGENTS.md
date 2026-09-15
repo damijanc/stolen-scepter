@@ -45,13 +45,18 @@ Implemented and tested:
 - The town transaction cores: boat rental/cancellation, siege-weapon purchase,
   and spell purchase, with their town/location, already-owned, spell-cap, and
   exact-gold guards.
+- Home-castle recruitment from the bottomless castle pool, and garrison
+  transfers in both directions at an owned castle.
+- The one-step location markers `in_town`, `home_castle`, `own_castle`, and
+  the dwelling pair: cleared at the top of every step and re-set by the gate
+  and dwelling paths, so a transaction is legal only in the step that arrived.
 - Combat damage plus all 25 digest goldens. Full battle setup, turns, AI, and
   headless encounter resolution are still unported.
 
-Test coverage is 93 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 110 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the town spell purchase. Run `git log --oneline -5`
+The most recent slice is castle garrison transfers. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -104,12 +109,13 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-The town transaction cores are done. The most coherent next slice is
-home-castle recruitment (`GameBuyTroop` with a catalog `dwelling=="castle"`
-pool, gated on `position.home_castle`), which completes the town/castle action
-flows.
+The town and castle action cores are done. The next major gap is full headless
+combat: setup, the turn loop, AI, player-army writeback, and spoils. Note that
+a siege win is also supposed to set `position.own_castle` the instant a castle
+flips to the player; only the step-onto-gate path sets it today, so wire that
+in when siege resolution lands.
 
-Two habits the town cores rewarded:
+Three habits these cores rewarded:
 
 - Check the guard ORDER, not just the guard set. Each core reuses one result
   as a catch-all for illegal calls, so an out-of-town owner and a broke owner
@@ -118,6 +124,9 @@ Two habits the town cores rewarded:
   the test name. `GameKnownSpells` is documented as counting distinct spells
   but sums `counts[]`, so charges of one spell count individually toward
   `max_spells`.
+- Resist tidying duplicated C into shared Rust helpers. The garrison and
+  ungarrison slot scans look identical but compact differently afterwards, and
+  a trait over both hid that. Translate the index scans as written.
 
 Note that the town-flow callers live in `reference/src/views.c` (for example
 `town_do_boat`), not in `flow_resolve.c` or `player_io.c`. Those callers hold
