@@ -74,6 +74,15 @@ pub enum ChestOutcome {
     Empty = 6,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecruitOutcome {
+    Ok = 0,
+    NoGold = 1,
+    NoSlotOrInvalid = 2,
+    OverLeadership = 3,
+    IllegalLocation = 4,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ChestPending {
     pub pending_gold: i32,
@@ -304,6 +313,9 @@ pub struct Position {
     pub last_x: i32,
     pub last_y: i32,
     pub in_town: FixedStr<GAME_ID_LEN>,
+    pub dwelling_troop: FixedStr<CAT_ID_LEN>,
+    pub dwelling_x: i32,
+    pub dwelling_y: i32,
 }
 
 impl Default for Position {
@@ -315,6 +327,9 @@ impl Default for Position {
             last_x: 0,
             last_y: 0,
             in_town: FixedStr::empty(),
+            dwelling_troop: FixedStr::empty(),
+            dwelling_x: -1,
+            dwelling_y: -1,
         }
     }
 }
@@ -1225,6 +1240,25 @@ impl Game {
         self.enforce_dwelling_pinned(resources, zone, x, y, troop_id.as_str())
     }
 
+    pub fn touch_dwelling(
+        &mut self,
+        resources: &Resources,
+        zone: &str,
+        x: i32,
+        y: i32,
+        dwelling_kind: &str,
+    ) -> Option<DwellingState> {
+        let dwelling = *self.enforce_dwelling(resources, zone, x, y, dwelling_kind)?;
+        if !dwelling.troop_id.is_empty() {
+            self.position
+                .dwelling_troop
+                .copy_from_str(dwelling.troop_id.as_str());
+            self.position.dwelling_x = x;
+            self.position.dwelling_y = y;
+        }
+        Some(dwelling)
+    }
+
     fn dwelling_troop_at(
         &self,
         resources: &Resources,
@@ -1748,6 +1782,100 @@ impl Game {
         free_leadership / troop.hit_points
     }
 
+    pub fn recruit_location_cap(&self, resources: &Resources, troop_id: &str) -> i32 {
+        let Some(_troop) = resources.troop_by_id(troop_id) else {
+            return -1;
+        };
+        if self.position.dwelling_troop.as_str() == troop_id {
+            for dwelling in &self.dwellings[..self.dwelling_count] {
+                if dwelling.x == self.position.dwelling_x
+                    && dwelling.y == self.position.dwelling_y
+                    && dwelling.zone.as_str() == self.position.zone.as_str()
+                    && dwelling.troop_id.as_str() == troop_id
+                {
+                    return dwelling.count;
+                }
+            }
+            return -1;
+        }
+        -1
+    }
+
+    pub fn dwelling_recruit_cap(&self, resources: &Resources, troop_id: &str) -> i32 {
+        let Some(troop) = resources.troop_by_id(troop_id) else {
+            return 0;
+        };
+        let max = self.max_recruitable(resources, troop_id).max(0);
+        let affordable = if troop.recruit_cost > 0 {
+            self.stats.gold / troop.recruit_cost
+        } else {
+            0
+        };
+        max.min(affordable)
+            .min(self.recruit_location_cap(resources, troop_id).max(0))
+    }
+
+    pub fn buy_troop(
+        &mut self,
+        resources: &Resources,
+        troop_id: &str,
+        count: i32,
+    ) -> RecruitOutcome {
+        if troop_id.is_empty() || count <= 0 {
+            return RecruitOutcome::NoSlotOrInvalid;
+        }
+        let Some(troop) = resources.troop_by_id(troop_id) else {
+            return RecruitOutcome::NoSlotOrInvalid;
+        };
+        let loc_cap = self.recruit_location_cap(resources, troop_id);
+        if loc_cap < 0 || count > loc_cap {
+            return RecruitOutcome::IllegalLocation;
+        }
+        let total_cost = troop.recruit_cost * count;
+        if self.stats.gold < total_cost {
+            return RecruitOutcome::NoGold;
+        }
+        if count > self.max_recruitable(resources, troop_id) {
+            return RecruitOutcome::OverLeadership;
+        }
+        if self.add_troop(troop_id, count) != 0 {
+            return RecruitOutcome::NoSlotOrInvalid;
+        }
+        self.stats.gold -= total_cost;
+        RecruitOutcome::Ok
+    }
+
+    pub fn recruit_from_dwelling(
+        &mut self,
+        resources: &Resources,
+        zone: &str,
+        x: i32,
+        y: i32,
+        troop_id: &str,
+        requested: i32,
+    ) -> RecruitOutcome {
+        if requested <= 0 {
+            return RecruitOutcome::NoSlotOrInvalid;
+        }
+        let count = requested.min(self.max_recruitable(resources, troop_id).max(0));
+        if count <= 0 {
+            return RecruitOutcome::NoSlotOrInvalid;
+        }
+        let outcome = self.buy_troop(resources, troop_id, count);
+        if outcome == RecruitOutcome::Ok {
+            for dwelling in &mut self.dwellings[..self.dwelling_count] {
+                if dwelling.x == x && dwelling.y == y && dwelling.zone.as_str() == zone {
+                    dwelling.count -= count;
+                    if dwelling.count < 0 {
+                        dwelling.count = 0;
+                    }
+                    break;
+                }
+            }
+        }
+        outcome
+    }
+
     pub fn add_troop(&mut self, troop_id: &str, count: i32) -> i32 {
         if troop_id.is_empty() || count <= 0 {
             return 1;
@@ -2052,7 +2180,9 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{AudienceOutcome, CastleOwnerKind, ChestOutcome, Game, GAME_ARMY_SLOTS};
+    use super::{
+        AudienceOutcome, CastleOwnerKind, ChestOutcome, Game, RecruitOutcome, GAME_ARMY_SLOTS,
+    };
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tables::ArtifactPower;
@@ -2219,6 +2349,53 @@ mod tests {
         assert_eq!(pending.pending_gold, 0);
         assert_eq!(pending.pending_leadership, 0);
         assert_eq!(game.spells.counts[0], 1);
+    }
+
+    #[test]
+    fn dwelling_visit_sets_recruit_source_and_successful_recruit_drains_population() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "troops": [
+                {"index":0,"id":"sprites","skill_level":1,"hit_points":2,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":5,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"forest","max_population":10,"growth_per_week":3}
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game {
+            seed: 0,
+            ..Game::default()
+        };
+        game.position.zone.copy_from_str("home");
+        game.position.x = 2;
+        game.position.y = 3;
+        game.stats.gold = 100;
+        game.stats.leadership_current = 20;
+
+        let dwelling = game
+            .touch_dwelling(&resources, "home", 2, 3, "forest")
+            .expect("dwelling materializes");
+
+        assert_eq!(dwelling.troop_id.as_str(), "sprites");
+        assert_eq!(dwelling.count, 10);
+        assert_eq!(game.position.dwelling_troop.as_str(), "sprites");
+        assert_eq!((game.position.dwelling_x, game.position.dwelling_y), (2, 3));
+        assert_eq!(game.dwelling_recruit_cap(&resources, "sprites"), 10);
+
+        assert_eq!(
+            game.recruit_from_dwelling(&resources, "home", 2, 3, "sprites", 7),
+            RecruitOutcome::Ok
+        );
+        assert_eq!(game.stats.gold, 65);
+        assert_eq!(game.army[0].id.as_str(), "sprites");
+        assert_eq!(game.army[0].count, 7);
+        assert_eq!(game.dwellings[0].count, 3);
+
+        game.stats.leadership_current = 100;
+        assert_eq!(
+            game.recruit_from_dwelling(&resources, "home", 2, 3, "sprites", 5),
+            RecruitOutcome::IllegalLocation
+        );
+        assert_eq!(game.dwellings[0].count, 3);
     }
 
     #[test]

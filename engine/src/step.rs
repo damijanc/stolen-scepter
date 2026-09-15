@@ -99,6 +99,9 @@ pub fn game_step_basic(
     }
 
     game.position.in_town = FixedStr::empty();
+    game.position.dwelling_troop = FixedStr::empty();
+    game.position.dwelling_x = -1;
+    game.position.dwelling_y = -1;
 
     let nx = game.position.x + dx;
     let ny = game.position.y + dy;
@@ -277,11 +280,8 @@ fn resolve_interaction(
         | Interact::DwellingForest
         | Interact::DwellingHills
         | Interact::DwellingDungeon => {
-            let dwelling = game.dwellings[..game.dwelling_count]
-                .iter()
-                .find(|dwelling| {
-                    dwelling.zone.as_str() == zone && dwelling.x == x && dwelling.y == y
-                });
+            let kind = dwelling_kind_name(tile.interactive);
+            let dwelling = game.touch_dwelling(resources, zone.as_str(), x, y, kind);
             StepInteraction::Dwelling {
                 id,
                 kind: tile.interactive,
@@ -332,6 +332,15 @@ fn resolve_interaction(
 fn consume_tile(game: &mut Game, map: &mut Map, zone: &str, x: i32, y: i32) {
     map.clear_interactive(x, y);
     game.add_consumed(zone, x, y);
+}
+
+fn dwelling_kind_name(interactive: Interact) -> &'static str {
+    match interactive {
+        Interact::DwellingForest => "forest",
+        Interact::DwellingHills => "hills",
+        Interact::DwellingDungeon => "dungeon",
+        _ => "plains",
+    }
 }
 
 fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
@@ -915,11 +924,14 @@ mod tests {
                 count: 12
             }
         );
+        assert_eq!(game.position.dwelling_troop.as_str(), "sprites");
+        assert_eq!((game.position.dwelling_x, game.position.dwelling_y), (6, 0));
 
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),
             StepInteraction::Alcove
         );
+        assert!(game.position.dwelling_troop.is_empty());
         assert!(game.stats.knows_magic);
         assert_consumed(&game, &map, "home", 7, 0);
 
