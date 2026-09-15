@@ -42,15 +42,16 @@ Implemented and tested:
   dwelling recruitment.
 - Friendly foe offers/acceptance and hostile foe post-combat resolution.
 - Weekly commission/upkeep/boat handling and astrology effects.
-- Town boat rental/cancellation and siege-weapon purchase, with the
-  town/location, already-owned, and exact-gold guards.
+- The town transaction cores: boat rental/cancellation, siege-weapon purchase,
+  and spell purchase, with their town/location, already-owned, spell-cap, and
+  exact-gold guards.
 - Combat damage plus all 25 digest goldens. Full battle setup, turns, AI, and
   headless encounter resolution are still unported.
 
-Test coverage is 86 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 93 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the town siege purchase. Run `git log --oneline -5`
+The most recent slice is the town spell purchase. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -103,14 +104,20 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-The most coherent next slice is `GameBuySpell`, the last of the town action
-cores beside the boat and siege functions in `reference/engine/game.c`. Then
-home-castle recruitment.
+The town transaction cores are done. The most coherent next slice is
+home-castle recruitment (`GameBuyTroop` with a catalog `dwelling=="castle"`
+pool, gated on `position.home_castle`), which completes the town/castle action
+flows.
 
-When porting a town core, check the guard ORDER, not just the guard set. The
-boat and siege cores both reuse their "no gold" result as a catch-all for
-illegal calls, so an out-of-town owner and a broke owner return different
-values purely because of the sequence the C tests them in.
+Two habits the town cores rewarded:
+
+- Check the guard ORDER, not just the guard set. Each core reuses one result
+  as a catch-all for illegal calls, so an out-of-town owner and a broke owner
+  return different values purely because of the sequence C tests them in.
+- Where a header comment and the C code disagree, port the code and say so in
+  the test name. `GameKnownSpells` is documented as counting distinct spells
+  but sums `counts[]`, so charges of one spell count individually toward
+  `max_spells`.
 
 Note that the town-flow callers live in `reference/src/views.c` (for example
 `town_do_boat`), not in `flow_resolve.c` or `player_io.c`. Those callers hold

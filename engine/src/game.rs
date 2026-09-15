@@ -104,6 +104,15 @@ pub enum SiegeBuyOutcome {
     NoGold = 2,
 }
 
+/// Outcome of a town spell purchase, mirroring OpenBounty's `SpellBuyResult`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpellBuyOutcome {
+    Ok = 0,
+    NoSpell = 1,
+    AtCap = 2,
+    NoGold = 3,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ChestPending {
     pub pending_gold: i32,
@@ -2146,6 +2155,54 @@ impl Game {
         SiegeBuyOutcome::Ok
     }
 
+    /// Total spell charges carried, the sum of the whole spellbook. Ports
+    /// `GameKnownSpells`, which sums counts[] rather than counting distinct
+    /// spells, so a hero holding three charges of one spell reads as three.
+    pub fn known_spells(&self) -> i32 {
+        self.spells
+            .counts
+            .iter()
+            .fold(0_i32, |total, count| total.wrapping_add(*count))
+    }
+
+    /// Buy the spell on sale at `town_id`. Unlike the boat and siege cores
+    /// this names its town: OpenBounty requires `position.in_town` to equal
+    /// `town_id`, so an off-map call and one naming a different town are both
+    /// rejected.
+    pub fn buy_spell(&mut self, resources: &Resources, town_id: &str) -> SpellBuyOutcome {
+        if town_id.is_empty() || self.position.in_town.as_str() != town_id {
+            return SpellBuyOutcome::NoSpell;
+        }
+        let Some(town) = self.towns.iter().find(|town| town.id.as_str() == town_id) else {
+            return SpellBuyOutcome::NoSpell;
+        };
+        let spell_for_sale = town.spell_for_sale;
+        if spell_for_sale.is_empty() {
+            return SpellBuyOutcome::NoSpell;
+        }
+        let Some(spell) = resources.spell_by_id(spell_for_sale.as_str()) else {
+            return SpellBuyOutcome::NoSpell;
+        };
+        let (index, cost) = (spell.index, spell.cost);
+        // C indexes counts[sp->index] unchecked because its catalog bounds the
+        // index; decline rather than panic on a catalog that does not.
+        let Ok(index) = usize::try_from(index) else {
+            return SpellBuyOutcome::NoSpell;
+        };
+        if index >= self.spells.counts.len() {
+            return SpellBuyOutcome::NoSpell;
+        }
+        if self.known_spells() >= self.stats.max_spells {
+            return SpellBuyOutcome::AtCap;
+        }
+        if self.stats.gold <= cost {
+            return SpellBuyOutcome::NoGold;
+        }
+        self.spells.counts[index] = self.spells.counts[index].wrapping_add(1);
+        self.stats.gold = self.stats.gold.wrapping_sub(cost);
+        SpellBuyOutcome::Ok
+    }
+
     pub fn week_id(&self, resources: &Resources) -> i32 {
         let difficulty = usize::try_from(self.character.difficulty)
             .ok()
@@ -2602,7 +2659,7 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 mod tests {
     use super::{
         AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome, FoeState,
-        Game, RecruitOutcome, SiegeBuyOutcome, TravelMode, GAME_ARMY_SLOTS,
+        Game, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, TravelMode, GAME_ARMY_SLOTS,
     };
     use crate::combat::CombatResult;
     use crate::map::{Map, Tile};
@@ -3217,6 +3274,135 @@ mod tests {
 
         // The in_town guard comes first in C, so an owner off-map sees NoGold.
         assert_eq!(game.buy_siege(&resources), SiegeBuyOutcome::NoGold);
+    }
+
+    fn spell_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "spells": [
+                {"index":0,"id":"bridge","kind":"adventure","cost":100},
+                {"index":1,"id":"fireball","kind":"combat","cost":200}
+              ],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// Hero standing in `town0`, which has `bridge` (cost 100) on sale.
+    fn spell_town_game() -> Game {
+        let mut game = boat_town_game();
+        game.towns[0].id.copy_from_str("town0");
+        game.towns[0].spell_for_sale.copy_from_str("bridge");
+        game.stats.max_spells = 5;
+        game
+    }
+
+    #[test]
+    fn known_spells_sums_charges_not_distinct_spells() {
+        let mut game = Game::default();
+        game.spells.counts[0] = 3;
+        game.spells.counts[1] = 2;
+
+        // The header calls these "distinct spells", but GameKnownSpells sums
+        // counts[]; the executable behavior wins.
+        assert_eq!(game.known_spells(), 5);
+    }
+
+    #[test]
+    fn buy_spell_deducts_cost_and_adds_a_charge() {
+        let resources = spell_fixture();
+        let mut game = spell_town_game();
+        game.stats.gold = 101;
+
+        assert_eq!(game.buy_spell(&resources, "town0"), SpellBuyOutcome::Ok);
+        assert_eq!(game.stats.gold, 1);
+        assert_eq!(game.spells.counts[0], 1);
+    }
+
+    #[test]
+    fn buy_spell_refuses_when_gold_equals_cost_like_openbounty() {
+        let resources = spell_fixture();
+        let mut game = spell_town_game();
+        game.stats.gold = 100;
+
+        assert_eq!(game.buy_spell(&resources, "town0"), SpellBuyOutcome::NoGold);
+        assert_eq!(game.stats.gold, 100);
+        assert_eq!(game.spells.counts[0], 0);
+    }
+
+    #[test]
+    fn buy_spell_requires_the_hero_to_be_in_the_named_town() {
+        let resources = spell_fixture();
+        let mut game = spell_town_game();
+        game.stats.gold = 10_000;
+        game.towns[1].id.copy_from_str("town1");
+        game.towns[1].spell_for_sale.copy_from_str("fireball");
+
+        // Standing in town0, naming town1: rejected even though town1 sells a
+        // spell the hero could afford.
+        assert_eq!(
+            game.buy_spell(&resources, "town1"),
+            SpellBuyOutcome::NoSpell
+        );
+        assert_eq!(game.stats.gold, 10_000);
+
+        game.position.in_town.copy_from_str("");
+        assert_eq!(
+            game.buy_spell(&resources, "town0"),
+            SpellBuyOutcome::NoSpell
+        );
+        assert_eq!(game.stats.gold, 10_000);
+    }
+
+    #[test]
+    fn buy_spell_reports_no_spell_for_an_empty_or_unknown_stock() {
+        let resources = spell_fixture();
+        let mut game = spell_town_game();
+        game.stats.gold = 10_000;
+
+        game.towns[0].spell_for_sale.copy_from_str("");
+        assert_eq!(
+            game.buy_spell(&resources, "town0"),
+            SpellBuyOutcome::NoSpell
+        );
+
+        game.towns[0].spell_for_sale.copy_from_str("not_in_catalog");
+        assert_eq!(
+            game.buy_spell(&resources, "town0"),
+            SpellBuyOutcome::NoSpell
+        );
+        assert_eq!(game.stats.gold, 10_000);
+    }
+
+    #[test]
+    fn buy_spell_is_capped_by_max_spells_before_checking_gold() {
+        let resources = spell_fixture();
+        let mut game = spell_town_game();
+        game.stats.gold = 10_000;
+        game.stats.max_spells = 2;
+        game.spells.counts[1] = 2;
+
+        // At the cap with gold to spare, and still AtCap when broke: the cap
+        // is tested ahead of affordability.
+        assert_eq!(game.buy_spell(&resources, "town0"), SpellBuyOutcome::AtCap);
+        game.stats.gold = 0;
+        assert_eq!(game.buy_spell(&resources, "town0"), SpellBuyOutcome::AtCap);
+        assert_eq!(game.spells.counts[0], 0);
+    }
+
+    #[test]
+    fn buy_spell_stacks_repeat_charges_of_the_same_spell() {
+        let resources = spell_fixture();
+        let mut game = spell_town_game();
+        game.stats.gold = 1_000;
+
+        assert_eq!(game.buy_spell(&resources, "town0"), SpellBuyOutcome::Ok);
+        assert_eq!(game.buy_spell(&resources, "town0"), SpellBuyOutcome::Ok);
+
+        assert_eq!(game.spells.counts[0], 2);
+        assert_eq!(game.known_spells(), 2);
+        assert_eq!(game.stats.gold, 800);
     }
 
     #[test]
