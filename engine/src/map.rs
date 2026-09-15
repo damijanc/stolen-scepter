@@ -467,6 +467,18 @@ impl Map {
         }
     }
 
+    /// Clear an encounter overlay without destroying another interactive object.
+    pub fn clear_foe_stamp(&mut self, x: i32, y: i32) -> bool {
+        let Some(tile) = self.tile_i32(x, y) else {
+            return false;
+        };
+        if tile.interactive != Interact::Foe {
+            return false;
+        }
+        self.clear_interactive(x, y);
+        true
+    }
+
     pub fn apply_consumed(&mut self, game: &Game, zone_id: &str) {
         for mutation in &game.consumed[..game.consumed_count] {
             if mutation.zone.as_str() != zone_id {

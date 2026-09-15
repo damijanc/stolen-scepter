@@ -427,6 +427,16 @@ pub struct FoeState {
     pub friendly: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FriendlyOffer {
+    pub troop_id: FixedStr<CAT_ID_LEN>,
+    pub count: i32,
+    pub foe_id: FixedStr<CAT_ID_LEN>,
+    pub zone: FixedStr<GAME_ID_LEN>,
+    pub x: i32,
+    pub y: i32,
+}
+
 impl Default for FoeState {
     fn default() -> Self {
         Self {
@@ -1905,6 +1915,136 @@ impl Game {
         0
     }
 
+    /// Build the deterministic free-troop offer for a friendly foe. This mirrors
+    /// `start_foe_friendly_flow`: it deliberately does not consume world RNG.
+    pub fn friendly_offer(
+        &self,
+        resources: &Resources,
+        foe_id: &str,
+        x: i32,
+        y: i32,
+    ) -> Option<FriendlyOffer> {
+        let foe = self.find_foe(foe_id)?;
+        if !foe.alive || !foe.friendly {
+            return None;
+        }
+
+        let continent = resources
+            .zone_index_by_id(self.position.zone.as_str())
+            .unwrap_or(0);
+        let tier = continent & 3;
+        let kind = self.friendly_tile_hash(x, y, 131, 17, self.seed) & 3;
+        let chance = (self.friendly_tile_hash(x, y, 17, 131, self.seed >> 8) % 100 + 1) as i32;
+        let mut pool_slot = 0;
+        while pool_slot < RES_SPAWN_POOL_N - 1
+            && chance > resources.spawn.chance_curve[tier][pool_slot]
+        {
+            pool_slot += 1;
+        }
+
+        let troop_id = resources.spawn.troop_pool[kind as usize][pool_slot].as_str();
+        let troop = resources.troop_by_id(troop_id)?;
+        let count = troop.tier_counts[tier].max(2);
+        if !self.has_army_slot_for(troop_id) {
+            return None;
+        }
+
+        let mut offer = FriendlyOffer {
+            troop_id: FixedStr::empty(),
+            count,
+            foe_id: FixedStr::empty(),
+            zone: FixedStr::empty(),
+            x,
+            y,
+        };
+        offer.troop_id.copy_from_str(troop_id);
+        offer.foe_id.copy_from_str(foe_id);
+        offer.zone.copy_from_str(self.position.zone.as_str());
+        Some(offer)
+    }
+
+    /// Start a friendly encounter. If no valid offer can be made, OpenBounty
+    /// makes the foe flee immediately; otherwise the caller resolves the offer.
+    pub fn begin_friendly_encounter(
+        &mut self,
+        map: &mut Map,
+        resources: &Resources,
+        foe_id: &str,
+        x: i32,
+        y: i32,
+    ) -> Option<FriendlyOffer> {
+        let offer = self.friendly_offer(resources, foe_id, x, y);
+        let is_live_friendly = self
+            .find_foe(foe_id)
+            .is_some_and(|foe| foe.alive && foe.friendly);
+        if offer.is_none() && is_live_friendly {
+            let zone = self.position.zone;
+            self.consume_friendly_foe(map, foe_id, zone.as_str(), x, y);
+        }
+        offer
+    }
+
+    /// Resolve the yes/no choice. A friendly foe is always consumed; accepting
+    /// adds its offered troop stack without charging gold.
+    pub fn resolve_friendly_offer(&mut self, map: &mut Map, offer: FriendlyOffer, accept: bool) {
+        if accept && !offer.troop_id.is_empty() && offer.count > 0 {
+            self.add_troop(offer.troop_id.as_str(), offer.count);
+        }
+        self.consume_friendly_foe(
+            map,
+            offer.foe_id.as_str(),
+            offer.zone.as_str(),
+            offer.x,
+            offer.y,
+        );
+    }
+
+    fn find_foe(&self, placement_id: &str) -> Option<&FoeState> {
+        if placement_id.is_empty() {
+            return None;
+        }
+        self.foes[..self.foe_count].iter().find(|foe| {
+            foe.placement_id.as_str() == placement_id
+                && (self.position.zone.is_empty() || foe.zone == self.position.zone)
+        })
+    }
+
+    fn has_army_slot_for(&self, troop_id: &str) -> bool {
+        self.army.iter().any(|stack| {
+            (stack.id.as_str() == troop_id && stack.count > 0)
+                || stack.id.is_empty()
+                || stack.count == 0
+        })
+    }
+
+    fn friendly_tile_hash(&self, x: i32, y: i32, x_factor: i32, y_factor: i32, seed: u64) -> u32 {
+        let offset = x
+            .wrapping_mul(x_factor)
+            .wrapping_add(y.wrapping_mul(y_factor));
+        (seed.wrapping_add(offset as u64)) as u32
+    }
+
+    fn consume_friendly_foe(&mut self, map: &mut Map, foe_id: &str, zone: &str, x: i32, y: i32) {
+        if map.clear_foe_stamp(x, y) {
+            self.add_consumed(zone, x, y);
+        }
+
+        let foe_index = self.foes[..self.foe_count].iter().position(|foe| {
+            foe.placement_id.as_str() == foe_id
+                && (self.position.zone.is_empty() || foe.zone == self.position.zone)
+        });
+        let Some(foe_index) = foe_index else {
+            return;
+        };
+        let foe = &mut self.foes[foe_index];
+        foe.alive = false;
+        let foe_zone = foe.zone;
+        let (foe_x, foe_y) = (foe.x, foe.y);
+        if map.clear_foe_stamp(foe_x, foe_y) {
+            self.add_consumed(foe_zone.as_str(), foe_x, foe_y);
+        }
+    }
+
     pub fn compact_army(&mut self) {
         let mut dst = 0;
         for src in 0..GAME_ARMY_SLOTS {
@@ -2181,7 +2321,8 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{
-        AudienceOutcome, CastleOwnerKind, ChestOutcome, Game, RecruitOutcome, GAME_ARMY_SLOTS,
+        AudienceOutcome, CastleOwnerKind, ChestOutcome, FoeState, Game, RecruitOutcome,
+        GAME_ARMY_SLOTS,
     };
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
@@ -2396,6 +2537,74 @@ mod tests {
             RecruitOutcome::IllegalLocation
         );
         assert_eq!(game.dwellings[0].count, 3);
+    }
+
+    #[test]
+    fn friendly_foe_offer_acceptance_and_decline_follow_openbounty_rules() {
+        let resources = friendly_foe_fixture();
+        let mut game = friendly_foe_game();
+        let mut map = Map::new(4, 1);
+        map.stamp_foe(1, 0, "friendly0");
+
+        let offer = game
+            .begin_friendly_encounter(&mut map, &resources, "friendly0", 1, 0)
+            .expect("available army slot receives an offer");
+        assert_eq!(offer.troop_id.as_str(), "sprites");
+        assert_eq!(offer.count, 7);
+        assert_eq!(game.rng_snapshot(), 0);
+
+        game.resolve_friendly_offer(&mut map, offer, true);
+        assert_eq!(game.army[0].id.as_str(), "sprites");
+        assert_eq!(game.army[0].count, 7);
+        assert!(!game.foes[0].alive);
+        assert!(game.is_consumed("home", 1, 0));
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::None
+        );
+
+        let mut declined_game = friendly_foe_game();
+        let mut declined_map = Map::new(4, 1);
+        declined_map.stamp_foe(1, 0, "friendly0");
+        let declined_offer = declined_game
+            .begin_friendly_encounter(&mut declined_map, &resources, "friendly0", 1, 0)
+            .expect("available army slot receives an offer");
+        declined_game.resolve_friendly_offer(&mut declined_map, declined_offer, false);
+        assert!(declined_game.army.iter().all(|stack| stack.count == 0));
+        assert!(!declined_game.foes[0].alive);
+        assert!(declined_game.is_consumed("home", 1, 0));
+    }
+
+    #[test]
+    fn friendly_foe_without_army_capacity_flees_and_clears_current_stamp() {
+        let resources = friendly_foe_fixture();
+        let mut game = friendly_foe_game();
+        for (index, stack) in game.army.iter_mut().enumerate() {
+            stack
+                .id
+                .copy_from_str(if index == 0 { "other0" } else { "other" });
+            stack.count = 1;
+        }
+        game.foes[0].x = 2;
+        game.foes[0].y = 0;
+        let mut map = Map::new(4, 1);
+        map.stamp_foe(1, 0, "friendly0");
+        map.stamp_foe(2, 0, "friendly0");
+
+        assert!(game
+            .begin_friendly_encounter(&mut map, &resources, "friendly0", 1, 0)
+            .is_none());
+        assert!(!game.foes[0].alive);
+        assert!(game.is_consumed("home", 1, 0));
+        assert!(game.is_consumed("home", 2, 0));
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::None
+        );
+        assert_eq!(
+            map.tile_i32(2, 0).expect("tile exists").interactive,
+            Interact::None
+        );
     }
 
     #[test]
@@ -3246,5 +3455,43 @@ mod tests {
             {"index":2,"id":"archers","skill_level":3,"hit_points":10,"move_rate":2,"melee":[1,2],"ranged":[1,3,12],"recruit_cost":250,"spoils_factor":20,"abilities":"","morale_group":"B"}
           ]
         }"#
+    }
+
+    fn friendly_foe_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "zones": [{"id":"home"}],
+              "spawn": {
+                "tier_chance_curve": [[100,100,100],[100,100,100],[100,100,100],[100,100,100]],
+                "tier_troop_pool": [
+                  ["sprites","sprites","sprites","sprites"],
+                  ["sprites","sprites","sprites","sprites"],
+                  ["sprites","sprites","sprites","sprites"],
+                  ["sprites","sprites","sprites","sprites"]
+                ]
+              },
+              "troops": [
+                {"index":0,"id":"sprites","skill_level":1,"hit_points":2,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":5,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[7,8,9,10]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    fn friendly_foe_game() -> Game {
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        let mut foe = FoeState::default();
+        foe.zone = game.position.zone;
+        foe.x = 1;
+        foe.y = 0;
+        foe.origin_x = 1;
+        foe.origin_y = 0;
+        foe.placement_id.copy_from_str("friendly0");
+        foe.alive = true;
+        foe.friendly = true;
+        game.foes[0] = foe;
+        game.foe_count = 1;
+        game
     }
 }
