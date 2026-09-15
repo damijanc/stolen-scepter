@@ -11,6 +11,12 @@ pub const COMBAT_SLOTS: usize = 5;
 pub const COMBAT_SIDE_PLAYER: usize = 0;
 pub const COMBAT_SIDE_AI: usize = 1;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CombatResult {
+    Win = 0,
+    Loss = 1,
+}
+
 pub const COMBAT_POWER_INCREASED_DAMAGE: u8 = 1 << 0;
 pub const COMBAT_POWER_QUARTER_PROTECTION: u8 = 1 << 1;
 

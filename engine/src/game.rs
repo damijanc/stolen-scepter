@@ -1,3 +1,4 @@
+use crate::combat::CombatResult;
 use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
@@ -1999,6 +2000,38 @@ impl Game {
         );
     }
 
+    /// Apply a completed hostile-foe battle. Combat itself belongs to the
+    /// caller; this mirrors OpenBounty's `flow_apply_attack_foe` state change.
+    /// Returns `true` only when the caller must handle the player's loss.
+    pub fn resolve_hostile_foe(
+        &mut self,
+        map: &mut Map,
+        foe_id: &str,
+        foe_x: i32,
+        foe_y: i32,
+        outcome: CombatResult,
+    ) -> bool {
+        if outcome == CombatResult::Loss {
+            return true;
+        }
+
+        // Only remove foe overlays. The hero may be on a different, live
+        // pickup tile when a queued battle result arrives.
+        map.clear_foe_stamp(foe_x, foe_y);
+
+        let foe_index = self.foes[..self.foe_count].iter().position(|foe| {
+            foe.placement_id.as_str() == foe_id
+                && (self.position.zone.is_empty() || foe.zone == self.position.zone)
+        });
+        let Some(foe_index) = foe_index else {
+            return false;
+        };
+        let foe = &mut self.foes[foe_index];
+        foe.alive = false;
+        map.clear_foe_stamp(foe.x, foe.y);
+        false
+    }
+
     fn find_foe(&self, placement_id: &str) -> Option<&FoeState> {
         if placement_id.is_empty() {
             return None;
@@ -2324,6 +2357,7 @@ mod tests {
         AudienceOutcome, CastleOwnerKind, ChestOutcome, FoeState, Game, RecruitOutcome,
         GAME_ARMY_SLOTS,
     };
+    use crate::combat::CombatResult;
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tables::ArtifactPower;
@@ -2604,6 +2638,51 @@ mod tests {
         assert_eq!(
             map.tile_i32(2, 0).expect("tile exists").interactive,
             Interact::None
+        );
+    }
+
+    #[test]
+    fn hostile_foe_win_clears_stale_and_current_stamps_without_consuming_tiles() {
+        let mut game = friendly_foe_game();
+        game.foes[0].friendly = false;
+        game.foes[0].x = 2;
+        game.foes[0].y = 0;
+        let mut other_zone_foe = game.foes[0];
+        other_zone_foe.zone.copy_from_str("away");
+        game.foes[1] = other_zone_foe;
+        game.foe_count = 2;
+
+        let mut map = Map::new(4, 1);
+        map.stamp_foe(1, 0, "friendly0");
+        map.stamp_foe(2, 0, "friendly0");
+
+        assert!(!game.resolve_hostile_foe(&mut map, "friendly0", 1, 0, CombatResult::Win));
+        assert!(!game.foes[0].alive);
+        assert!(game.foes[1].alive);
+        assert_eq!(game.consumed_count, 0);
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::None
+        );
+        assert_eq!(
+            map.tile_i32(2, 0).expect("tile exists").interactive,
+            Interact::None
+        );
+    }
+
+    #[test]
+    fn hostile_foe_loss_leaves_world_state_for_temporary_death_handling() {
+        let mut game = friendly_foe_game();
+        game.foes[0].friendly = false;
+        let mut map = Map::new(2, 1);
+        map.stamp_foe(1, 0, "friendly0");
+
+        assert!(game.resolve_hostile_foe(&mut map, "friendly0", 1, 0, CombatResult::Loss));
+        assert!(game.foes[0].alive);
+        assert_eq!(game.consumed_count, 0);
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::Foe
         );
     }
 
