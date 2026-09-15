@@ -50,13 +50,16 @@ Implemented and tested:
 - The one-step location markers `in_town`, `home_castle`, `own_castle`, and
   the dwelling pair: cleared at the top of every step and re-set by the gate
   and dwelling paths, so a transaction is legal only in the step that arrived.
-- Combat damage plus all 25 digest goldens. Full battle setup, turns, AI, and
-  headless encounter resolution are still unported.
+- Combat damage plus all 25 digest goldens.
+- Headless combat end to end: seeding, battlefield setup (open-field bands,
+  random obstacles, the fixed castle layout), movement and flight, the turn
+  and round machinery, the AI policy, and `combat_run_headless` with its
+  stall cutoff, spoils, and player-army writeback.
 
-Test coverage is 110 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 147 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is castle garrison transfers. Run `git log --oneline -5`
+The most recent slice is headless combat. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -109,11 +112,17 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-The town and castle action cores are done. The next major gap is full headless
-combat: setup, the turn loop, AI, player-army writeback, and spoils. Note that
-a siege win is also supposed to set `position.own_castle` the instant a castle
-flips to the player; only the step-onto-gate path sets it today, so wire that
-in when siege resolution lands.
+Headless combat resolves, so the next gap is wiring it to the world: foe
+following and collision-triggered flows, then castle siege entry. Two loose
+ends to close while doing that:
+
+- A siege win should set `position.own_castle` the instant a castle flips to
+  the player. Only the step-onto-gate path sets it today.
+- `combat.rs` deliberately omits what only a rendered fight needs: combat
+  spells (`combat_cast_spell` and the `spell_*` helpers, reachable only
+  through a player policy -- the headless default policy never casts) and
+  `CombatTurnRecord` (write-only replay data for the shell's animation).
+  Port those when a shell exists, not before.
 
 Three habits these cores rewarded:
 
@@ -122,8 +131,14 @@ Three habits these cores rewarded:
   return different values purely because of the sequence C tests them in.
 - Where a header comment and the C code disagree, port the code and say so in
   the test name. `GameKnownSpells` is documented as counting distinct spells
-  but sums `counts[]`, so charges of one spell count individually toward
-  `max_spells`.
+  but sums `counts[]`. `calc_distance` is documented as "squared-distance
+  x 256" but actually scales by 2^24, because `isqrt32` already returns 16.16
+  fixed point and `calc_distance` pre-shifts on top of it.
+- When a test you just wrote fails, check the C before changing the code. Two
+  combat tests failed on first run and both times the port was right and the
+  expectation was wrong -- the second was an out-of-control stack targeting
+  ITSELF, which C permits because it drops the self-skip along with the
+  own-side skip.
 - Resist tidying duplicated C into shared Rust helpers. The garrison and
   ungarrison slot scans look identical but compact differently afterwards, and
   a trait over both hid that. Translate the index scans as written.
