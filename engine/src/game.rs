@@ -84,6 +84,17 @@ pub enum RecruitOutcome {
     IllegalLocation = 4,
 }
 
+/// Outcome of a town boat rent/cancel attempt, mirroring OpenBounty's
+/// `BoatActionResult`. The engine applies the state mutation; the dialog for
+/// each outcome stays with the shell.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BoatActionOutcome {
+    RentOk = 0,
+    RentNoGold = 1,
+    CancelOk = 2,
+    CancelAtSea = 3,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ChestPending {
     pub pending_gold: i32,
@@ -2062,6 +2073,50 @@ impl Game {
         }
     }
 
+    /// Rent a boat at the town's dock tile. OpenBounty rents only from the
+    /// town menu, so `position.in_town` must be set, and its guard is
+    /// `gold <= cost`: an exact-cost purse buys nothing and leaves state
+    /// untouched.
+    pub fn rent_boat(
+        &mut self,
+        resources: &Resources,
+        boat_x: i32,
+        boat_y: i32,
+        zone_id: &str,
+    ) -> BoatActionOutcome {
+        if self.position.in_town.is_empty() {
+            return BoatActionOutcome::RentNoGold;
+        }
+        let cost = self.boat_cost(resources);
+        if self.stats.gold <= cost {
+            return BoatActionOutcome::RentNoGold;
+        }
+        self.stats.gold = self.stats.gold.wrapping_sub(cost);
+        // OpenBounty clears the whole BoatState before writing the live
+        // fields so two histories reaching the same boat share a byte image.
+        self.boat = BoatState {
+            has_boat: true,
+            x: boat_x,
+            y: boat_y,
+            zone: FixedStr::from_str(zone_id),
+        };
+        BoatActionOutcome::RentOk
+    }
+
+    /// Cancel a boat rental. OpenBounty refuses while the hero is sailing, and
+    /// reports `BOAT_CANCEL_OK` without touching state when the hero is not at
+    /// a town.
+    pub fn cancel_boat(&mut self) -> BoatActionOutcome {
+        if self.position.in_town.is_empty() {
+            return BoatActionOutcome::CancelOk;
+        }
+        if self.travel_mode == TravelMode::Boat {
+            return BoatActionOutcome::CancelAtSea;
+        }
+        self.boat = BoatState::default();
+        BoatActionOutcome::CancelOk
+    }
+
     pub fn week_id(&self, resources: &Resources) -> i32 {
         let difficulty = usize::try_from(self.character.difficulty)
             .ok()
@@ -2517,8 +2572,8 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{
-        AudienceOutcome, CastleOwnerKind, ChestOutcome, FoeState, Game, RecruitOutcome,
-        GAME_ARMY_SLOTS,
+        AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome, FoeState,
+        Game, RecruitOutcome, TravelMode, GAME_ARMY_SLOTS,
     };
     use crate::combat::CombatResult;
     use crate::map::{Map, Tile};
@@ -2938,6 +2993,130 @@ mod tests {
         assert!(!game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (-1, -1));
         assert_eq!(game.boat.zone.as_str(), "home");
+    }
+
+    fn boat_town_game() -> Game {
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.in_town.copy_from_str("town0");
+        game
+    }
+
+    #[test]
+    fn rent_boat_deducts_cost_and_records_dock_tile() {
+        let resources = weekly_fixture();
+        let mut game = boat_town_game();
+        let cost = game.boat_cost(&resources);
+        game.stats.gold = cost + 1;
+
+        assert_eq!(
+            game.rent_boat(&resources, 7, 9, "continentia"),
+            BoatActionOutcome::RentOk
+        );
+        assert_eq!(game.stats.gold, 1);
+        assert!(game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (7, 9));
+        assert_eq!(game.boat.zone.as_str(), "continentia");
+    }
+
+    #[test]
+    fn rent_boat_refuses_when_gold_equals_cost_like_openbounty() {
+        let resources = weekly_fixture();
+        let mut game = boat_town_game();
+        let cost = game.boat_cost(&resources);
+        game.stats.gold = cost;
+
+        assert_eq!(
+            game.rent_boat(&resources, 1, 2, "continentia"),
+            BoatActionOutcome::RentNoGold
+        );
+        assert_eq!(game.stats.gold, cost);
+        assert_eq!(game.boat, BoatState::default());
+    }
+
+    #[test]
+    fn rent_boat_requires_the_hero_to_be_at_a_town() {
+        let resources = weekly_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.stats.gold = 10_000;
+
+        assert_eq!(
+            game.rent_boat(&resources, 1, 2, "continentia"),
+            BoatActionOutcome::RentNoGold
+        );
+        assert_eq!(game.stats.gold, 10_000);
+        assert_eq!(game.boat, BoatState::default());
+    }
+
+    #[test]
+    fn rent_boat_charges_the_cheap_price_with_the_cheaper_boats_artifact() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "economy": {"boat_cost_normal":500,"boat_cost_cheap":100},
+              "artifacts": [{"index":0,"id":"anchor","power":"cheaper_boats"}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = boat_town_game();
+        game.stats.gold = 501;
+        assert!(game.claim_artifact_by_id(&resources, "anchor"));
+        assert_eq!(game.boat_cost(&resources), 100);
+
+        assert_eq!(
+            game.rent_boat(&resources, 3, 4, "home"),
+            BoatActionOutcome::RentOk
+        );
+        assert_eq!(game.stats.gold, 401);
+    }
+
+    #[test]
+    fn cancel_boat_is_refused_while_sailing() {
+        let resources = weekly_fixture();
+        let mut game = boat_town_game();
+        game.stats.gold = game.boat_cost(&resources) + 1;
+        assert_eq!(
+            game.rent_boat(&resources, 3, 4, "home"),
+            BoatActionOutcome::RentOk
+        );
+        game.travel_mode = TravelMode::Boat;
+
+        assert_eq!(game.cancel_boat(), BoatActionOutcome::CancelAtSea);
+        assert!(game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (3, 4));
+    }
+
+    #[test]
+    fn cancel_boat_clears_state_when_ashore() {
+        let resources = weekly_fixture();
+        let mut game = boat_town_game();
+        game.stats.gold = game.boat_cost(&resources) + 1;
+        assert_eq!(
+            game.rent_boat(&resources, 3, 4, "home"),
+            BoatActionOutcome::RentOk
+        );
+        game.travel_mode = TravelMode::Walk;
+
+        assert_eq!(game.cancel_boat(), BoatActionOutcome::CancelOk);
+        assert_eq!(game.boat, BoatState::default());
+        assert_eq!(game.stats.gold, 1);
+    }
+
+    #[test]
+    fn cancel_boat_out_of_town_reports_ok_without_touching_state() {
+        let resources = weekly_fixture();
+        let mut game = boat_town_game();
+        game.stats.gold = game.boat_cost(&resources) + 1;
+        assert_eq!(
+            game.rent_boat(&resources, 3, 4, "home"),
+            BoatActionOutcome::RentOk
+        );
+        game.position.in_town.copy_from_str("");
+
+        assert_eq!(game.cancel_boat(), BoatActionOutcome::CancelOk);
+        assert!(game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (3, 4));
     }
 
     #[test]
