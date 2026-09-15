@@ -431,12 +431,14 @@ impl Default for FoeState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorldProgress {
     pub zones_discovered: [bool; RES_MAX_ZONES],
+    pub orbs_found: [bool; RES_MAX_ZONES],
 }
 
 impl Default for WorldProgress {
     fn default() -> Self {
         Self {
             zones_discovered: [false; RES_MAX_ZONES],
+            orbs_found: [false; RES_MAX_ZONES],
         }
     }
 }
@@ -864,6 +866,84 @@ impl Game {
             self.stats.leadership_base += leadership;
             self.stats.leadership_current += leadership;
         }
+    }
+
+    pub fn activate_orb(&mut self, resources: &Resources) -> Option<usize> {
+        let zone_index = resources.zone_index_by_id(self.position.zone.as_str())?;
+        if zone_index >= self.world.orbs_found.len() {
+            return None;
+        }
+        self.world.orbs_found[zone_index] = true;
+        Some(zone_index)
+    }
+
+    pub fn resolve_navmap(&mut self, resources: &Resources, id: &str) -> Option<usize> {
+        let current_zone = resources.zone_index_by_id(self.position.zone.as_str());
+        let mut target_zone = first_number_in_id(id).and_then(|index| {
+            if index >= 0 {
+                Some(index as usize)
+            } else {
+                None
+            }
+        });
+
+        let target_usable = target_zone
+            .filter(|target| *target < resources.zone_count())
+            .filter(|target| Some(*target) != current_zone)
+            .filter(|target| {
+                *target < self.world.zones_discovered.len() && !self.world.zones_discovered[*target]
+            });
+
+        target_zone = target_usable.or_else(|| {
+            (0..resources.zone_count())
+                .find(|index| Some(*index) != current_zone && !self.world.zones_discovered[*index])
+        });
+
+        let target = target_zone?;
+        if target >= self.world.zones_discovered.len() {
+            return None;
+        }
+        self.world.zones_discovered[target] = true;
+        Some(target)
+    }
+
+    pub fn resolve_telecave(&mut self) -> Option<(i32, i32)> {
+        let zone = self.position.zone.as_str();
+        let x = self.position.x;
+        let y = self.position.y;
+        let mut self_seq = None;
+        let mut seq = 0usize;
+        for placement in &self.placements[..self.placement_count] {
+            if placement.zone.as_str() != zone || placement.kind != Interact::Telecave {
+                continue;
+            }
+            if placement.x == x && placement.y == y {
+                self_seq = Some(seq);
+            }
+            seq += 1;
+        }
+
+        let self_seq = self_seq?;
+        let target_seq = if self_seq % 2 == 0 {
+            self_seq + 1
+        } else {
+            self_seq.saturating_sub(1)
+        };
+        let mut seq = 0usize;
+        for placement in &self.placements[..self.placement_count] {
+            if placement.zone.as_str() != zone || placement.kind != Interact::Telecave {
+                continue;
+            }
+            if seq == target_seq {
+                self.position.x = placement.x;
+                self.position.y = placement.y;
+                self.position.last_x = placement.x;
+                self.position.last_y = placement.y;
+                return Some((placement.x, placement.y));
+            }
+            seq += 1;
+        }
+        None
     }
 
     pub fn add_placement(&mut self, zone: &str, x: i32, y: i32, kind: Interact, id: &str) {
@@ -1950,6 +2030,18 @@ fn chest_rand(seed: u64, x: i32, y: i32, salt: u32) -> u32 {
     h.wrapping_mul(1_664_525).wrapping_add(1_013_904_223)
 }
 
+fn first_number_in_id(id: &str) -> Option<i32> {
+    let start = id
+        .char_indices()
+        .find(|(_, ch)| ch.is_ascii_digit())
+        .map(|(index, _)| index)?;
+    let digits = id[start..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+    digits.parse().ok()
+}
+
 fn normalize_dwelling_kind(kind: &str) -> &str {
     if kind == "hills" {
         "hill"
@@ -2127,6 +2219,52 @@ mod tests {
         assert_eq!(pending.pending_gold, 0);
         assert_eq!(pending.pending_leadership, 0);
         assert_eq!(game.spells.counts[0], 1);
+    }
+
+    #[test]
+    fn navmap_unlocks_target_or_first_undiscovered_zone() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "zones": [{"id":"home"},{"id":"away"},{"id":"far"}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+
+        assert_eq!(game.resolve_navmap(&resources, "navmap_0"), Some(1));
+        assert!(game.world.zones_discovered[1]);
+        assert_eq!(game.resolve_navmap(&resources, "navmap_1"), Some(2));
+        assert!(game.world.zones_discovered[2]);
+        assert_eq!(game.resolve_navmap(&resources, "navmap_99"), None);
+    }
+
+    #[test]
+    fn orb_marks_current_zone_and_telecave_pairs_by_same_zone_sequence() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "zones": [{"id":"home"},{"id":"away"}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.x = 1;
+        game.position.y = 0;
+        game.add_placement("home", 1, 0, Interact::Telecave, "telecave_0");
+        game.add_placement("home", 5, 0, Interact::Telecave, "telecave_1");
+        game.add_placement("away", 7, 0, Interact::Telecave, "telecave_0");
+
+        assert_eq!(game.activate_orb(&resources), Some(0));
+        assert!(game.world.orbs_found[0]);
+        assert!(!game.world.orbs_found[1]);
+
+        assert_eq!(game.resolve_telecave(), Some((5, 0)));
+        assert_eq!((game.position.x, game.position.y), (5, 0));
+        assert_eq!((game.position.last_x, game.position.last_y), (5, 0));
     }
 
     #[test]

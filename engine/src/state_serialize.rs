@@ -127,6 +127,33 @@ pub fn build_snapshot_with_resources(
         );
     }
 
+    if let Some(resources) = resources {
+        let zone_count = resources
+            .zone_count()
+            .min(game.world.zones_discovered.len());
+        let zones_discovered: Vec<_> = game.world.zones_discovered[..zone_count]
+            .iter()
+            .enumerate()
+            .filter(|(_, discovered)| **discovered)
+            .filter_map(|(index, _)| resources.zone_by_index(index))
+            .map(|zone| serde_json::json!(zone.id.as_str()))
+            .collect();
+        let orbs_found: Vec<_> = game.world.orbs_found[..zone_count]
+            .iter()
+            .enumerate()
+            .filter(|(_, found)| **found)
+            .filter_map(|(index, _)| resources.zone_by_index(index))
+            .map(|zone| serde_json::json!(zone.id.as_str()))
+            .collect();
+        root.insert(
+            "world".to_owned(),
+            serde_json::json!({
+                "zones_discovered": zones_discovered,
+                "orbs_found": orbs_found,
+            }),
+        );
+    }
+
     let towns: Vec<_> = game
         .towns
         .iter()
@@ -463,6 +490,11 @@ mod tests {
         assert_eq!(snapshot["army"][0]["count"], 25);
         assert_eq!(snapshot["spells"]["bridge"], 0);
         assert_eq!(snapshot["artifacts"]["found"], serde_json::json!([]));
+        assert_eq!(
+            snapshot["world"]["zones_discovered"],
+            serde_json::json!(["home"])
+        );
+        assert_eq!(snapshot["world"]["orbs_found"], serde_json::json!([]));
         assert_eq!(snapshot["contract"]["active"], "");
         assert_eq!(snapshot["contract"]["cycle"][0], "villain0");
         assert_eq!(snapshot["contract"]["cycle"][1], "villain1");

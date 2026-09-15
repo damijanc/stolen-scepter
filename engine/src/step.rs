@@ -44,12 +44,15 @@ pub enum StepInteraction {
     Alcove,
     Orb {
         id: String,
+        zone_index: Option<usize>,
     },
     Telecave {
         id: String,
+        destination: Option<(i32, i32)>,
     },
     Navmap {
         id: String,
+        discovered_zone: Option<usize>,
     },
     Foe {
         id: String,
@@ -295,13 +298,21 @@ fn resolve_interaction(
             StepInteraction::Alcove
         }
         Interact::Orb => {
+            let zone_index = game.activate_orb(resources);
             consume_tile(game, map, zone.as_str(), x, y);
-            StepInteraction::Orb { id }
+            StepInteraction::Orb { id, zone_index }
         }
-        Interact::Telecave => StepInteraction::Telecave { id },
+        Interact::Telecave => {
+            let destination = game.resolve_telecave();
+            StepInteraction::Telecave { id, destination }
+        }
         Interact::Navmap => {
+            let discovered_zone = game.resolve_navmap(resources, id.as_str());
             consume_tile(game, map, zone.as_str(), x, y);
-            StepInteraction::Navmap { id }
+            StepInteraction::Navmap {
+                id,
+                discovered_zone,
+            }
         }
         Interact::Foe => {
             let foe = game.foes[..game.foe_count]
@@ -828,6 +839,7 @@ mod tests {
         let resources = interaction_fixture();
         let mut game = Game::default();
         game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
         game.stats.steps_left_today = 40;
         game.towns[0].id.copy_from_str("town0");
         game.castles[0].id.copy_from_str("castle0");
@@ -914,23 +926,28 @@ mod tests {
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),
             StepInteraction::Navmap {
-                id: "navmap0".to_owned()
+                id: "navmap0".to_owned(),
+                discovered_zone: Some(1)
             }
         );
+        assert!(game.world.zones_discovered[1]);
         assert_consumed(&game, &map, "home", 8, 0);
 
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),
             StepInteraction::Orb {
-                id: "orb0".to_owned()
+                id: "orb0".to_owned(),
+                zone_index: Some(0)
             }
         );
+        assert!(game.world.orbs_found[0]);
         assert_consumed(&game, &map, "home", 9, 0);
 
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),
             StepInteraction::Telecave {
-                id: "telecave0".to_owned()
+                id: "telecave0".to_owned(),
+                destination: None
             }
         );
         assert_eq!(
@@ -991,6 +1008,10 @@ mod tests {
         Resources::from_json_str(
             r#"{
               "time": {"day_steps": 40, "week_days": 5},
+              "zones": [
+                {"id": "home"},
+                {"id": "away"}
+              ],
               "towns": [
                 {"index": 0, "id": "town0", "name": "Town", "zone": "home", "x": 1, "y": 0,
                  "boat": {"x": 20, "y": 21}}
