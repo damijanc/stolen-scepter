@@ -98,7 +98,11 @@ pub fn game_step_basic(
         return StepResult::NoDirection;
     }
 
+    // The recruit-source markers share in_town's lifetime: a transaction is
+    // only legal in the step that stepped onto the gate or dwelling tile, so
+    // clear them up front and let the paths below re-set them.
     game.position.in_town = FixedStr::empty();
+    game.position.home_castle = FixedStr::empty();
     game.position.dwelling_troop = FixedStr::empty();
     game.position.dwelling_x = -1;
     game.position.dwelling_y = -1;
@@ -242,6 +246,15 @@ fn resolve_interaction(
             {
                 castle.visited = true;
                 castle.known = true;
+            }
+            // The hero is now AT the home castle: home-pool recruiting keys
+            // off this marker, set before any bounce-back so a recruit this
+            // step is legal, mirroring the town path's in_town set.
+            if resources
+                .castle_by_id(id.as_str())
+                .is_some_and(|castle| castle.is_home())
+            {
+                game.position.home_castle.copy_from_str(id.as_str());
             }
             StepInteraction::CastleGate { id }
         }
@@ -1016,6 +1029,51 @@ mod tests {
             }"#,
         )
         .expect("fixture parses")
+    }
+
+    #[test]
+    fn audience_gate_sets_home_castle_marker_and_the_next_step_revokes_it() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 40},
+              "zones": [{"id": "home"}],
+              "castles": [
+                {"index": 0, "id": "keep", "zone": "home", "x": 1, "y": 0,
+                 "special": {"flow": "audience"}},
+                {"index": 1, "id": "outpost", "zone": "home", "x": 3, "y": 0}
+              ],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut map = Map::from_tiles(
+            4,
+            1,
+            vec![
+                Tile::plain_grass(),
+                tile_with_id(Interact::CastleGate, "keep"),
+                Tile::plain_grass(),
+                tile_with_id(Interact::CastleGate, "outpost"),
+            ],
+        )
+        .expect("fixture dimensions match");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+        game.stats.steps_left_today = 40;
+        game.castles[0].id.copy_from_str("keep");
+        game.castles[1].id.copy_from_str("outpost");
+
+        move_interaction(&mut game, &mut map, &resources);
+        assert_eq!(game.position.home_castle.as_str(), "keep");
+
+        // Stepping away revokes the recruit privilege, exactly like in_town.
+        move_interaction(&mut game, &mut map, &resources);
+        assert!(game.position.home_castle.is_empty());
+
+        // A non-audience castle gate never sets the marker.
+        move_interaction(&mut game, &mut map, &resources);
+        assert!(game.position.home_castle.is_empty());
     }
 
     fn interaction_fixture() -> Resources {

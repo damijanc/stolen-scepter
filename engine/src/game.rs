@@ -20,6 +20,9 @@ pub const GAME_MAX_PLACEMENTS: usize = 128;
 pub const GAME_MAX_HOSTILE_PER_ZONE: usize = 35;
 pub const GAME_MAX_FOES: usize = 160;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
+/// Recruit cap standing in for the home castle's bottomless pool, OpenBounty's
+/// `1 << 28`. Large enough never to bind before gold or leadership do.
+pub const CASTLE_POOL_CAP: i32 = 1 << 28;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SaltKind {
@@ -345,6 +348,10 @@ pub struct Position {
     pub last_x: i32,
     pub last_y: i32,
     pub in_town: FixedStr<GAME_ID_LEN>,
+    /// Home (audience) castle the hero is currently transacting with, or empty
+    /// when not on its gate. Home-pool recruiting keys off this marker, and it
+    /// has the same one-step lifetime as `in_town`.
+    pub home_castle: FixedStr<GAME_ID_LEN>,
     pub dwelling_troop: FixedStr<CAT_ID_LEN>,
     pub dwelling_x: i32,
     pub dwelling_y: i32,
@@ -359,6 +366,7 @@ impl Default for Position {
             last_x: 0,
             last_y: 0,
             in_town: FixedStr::empty(),
+            home_castle: FixedStr::empty(),
             dwelling_troop: FixedStr::empty(),
             dwelling_x: -1,
             dwelling_y: -1,
@@ -1825,20 +1833,46 @@ impl Game {
     }
 
     pub fn recruit_location_cap(&self, resources: &Resources, troop_id: &str) -> i32 {
-        let Some(_troop) = resources.troop_by_id(troop_id) else {
+        let Some(troop) = resources.troop_by_id(troop_id) else {
             return -1;
         };
-        if self.position.dwelling_troop.as_str() == troop_id {
-            for dwelling in &self.dwellings[..self.dwelling_count] {
-                if dwelling.x == self.position.dwelling_x
-                    && dwelling.y == self.position.dwelling_y
-                    && dwelling.zone.as_str() == self.position.zone.as_str()
-                    && dwelling.troop_id.as_str() == troop_id
-                {
-                    return dwelling.count;
-                }
-            }
+        // A dwelling the hero is standing on that offers this troop sells it
+        // whatever the troop's catalog class: the salt roll can seed
+        // castle-class troops at dwellings, and a castle-first early return
+        // would refuse the very shop the world spawned.
+        if !self.position.dwelling_troop.is_empty()
+            && self.position.dwelling_troop.as_str() == troop_id
+        {
+            return self.standing_dwelling_cap(troop_id);
+        }
+        if troop.dwelling.as_str() == "castle" {
+            // Home pool: the castle never runs dry, so the cap is only the
+            // gate marker.
+            return if self.position.home_castle.is_empty() {
+                -1
+            } else {
+                CASTLE_POOL_CAP
+            };
+        }
+        if self.position.dwelling_troop.is_empty()
+            || self.position.dwelling_troop.as_str() != troop_id
+        {
             return -1;
+        }
+        self.standing_dwelling_cap(troop_id)
+    }
+
+    /// Population of the dwelling the hero is standing on, if it offers
+    /// `troop_id`, else -1.
+    fn standing_dwelling_cap(&self, troop_id: &str) -> i32 {
+        for dwelling in &self.dwellings[..self.dwelling_count] {
+            if dwelling.x == self.position.dwelling_x
+                && dwelling.y == self.position.dwelling_y
+                && dwelling.zone.as_str() == self.position.zone.as_str()
+                && dwelling.troop_id.as_str() == troop_id
+            {
+                return dwelling.count;
+            }
         }
         -1
     }
@@ -2659,7 +2693,8 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 mod tests {
     use super::{
         AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome, FoeState,
-        Game, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, TravelMode, GAME_ARMY_SLOTS,
+        Game, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, TravelMode, CASTLE_POOL_CAP,
+        GAME_ARMY_SLOTS,
     };
     use crate::combat::CombatResult;
     use crate::map::{Map, Tile};
@@ -2828,6 +2863,145 @@ mod tests {
         assert_eq!(pending.pending_gold, 0);
         assert_eq!(pending.pending_leadership, 0);
         assert_eq!(game.spells.counts[0], 1);
+    }
+
+    fn castle_pool_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "castles": [
+                {"index":0,"id":"castle0","zone":"home","x":4,"y":5,"special":{"flow":"audience"}},
+                {"index":1,"id":"castle1","zone":"home","x":8,"y":9}
+              ],
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"},
+                {"index":1,"id":"sprites","skill_level":1,"hit_points":2,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":5,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"forest","max_population":10}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// Hero on the home-castle gate with gold and leadership to spare.
+    fn home_castle_game() -> Game {
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.home_castle.copy_from_str("castle0");
+        game.stats.gold = 1_000;
+        game.stats.leadership_current = 100;
+        game
+    }
+
+    #[test]
+    fn audience_castle_is_identified_by_its_flow_marker() {
+        let resources = castle_pool_fixture();
+
+        assert!(resources.castle_by_id("castle0").unwrap().is_home());
+        assert!(!resources.castle_by_id("castle1").unwrap().is_home());
+        assert_eq!(
+            resources.home_castle().map(|castle| castle.id.as_str()),
+            Some("castle0")
+        );
+    }
+
+    #[test]
+    fn home_pool_troop_recruits_only_at_the_home_castle_gate() {
+        let resources = castle_pool_fixture();
+        let mut game = home_castle_game();
+
+        assert_eq!(
+            game.recruit_location_cap(&resources, "peasants"),
+            CASTLE_POOL_CAP
+        );
+        assert_eq!(
+            game.buy_troop(&resources, "peasants", 4),
+            RecruitOutcome::Ok
+        );
+        assert_eq!(game.stats.gold, 960);
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 4);
+    }
+
+    #[test]
+    fn home_pool_troop_is_illegal_away_from_the_gate() {
+        let resources = castle_pool_fixture();
+        let mut game = home_castle_game();
+        game.position.home_castle.copy_from_str("");
+
+        assert_eq!(game.recruit_location_cap(&resources, "peasants"), -1);
+        assert_eq!(
+            game.buy_troop(&resources, "peasants", 1),
+            RecruitOutcome::IllegalLocation
+        );
+        assert_eq!(game.stats.gold, 1_000);
+        assert_eq!(game.army[0].count, 0);
+    }
+
+    #[test]
+    fn home_pool_never_runs_dry_but_still_yields_to_gold_and_leadership() {
+        let resources = castle_pool_fixture();
+        let mut game = home_castle_game();
+        game.stats.gold = 35;
+        game.stats.leadership_current = 100;
+
+        // The location cap is effectively unbounded, so gold binds first.
+        assert_eq!(
+            game.recruit_location_cap(&resources, "peasants"),
+            CASTLE_POOL_CAP
+        );
+        assert_eq!(
+            game.buy_troop(&resources, "peasants", 4),
+            RecruitOutcome::NoGold
+        );
+
+        game.stats.gold = 1_000;
+        game.stats.leadership_current = 3;
+        assert_eq!(
+            game.buy_troop(&resources, "peasants", 4),
+            RecruitOutcome::OverLeadership
+        );
+        assert_eq!(game.army[0].count, 0);
+    }
+
+    #[test]
+    fn dwelling_the_hero_stands_on_outranks_the_castle_class_of_its_troop() {
+        let resources = castle_pool_fixture();
+        let mut game = home_castle_game();
+        // The salt roll can seed a castle-class troop at a dwelling; standing
+        // on that dwelling must sell it from the dwelling's population rather
+        // than falling through to the bottomless home pool.
+        game.position.home_castle.copy_from_str("");
+        game.position.dwelling_troop.copy_from_str("peasants");
+        game.position.dwelling_x = 2;
+        game.position.dwelling_y = 3;
+        game.dwellings[0].zone.copy_from_str("home");
+        game.dwellings[0].x = 2;
+        game.dwellings[0].y = 3;
+        game.dwellings[0].troop_id.copy_from_str("peasants");
+        game.dwellings[0].count = 6;
+        game.dwelling_count = 1;
+
+        assert_eq!(game.recruit_location_cap(&resources, "peasants"), 6);
+        assert_eq!(
+            game.buy_troop(&resources, "peasants", 7),
+            RecruitOutcome::IllegalLocation
+        );
+        assert_eq!(
+            game.buy_troop(&resources, "peasants", 6),
+            RecruitOutcome::Ok
+        );
+    }
+
+    #[test]
+    fn dwelling_troop_stays_illegal_at_the_home_castle() {
+        let resources = castle_pool_fixture();
+        let mut game = home_castle_game();
+
+        // "sprites" is a forest troop: the home-castle gate sells nothing.
+        assert_eq!(game.recruit_location_cap(&resources, "sprites"), -1);
+        assert_eq!(
+            game.buy_troop(&resources, "sprites", 1),
+            RecruitOutcome::IllegalLocation
+        );
     }
 
     #[test]

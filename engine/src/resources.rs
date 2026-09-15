@@ -416,6 +416,10 @@ impl Default for ResTown {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
 pub struct ResCastleSpecial {
     pub excluded_from_contract: bool,
+    /// Pack marker for a quest castle: "" is a normal castle, "audience" is
+    /// the home castle. OpenBounty keeps the flow id in resources and tests it
+    /// only through `resources_castle_is_home`.
+    pub flow: FixedStr<RES_ID_LEN>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -430,6 +434,14 @@ pub struct ResCastle {
     pub gate_y: i32,
     pub difficulty_tier: i32,
     pub special: ResCastleSpecial,
+}
+
+impl ResCastle {
+    /// True for the audience castle. Ports `resources_castle_is_home`, which
+    /// is the only place OpenBounty tests the flow id.
+    pub fn is_home(&self) -> bool {
+        self.special.flow.as_str() == "audience"
+    }
 }
 
 impl Default for ResCastle {
@@ -640,6 +652,14 @@ impl Resources {
         self.artifacts[..self.artifacts_count]
             .iter()
             .position(|artifact| artifact.zone.as_str() == zone && artifact.local_idx == local_idx)
+    }
+
+    /// The audience (home) castle, or None if the pack defines none. Ports
+    /// `resources_home_castle`.
+    pub fn home_castle(&self) -> Option<&ResCastle> {
+        self.castles[..self.castle_count]
+            .iter()
+            .find(|castle| castle.is_home())
     }
 
     pub fn spell_by_index(&self, index: i32) -> Option<&SpellDef> {
@@ -1598,6 +1618,9 @@ fn parse_castle(value: &serde_json::Value) -> Result<ResCastle, ResourceError> {
     if let Some(special) = value.get("special") {
         castle.special.excluded_from_contract =
             optional_bool_field(special, "excluded_from_contract", false)?;
+        if let Some(flow) = optional_string_field(special, "flow")? {
+            castle.special.flow.copy_from_str(flow);
+        }
     }
 
     Ok(castle)
