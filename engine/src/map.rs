@@ -3,6 +3,8 @@ use crate::resources::{ResZone, Resources};
 use crate::tables::FixedStr;
 use crate::tile::{Interact, Terrain};
 
+/// Length of a tile's art name, C's `TILE_ART_NAME_LEN`.
+pub const TILE_ART_LEN: usize = 24;
 pub const TILE_ID_LEN: usize = 24;
 pub const TILE_SIGN_BODY_LEN: usize = 96;
 pub const TILE_SIGN_TITLE_LEN: usize = 48;
@@ -11,6 +13,11 @@ pub const TILE_SIGN_TITLE_LEN: usize = 48;
 pub struct Tile {
     pub terrain: Terrain,
     pub interactive: Interact,
+    /// Sprite filename base, e.g. `water` or `castle_gate`. Only a renderer
+    /// reads it, but the map module is the only thing that knows it: terrain
+    /// alone cannot name the art, because an artifact and a chest on grass
+    /// share a terrain and do not share a sprite.
+    pub art: FixedStr<TILE_ART_LEN>,
     pub id: FixedStr<TILE_ID_LEN>,
     pub blocks_foot: bool,
     pub is_bridge: bool,
@@ -25,6 +32,7 @@ impl Default for Tile {
         Self {
             terrain: Terrain::Grass,
             interactive: Interact::None,
+            art: FixedStr::empty(),
             id: FixedStr::empty(),
             blocks_foot: false,
             is_bridge: false,
@@ -37,8 +45,12 @@ impl Default for Tile {
 }
 
 impl Tile {
+    /// C's `default_tile`: the loader's starting state for every tile,
+    /// before the .dat is decoded over it.
     pub fn plain_grass() -> Self {
-        Self::default()
+        let mut tile = Self::default();
+        tile.art.copy_from_str("grass");
+        tile
     }
 
     pub fn terrain(terrain: Terrain) -> Self {
@@ -158,6 +170,11 @@ impl Map {
         }
 
         let mut map = Self::new(width, height);
+        // C defaults every tile to plain grass before decoding, so a row the
+        // .dat leaves short still has terrain and art.
+        for tile in map.tiles.iter_mut() {
+            *tile = Tile::plain_grass();
+        }
         let mut p = skip_blank_and_comments(bytes, 0);
         for y in 0..height {
             if p >= bytes.len() {
@@ -172,6 +189,7 @@ impl Map {
                     .tile_code(code)
                     .ok_or(MapLoadError::UnknownTileCode { x, y, code })?;
                 let tile = map.tile_mut(x, y).expect("loader writes in bounds");
+                tile.art.copy_from_str(tile_code.art.as_str());
                 tile.terrain = tile_code.terrain;
                 tile.blocks_foot = tile_code.blocks_foot;
                 tile.is_bridge = tile_code.is_bridge;
@@ -322,6 +340,7 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Opt
             tile.id.copy_from_str(sign.id.as_str());
             tile.sign_title.copy_from_str(sign.title.as_str());
             tile.sign_body.copy_from_str(sign.body.as_str());
+            tile.art.copy_from_str("sign");
         }
     }
 
@@ -337,6 +356,7 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Opt
             tile.id.copy_from_str(town.id.as_str());
             tile.boat_spawn_x = town.boat_x;
             tile.boat_spawn_y = town.boat_y;
+            tile.art.copy_from_str("town");
         }
     }
 
@@ -350,6 +370,7 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Opt
                 if let Some(tile) =
                     map.tile_mut_i32(castle.x + decoration.dx, castle.y + decoration.dy)
                 {
+                    tile.art.copy_from_str(decoration.art.as_str());
                     tile.blocks_foot = true;
                 }
             }
@@ -376,6 +397,7 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Opt
         if let Some(tile) = map.tile_mut_i32(chest.x, chest.y) {
             tile.interactive = Interact::TreasureChest;
             tile.id.copy_from_str(chest.id.as_str());
+            tile.art.copy_from_str("chest");
         }
     }
 
@@ -383,12 +405,18 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Opt
         if let Some(tile) = map.tile_mut_i32(artifact.x, artifact.y) {
             tile.interactive = Interact::Artifact;
             tile.id.copy_from_str(artifact.id.as_str());
+            // Both artifact tile bytes show the same chest art: which
+            // artifact it is stays hidden until the hero picks it up.
+            tile.art.copy_from_str("artifact_chest");
         }
     }
 
     for dwelling in &zone.dwellings[..zone.dwelling_count] {
         if let Some(tile) = map.tile_mut_i32(dwelling.x, dwelling.y) {
             tile.interactive = Interact::from_dwelling_kind(dwelling.kind.as_str());
+            if let Some(art) = interactive_art(tile.interactive) {
+                tile.art.copy_from_str(art);
+            }
             tile.id.copy_from_str(dwelling.id.as_str());
         }
     }
@@ -396,11 +424,57 @@ fn stamp_objects(map: &mut Map, resources: &Resources, zone: &ResZone, game: Opt
     if zone.magic_alcove_x >= 0 && zone.magic_alcove_y >= 0 {
         if let Some(tile) = map.tile_mut_i32(zone.magic_alcove_x, zone.magic_alcove_y) {
             tile.interactive = Interact::Alcove;
+            // The alcove reuses the hill-cave sprite.
+            tile.art.copy_from_str("dwelling_hills");
             tile.id.copy_from_str("alcove");
             tile.blocks_foot = false;
         }
     }
 }
+
+/// The tile art an interactive overlay shows. Ports C's `placement_art`,
+/// which the dwelling stamp shares.
+///
+/// A navmap and an orb keep the chest look on purpose: the hero finds out
+/// what they are by stepping on them. A telecave borrows the dungeon-dwelling
+/// sprite because no telecave art exists yet.
+pub fn interactive_art(kind: Interact) -> Option<&'static str> {
+    Some(match kind {
+        Interact::Telecave => "dwelling_dungeon",
+        Interact::Navmap | Interact::Orb => "chest",
+        Interact::Artifact => "artifact_chest",
+        Interact::DwellingPlains => "dwelling_plains",
+        Interact::DwellingForest => "dwelling_forest",
+        Interact::DwellingHills => "dwelling_hills",
+        Interact::DwellingDungeon => "dwelling_dungeon",
+        _ => return None,
+    })
+}
+
+/// Every art name this module stamps for a placed object. The .dat carries
+/// pure terrain, so these never appear in a pack's tile legend and a manifest
+/// that enumerates a pack's art has to add them by hand. Ports
+/// `map_object_art_names`.
+pub const OBJECT_ART_NAMES: [&str; 18] = [
+    "castle_tl",
+    "castle_tr",
+    "castle_br",
+    "castle_ml",
+    "castle_mr",
+    "castle_gate",
+    "town",
+    "chest",
+    "artifact_chest",
+    "artifact_ring",
+    "sign",
+    "bridge_h",
+    "bridge_v",
+    "wandering_army",
+    "dwelling_plains",
+    "dwelling_forest",
+    "dwelling_hills",
+    "dwelling_dungeon",
+];
 
 fn stamp_placements(map: &mut Map, game: &Game, zone_id: &str) {
     for placement in &game.placements[..game.placement_count] {
@@ -410,6 +484,9 @@ fn stamp_placements(map: &mut Map, game: &Game, zone_id: &str) {
         if let Some(tile) = map.tile_mut_i32(placement.x, placement.y) {
             tile.interactive = placement.kind;
             tile.id.copy_from_str(placement.id.as_str());
+            if let Some(art) = interactive_art(placement.kind) {
+                tile.art.copy_from_str(art);
+            }
         }
     }
 
@@ -428,17 +505,21 @@ fn game_friendly_foe_origin_at(game: &Game, zone: &str, x: i32, y: i32) -> bool 
 }
 
 fn stamp_castle(map: &mut Map, x: i32, y: i32, id: &str) {
-    for (dx, dy, is_gate) in [
-        (-1, -1, false),
-        (0, -1, false),
-        (1, -1, false),
-        (-1, 0, false),
-        (0, 0, true),
-        (1, 0, false),
+    // A castle is 3 wide by 2 tall, centred on its gate at the bottom middle.
+    // The `br` piece sits at the TOP middle: the name is wrong but it is the
+    // asset's, so it is preserved.
+    for (dx, dy, art, is_gate) in [
+        (-1, -1, "castle_tl", false),
+        (0, -1, "castle_br", false),
+        (1, -1, "castle_tr", false),
+        (-1, 0, "castle_ml", false),
+        (0, 0, "castle_gate", true),
+        (1, 0, "castle_mr", false),
     ] {
         let Some(tile) = map.tile_mut_i32(x + dx, y + dy) else {
             continue;
         };
+        tile.art.copy_from_str(art);
         if is_gate {
             tile.interactive = Interact::CastleGate;
             tile.id.copy_from_str(id);
@@ -460,7 +541,13 @@ impl Map {
         tile.sign_body = FixedStr::empty();
         tile.boat_spawn_x = -1;
         tile.boat_spawn_y = -1;
-        if tile.terrain != Terrain::Water {
+        // A consumed tile becomes plain walkable grass whatever it sat on,
+        // so a picked-up dwelling on a mountain edge stops blocking. Water
+        // stays water, or a floating pickup would leave a walkable hole.
+        if tile.terrain == Terrain::Water {
+            tile.art.copy_from_str("water");
+        } else {
+            tile.art.copy_from_str("grass");
             tile.terrain = Terrain::Grass;
             tile.blocks_foot = false;
             tile.is_bridge = false;
@@ -501,6 +588,7 @@ impl Map {
         }
         tile.interactive = Interact::Foe;
         tile.id.copy_from_str(placement_id);
+        tile.art.copy_from_str("wandering_army");
     }
 
     pub fn tile_mut_i32(&mut self, x: i32, y: i32) -> Option<&mut Tile> {
@@ -752,5 +840,140 @@ mod tests {
         );
         assert_eq!(map.tile(5, 1).expect("in bounds").id.as_str(), "");
         assert_eq!(map.tile(5, 1).expect("in bounds").terrain, Terrain::Water);
+    }
+
+    fn art_fixture() -> Resources {
+        Resources::from_json_str(
+            r##"{
+              "tile_codes": {
+                ".": {"art":"grass","terrain":"grass"},
+                "M": {"art":"mountain","terrain":"mountain","blocks_foot":true},
+                "W": {"art":"water","terrain":"water"}
+              },
+              "zones": [{
+                "id":"home",
+                "map":"maps/home.dat",
+                "width":8,
+                "height":3,
+                "signs":[{"x":0,"y":1,"id":"sign0","title":"T","body":"B"}],
+                "castles":[{"x":6,"y":2,"id":"castle0",
+                            "decorations":[{"dx":-2,"dy":0,"art":"tower"}]}],
+                "chests":[{"x":1,"y":1,"id":"chest0"}],
+                "artifacts":[{"x":3,"y":1,"id":"artifact0"}],
+                "dwellings":[{"x":2,"y":1,"id":"dw0","kind":"hills"}],
+                "magic_alcove":{"x":4,"y":1}
+              }],
+              "towns": [{"index":0,"id":"town0","zone":"home","x":5,"y":0}],
+              "troops": []
+            }"##,
+        )
+        .expect("fixture parses")
+    }
+
+    fn art_at(map: &Map, x: usize, y: usize) -> String {
+        map.tile(x, y).expect("in bounds").art.as_str().to_owned()
+    }
+
+    #[test]
+    fn the_legend_names_the_art_of_plain_terrain() {
+        let resources = art_fixture();
+        let zone = resources.zone_by_id("home").expect("zone exists");
+        // The last row is deliberately short of the zone's declared width.
+        let map = Map::load_zone_bytes(&resources, zone, b"..MW....\n........\nMM\n")
+            .expect("map bytes load");
+
+        assert_eq!(art_at(&map, 0, 0), "grass");
+        assert_eq!(art_at(&map, 2, 0), "mountain");
+        assert_eq!(art_at(&map, 3, 0), "water");
+        assert_eq!(art_at(&map, 0, 2), "mountain");
+        // Past the end of the short row the default fill is what shows, so
+        // the tile still names art rather than coming out nameless.
+        assert_eq!(art_at(&map, 3, 2), "grass");
+    }
+
+    #[test]
+    fn every_stamped_object_names_its_own_art() {
+        // Terrain alone cannot name the art: the chest and the artifact below
+        // sit on identical grass and draw different sprites.
+        let resources = art_fixture();
+        let zone = resources.zone_by_id("home").expect("zone exists");
+        let map = Map::load_zone_bytes(&resources, zone, b"........\n........\n........\n")
+            .expect("map bytes load");
+
+        assert_eq!(art_at(&map, 0, 1), "sign");
+        assert_eq!(art_at(&map, 5, 0), "town");
+        assert_eq!(art_at(&map, 1, 1), "chest");
+        assert_eq!(art_at(&map, 3, 1), "artifact_chest");
+        assert_eq!(art_at(&map, 2, 1), "dwelling_hills");
+        // The alcove borrows the hill-cave sprite.
+        assert_eq!(art_at(&map, 4, 1), "dwelling_hills");
+    }
+
+    #[test]
+    fn a_castle_names_all_six_of_its_pieces_and_its_decorations() {
+        let resources = art_fixture();
+        let zone = resources.zone_by_id("home").expect("zone exists");
+        let map = Map::load_zone_bytes(&resources, zone, b"........\n........\n........\n")
+            .expect("map bytes load");
+
+        // Gate at (6,2), so the block runs (5..7, 1..2). `br` is the TOP
+        // middle piece despite its name, which is the asset's, not ours.
+        assert_eq!(art_at(&map, 5, 1), "castle_tl");
+        assert_eq!(art_at(&map, 6, 1), "castle_br");
+        assert_eq!(art_at(&map, 7, 1), "castle_tr");
+        assert_eq!(art_at(&map, 5, 2), "castle_ml");
+        assert_eq!(art_at(&map, 6, 2), "castle_gate");
+        assert_eq!(art_at(&map, 7, 2), "castle_mr");
+        assert_eq!(art_at(&map, 4, 2), "tower");
+    }
+
+    #[test]
+    fn a_salted_placement_takes_the_art_of_its_kind() {
+        let resources = art_fixture();
+        let zone = resources.zone_by_id("home").expect("zone exists");
+        let mut game = Game::default();
+        game.add_placement("home", 0, 0, Interact::Telecave, "telecave0");
+        game.add_placement("home", 1, 0, Interact::Navmap, "navmap0");
+        game.add_placement("home", 2, 0, Interact::Orb, "orb0");
+        game.add_placement("home", 3, 0, Interact::DwellingForest, "dw1");
+
+        let map = Map::load_zone_bytes_with_placements(
+            &resources,
+            zone,
+            b"........\n........\n........\n",
+            &game,
+        )
+        .expect("map bytes load");
+
+        // A navmap and an orb keep the chest look on purpose: the hero learns
+        // what they are by stepping on them.
+        assert_eq!(art_at(&map, 1, 0), "chest");
+        assert_eq!(art_at(&map, 2, 0), "chest");
+        // The telecave has no sprite of its own yet, so it borrows the
+        // dungeon dwelling's.
+        assert_eq!(art_at(&map, 0, 0), "dwelling_dungeon");
+        assert_eq!(art_at(&map, 3, 0), "dwelling_forest");
+    }
+
+    #[test]
+    fn a_foe_stamp_shows_a_wandering_army_and_giving_it_up_restores_the_ground() {
+        let resources = art_fixture();
+        let zone = resources.zone_by_id("home").expect("zone exists");
+        let mut map = Map::load_zone_bytes(&resources, zone, b"..W.....\n........\n........\n")
+            .expect("map bytes load");
+
+        map.stamp_foe(0, 0, "hostile0");
+        assert_eq!(art_at(&map, 0, 0), "wandering_army");
+
+        assert!(map.clear_foe_stamp(0, 0));
+        assert_eq!(art_at(&map, 0, 0), "grass");
+
+        // A dwelling on a mountain edge reverts to walkable grass once taken,
+        // but water stays water so a floating pickup leaves no hole.
+        map.stamp_foe(2, 0, "sailor0");
+        assert_eq!(art_at(&map, 2, 0), "wandering_army");
+        map.clear_interactive(2, 0);
+        assert_eq!(art_at(&map, 2, 0), "water");
+        assert_eq!(map.tile(2, 0).expect("in bounds").terrain, Terrain::Water);
     }
 }

@@ -156,13 +156,18 @@ C sets them in engine code and writes them to saves, so they belong here.
   mirror flag, so the loader derives the facing from it rather than bumping
   the save version. The Rust port was writing neither field, which made its
   v11 saves narrower than C's v11.
-- `Tile.art` -- STILL MISSING. C's `Tile` carries the sprite filename base
-  ("water", "castle_gate"), derives `terrain` from it at load, clears it in
-  `MapClearInteractive`, and stamps 18 specific names for placed objects
-  (`map_object_art_names`). `map_render` draws with `tile_cache_get(t->art)`.
-  The Rust `Tile` keeps only `terrain`, and the legend is not retained, so
-  the art name is unrecoverable: an artifact and a chest on grass have the
-  same terrain and different art. Add the field before step 4.
+- `Tile.art` -- DONE. The sprite filename base ("water", "castle_gate"),
+  which `map_render` draws with via `tile_cache_get(t->art)`. The Rust `Tile`
+  kept only `terrain`, and the legend is not retained, so the name was
+  unrecoverable. It is not derivable either, in two separate ways: an
+  artifact and a chest on grass share a terrain and not a sprite, and the
+  shipped pack's legend maps 5 terrains onto 60 art names -- every coastline
+  and forest/desert/mountain edge variant. A terrain-only renderer would have
+  drawn flat blocks of colour with no edges at all.
+
+  Verified against the shipped pack: loading every zone yields 72 distinct
+  art names, all 72 have a PNG in `art/tiles/`, and none is empty. That check
+  is not committed, for the same reason as the smoke test above.
 
 Both were invisible to the sweep methods in `AGENTS.md`, which compare
 function names and body sizes. Neither catches a missing struct FIELD. When
