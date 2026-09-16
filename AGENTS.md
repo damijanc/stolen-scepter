@@ -66,6 +66,11 @@ Implemented and tested:
 - `Game.oracle_mode`, the transient autoplay flag that keeps the legacy
   promote-on-capture behavior and the legacy reachable-flying-hero behavior.
   Real play promotes only at an audience and cannot be caught while flying.
+- The save-shaped snapshot: `build_snapshot_full` emits `pack_id`, `boat`
+  and `map_state` (hex fog rows per discovered continent, the ACTIVE zone's
+  live fog winning over its stale per-continent snapshot). `pack_hash` is
+  not emitted -- it hashes the pack zip, which the Rust engine does not load,
+  and nothing gates on it.
 - Fog of war (`engine/src/fog.rs`): a fixed 64x64 seen grid per continent,
   revealed by `game_step_basic` right after each move. `reveal` takes a
   radius and IGNORES it -- the original always stamps 5x5.
@@ -76,10 +81,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 191 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 197 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is fog of war. Run `git log --oneline -5`
+The most recent slice is completing the save snapshot. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -142,13 +147,13 @@ Everything ported so far is reachable from `game_step_basic`; there are no
 dangling engine cores left to wire up.
 
 The save format is v11, NOT the v8 named in older drafts of
-`specs/parity-port-plan.md`. `SaveGameWrite` is just `state_build_snapshot`
-printed to a file, and `state_serialize.rs` already declares
-`SAVE_VERSION = 11`, so the writer mostly exists. Compared with C's snapshot
-the Rust one is still missing the root keys `pack_id`, `pack_hash`, `boat`,
-`map_state` and `fog`; the harness-only keys (`tiles`, `combat`, `dialog`,
-`prompt`, `fast_quit_prompt`, `view`) are additive and the loader ignores
-them, so they are not needed for a save.
+`specs/parity-port-plan.md`. The snapshot now carries every save-relevant
+key, so what remains is the file I/O: `SaveGameWrite` is just the snapshot
+printed to a file, while `SaveGameRead` (~500 lines of
+`reference/engine/savegame.c`) parses it back and enforces two guards --
+a `version` that must equal 11 exactly, and a `pack_id` that must match the
+loaded pack or the load is refused. A write/read round-trip test is the
+natural acceptance check.
 
 Two standing omissions:
 

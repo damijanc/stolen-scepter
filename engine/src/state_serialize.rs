@@ -1,6 +1,9 @@
+use crate::fog::Fog;
 use crate::game::{
     CastleOwnerKind, Game, Mount, TravelMode, Unit, CONTRACT_CYCLE_MAX, GAME_ARMY_SLOTS,
+    GAME_CONTINENTS,
 };
+use crate::map::Map;
 use crate::resources::Resources;
 
 pub const SAVE_VERSION: u32 = 11;
@@ -12,6 +15,36 @@ pub fn build_snapshot(game: Option<&Game>) -> serde_json::Value {
 pub fn build_snapshot_with_resources(
     game: Option<&Game>,
     resources: Option<&Resources>,
+) -> serde_json::Value {
+    build_snapshot_full(game, resources, None, None)
+}
+
+/// Encode one fog row as hex nibbles, 4 tiles per character, most
+/// significant bit first within each nibble.
+fn encode_fog_row(fog: &Fog, row: i32, width: usize) -> String {
+    let nibbles = width.div_ceil(4);
+    let mut out = String::with_capacity(nibbles);
+    for n in 0..nibbles {
+        let mut v = 0u8;
+        for b in 0..4 {
+            let x = n * 4 + b;
+            if x < width && fog.seen(x as i32, row) {
+                v |= 1 << (3 - b);
+            }
+        }
+        out.push(char::from_digit(v as u32, 16).unwrap_or('0'));
+    }
+    out
+}
+
+/// The full snapshot, which the save format is a subset of. `map` and `fog`
+/// are the ACTIVE zone's live state: its fog wins over the per-continent
+/// snapshot, which may be stale from before recent moves.
+pub fn build_snapshot_full(
+    game: Option<&Game>,
+    resources: Option<&Resources>,
+    map: Option<&Map>,
+    fog: Option<&Fog>,
 ) -> serde_json::Value {
     let mut root = serde_json::Map::new();
     root.insert("version".to_owned(), serde_json::json!(SAVE_VERSION));
@@ -30,6 +63,15 @@ pub fn build_snapshot_with_resources(
         root.insert("seed_index".to_owned(), serde_json::json!(game.seed_index));
     } else {
         root.insert("seed".to_owned(), serde_json::json!(game.seed));
+    }
+
+    if let Some(resources) = resources {
+        if !resources.pack_id.is_empty() {
+            root.insert(
+                "pack_id".to_owned(),
+                serde_json::json!(resources.pack_id.as_str()),
+            );
+        }
     }
 
     root.insert(
@@ -232,6 +274,51 @@ pub fn build_snapshot_with_resources(
         .collect();
     root.insert("castles".to_owned(), serde_json::Value::Array(castles));
 
+    // map_state: fog per discovered continent, hex per row. The active
+    // zone uses the live fog and the live map's dimensions; every other
+    // discovered zone falls back to its snapshot and its declared size.
+    if let (Some(resources), Some(map), Some(fog)) = (resources, map, fog) {
+        let mut mstate = serde_json::Map::new();
+        for zone_index in 0..GAME_CONTINENTS {
+            if zone_index >= game.world.zones_discovered.len()
+                || !game.world.zones_discovered[zone_index]
+            {
+                continue;
+            }
+            let Some(zone) = resources.zone_by_index(zone_index) else {
+                continue;
+            };
+            let is_active = zone.id.as_str() == game.position.zone.as_str();
+            let (source, width, height) = if is_active {
+                (fog, map.width, map.height)
+            } else {
+                (
+                    &game.world.continent_fog[zone_index],
+                    zone.width.max(0) as usize,
+                    zone.height.max(0) as usize,
+                )
+            };
+            let rows: Vec<_> = (0..height)
+                .map(|y| serde_json::json!(encode_fog_row(source, y as i32, width)))
+                .collect();
+            mstate.insert(
+                zone.id.as_str().to_owned(),
+                serde_json::json!({ "fog": rows }),
+            );
+        }
+        root.insert("map_state".to_owned(), serde_json::Value::Object(mstate));
+    }
+
+    root.insert(
+        "boat".to_owned(),
+        serde_json::json!({
+            "has_boat": game.boat.has_boat,
+            "x": game.boat.x,
+            "y": game.boat.y,
+            "zone": game.boat.zone.as_str(),
+        }),
+    );
+
     root.insert(
         "scepter".to_owned(),
         serde_json::json!({
@@ -393,8 +480,13 @@ fn unit_array_snapshot(units: &[Unit; GAME_ARMY_SLOTS]) -> Vec<serde_json::Value
 
 #[cfg(test)]
 mod tests {
-    use super::{build_snapshot, build_snapshot_with_resources, snapshot_to_string, SAVE_VERSION};
+    use super::{
+        build_snapshot, build_snapshot_full, build_snapshot_with_resources, encode_fog_row,
+        snapshot_to_string, SAVE_VERSION,
+    };
+    use crate::fog::Fog;
     use crate::game::Game;
+    use crate::map::Map;
     use crate::resources::Resources;
 
     #[test]
@@ -530,5 +622,119 @@ mod tests {
         assert_eq!(snapshot["placements"], serde_json::json!([]));
         assert_eq!(snapshot["foes"], serde_json::json!([]));
         assert_eq!(snapshot["dwellings"], serde_json::json!([]));
+    }
+
+    fn save_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "pack_id": "openbounty",
+              "world": {"starting_zone": "home"},
+              "zones": [
+                {"id":"home","width":8,"height":4},
+                {"id":"away","width":6,"height":2}
+              ],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn fog_rows_pack_four_tiles_into_one_hex_nibble() {
+        let map = Map::new(8, 1);
+        let mut fog = Fog::new();
+
+        // Nothing seen yet.
+        assert_eq!(encode_fog_row(&fog, 0, 8), "00");
+
+        // Reveal around (1,0): a 5x5 square clipped to the row covers x 0..=3.
+        fog.reveal(&map, 1, 0, 3);
+        // High nibble = tiles 0..3 all seen, low nibble = tiles 4..7 unseen.
+        assert_eq!(encode_fog_row(&fog, 0, 8), "f0");
+    }
+
+    #[test]
+    fn a_partial_row_still_rounds_up_to_whole_nibbles() {
+        let map = Map::new(5, 1);
+        let mut fog = Fog::new();
+        fog.reveal(&map, 0, 0, 3);
+        // Width 5 needs two nibbles; tiles 0..2 seen, tile 4 not.
+        assert_eq!(encode_fog_row(&fog, 0, 5), "e0");
+    }
+
+    #[test]
+    fn the_save_snapshot_carries_pack_identity_and_the_boat() {
+        let resources = save_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.boat.has_boat = true;
+        game.boat.x = 4;
+        game.boat.y = 5;
+        game.boat.zone.copy_from_str("home");
+
+        let snapshot = build_snapshot_with_resources(Some(&game), Some(&resources));
+
+        assert_eq!(snapshot["version"], SAVE_VERSION);
+        assert_eq!(snapshot["pack_id"], "openbounty");
+        assert_eq!(snapshot["boat"]["has_boat"], true);
+        assert_eq!(snapshot["boat"]["x"], 4);
+        assert_eq!(snapshot["boat"]["zone"], "home");
+    }
+
+    #[test]
+    fn map_state_prefers_the_live_fog_for_the_zone_the_hero_is_in() {
+        let resources = save_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+        game.world.zones_discovered[1] = true;
+        // A stale snapshot for the active zone, which the live fog must beat.
+        game.world.continent_fog[0].seen[0][7] = true;
+        // The other zone has only its snapshot to offer.
+        game.world.continent_fog[1].seen[1][0] = true;
+
+        let map = Map::new(8, 4);
+        let mut fog = Fog::new();
+        fog.reveal(&map, 1, 0, 3);
+
+        let snapshot = build_snapshot_full(Some(&game), Some(&resources), Some(&map), Some(&fog));
+        let state = &snapshot["map_state"];
+
+        // Active zone: the live fog wins, so tile 7 reads unseen despite the
+        // stale snapshot claiming otherwise.
+        assert_eq!(state["home"]["fog"][0], "f0");
+        assert_eq!(state["home"]["fog"].as_array().expect("rows").len(), 4);
+        // Inactive zone: its own snapshot, at its declared size.
+        assert_eq!(state["away"]["fog"][1], "80");
+        assert_eq!(state["away"]["fog"].as_array().expect("rows").len(), 2);
+    }
+
+    #[test]
+    fn map_state_skips_undiscovered_zones() {
+        let resources = save_fixture();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+
+        let map = Map::new(8, 4);
+        let fog = Fog::new();
+        let snapshot = build_snapshot_full(Some(&game), Some(&resources), Some(&map), Some(&fog));
+
+        assert!(snapshot["map_state"].get("home").is_some());
+        assert!(
+            snapshot["map_state"].get("away").is_none(),
+            "an undiscovered zone contributes no fog"
+        );
+    }
+
+    #[test]
+    fn map_state_is_omitted_without_a_live_map_and_fog() {
+        let resources = save_fixture();
+        let mut game = Game::default();
+        game.world.zones_discovered[0] = true;
+
+        let snapshot = build_snapshot_with_resources(Some(&game), Some(&resources));
+
+        assert!(snapshot.get("map_state").is_none());
     }
 }

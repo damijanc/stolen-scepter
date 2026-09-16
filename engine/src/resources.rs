@@ -468,6 +468,9 @@ impl Default for ResCastle {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
     resource_root: FixedStr<CAT_PATH_LEN>,
+    /// Pack identity. The save loader refuses a save written against a
+    /// different pack, since its ids belong to that pack's catalog.
+    pub pack_id: FixedStr<RES_ID_LEN>,
     pub time: ResTime,
     pub world: ResWorld,
     pub contract: ResContract,
@@ -497,6 +500,7 @@ impl Default for Resources {
     fn default() -> Self {
         Self {
             resource_root: FixedStr::empty(),
+            pack_id: FixedStr::empty(),
             time: ResTime::default(),
             world: ResWorld::default(),
             contract: ResContract::default(),
@@ -540,6 +544,9 @@ impl Resources {
     pub fn from_json_str(input: &str) -> Result<Self, ResourceError> {
         let root: serde_json::Value = serde_json::from_str(input).map_err(ResourceError::Json)?;
         let mut resources = Self::default();
+        if let Some(pack_id) = optional_string_field(&root, "pack_id")? {
+            resources.pack_id.copy_from_str(pack_id);
+        }
         resources.parse_time(&root)?;
         resources.parse_world(&root)?;
         resources.parse_contract(&root)?;

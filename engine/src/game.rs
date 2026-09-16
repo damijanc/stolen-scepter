@@ -1,6 +1,7 @@
 use crate::combat::{
     combat_run_headless, CombatMode, CombatResult, CombatTarget, COMBAT_MAX_ROUNDS,
 };
+use crate::fog::Fog;
 use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
@@ -22,6 +23,8 @@ pub const GAME_MAX_PLACEMENTS: usize = 128;
 pub const GAME_MAX_HOSTILE_PER_ZONE: usize = 35;
 pub const GAME_MAX_FOES: usize = 160;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
+/// Continents that retain their own fog snapshot.
+pub const GAME_CONTINENTS: usize = 4;
 /// How far, on each axis, a foe may be from the hero's previous tile and
 /// still give chase.
 pub const GAME_FOE_FOLLOW_RANGE: i32 = 2;
@@ -538,6 +541,10 @@ impl Default for FoeState {
 pub struct WorldProgress {
     pub zones_discovered: [bool; RES_MAX_ZONES],
     pub orbs_found: [bool; RES_MAX_ZONES],
+    /// Fog retained per continent, so a revisited zone keeps the terrain it
+    /// has already revealed. The active zone's live `Fog` is authoritative
+    /// and wins over its snapshot here, which may be stale.
+    pub continent_fog: [Fog; GAME_CONTINENTS],
 }
 
 impl Default for WorldProgress {
@@ -545,6 +552,7 @@ impl Default for WorldProgress {
         Self {
             zones_discovered: [false; RES_MAX_ZONES],
             orbs_found: [false; RES_MAX_ZONES],
+            continent_fog: [Fog::new(); GAME_CONTINENTS],
         }
     }
 }
