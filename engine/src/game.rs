@@ -1,4 +1,6 @@
-use crate::combat::CombatResult;
+use crate::combat::{
+    combat_run_headless, CombatMode, CombatResult, CombatTarget, COMBAT_MAX_ROUNDS,
+};
 use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
@@ -2079,6 +2081,41 @@ impl Game {
         );
     }
 
+    /// Fight the hostile foe the hero has chosen to attack, then apply the
+    /// outcome. The shell owns the attack/decline prompt and passes only the
+    /// resolved decision, so this is the whole engine side of the flow:
+    /// OpenBounty's target build plus `combat_run_headless` plus
+    /// `flow_apply_attack_foe`.
+    ///
+    /// Returns the battle result and the `temp_death` flag the caller must
+    /// act on after a loss.
+    pub fn attack_hostile_foe(
+        &mut self,
+        map: &mut Map,
+        resources: &Resources,
+        foe_id: &str,
+        foe_x: i32,
+        foe_y: i32,
+    ) -> (CombatResult, bool) {
+        // C leaves the target's garrison NULL when the foe cannot be found,
+        // which fields an empty AI side; an all-empty garrison does the same.
+        let garrison = self
+            .find_foe(foe_id)
+            .map(|foe| foe.garrison)
+            .unwrap_or_default();
+        let target = CombatTarget {
+            // The seed key is the placement id, so the constant display name
+            // never reaches the RNG.
+            name: "Hostile band",
+            garrison: &garrison,
+            seed_key: foe_id,
+        };
+        let outcome =
+            combat_run_headless(self, resources, CombatMode::Foe, &target, COMBAT_MAX_ROUNDS);
+        let temp_death = self.resolve_hostile_foe(map, foe_id, foe_x, foe_y, outcome);
+        (outcome, temp_death)
+    }
+
     /// Apply a completed hostile-foe battle. Combat itself belongs to the
     /// caller; this mirrors OpenBounty's `flow_apply_attack_foe` state change.
     /// Returns `true` only when the caller must handle the player's loss.
@@ -2822,7 +2859,7 @@ mod tests {
         FoeState, Game, GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
         TravelMode, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
     };
-    use crate::combat::CombatResult;
+    use crate::combat::{combat_seed_rng, Combat, CombatMode, CombatResult, CombatTarget};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tables::ArtifactPower;
@@ -3431,6 +3468,191 @@ mod tests {
         assert_eq!(
             map.tile_i32(1, 0).expect("tile exists").interactive,
             Interact::Foe
+        );
+    }
+
+    /// Troops for a foe encounter: ogres are the heavy, peasants the fodder.
+    fn foe_combat_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+                {"index":1,"id":"ogres","skill_level":4,"hit_points":5,"move_rate":2,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":40,"spoils_factor":4,"abilities":"","morale_group":"A"}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// Hero in "home" with an army, facing one live hostile band at (1, 0).
+    fn hostile_band_game(hero: &[(&str, i32)], band: &[(&str, i32)]) -> Game {
+        let mut game = Game::default();
+        game.seed = 4_242;
+        game.position.zone.copy_from_str("home");
+        game.stats.leadership_current = 10_000;
+        for (slot, (id, count)) in hero.iter().enumerate() {
+            game.army[slot].id.copy_from_str(id);
+            game.army[slot].count = *count;
+        }
+        let mut foe = FoeState::default();
+        foe.zone = game.position.zone;
+        foe.x = 1;
+        foe.y = 0;
+        foe.origin_x = 1;
+        foe.origin_y = 0;
+        foe.placement_id.copy_from_str("band0");
+        foe.alive = true;
+        foe.friendly = false;
+        for (slot, (id, count)) in band.iter().enumerate() {
+            foe.garrison[slot].id.copy_from_str(id);
+            foe.garrison[slot].count = *count;
+        }
+        game.foes[0] = foe;
+        game.foe_count = 1;
+        game
+    }
+
+    #[test]
+    fn attacking_a_weak_band_wins_kills_the_foe_and_banks_its_spoils() {
+        let resources = foe_combat_fixture();
+        let mut game = hostile_band_game(&[("ogres", 40)], &[("peasants", 2)]);
+        game.stats.gold = 500;
+        let mut map = Map::new(4, 1);
+        map.stamp_foe(1, 0, "band0");
+
+        let (outcome, temp_death) = game.attack_hostile_foe(&mut map, &resources, "band0", 1, 0);
+
+        assert_eq!(outcome, CombatResult::Win);
+        assert!(!temp_death);
+        assert!(!game.foes[0].alive);
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::None
+        );
+        // peasants spoils_factor 1 * 5 * 2 = 10, and survivors are written back.
+        assert_eq!(game.stats.gold, 510);
+        assert!(game.army[0].count > 0);
+        assert!(game.army[0].count <= 40);
+    }
+
+    #[test]
+    fn losing_to_a_band_leaves_it_alive_and_asks_for_temporary_death() {
+        let resources = foe_combat_fixture();
+        let mut game = hostile_band_game(
+            &[("peasants", 1)],
+            &[("ogres", 40), ("ogres", 40), ("ogres", 40)],
+        );
+        game.stats.gold = 500;
+        let mut map = Map::new(4, 1);
+        map.stamp_foe(1, 0, "band0");
+
+        let (outcome, temp_death) = game.attack_hostile_foe(&mut map, &resources, "band0", 1, 0);
+
+        assert_eq!(outcome, CombatResult::Loss);
+        assert!(temp_death, "the caller must handle the defeat");
+        assert!(game.foes[0].alive);
+        assert_eq!(game.stats.gold, 500, "no spoils on a loss");
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::Foe
+        );
+    }
+
+    #[test]
+    fn a_band_the_engine_cannot_find_fields_no_defenders_and_is_walked_over() {
+        let resources = foe_combat_fixture();
+        let mut game = hostile_band_game(&[("ogres", 10)], &[("ogres", 99)]);
+        // Same placement id, different zone: find_foe scopes to the hero's
+        // zone, so this band's garrison must not defend.
+        game.foes[0].zone.copy_from_str("away");
+        let mut map = Map::new(4, 1);
+
+        let (outcome, _) = game.attack_hostile_foe(&mut map, &resources, "band0", 1, 0);
+
+        assert_eq!(outcome, CombatResult::Win, "an empty AI side loses at once");
+        assert_eq!(game.army[0].count, 10, "nothing was there to fight back");
+        assert!(game.foes[0].alive, "an out-of-zone foe is not marked dead");
+    }
+
+    #[test]
+    fn the_same_band_always_resolves_the_same_way() {
+        let resources = foe_combat_fixture();
+        let mut results = Vec::new();
+        for _ in 0..4 {
+            let mut game = hostile_band_game(&[("ogres", 9)], &[("peasants", 30)]);
+            let mut map = Map::new(4, 1);
+            map.stamp_foe(1, 0, "band0");
+            let (outcome, _) = game.attack_hostile_foe(&mut map, &resources, "band0", 1, 0);
+            results.push((outcome, game.stats.gold, game.army[0].count));
+        }
+        assert!(
+            results.windows(2).all(|pair| pair[0] == pair[1]),
+            "a foe fight must be a pure function of seed, identity and mode: {results:?}"
+        );
+    }
+
+    #[test]
+    fn the_band_identity_is_what_seeds_the_fight() {
+        let resources = foe_combat_fixture();
+        let mut game = hostile_band_game(&[("ogres", 9)], &[("peasants", 30)]);
+        let mut map = Map::new(4, 1);
+
+        // The wiring passes the placement id as the seed key, so two bands
+        // with identical armies fight from different RNG streams. Assert on
+        // the seed itself: whether that divergence reaches the casualty count
+        // depends on how lopsided the matchup is.
+        let mut a = Combat::default();
+        let mut b = Combat::default();
+        let garrison = game.foes[0].garrison;
+        combat_seed_rng(
+            &mut a,
+            &game,
+            CombatMode::Foe,
+            &CombatTarget {
+                name: "Hostile band",
+                garrison: &garrison,
+                seed_key: "band0",
+            },
+        );
+        combat_seed_rng(
+            &mut b,
+            &game,
+            CombatMode::Foe,
+            &CombatTarget {
+                name: "Hostile band",
+                garrison: &garrison,
+                seed_key: "band_other",
+            },
+        );
+        assert_ne!(a.rng_state, b.rng_state);
+
+        // And the constant display name never reaches the seed.
+        let (outcome, _) = game.attack_hostile_foe(&mut map, &resources, "band0", 1, 0);
+        assert_eq!(outcome, CombatResult::Win);
+    }
+
+    #[test]
+    fn a_foe_that_moved_since_the_flow_queued_has_both_stamps_cleared() {
+        let resources = foe_combat_fixture();
+        let mut game = hostile_band_game(&[("ogres", 40)], &[("peasants", 1)]);
+        let mut map = Map::new(4, 1);
+        // The flow queued at (1, 0) but the band followed the hero to (2, 0).
+        map.stamp_foe(1, 0, "band0");
+        map.stamp_foe(2, 0, "band0");
+        game.foes[0].x = 2;
+
+        let (outcome, _) = game.attack_hostile_foe(&mut map, &resources, "band0", 1, 0);
+
+        assert_eq!(outcome, CombatResult::Win);
+        assert_eq!(
+            map.tile_i32(1, 0).expect("tile exists").interactive,
+            Interact::None,
+            "stale stamp cleared"
+        );
+        assert_eq!(
+            map.tile_i32(2, 0).expect("tile exists").interactive,
+            Interact::None,
+            "current stamp cleared"
         );
     }
 

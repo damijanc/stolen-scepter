@@ -55,11 +55,15 @@ Implemented and tested:
   random obstacles, the fixed castle layout), movement and flight, the turn
   and round machinery, the AI policy, and `combat_run_headless` with its
   stall cutoff, spoils, and player-army writeback.
+- Hostile foe encounters wired to that resolver: `Game::attack_hostile_foe`
+  builds the target from the foe's garrison, keyed by its placement id, and
+  routes the outcome through `resolve_hostile_foe`.
 
-Test coverage is 147 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 153 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is headless combat. Run `git log --oneline -5`
+The most recent slice is wiring hostile foe encounters to combat. Run
+`git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -112,9 +116,10 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-Headless combat resolves, so the next gap is wiring it to the world: foe
-following and collision-triggered flows, then castle siege entry. Two loose
-ends to close while doing that:
+Hostile foe fights now run end to end. `CombatMode::Castle` is ported but has
+no caller yet, so castle siege entry is the direct mirror of the foe slice and
+the natural next step; foe following (`GameFoesFollow`) is the other open half
+of the foe system. Two loose ends to close along the way:
 
 - A siege win should set `position.own_castle` the instant a castle flips to
   the player. Only the step-onto-gate path sets it today.
