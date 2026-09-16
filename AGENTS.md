@@ -78,6 +78,10 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- `Game::discard_spell`, porting `flow_apply_discard_spell` -- what answers
+  a `SpellCast::OfferDiscard`. Its bound is a hard-coded 14 catalog slots
+  (the stock 7 combat + 7 adventure), NOT the spell array's capacity, so a
+  pack's fifteenth spell can be held and never discarded.
 - Combat spells (`engine/src/combat.rs`): `combat_cast_spell` and the six
   `spell_*` effects, plus `combat_spell_target_filter` and
   `combat_cell_passes_filter`. The charge and the once-per-round latch move
@@ -158,10 +162,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 299 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 303 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the combat spells. Run `git log --oneline -5`
+The most recent slice is the spell discard. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -265,6 +269,20 @@ Traps the save slice turned up, worth knowing before touching that format:
 - A load upgrades `continent_fog[active]` to the live fog rather than
   preserving whatever the source game held there, so whole-struct round-trip
   equality needs that one slot accounted for.
+
+All twelve `flow_apply_*` cores in `flow_resolve.c` are now ported, most of
+them under Rust names that do not resemble the C ones (`flow_apply_navigate`
+is `resolve_navmap`, `flow_apply_attack_foe` is `attack_hostile_foe`, and so
+on), which is why a name-matching sweep cannot confirm this -- the list has
+to be walked by hand.
+
+`player_io.c` itself stays unported, and unlike the combat spells that
+deferral survives scrutiny: the queue is a FIFO of header/body TEXT, which
+is presentation, and its `player_io_answer` routing exists to pick a
+`flow_apply_*` core from the live `pending_flow`. Every one of those cores
+is already a directly callable engine method here, so a shell can call the
+one it means instead of routing through a mirrored global. What a shell
+cannot get from the engine is the text, and that is the point.
 
 Two standing omissions:
 

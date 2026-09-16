@@ -23,6 +23,11 @@ use crate::tile::{Interact, Terrain};
 /// `GAME_LEADERSHIP_MAX` (`engine/include/game.h`).
 pub const GAME_LEADERSHIP_MAX: i32 = 65_000;
 
+/// How many catalog slots `flow_apply_discard_spell` will touch: the stock
+/// catalog's 7 combat plus 7 adventure spells, hard-coded in C rather than
+/// derived from the loaded catalog.
+pub const DISCARDABLE_SPELL_SLOTS: i32 = 14;
+
 /// The id-to-effect classification, porting `AdventureEffect`. A pack spell id
 /// absent from the table is an adventure spell the engine cannot apply.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -442,6 +447,31 @@ impl Game {
         }
     }
 
+    /// Discard one charge of `spell_idx`, freeing a spellbook slot against
+    /// the `max_spells` cap. Ports `flow_apply_discard_spell`, minus its
+    /// yes/no answer: C bails unless the answer was yes, so the core here
+    /// takes the yes as given and the shell asks the question.
+    ///
+    /// This is what answers a [`SpellCast::OfferDiscard`]. Returns whether a
+    /// charge was actually given up -- a stale index or an already-empty
+    /// spell is a safe no-op, as in C.
+    pub fn discard_spell(&mut self, spell_idx: i32) -> bool {
+        // C's bound is a hard-coded 14, the stock catalog's 7 combat plus 7
+        // adventure spells -- NOT the spell-array capacity. A pack shipping
+        // a fifteenth spell could hold it but never discard it.
+        if !(0..DISCARDABLE_SPELL_SLOTS).contains(&spell_idx) {
+            return false;
+        }
+        let Ok(slot) = usize::try_from(spell_idx) else {
+            return false;
+        };
+        if slot >= self.spells.counts.len() || self.spells.counts[slot] <= 0 {
+            return false;
+        }
+        self.spells.counts[slot] = self.spells.counts[slot].wrapping_sub(1);
+        true
+    }
+
     /// Cast the spell in catalog slot `spell_idx` from the spellbook. Ports
     /// `dispatch_adventure_spell`.
     pub fn dispatch_adventure_spell(&mut self, resources: &Resources, spell_idx: i32) -> SpellCast {
@@ -478,7 +508,7 @@ impl Game {
 mod tests {
     use super::{
         spell_adventure_effect, spell_index_by_adventure_effect, try_build_bridge, AdventureCast,
-        AdventureEffect, GateMode, SpellCast, GAME_LEADERSHIP_MAX,
+        AdventureEffect, GateMode, SpellCast, DISCARDABLE_SPELL_SLOTS, GAME_LEADERSHIP_MAX,
     };
     use crate::game::{CastleOwnerKind, Game};
     use crate::map::{Map, Tile};
@@ -880,6 +910,64 @@ mod tests {
         );
         // Arming spends nothing: the charge goes on the chosen teleport.
         assert_eq!(game.spells.counts[0], 1);
+    }
+
+    #[test]
+    fn discarding_frees_a_spellbook_slot() {
+        let mut game = knight();
+        game.spells.counts[7] = 2;
+        game.stats.max_spells = 3;
+        assert_eq!(game.known_spells(), 2);
+
+        assert!(game.discard_spell(7));
+        assert_eq!(game.spells.counts[7], 1);
+        // The cap is measured in charges, so a discard really does make room.
+        assert_eq!(game.known_spells(), 1);
+    }
+
+    #[test]
+    fn discarding_a_spell_not_held_is_a_safe_no_op() {
+        let mut game = knight();
+
+        assert!(!game.discard_spell(7));
+        assert!(!game.discard_spell(-1));
+        assert_eq!(game.known_spells(), 0);
+    }
+
+    #[test]
+    fn the_discard_bound_is_the_stock_catalogue_not_the_array() {
+        let mut game = knight();
+        // Slot 14 is beyond C's hard-coded bound but well inside the spell
+        // array, so a charge parked there can be held and never discarded.
+        game.spells.counts[14] = 1;
+        assert!(!game.discard_spell(14));
+        assert_eq!(game.spells.counts[14], 1);
+        assert!(game.spells.counts.len() > DISCARDABLE_SPELL_SLOTS as usize);
+
+        // The last slot C will touch.
+        game.spells.counts[13] = 1;
+        assert!(game.discard_spell(13));
+    }
+
+    #[test]
+    fn an_offer_to_discard_is_answered_by_the_discard() {
+        let resources = spell_fixture();
+        let mut game = knight();
+        game.spells.counts[7] = 1;
+
+        // The dispatcher offers; nothing is spent until the discard runs.
+        assert_eq!(
+            game.dispatch_adventure_spell(&resources, 7),
+            SpellCast::OfferDiscard
+        );
+        assert_eq!(game.spells.counts[7], 1);
+        assert!(game.discard_spell(7));
+        assert_eq!(game.spells.counts[7], 0);
+        // With the charge gone the offer is no longer on the table.
+        assert_eq!(
+            game.dispatch_adventure_spell(&resources, 7),
+            SpellCast::NotKnown
+        );
     }
 
     #[test]
