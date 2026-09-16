@@ -6,8 +6,8 @@ use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{
-    class_stats_at_rank, ArtifactPower, FixedStr, CAT_ARTIFACTS_MAX, CAT_ID_LEN, CAT_SPELLS_MAX,
-    CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB,
+    class_stats_at_rank, ArtifactPower, FixedStr, TroopDef, CAT_ARTIFACTS_MAX, CAT_ID_LEN,
+    CAT_SPELLS_MAX, CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
 };
 use crate::tile::{Interact, Terrain};
 
@@ -1406,6 +1406,57 @@ impl Game {
                 }
             }
         }
+        true
+    }
+
+    /// Whether the whole army can take to the air. Ports `GamePlayerCanFly`.
+    ///
+    /// EVERY non-empty stack must qualify, so one earthbound stack grounds
+    /// the hero. Note that an EMPTY army passes vacuously: the loop finds
+    /// nothing to reject and returns true.
+    pub fn player_can_fly(&self, resources: &Resources) -> bool {
+        for slot in 0..GAME_ARMY_SLOTS {
+            if self.army[slot].id.is_empty() || self.army[slot].count == 0 {
+                continue;
+            }
+            if !troop_flies(resources.troop_by_id(self.army[slot].id.as_str())) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Take to the air. Ports `GameMountFly`: the transition is legal only
+    /// from `Mount::Ride`, so a hero already flying or at sea is refused.
+    pub fn mount_fly(&mut self, resources: &Resources) -> bool {
+        if self.character.mount != Mount::Ride || !self.player_can_fly(resources) {
+            return false;
+        }
+        self.character.mount = Mount::Fly;
+        true
+    }
+
+    /// Whether `(x, y)` will take a landing. Ports `GameCanLandAt`: plain
+    /// grass, nothing interactive on it, and not a visual blocker.
+    ///
+    /// `is_bridge` is deliberately NOT consulted, and a built bridge is grass
+    /// with no interactive and no blocker, so a hero can land on one.
+    pub fn can_land_at(&self, map: &Map, x: i32, y: i32) -> bool {
+        let Some(tile) = map.tile_i32(x, y) else {
+            return false;
+        };
+        tile.terrain == Terrain::Grass && tile.interactive == Interact::None && !tile.blocks_foot
+    }
+
+    /// Come down where the hero is. Ports `GameLandHere`.
+    pub fn land_here(&mut self, map: &Map) -> bool {
+        if self.character.mount != Mount::Fly {
+            return false;
+        }
+        if !self.can_land_at(map, self.position.x, self.position.y) {
+            return false;
+        }
+        self.character.mount = Mount::Ride;
         true
     }
 
@@ -3645,6 +3696,14 @@ fn foe_can_stand(map: &Map, x: i32, y: i32) -> bool {
     !adjacent_to_castle_gate(map, x, y)
 }
 
+/// The per-troop half of [`Game::player_can_fly`]. Ports `GameTroopFlies`.
+///
+/// The FLY ability alone is not enough: the troop must ALSO be skill level 2
+/// or better, so a low-tier flier cannot carry the hero.
+pub fn troop_flies(troop: Option<&TroopDef>) -> bool {
+    troop.is_some_and(|troop| (troop.abilities & TROOP_ABIL_FLY) != 0 && troop.skill_level >= 2)
+}
+
 fn first_number_in_id(id: &str) -> Option<i32> {
     let start = id
         .char_indices()
@@ -3667,6 +3726,7 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use super::troop_flies;
     use super::{
         ArmyStack, AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome,
         FoeState, Fog, Game, GarrisonOutcome, GateDestKind, GateDestination, Mount, RecruitOutcome,
@@ -6307,6 +6367,159 @@ mod tests {
     }
 
     /// Two zones, each 6x2. `home` spawns on grass, `isle` spawns on water.
+    /// `gryphons` fly and are skill 3. `sprites` carry the FLY bit but are
+    /// only skill 1. `peasants` do not fly at all.
+    fn flying_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"},
+                {"index":1,"id":"gryphons","skill_level":3,"hit_points":6,"move_rate":3,"melee":[2,3],"ranged":[0,0,0],"recruit_cost":50,"spoils_factor":1,"abilities":"FLY","morale_group":"B","dwelling":"hills"},
+                {"index":2,"id":"sprites","skill_level":1,"hit_points":1,"move_rate":3,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":5,"spoils_factor":1,"abilities":"FLY","morale_group":"A","dwelling":"forest"}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    fn with_army(stacks: &[(&str, i32)]) -> Game {
+        let mut game = Game::default();
+        for (slot, (id, count)) in stacks.iter().enumerate() {
+            game.army[slot].id.copy_from_str(id);
+            game.army[slot].count = *count;
+        }
+        game
+    }
+
+    #[test]
+    fn a_flier_needs_the_ability_and_skill_level_two() {
+        let resources = flying_fixture();
+
+        assert!(troop_flies(resources.troop_by_id("gryphons")));
+        // Sprites carry the FLY bit but are only skill 1, so they ground the
+        // hero despite flying in combat.
+        assert!(!troop_flies(resources.troop_by_id("sprites")));
+        assert!(!troop_flies(resources.troop_by_id("peasants")));
+        assert!(!troop_flies(None));
+    }
+
+    #[test]
+    fn one_earthbound_stack_grounds_the_whole_army() {
+        let resources = flying_fixture();
+
+        assert!(with_army(&[("gryphons", 10)]).player_can_fly(&resources));
+        assert!(!with_army(&[("gryphons", 10), ("peasants", 5)]).player_can_fly(&resources));
+        // A stack at zero count is not an obstacle -- the loop skips it the
+        // same way it skips an empty slot.
+        assert!(with_army(&[("gryphons", 10), ("peasants", 0)]).player_can_fly(&resources));
+    }
+
+    #[test]
+    fn an_empty_army_can_fly_vacuously() {
+        let resources = flying_fixture();
+
+        // GamePlayerCanFly looks for a stack to REJECT; with none, it
+        // returns true. Nothing in the engine prevents this state.
+        assert!(Game::default().player_can_fly(&resources));
+    }
+
+    #[test]
+    fn a_stack_naming_no_catalogue_troop_grounds_the_army() {
+        let resources = flying_fixture();
+
+        // troop_by_id misses, and GameTroopFlies(NULL) is false.
+        assert!(!with_army(&[("no_such_troop", 3)]).player_can_fly(&resources));
+    }
+
+    #[test]
+    fn mounting_flight_is_legal_only_from_the_saddle() {
+        let resources = flying_fixture();
+        let mut game = with_army(&[("gryphons", 10)]);
+
+        assert!(game.mount_fly(&resources));
+        assert_eq!(game.character.mount, Mount::Fly);
+        // Already airborne: refused rather than re-applied.
+        assert!(!game.mount_fly(&resources));
+
+        // At sea is not the saddle either.
+        let mut sailor = with_army(&[("gryphons", 10)]);
+        sailor.character.mount = Mount::Sail;
+        assert!(!sailor.mount_fly(&resources));
+        assert_eq!(sailor.character.mount, Mount::Sail);
+    }
+
+    #[test]
+    fn a_grounded_army_cannot_take_off() {
+        let resources = flying_fixture();
+        let mut game = with_army(&[("peasants", 5)]);
+
+        assert!(!game.mount_fly(&resources));
+        assert_eq!(game.character.mount, Mount::Ride);
+    }
+
+    #[test]
+    fn landing_needs_plain_open_grass() {
+        let mut map = Map::from_tiles(
+            5,
+            1,
+            vec![
+                Tile::plain_grass(),
+                Tile::terrain(Terrain::Water),
+                Tile::interactive(Interact::TreasureChest),
+                Tile::blocked_grass(),
+                Tile::terrain(Terrain::Mountain),
+            ],
+        )
+        .expect("fixture dimensions match");
+        map.tile_mut_i32(2, 0).expect("tile exists").terrain = Terrain::Grass;
+        let game = Game::default();
+
+        assert!(game.can_land_at(&map, 0, 0));
+        assert!(!game.can_land_at(&map, 1, 0), "water");
+        assert!(!game.can_land_at(&map, 2, 0), "something on the tile");
+        assert!(!game.can_land_at(&map, 3, 0), "a visual blocker");
+        assert!(!game.can_land_at(&map, 4, 0), "mountain");
+        // Off the map is not a landing site either.
+        assert!(!game.can_land_at(&map, -1, 0));
+        assert!(!game.can_land_at(&map, 99, 0));
+    }
+
+    #[test]
+    fn a_bridge_takes_a_landing_because_it_is_grass() {
+        let mut map =
+            Map::from_tiles(1, 1, vec![Tile::plain_grass()]).expect("fixture dimensions match");
+        map.tile_mut_i32(0, 0).expect("tile exists").is_bridge = true;
+        let game = Game::default();
+
+        // GameCanLandAt never consults is_bridge, and a built bridge is
+        // grass with nothing on it, so it qualifies.
+        assert!(game.can_land_at(&map, 0, 0));
+    }
+
+    #[test]
+    fn landing_returns_the_hero_to_the_saddle_only_while_airborne() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Water)],
+        )
+        .expect("fixture dimensions match");
+        let mut game = Game::default();
+
+        // On the ground already: nothing to land from.
+        assert!(!game.land_here(&map));
+
+        game.character.mount = Mount::Fly;
+        game.position.x = 1;
+        // Over water: the hero stays up.
+        assert!(!game.land_here(&map));
+        assert_eq!(game.character.mount, Mount::Fly);
+
+        game.position.x = 0;
+        assert!(game.land_here(&map));
+        assert_eq!(game.character.mount, Mount::Ride);
+    }
+
     fn scoring_fixture() -> Resources {
         Resources::from_json_str(
             r#"{

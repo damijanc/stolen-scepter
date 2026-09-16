@@ -78,6 +78,12 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- Mount transitions: `Game::mount_fly` and `Game::land_here`, with
+  `Game::player_can_fly`, the free `troop_flies`, and `Game::can_land_at`.
+  Flight needs EVERY non-empty stack to both carry FLY and be skill level 2
+  or better, so a sprite stack grounds the hero even though sprites fly in
+  combat. An empty army flies vacuously. Landing wants plain open grass and
+  never consults `is_bridge`, so a built bridge takes a landing.
 - The endgame. `step::search_here` ports `flow_apply_search`: digging on the
   Scepter tile sets `stats.won` and costs nothing, and any other dig spends
   `tuning.search_cost_days` and can run the calendar out.
@@ -112,10 +118,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 254 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 263 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the endgame. Run `git log --oneline -5`
+The most recent slice is the mount transitions. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -183,10 +189,17 @@ of scope, but that sweep is what surfaced the endgame.
 
 Known-unported engine cores that sweep still reports, none yet judged worth
 a slice: `flow_apply_dismiss_army`/`dismiss_last` (army dismissal and its
-temp-death chain), `GameSpendWeek`, the flying/landing set (`GameCanLandAt`,
-`GameLandHere`, `GamePlayerCanFly`, `GameMountFly`, `GameTroopFlies`),
+temp-death chain, which also wants `tuning.temp_death` -- the one knob of
+that block still unported), `GameSpendWeek`,
 `GameWeeklyNetGold`/`GameWeeklyOutgoings`, and `puzzle_grid_entity`. Confirm
 against the C before assuming any of these is really missing.
+
+Both the endgame and the mount transitions showed the same tell, which is
+worth looking for directly: state the engine STORES and SAVES but never
+reads or writes. `game.scepter` was placed and serialized with nothing to
+dig it up; `Mount::Fly` was honoured by movement and by the foe AI with no
+way to enter or leave it. Grep a state field for its writers before assuming
+the system around it is done.
 
 One known divergence, found while porting zone switching and deliberately
 left alone. C sizes `zones_discovered`, `orbs_found` and `continent_fog` at
