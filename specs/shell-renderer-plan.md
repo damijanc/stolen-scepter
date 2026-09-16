@@ -145,6 +145,32 @@ for modern (already large; 800x702 at 2x exceeds 1080p). Clamps are
   8px. `map_render` centres the hero with `RADIUS = tiles / 2`; an even count
   leaves him half a tile off.
 
+## Engine state the renderer needs
+
+Starting the renderer surfaced engine fields the port had dropped because
+nothing in a render-free engine read them. They are not presentation-only:
+C sets them in engine code and writes them to saves, so they belong here.
+
+- `Position.facing` / `Position.facing_left` -- DONE. Set by `step`, carried
+  in saves. A save written before four-way facing existed carries only the
+  mirror flag, so the loader derives the facing from it rather than bumping
+  the save version. The Rust port was writing neither field, which made its
+  v11 saves narrower than C's v11.
+- `Tile.art` -- STILL MISSING. C's `Tile` carries the sprite filename base
+  ("water", "castle_gate"), derives `terrain` from it at load, clears it in
+  `MapClearInteractive`, and stamps 18 specific names for placed objects
+  (`map_object_art_names`). `map_render` draws with `tile_cache_get(t->art)`.
+  The Rust `Tile` keeps only `terrain`, and the legend is not retained, so
+  the art name is unrecoverable: an artifact and a chest on grass have the
+  same terrain and different art. Add the field before step 4.
+
+Both were invisible to the sweep methods in `AGENTS.md`, which compare
+function names and body sizes. Neither catches a missing struct FIELD. When
+checking a struct, compare it field by field against its C original.
+
+`Game.anim_frame` is genuinely the shell's: C declares it in `game.h` but
+nothing in the engine reads or serializes it.
+
 ## Asset inventory
 
 - 311 RGBA PNGs under `art/`: `tiles`, `troops`, `villains`, `classes`,
@@ -172,9 +198,37 @@ including `resources_format_template` and its `%VAR%` substitution.
 
 1. **Layout model.** Parse `render` in `engine/src/resources.rs`; port
    `layout_init` and the `CL_*` geometry to `shell/src/layout.rs`. No
-   graphics dependency yet. THIS IS THE CURRENT SLICE.
+   graphics dependency yet. DONE.
 2. **Draw-command vocabulary.** The command enum plus a headless recorder
-   backend, so view code can be tested before a window exists.
+   backend, so view code can be tested before a window exists. Findings from
+   reading every draw site in the C shell, which settle the design:
+   - Six primitives across ~90 call sites: `DrawRectangle` (43),
+     `DrawTexturePro` (30), `DrawRectangleLines` (12), three
+     `DrawRectangleRounded`, three `DrawRectangleRoundedLines`, and three
+     `DrawText` (all three in the pack picker, none in the game).
+   - EVERY src rect is the whole texture. The only exception is the bitmap
+     font's glyph sub-rect, which a `Text` command absorbs. So a blit
+     command needs NO src rect, which is what keeps view code testable
+     headlessly -- it never has to know a texture's dimensions.
+   - Mirroring is real but is expressed in C as a NEGATIVE src width, a
+     raylib convention. Make it an explicit `flip_x`. Three sites decide it:
+     hero facing, combat side, end cartoon.
+   - Rotation is 0 and origin is (0,0) at every single call site.
+   - Dst size is a layout constant everywhere EXCEPT `combat_render`, which
+     sizes dst from the texture's own pixels. So the dst needs a "native
+     size" case alongside the explicit rect.
+   - `BeginScissorMode` is used exactly once, for the map viewport.
+   - Keep `Text` a command rather than expanding it to glyph blits at emit
+     time: a test then asserts on the string, not on 20 blits. Metrics are
+     fixed 8x8 and pure, so measuring needs no asset.
+   - DEFER the sprite catalog (`sprites_anim_tex`'s directional/mirror
+     resolution, `sprites_frame` folding, and the "animated else still"
+     fallback). All three need pack data, and their shape is decided by
+     `map_render`, their only caller, in step 4. Same reasoning as
+     `CombatTurnRecord`.
+   - `palette.bin` is 768 raw RGB bytes; the first 16 entries have a
+     canonical fallback in `palette.c` so chrome renders without the file.
+     Parsing it is pure and belongs in this step.
 3. **Backend.** macroquad window, integer-scale present, sprite atlas load,
    bitmap font, input mapping.
 4. **Chrome + map viewport.** First thing actually on screen.

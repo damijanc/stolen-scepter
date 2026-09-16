@@ -6,8 +6,9 @@ use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{
-    class_stats_at_rank, puzzle_grid_entity, ArtifactPower, FixedStr, TroopDef, CAT_ARTIFACTS_MAX,
-    CAT_ID_LEN, CAT_SPELLS_MAX, CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
+    class_stats_at_rank, puzzle_grid_entity, ArtifactPower, Facing, FixedStr, TroopDef,
+    CAT_ARTIFACTS_MAX, CAT_ID_LEN, CAT_SPELLS_MAX, CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB,
+    TROOP_ABIL_FLY,
 };
 use crate::tile::{Interact, Terrain};
 
@@ -386,6 +387,12 @@ pub struct Position {
     pub y: i32,
     pub last_x: i32,
     pub last_y: i32,
+    /// Mirror flag for a pack whose hero art is a single strip.
+    pub facing_left: bool,
+    /// Which way the hero last moved. Only a pack that authors four facings
+    /// distinguishes north from south, but `facing_left` is kept consistent
+    /// with it so a save written by either build reads correctly in the other.
+    pub facing: Facing,
     pub in_town: FixedStr<GAME_ID_LEN>,
     /// Home (audience) castle the hero is currently transacting with, or empty
     /// when not on its gate. Home-pool recruiting keys off this marker, and it
@@ -408,6 +415,8 @@ impl Default for Position {
             y: 0,
             last_x: 0,
             last_y: 0,
+            facing_left: false,
+            facing: Facing::South,
             in_town: FixedStr::empty(),
             home_castle: FixedStr::empty(),
             own_castle: FixedStr::empty(),

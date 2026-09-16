@@ -118,6 +118,8 @@ pub fn build_snapshot_full(
             "y": game.position.y,
             "last_x": game.position.last_x,
             "last_y": game.position.last_y,
+            "facing_left": game.position.facing_left,
+            "facing": game.position.facing.as_i32(),
             "travel_mode": travel_mode_id(game.travel_mode),
         }),
     );
@@ -578,6 +580,11 @@ mod tests {
         assert_eq!(snapshot["stats"]["days_left"], 401);
         assert_eq!(snapshot["position"]["zone"], "home");
         assert_eq!(snapshot["position"]["travel_mode"], "walk");
+        // A fresh hero has not moved, so he faces south with no mirror. Both
+        // are written: a pack with four authored facings reads the number,
+        // and one with a single strip reads the flag.
+        assert_eq!(snapshot["position"]["facing"], 0);
+        assert_eq!(snapshot["position"]["facing_left"], false);
         assert_eq!(snapshot["army"][0]["slot"], 0);
         assert_eq!(snapshot["army"][0]["troop"], "peasants");
         assert_eq!(snapshot["army"][0]["count"], 25);

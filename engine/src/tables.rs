@@ -20,6 +20,42 @@ pub const TROOP_ABIL_LEECH: i32 = 1 << 5;
 pub const TROOP_ABIL_SCYTHE: i32 = 1 << 6;
 pub const TROOP_ABIL_UNDEAD: i32 = 1 << 7;
 
+/// Number of authored sprite facings, C's `OB_FACE_COUNT`.
+pub const FACE_COUNT: usize = 4;
+
+/// Which way the hero's sprite looks, C's `OB_FACE_*`.
+///
+/// Only a renderer reads this, but it is engine state all the same: movement
+/// sets it and a save carries it, exactly as in C. The discriminants are the
+/// C values because saves store the number, and a pack indexes its animation
+/// facings by it.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Facing {
+    #[default]
+    South = 0,
+    East = 1,
+    West = 2,
+    North = 3,
+}
+
+impl Facing {
+    pub fn as_i32(self) -> i32 {
+        self as i32
+    }
+
+    /// C range-checks a loaded facing and falls back to south, so an
+    /// out-of-range number is not an error.
+    pub fn from_i32(value: i32) -> Option<Self> {
+        match value {
+            0 => Some(Self::South),
+            1 => Some(Self::East),
+            2 => Some(Self::West),
+            3 => Some(Self::North),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct FixedStr<const N: usize> {
     bytes: [u8; N],

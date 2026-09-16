@@ -2,7 +2,7 @@ use crate::fog::Fog;
 use crate::game::{CastleOwnerKind, ChestOutcome, ChestPending, Game, Mount, TravelMode};
 use crate::map::{Map, Tile};
 use crate::resources::Resources;
-use crate::tables::FixedStr;
+use crate::tables::{Facing, FixedStr};
 use crate::tile::{Interact, Terrain};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -159,6 +159,23 @@ pub fn game_step_basic(
 
     game.position.last_x = prev_x;
     game.position.last_y = prev_y;
+    if dx < 0 {
+        game.position.facing_left = true;
+    } else if dx > 0 {
+        game.position.facing_left = false;
+    }
+    // Movement is 8-way, so a diagonal has to resolve to one of four facings.
+    // Horizontal wins, which keeps the facing consistent with facing_left
+    // above and matches how the game has always read a diagonal step.
+    if dx > 0 {
+        game.position.facing = Facing::East;
+    } else if dx < 0 {
+        game.position.facing = Facing::West;
+    } else if dy > 0 {
+        game.position.facing = Facing::South;
+    } else if dy < 0 {
+        game.position.facing = Facing::North;
+    }
     game.position.x = nx;
     game.position.y = ny;
 
@@ -527,6 +544,7 @@ mod tests {
     use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
+    use crate::tables::Facing;
     use crate::tile::{Interact, Terrain};
 
     #[test]
@@ -1583,5 +1601,84 @@ mod tests {
             }"#,
         )
         .expect("fixture parses")
+    }
+
+    /// A 3x3 of plain grass with the hero in the middle, so every one of the
+    /// eight directions is a legal step.
+    fn facing_fixture() -> (Game, Map, Resources) {
+        let map = Map::from_tiles(3, 3, vec![Tile::plain_grass(); 9]).expect("3x3 of grass");
+        let mut game = Game::default();
+        game.position.x = 1;
+        game.position.y = 1;
+        game.stats.steps_left_today = 40;
+        (game, map, time_fixture())
+    }
+
+    fn step_facing(dx: i32, dy: i32) -> (Facing, bool) {
+        let (mut game, mut map, resources) = facing_fixture();
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, dx, dy);
+        assert!(result.moved(), "grass is walkable in every direction");
+        (game.position.facing, game.position.facing_left)
+    }
+
+    #[test]
+    fn a_cardinal_step_faces_the_way_it_moved() {
+        assert_eq!(step_facing(1, 0), (Facing::East, false));
+        assert_eq!(step_facing(-1, 0), (Facing::West, true));
+        assert_eq!(step_facing(0, 1), (Facing::South, false));
+        assert_eq!(step_facing(0, -1), (Facing::North, false));
+    }
+
+    #[test]
+    fn a_diagonal_step_resolves_to_its_horizontal_half() {
+        // Movement is 8-way but there are only four facings, so a diagonal
+        // has to pick one. Horizontal wins, which keeps facing and
+        // facing_left agreeing with each other.
+        assert_eq!(step_facing(1, -1), (Facing::East, false));
+        assert_eq!(step_facing(1, 1), (Facing::East, false));
+        assert_eq!(step_facing(-1, -1), (Facing::West, true));
+        assert_eq!(step_facing(-1, 1), (Facing::West, true));
+    }
+
+    #[test]
+    fn a_vertical_step_leaves_the_mirror_alone() {
+        // facing_left is only touched by horizontal movement, so a hero who
+        // walked west and then north keeps looking west.
+        let (mut game, mut map, resources) = facing_fixture();
+        game.position.x = 2;
+        game.position.y = 2;
+
+        let west = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, -1, 0);
+        assert!(west.moved(), "west from the corner is grass");
+        assert!(game.position.facing_left);
+
+        let north = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 0, -1);
+        assert!(north.moved(), "north from the edge is grass");
+        assert_eq!(game.position.facing, Facing::North);
+        assert!(
+            game.position.facing_left,
+            "a vertical step must not reset the mirror"
+        );
+    }
+
+    #[test]
+    fn a_blocked_step_does_not_turn_the_hero() {
+        let map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), Tile::terrain(Terrain::Water)],
+        )
+        .expect("fixture dimensions match");
+        let mut map = map;
+        let mut game = Game::default();
+        let resources = time_fixture();
+        game.stats.steps_left_today = 40;
+        game.position.facing = Facing::North;
+
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
+
+        assert!(!result.moved(), "water is not walkable on foot");
+        assert_eq!(game.position.facing, Facing::North);
+        assert!(!game.position.facing_left);
     }
 }

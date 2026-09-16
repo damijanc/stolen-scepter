@@ -7,7 +7,7 @@ use crate::map::Map;
 use crate::resources::Resources;
 use crate::rng::seed_from_index;
 use crate::state_serialize::{build_snapshot_full, SAVE_VERSION};
-use crate::tables::FixedStr;
+use crate::tables::{Facing, FixedStr};
 
 /// Why a save could not be written or read. Mirrors OpenBounty's
 /// `SaveResult` minus its OK case, which Rust expresses as `Ok(())`.
@@ -202,6 +202,15 @@ fn read_position(root: &serde_json::Value, game: &mut Game) {
     game.position.y = as_i32(section.get("y")).unwrap_or(0);
     game.position.last_x = as_i32(section.get("last_x")).unwrap_or(0);
     game.position.last_y = as_i32(section.get("last_y")).unwrap_or(0);
+    game.position.facing_left = as_bool(section.get("facing_left"));
+    // Absent in saves written before facings existed, so derive it from
+    // facing_left rather than bumping the save version and orphaning them.
+    // A stored number that is out of range falls back to south.
+    game.position.facing = match as_i32(section.get("facing")) {
+        Some(stored) => Facing::from_i32(stored).unwrap_or(Facing::South),
+        None if game.position.facing_left => Facing::West,
+        None => Facing::East,
+    };
     game.travel_mode = match as_str(section.get("travel_mode")) {
         "boat" => TravelMode::Boat,
         _ => TravelMode::Walk,
@@ -680,6 +689,8 @@ mod tests {
         game.position.y = 2;
         game.position.last_x = 2;
         game.position.last_y = 2;
+        game.position.facing = Facing::North;
+        game.position.facing_left = true;
         game.travel_mode = TravelMode::Boat;
 
         game.army[0].id.copy_from_str("ogres");
@@ -866,6 +877,56 @@ mod tests {
         let _ = std::fs::remove_file(&path);
 
         assert_eq!(result, Err(SaveError::Pack));
+    }
+
+    /// Load a hand-written save whose `position` section is `body`.
+    fn read_position_json(tag: &str, body: &str) -> Game {
+        let resources = save_resources();
+        let path = temp_path(tag);
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version": {SAVE_VERSION}, "pack_id": "openbounty",
+                     "position": {body}}}"#
+            ),
+        )
+        .expect("write");
+
+        let mut game = Game::default();
+        let map = Map::new(8, 4);
+        let mut fog = Fog::new();
+        let result = save_read(&path, &mut game, &resources, &map, &mut fog);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(result, Ok(()), "the fixture save is otherwise valid");
+        game
+    }
+
+    #[test]
+    fn a_save_written_before_facings_existed_derives_one_from_the_mirror() {
+        // Four-way facing was added after the mirror flag, so a save may carry
+        // only facing_left. C derives the facing rather than bumping the save
+        // version, which would have orphaned every existing save.
+        let looking_west = read_position_json("facing-legacy-w", r#"{"facing_left": true}"#);
+        assert_eq!(looking_west.position.facing, Facing::West);
+        assert!(looking_west.position.facing_left);
+
+        let looking_east = read_position_json("facing-legacy-e", r#"{"facing_left": false}"#);
+        assert_eq!(looking_east.position.facing, Facing::East);
+        assert!(!looking_east.position.facing_left);
+    }
+
+    #[test]
+    fn a_stored_facing_wins_over_the_mirror_unless_it_is_out_of_range() {
+        // A pack with four authored facings writes both, and the number is
+        // the one that counts -- here north, which the mirror cannot express.
+        let north = read_position_json("facing-both", r#"{"facing_left": true, "facing": 3}"#);
+        assert_eq!(north.position.facing, Facing::North);
+        assert!(north.position.facing_left);
+
+        // Out of range is not an error: C clamps it to south rather than
+        // refusing the save.
+        let junk = read_position_json("facing-junk", r#"{"facing_left": true, "facing": 9}"#);
+        assert_eq!(junk.position.facing, Facing::South);
     }
 
     #[test]
