@@ -78,6 +78,17 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- Combat spells (`engine/src/combat.rs`): `combat_cast_spell` and the six
+  `spell_*` effects, plus `combat_spell_target_filter` and
+  `combat_cell_passes_filter`. The charge and the once-per-round latch move
+  only on `CastResult::Ok`, so a spell an IMMUNE target shrugs off costs
+  nothing and the caster may try again the same round. Clone folds the
+  target's existing injury into the new bodies and carries the remainder
+  back; resurrect refuses a wholly destroyed stack and caps at `max_count`.
+  C reaches the caster through `Combat.heroes[side]`; this port took the
+  `leadership`/`powers`/`heroes_present` snapshots instead, so the cast takes
+  the caster's `&mut Game` explicitly -- it is the one combat call that
+  writes back to the Game.
 - The puzzle map. `tables::puzzle_grid_entity` ports the fixed 5x5
   `PUZZLE_GRID`, and `Game::puzzle_cell_revealed` ports the demo's
   `cell_revealed` rule over it. The 25 cells hold villains 0..16 and
@@ -147,10 +158,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 286 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 299 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the puzzle map. Run `git log --oneline -5`
+The most recent slice is the combat spells. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -260,11 +271,15 @@ Two standing omissions:
 - A villain siege's "Capture" dialog is built inline in C and pushed through
   `player_io_message`. The engine returns `VillainSiegeOutcome` instead so a
   shell can write the text; the message queue itself is unported.
-- `combat.rs` deliberately omits what only a rendered fight needs: combat
-  spells (`combat_cast_spell` and the `spell_*` helpers, reachable only
-  through a player policy -- the headless default policy never casts) and
-  `CombatTurnRecord` (write-only replay data for the shell's animation).
-  Port those when a shell exists, not before.
+- `CombatTurnRecord`, write-only replay data for a shell's animation. This
+  really is shell-shaped and can wait.
+
+The combat spells USED to sit in that second bullet, deferred on the grounds
+that only a player policy reaches them. That reason was wrong: it explained
+why they are unreachable, not why they are unportable. They are damage
+formulas, IMMUNE handling and a once-per-round latch -- engine rules that
+needed no shell. When deferring something, check the reason says the work
+belongs elsewhere, not merely that nothing calls it yet.
 
 Three habits these cores rewarded:
 

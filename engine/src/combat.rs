@@ -2,7 +2,7 @@ use crate::game::{ArmyStack, Game, Unit};
 use crate::resources::Resources;
 use crate::tables::{
     ArtifactPower, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY, TROOP_ABIL_IMMUNE, TROOP_ABIL_LEECH,
-    TROOP_ABIL_MAGIC, TROOP_ABIL_REGEN, TROOP_ABIL_SCYTHE,
+    TROOP_ABIL_MAGIC, TROOP_ABIL_REGEN, TROOP_ABIL_SCYTHE, TROOP_ABIL_UNDEAD,
 };
 
 const MULT: u64 = 25_214_903_917;
@@ -2159,5 +2159,756 @@ mod tests {
         assert_eq!(calc_distance(0, 0, 3, 4), 5 << 24);
         assert!(calc_distance(0, 0, 1, 1) > calc_distance(0, 0, 1, 0));
         assert_eq!(calc_distance(2, 2, 2, 2), 0);
+    }
+}
+
+// ----- Combat spells ---------------------------------------------------------
+//
+// Spell ids match the pack's spell catalog ordering: 0 Clone, 1 Teleport,
+// 2 Fireball, 3 Lightning, 4 Freeze, 5 Resurrect, 6 Turn Undead, with the
+// adventure spells following at 7 and beyond.
+//
+// C reaches the caster through `Combat.heroes[side]`, a `Game *`. This port
+// replaced that back-pointer with the `leadership`/`powers`/`heroes_present`
+// snapshots taken at prepare time, because nothing else in combat needed to
+// write back to the Game. A cast does: it spends a charge. So the caster is
+// passed in explicitly here rather than reached through `Combat`.
+
+pub const COMBAT_SPELL_CLONE: i32 = 0;
+pub const COMBAT_SPELL_TELEPORT: i32 = 1;
+pub const COMBAT_SPELL_FIREBALL: i32 = 2;
+pub const COMBAT_SPELL_LIGHTNING: i32 = 3;
+pub const COMBAT_SPELL_FREEZE: i32 = 4;
+pub const COMBAT_SPELL_RESURRECT: i32 = 5;
+pub const COMBAT_SPELL_TURN_UNDEAD: i32 = 6;
+
+/// Which cells a pick may land on. Ports `PICK_FILTER_*`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PickFilter {
+    Any = 0,
+    Empty = 1,
+    AnyUnit = 2,
+    Friendly = 3,
+    Enemy = 4,
+    Undead = 5,
+}
+
+/// Whether cell `(x, y)` is a legal pick under `filter`. Ports
+/// `combat_cell_passes_filter`.
+///
+/// Friend-or-foe is judged against the CURRENTLY ACTING unit
+/// (`Combat.unit_id`), not against `caster_side` alone, which is what lets
+/// an out-of-control stack be targeted by its own side.
+pub fn combat_cell_passes_filter(
+    c: &Combat,
+    resources: &Resources,
+    x: usize,
+    y: usize,
+    caster_side: usize,
+    filter: PickFilter,
+) -> bool {
+    let obstacle = c.omap[y][x];
+    let uid = c.umap[y][x];
+    let occupant = if uid != 0 {
+        Some(unpack_uid(uid))
+    } else {
+        None
+    };
+    match filter {
+        PickFilter::Any => true,
+        PickFilter::Empty => uid == 0 && obstacle == 0,
+        PickFilter::AnyUnit => uid != 0,
+        PickFilter::Friendly => match occupant {
+            None => false,
+            Some((u_side, u_slot)) => {
+                units_are_friendly(c, caster_side, c.unit_id as usize, u_side, u_slot)
+            }
+        },
+        PickFilter::Enemy => match occupant {
+            None => false,
+            Some((u_side, u_slot)) => {
+                !units_are_friendly(c, caster_side, c.unit_id as usize, u_side, u_slot)
+            }
+        },
+        PickFilter::Undead => match occupant {
+            None => false,
+            Some((u_side, u_slot)) => {
+                if units_are_friendly(c, caster_side, c.unit_id as usize, u_side, u_slot) {
+                    return false;
+                }
+                // An undead ENEMY only: turn undead cannot be aimed at your
+                // own skeletons. C reads the catalog through a global here;
+                // this port threads Resources like everywhere else.
+                resources
+                    .troop_by_index(c.units[u_side][u_slot].troop_idx)
+                    .is_some_and(|troop| troop.abilities & TROOP_ABIL_UNDEAD != 0)
+            }
+        },
+    }
+}
+
+/// What a cast attempt did. Ports the `COMBAT_CAST_*` return codes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CastResult {
+    /// The cast was refused outright and nothing was touched: no hero, no
+    /// magic, a spell already cast this round, an unknown spell, or no
+    /// charge held.
+    Illegal,
+    /// The cast was legal but the target shrugged it off. NO charge is
+    /// spent and the once-per-round latch does NOT move.
+    NoEffect,
+    Ok,
+}
+
+/// The direct-damage base for the three attack spells. Ports
+/// `combat_spell_damage_base`, the single copy of 25/10/50.
+fn combat_spell_damage_base(spell_idx: i32) -> i32 {
+    match spell_idx {
+        COMBAT_SPELL_FIREBALL => 25,
+        COMBAT_SPELL_LIGHTNING => 10,
+        COMBAT_SPELL_TURN_UNDEAD => 50,
+        _ => 0,
+    }
+}
+
+/// `base * spell_power`, with a spell power below 1 treated as 1. Ports
+/// `spell_damage_value`.
+pub fn spell_damage_value(base: i32, spell_power: i32) -> i32 {
+    let spell_power = spell_power.max(1);
+    base.wrapping_mul(spell_power)
+}
+
+/// The damage one cast deals to a non-IMMUNE target. Ports
+/// `combat_spell_direct_damage`.
+///
+/// 0 for the enhancer spells, whose value has no closed form, and 0 for
+/// turn undead against a living target.
+pub fn combat_spell_direct_damage(spell_idx: i32, spell_power: i32, target_undead: bool) -> i32 {
+    let base = combat_spell_damage_base(spell_idx);
+    if base == 0 {
+        return 0;
+    }
+    if spell_idx == COMBAT_SPELL_TURN_UNDEAD && !target_undead {
+        return 0;
+    }
+    spell_damage_value(base, spell_power)
+}
+
+/// The legal target filter for each combat spell. Ports
+/// `combat_spell_target_filter`, whose default arm is Enemy.
+pub fn combat_spell_target_filter(spell_idx: i32) -> PickFilter {
+    match spell_idx {
+        COMBAT_SPELL_CLONE => PickFilter::Friendly,
+        COMBAT_SPELL_TELEPORT => PickFilter::AnyUnit,
+        COMBAT_SPELL_FIREBALL => PickFilter::Enemy,
+        COMBAT_SPELL_LIGHTNING => PickFilter::Enemy,
+        COMBAT_SPELL_FREEZE => PickFilter::Enemy,
+        COMBAT_SPELL_RESURRECT => PickFilter::Friendly,
+        COMBAT_SPELL_TURN_UNDEAD => PickFilter::Undead,
+        _ => PickFilter::Enemy,
+    }
+}
+
+/// Deal spell damage, which routes through the ordinary damage path as an
+/// external, non-retaliating hit from no attacker. Ports `spell_damage`.
+pub fn spell_damage(
+    c: &mut Combat,
+    resources: &Resources,
+    t_side: usize,
+    t_slot: usize,
+    dmg: i32,
+) -> i32 {
+    combat_deal_damage(
+        c, resources, -1, -1, t_side, t_slot, false, true, dmg, false,
+    )
+}
+
+/// Clone a friendly stack. Ports `spell_clone`.
+///
+/// The existing injury is FOLDED IN before the division, so a hurt stack
+/// converts its accumulated damage into bodies too, and the remainder is
+/// carried back as the new injury rather than discarded.
+pub fn spell_clone(c: &mut Combat, resources: &Resources, t_side: usize, t_slot: usize, sp: i32) {
+    let unit = &c.units[t_side][t_slot];
+    let Some(troop) = resources.troop_by_index(unit.troop_idx) else {
+        return;
+    };
+    if troop.hit_points <= 0 {
+        return;
+    }
+    let damage = sp.wrapping_mul(10).wrapping_add(unit.injury);
+    let clones = damage / troop.hit_points;
+    let residual = damage % troop.hit_points;
+    let unit = &mut c.units[t_side][t_slot];
+    unit.count = unit.count.wrapping_add(clones);
+    unit.max_count = unit.max_count.wrapping_add(clones);
+    unit.injury = residual;
+}
+
+/// Move a stack to `(to_x, to_y)`. Ports `spell_teleport`.
+///
+/// Like C, this trusts the destination: it clears the old cell and stamps
+/// the new one with no bounds or occupancy check of its own, because the
+/// caller's target filter has already chosen the cell.
+pub fn spell_teleport(c: &mut Combat, from_side: usize, from_slot: usize, to_x: i32, to_y: i32) {
+    let (old_x, old_y) = (
+        c.units[from_side][from_slot].x,
+        c.units[from_side][from_slot].y,
+    );
+    c.umap[old_y as usize][old_x as usize] = 0;
+    let unit = &mut c.units[from_side][from_slot];
+    unit.x = to_x;
+    unit.y = to_y;
+    c.umap[to_y as usize][to_x as usize] = pack_uid(from_side, from_slot);
+}
+
+/// Freeze a stack so it cannot act. Ports `spell_freeze`, which returns -1
+/// for an IMMUNE target and 1 otherwise.
+pub fn spell_freeze(c: &mut Combat, resources: &Resources, t_side: usize, t_slot: usize) -> i32 {
+    let troop = resources.troop_by_index(c.units[t_side][t_slot].troop_idx);
+    if troop.is_some_and(|troop| troop.abilities & TROOP_ABIL_IMMUNE != 0) {
+        return -1;
+    }
+    c.units[t_side][t_slot].frozen = true;
+    1
+}
+
+/// Bring back fallen members of a stack. Ports `spell_resurrect`.
+///
+/// A wholly destroyed stack stays dead: the `count == 0` guard runs first.
+/// Revival is capped at the stack's starting size, and clears the injury.
+pub fn spell_resurrect(c: &mut Combat, t_side: usize, t_slot: usize, sp: i32) -> i32 {
+    let unit = &c.units[t_side][t_slot];
+    if unit.count == 0 {
+        return 0;
+    }
+    let mut revived = sp;
+    if revived <= 0 {
+        revived = 1;
+    }
+    if unit.count.wrapping_add(revived) > unit.max_count {
+        revived = unit.max_count.wrapping_sub(unit.count);
+    }
+    if revived <= 0 {
+        return 0;
+    }
+    let unit = &mut c.units[t_side][t_slot];
+    unit.count = unit.count.wrapping_add(revived);
+    unit.injury = 0;
+    1
+}
+
+/// Cast a combat spell. Ports `combat_cast_spell`, the single dispatcher
+/// that both a shell's apply phase and an autoplay policy go through.
+///
+/// `caster` is the Game of `side`; C reaches it through `Combat.heroes[]`.
+/// The charge is spent and the once-per-round latch advances only on
+/// [`CastResult::Ok`], so a spell an IMMUNE target shrugs off is free.
+#[allow(clippy::too_many_arguments)]
+pub fn combat_cast_spell(
+    c: &mut Combat,
+    resources: &Resources,
+    caster: &mut Game,
+    side: usize,
+    spell_idx: i32,
+    t_side: usize,
+    t_slot: usize,
+    dest_x: i32,
+    dest_y: i32,
+) -> CastResult {
+    // Every precondition mutates nothing. The heroes_present guard is what
+    // keeps AI-vs-AI combat inert: a cast there is impossible by
+    // construction, which is why the digest goldens never see one.
+    if side >= COMBAT_SIDES || !c.heroes_present[side] {
+        return CastResult::Illegal;
+    }
+    if !caster.stats.knows_magic {
+        return CastResult::Illegal;
+    }
+    if c.spells_this_round >= 1 {
+        return CastResult::Illegal;
+    }
+    if !(0..=COMBAT_SPELL_TURN_UNDEAD).contains(&spell_idx) {
+        return CastResult::Illegal;
+    }
+    let Ok(slot) = usize::try_from(spell_idx) else {
+        return CastResult::Illegal;
+    };
+    if slot >= caster.spells.counts.len() || caster.spells.counts[slot] <= 0 {
+        return CastResult::Illegal;
+    }
+
+    let sp = caster.stats.spell_power.max(1);
+    let target_immune = resources
+        .troop_by_index(c.units[t_side][t_slot].troop_idx)
+        .is_some_and(|troop| troop.abilities & TROOP_ABIL_IMMUNE != 0);
+
+    let casted = match spell_idx {
+        COMBAT_SPELL_CLONE => {
+            spell_clone(c, resources, t_side, t_slot, sp);
+            true
+        }
+        COMBAT_SPELL_TELEPORT => {
+            spell_teleport(c, t_side, t_slot, dest_x, dest_y);
+            true
+        }
+        COMBAT_SPELL_FIREBALL | COMBAT_SPELL_LIGHTNING | COMBAT_SPELL_TURN_UNDEAD => {
+            if target_immune {
+                false
+            } else {
+                let damage = spell_damage_value(combat_spell_damage_base(spell_idx), sp);
+                spell_damage(c, resources, t_side, t_slot, damage);
+                true
+            }
+        }
+        COMBAT_SPELL_FREEZE => spell_freeze(c, resources, t_side, t_slot) == 1,
+        COMBAT_SPELL_RESURRECT => spell_resurrect(c, t_side, t_slot, sp) == 1,
+        _ => false,
+    };
+
+    if casted {
+        caster.spells.counts[slot] = caster.spells.counts[slot].wrapping_sub(1);
+        c.spells_this_round = c.spells_this_round.wrapping_add(1);
+        return CastResult::Ok;
+    }
+    CastResult::NoEffect
+}
+
+#[cfg(test)]
+mod spell_tests {
+    use super::*;
+    use crate::tables::FixedStr;
+
+    /// peasants: 1hp. ogres: 5hp. dragons: IMMUNE. skeletons: UNDEAD.
+    fn spell_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+                {"index":1,"id":"ogres","skill_level":4,"hit_points":5,"move_rate":1,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":40,"spoils_factor":4,"abilities":"","morale_group":"A"},
+                {"index":2,"id":"dragons","skill_level":5,"hit_points":200,"move_rate":3,"melee":[25,50],"ranged":[0,0,0],"recruit_cost":500,"spoils_factor":5,"abilities":"IMMUNE","morale_group":"A"},
+                {"index":3,"id":"skeletons","skill_level":2,"hit_points":3,"move_rate":2,"melee":[2,3],"ranged":[0,0,0],"recruit_cost":20,"spoils_factor":2,"abilities":"UNDEAD","morale_group":"A"}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// A caster who knows magic, holds a charge of every combat spell, and
+    /// faces one enemy stack of `foe` at slot 0.
+    fn duel(foe_idx: i32, foe_count: i32) -> (Combat, Game) {
+        let mut c = Combat::default();
+        c.heroes_present[0] = true;
+        c.unit_id = 0;
+        c.units[0][0].troop_idx = 0;
+        c.units[0][0].count = 10;
+        c.units[0][0].max_count = 10;
+        c.units[0][0].x = 0;
+        c.units[0][0].y = 0;
+        c.umap[0][0] = pack_uid(0, 0);
+        c.units[1][0].troop_idx = foe_idx;
+        c.units[1][0].count = foe_count;
+        c.units[1][0].max_count = foe_count;
+        c.units[1][0].x = 3;
+        c.units[1][0].y = 0;
+        c.umap[0][3] = pack_uid(1, 0);
+
+        let mut caster = Game::default();
+        caster.stats.knows_magic = true;
+        caster.stats.spell_power = 2;
+        for slot in 0..=COMBAT_SPELL_TURN_UNDEAD as usize {
+            caster.spells.counts[slot] = 1;
+        }
+        caster.army[0].id = FixedStr::from_str("peasants");
+        caster.army[0].count = 10;
+        (c, caster)
+    }
+
+    #[test]
+    fn the_damage_bases_are_twenty_five_ten_and_fifty_times_spell_power() {
+        assert_eq!(
+            combat_spell_direct_damage(COMBAT_SPELL_FIREBALL, 2, false),
+            50
+        );
+        assert_eq!(
+            combat_spell_direct_damage(COMBAT_SPELL_LIGHTNING, 3, false),
+            30
+        );
+        // Turn undead bites only the undead.
+        assert_eq!(
+            combat_spell_direct_damage(COMBAT_SPELL_TURN_UNDEAD, 2, true),
+            100
+        );
+        assert_eq!(
+            combat_spell_direct_damage(COMBAT_SPELL_TURN_UNDEAD, 2, false),
+            0
+        );
+        // The enhancers have no closed-form damage.
+        assert_eq!(combat_spell_direct_damage(COMBAT_SPELL_CLONE, 5, false), 0);
+        assert_eq!(
+            combat_spell_direct_damage(COMBAT_SPELL_RESURRECT, 5, false),
+            0
+        );
+    }
+
+    #[test]
+    fn a_spell_power_below_one_is_treated_as_one() {
+        // The floor is in spell_damage_value, so a rank with no spell power
+        // still lands the base rather than nothing.
+        assert_eq!(spell_damage_value(25, 0), 25);
+        assert_eq!(spell_damage_value(25, -4), 25);
+        assert_eq!(spell_damage_value(25, 1), 25);
+    }
+
+    #[test]
+    fn each_spell_has_its_own_target_filter() {
+        assert_eq!(
+            combat_spell_target_filter(COMBAT_SPELL_CLONE),
+            PickFilter::Friendly
+        );
+        assert_eq!(
+            combat_spell_target_filter(COMBAT_SPELL_RESURRECT),
+            PickFilter::Friendly
+        );
+        assert_eq!(
+            combat_spell_target_filter(COMBAT_SPELL_TELEPORT),
+            PickFilter::AnyUnit
+        );
+        assert_eq!(
+            combat_spell_target_filter(COMBAT_SPELL_TURN_UNDEAD),
+            PickFilter::Undead
+        );
+        assert_eq!(
+            combat_spell_target_filter(COMBAT_SPELL_FIREBALL),
+            PickFilter::Enemy
+        );
+        // The default arm is Enemy, so an unknown id is not a wildcard.
+        assert_eq!(combat_spell_target_filter(99), PickFilter::Enemy);
+    }
+
+    #[test]
+    fn cloning_folds_the_existing_injury_into_the_new_bodies() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(1, 4);
+        // Target the 5hp ogres with 3 damage already taken. sp 2 gives
+        // 20 + 3 = 23 damage-equivalent, which is 4 whole ogres remainder 3.
+        c.units[1][0].injury = 3;
+        spell_clone(&mut c, &resources, 1, 0, 2);
+
+        assert_eq!(c.units[1][0].count, 8);
+        // max_count rises too, so resurrect can later refill to the new size.
+        assert_eq!(c.units[1][0].max_count, 8);
+        // The remainder is carried back, not discarded.
+        assert_eq!(c.units[1][0].injury, 3);
+    }
+
+    #[test]
+    fn cloning_a_troop_with_no_hit_points_does_nothing() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(1, 4);
+        // An index the catalogue does not hold.
+        c.units[1][0].troop_idx = 99;
+        spell_clone(&mut c, &resources, 1, 0, 2);
+        assert_eq!(c.units[1][0].count, 4);
+    }
+
+    #[test]
+    fn teleporting_moves_the_stack_and_its_map_stamp() {
+        let (mut c, _) = duel(0, 4);
+        assert_eq!(c.umap[0][3], pack_uid(1, 0));
+
+        spell_teleport(&mut c, 1, 0, 5, 2);
+        assert_eq!((c.units[1][0].x, c.units[1][0].y), (5, 2));
+        // The old cell is cleared and the new one stamped.
+        assert_eq!(c.umap[0][3], 0);
+        assert_eq!(c.umap[2][5], pack_uid(1, 0));
+    }
+
+    #[test]
+    fn freezing_is_refused_by_an_immune_target() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(2, 1);
+
+        assert_eq!(spell_freeze(&mut c, &resources, 1, 0), -1);
+        assert!(!c.units[1][0].frozen);
+        // A mortal target freezes.
+        c.units[1][0].troop_idx = 0;
+        assert_eq!(spell_freeze(&mut c, &resources, 1, 0), 1);
+        assert!(c.units[1][0].frozen);
+    }
+
+    #[test]
+    fn resurrection_refills_to_the_starting_size_and_never_raises_the_dead() {
+        let (mut c, _) = duel(0, 10);
+        c.units[1][0].count = 6;
+        c.units[1][0].injury = 2;
+
+        // sp 3 revives 3.
+        assert_eq!(spell_resurrect(&mut c, 1, 0, 3), 1);
+        assert_eq!(c.units[1][0].count, 9);
+        assert_eq!(c.units[1][0].injury, 0);
+
+        // Capped at max_count: only 1 of the requested 5 is revived.
+        assert_eq!(spell_resurrect(&mut c, 1, 0, 5), 1);
+        assert_eq!(c.units[1][0].count, 10);
+        // Already full: nothing to do.
+        assert_eq!(spell_resurrect(&mut c, 1, 0, 5), 0);
+
+        // A wholly destroyed stack stays destroyed.
+        c.units[1][0].count = 0;
+        assert_eq!(spell_resurrect(&mut c, 1, 0, 5), 0);
+        assert_eq!(c.units[1][0].count, 0);
+    }
+
+    #[test]
+    fn a_cast_spends_one_charge_and_latches_the_round() {
+        let resources = spell_fixture();
+        let (mut c, mut caster) = duel(0, 20);
+
+        assert_eq!(
+            combat_cast_spell(
+                &mut c,
+                &resources,
+                &mut caster,
+                0,
+                COMBAT_SPELL_FIREBALL,
+                1,
+                0,
+                0,
+                0
+            ),
+            CastResult::Ok
+        );
+        assert_eq!(caster.spells.counts[COMBAT_SPELL_FIREBALL as usize], 0);
+        assert_eq!(c.spells_this_round, 1);
+
+        // One spell per round, whatever charges remain elsewhere.
+        assert_eq!(
+            combat_cast_spell(
+                &mut c,
+                &resources,
+                &mut caster,
+                0,
+                COMBAT_SPELL_LIGHTNING,
+                1,
+                0,
+                0,
+                0
+            ),
+            CastResult::Illegal
+        );
+        assert_eq!(caster.spells.counts[COMBAT_SPELL_LIGHTNING as usize], 1);
+    }
+
+    #[test]
+    fn a_spell_an_immune_target_shrugs_off_is_free() {
+        let resources = spell_fixture();
+        let (mut c, mut caster) = duel(2, 3);
+
+        assert_eq!(
+            combat_cast_spell(
+                &mut c,
+                &resources,
+                &mut caster,
+                0,
+                COMBAT_SPELL_FIREBALL,
+                1,
+                0,
+                0,
+                0
+            ),
+            CastResult::NoEffect
+        );
+        // Neither the charge nor the once-per-round latch moved, so the
+        // caster may try something else this round.
+        assert_eq!(caster.spells.counts[COMBAT_SPELL_FIREBALL as usize], 1);
+        assert_eq!(c.spells_this_round, 0);
+        assert_eq!(c.units[1][0].count, 3);
+    }
+
+    #[test]
+    fn a_cast_is_refused_without_a_hero_magic_or_a_charge() {
+        let resources = spell_fixture();
+
+        // No hero on this side: what keeps AI-vs-AI combat inert.
+        let (mut c, mut caster) = duel(0, 20);
+        c.heroes_present[0] = false;
+        assert_eq!(
+            combat_cast_spell(
+                &mut c,
+                &resources,
+                &mut caster,
+                0,
+                COMBAT_SPELL_FIREBALL,
+                1,
+                0,
+                0,
+                0
+            ),
+            CastResult::Illegal
+        );
+
+        // Knows no magic.
+        let (mut c, mut caster) = duel(0, 20);
+        caster.stats.knows_magic = false;
+        assert_eq!(
+            combat_cast_spell(
+                &mut c,
+                &resources,
+                &mut caster,
+                0,
+                COMBAT_SPELL_FIREBALL,
+                1,
+                0,
+                0,
+                0
+            ),
+            CastResult::Illegal
+        );
+
+        // Holds no charge.
+        let (mut c, mut caster) = duel(0, 20);
+        caster.spells.counts[COMBAT_SPELL_FIREBALL as usize] = 0;
+        assert_eq!(
+            combat_cast_spell(
+                &mut c,
+                &resources,
+                &mut caster,
+                0,
+                COMBAT_SPELL_FIREBALL,
+                1,
+                0,
+                0,
+                0
+            ),
+            CastResult::Illegal
+        );
+
+        // An adventure spell id is out of combat's range.
+        let (mut c, mut caster) = duel(0, 20);
+        assert_eq!(
+            combat_cast_spell(&mut c, &resources, &mut caster, 0, 7, 1, 0, 0, 0),
+            CastResult::Illegal
+        );
+        assert_eq!(c.spells_this_round, 0);
+    }
+
+    #[test]
+    fn the_cell_filter_separates_friend_foe_and_empty_ground() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(0, 4);
+        c.omap[1][1] = 1;
+
+        // (0,0) holds the acting friendly stack, (3,0) the enemy.
+        assert!(combat_cell_passes_filter(
+            &c,
+            &resources,
+            0,
+            0,
+            0,
+            PickFilter::Friendly
+        ));
+        assert!(!combat_cell_passes_filter(
+            &c,
+            &resources,
+            0,
+            0,
+            0,
+            PickFilter::Enemy
+        ));
+        assert!(combat_cell_passes_filter(
+            &c,
+            &resources,
+            3,
+            0,
+            0,
+            PickFilter::Enemy
+        ));
+        assert!(!combat_cell_passes_filter(
+            &c,
+            &resources,
+            3,
+            0,
+            0,
+            PickFilter::Friendly
+        ));
+        assert!(combat_cell_passes_filter(
+            &c,
+            &resources,
+            3,
+            0,
+            0,
+            PickFilter::AnyUnit
+        ));
+
+        // Empty wants no unit AND no obstacle; Any takes anything at all.
+        assert!(combat_cell_passes_filter(
+            &c,
+            &resources,
+            2,
+            0,
+            0,
+            PickFilter::Empty
+        ));
+        assert!(!combat_cell_passes_filter(
+            &c,
+            &resources,
+            1,
+            1,
+            0,
+            PickFilter::Empty
+        ));
+        assert!(combat_cell_passes_filter(
+            &c,
+            &resources,
+            1,
+            1,
+            0,
+            PickFilter::Any
+        ));
+        assert!(!combat_cell_passes_filter(
+            &c,
+            &resources,
+            2,
+            0,
+            0,
+            PickFilter::AnyUnit
+        ));
+    }
+
+    #[test]
+    fn the_undead_filter_wants_an_enemy_that_is_also_undead() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(3, 4);
+
+        // An undead enemy passes.
+        assert!(combat_cell_passes_filter(
+            &c,
+            &resources,
+            3,
+            0,
+            0,
+            PickFilter::Undead
+        ));
+        // A living enemy does not.
+        c.units[1][0].troop_idx = 0;
+        assert!(!combat_cell_passes_filter(
+            &c,
+            &resources,
+            3,
+            0,
+            0,
+            PickFilter::Undead
+        ));
+        // Nor do your OWN skeletons: the friendly check runs first.
+        c.units[0][0].troop_idx = 3;
+        assert!(!combat_cell_passes_filter(
+            &c,
+            &resources,
+            0,
+            0,
+            0,
+            PickFilter::Undead
+        ));
     }
 }
