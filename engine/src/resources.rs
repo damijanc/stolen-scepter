@@ -66,6 +66,9 @@ pub struct ResWorld {
     pub default_name: FixedStr<RES_NAME_LEN>,
     pub max_army_slots: i32,
     pub default_options: [i32; 7],
+    /// Sight radius handed to fog reveals. OpenBounty carries it through the
+    /// call and then ignores it -- see `Fog::reveal`.
+    pub fog_sight: i32,
 }
 
 impl Default for ResWorld {
@@ -75,6 +78,7 @@ impl Default for ResWorld {
             default_name: FixedStr::from_str("Hero"),
             max_army_slots: 5,
             default_options: [4, 1, 1, 1, 1, 0, 5],
+            fog_sight: 3,
         }
     }
 }
@@ -888,6 +892,7 @@ impl Resources {
         }
         self.world.max_army_slots =
             optional_i32_field(world, "max_army_slots", self.world.max_army_slots)?;
+        self.world.fog_sight = optional_i32_field(world, "fog_sight", self.world.fog_sight)?;
         if let Some(options) = world.get("default_options") {
             let values = options
                 .as_array()

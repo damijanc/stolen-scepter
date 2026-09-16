@@ -147,7 +147,9 @@ Planned work:
 
 - Port save structs and JSON read/write.
 - Add round-trip tests.
-- Add golden fixture tests for OpenBounty save format version 8.
+- Add golden fixture tests for OpenBounty's save format. NOTE: the C
+  reference is at `SAVE_VERSION 11` (`engine/include/savegame.h`); the
+  version 8 named in earlier drafts of this plan is stale.
 
 Acceptance criteria:
 

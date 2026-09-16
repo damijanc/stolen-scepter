@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod combat;
+pub mod fog;
 pub mod game;
 pub mod map;
 pub mod resources;

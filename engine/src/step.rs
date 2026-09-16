@@ -1,3 +1,4 @@
+use crate::fog::Fog;
 use crate::game::{CastleOwnerKind, ChestOutcome, ChestPending, Game, Mount, TravelMode};
 use crate::map::{Map, Tile};
 use crate::resources::Resources;
@@ -103,6 +104,7 @@ impl StepResult {
 pub fn game_step_basic(
     game: &mut Game,
     map: &mut Map,
+    fog: &mut Fog,
     resources: &Resources,
     dx: i32,
     dy: i32,
@@ -173,6 +175,10 @@ pub fn game_step_basic(
             game.boat.y = prev_y;
         }
     }
+
+    // C reveals immediately after the move and before any interaction fires,
+    // so a bounce-back still leaves the destination revealed.
+    fog.reveal(map, nx, ny, resources.world.fog_sight);
 
     let terrain_costs_full_day = !flying && tile.terrain == Terrain::Desert;
     // Timestop freezes the world, so the foe-follow pass is skipped with it.
@@ -417,6 +423,7 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
 #[cfg(test)]
 mod tests {
     use super::{game_step_basic, FoeCollision, StepInteraction, StepResult};
+    use crate::fog::Fog;
     use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
@@ -443,7 +450,7 @@ mod tests {
         game.position.in_town.copy_from_str("town0");
         game.stats.steps_left_today = 5;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -474,7 +481,7 @@ mod tests {
         game.stats.steps_left_today = 33;
         game.stats.days_left = 10;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -508,7 +515,7 @@ mod tests {
         game.stats.steps_left_today = 33;
         game.stats.time_stop = 2;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert!(result.moved());
         assert_eq!(game.stats.time_stop, 1);
@@ -544,12 +551,51 @@ mod tests {
     }
 
     #[test]
+    fn step_basic_reveals_fog_around_the_destination() {
+        let mut map =
+            Map::from_tiles(8, 8, vec![Tile::plain_grass(); 64]).expect("fixture dimensions match");
+        let mut game = Game::default();
+        let resources = time_fixture();
+        game.position.x = 4;
+        game.position.y = 4;
+        game.stats.steps_left_today = 40;
+        let mut fog = Fog::new();
+
+        game_step_basic(&mut game, &mut map, &mut fog, &resources, 1, 0);
+
+        // The 5x5 square is centred on where the hero landed, not where it
+        // started.
+        assert!(fog.seen(5, 4));
+        assert!(fog.seen(7, 6), "corner of the square around (5,4)");
+        assert!(!fog.seen(2, 4), "two columns behind the start stays dark");
+    }
+
+    #[test]
+    fn step_basic_reveals_even_when_the_move_is_blocked_by_an_interaction() {
+        // C reveals before the interaction block runs, so a destination that
+        // bounces the hero back is still revealed.
+        let mut map =
+            Map::from_tiles(8, 8, vec![Tile::plain_grass(); 64]).expect("fixture dimensions match");
+        let mut game = Game::default();
+        let resources = time_fixture();
+        game.position.x = 4;
+        game.position.y = 4;
+        game.stats.steps_left_today = 40;
+        let mut fog = Fog::new();
+
+        game_step_basic(&mut game, &mut map, &mut fog, &resources, 0, 1);
+
+        assert!(fog.seen(4, 5));
+        assert!(fog.seen(4, 7));
+    }
+
+    #[test]
     fn step_basic_advances_foes_during_the_step() {
         let (mut game, mut map, resources) = following_foe_game(false);
 
         // Hero retreats (1,0) -> (0,0). The foe chases the tile just left,
         // (1,0), closing to (2,0) without reaching the hero.
-        let result = game_step_basic(&mut game, &mut map, &resources, -1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, -1, 0);
 
         assert_eq!(step_collision(&result), None);
         assert_eq!((game.foes[0].x, game.foes[0].y), (2, 0));
@@ -566,7 +612,7 @@ mod tests {
 
         // Hero advances (1,0) -> (2,0). The cell closest to the tile it left
         // IS the tile it moved to, so the foe walks onto the hero.
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         let collision = step_collision(&result).expect("the foe reached the hero");
         assert_eq!(collision.id, "band0");
@@ -582,7 +628,7 @@ mod tests {
     fn step_basic_marks_a_friendly_collision_so_the_shell_can_pick_the_prompt() {
         let (mut game, mut map, resources) = following_foe_game(true);
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         let collision = step_collision(&result).expect("the foe reached the hero");
         assert!(collision.friendly);
@@ -593,7 +639,7 @@ mod tests {
         let (mut game, mut map, resources) = following_foe_game(false);
         game.stats.time_stop = 2;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(step_collision(&result), None);
         assert_eq!(
@@ -611,11 +657,11 @@ mod tests {
         let (mut game, mut map, resources) = following_foe_game(false);
         game.stats.time_stop = 1;
 
-        game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
         assert_eq!((game.foes[0].x, game.foes[0].y), (3, 0), "still frozen");
         assert_eq!(game.stats.time_stop, 0);
 
-        game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
         assert_ne!((game.foes[0].x, game.foes[0].y), (3, 0), "moving again");
     }
 
@@ -632,7 +678,7 @@ mod tests {
         game.stats.steps_left_today = 5;
 
         assert_eq!(
-            game_step_basic(&mut game, &mut map, &resources, 1, 0),
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0),
             StepResult::BlockedTerrain {
                 terrain: Terrain::Forest
             }
@@ -642,7 +688,7 @@ mod tests {
         assert_eq!(game.stats.steps_left_today, 5);
 
         assert_eq!(
-            game_step_basic(&mut game, &mut map, &resources, -1, 0),
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, -1, 0),
             StepResult::BlockedEdge
         );
         assert_eq!((game.position.x, game.position.y), (0, 0));
@@ -662,7 +708,7 @@ mod tests {
         game.stats.steps_left_today = 5;
 
         assert_eq!(
-            game_step_basic(&mut game, &mut map, &resources, 1, 0),
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0),
             StepResult::BlockedTerrain {
                 terrain: Terrain::Water
             }
@@ -689,7 +735,7 @@ mod tests {
         game.boat.y = 0;
         game.stats.steps_left_today = 5;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -725,7 +771,7 @@ mod tests {
         game.stats.steps_left_today = 5;
 
         assert_eq!(
-            game_step_basic(&mut game, &mut map, &resources, 1, 0),
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0),
             StepResult::BlockedTerrain {
                 terrain: Terrain::Water
             }
@@ -759,19 +805,19 @@ mod tests {
         game.boat.y = 0;
         game.stats.steps_left_today = 5;
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (1, 0));
         assert_eq!(game.travel_mode, TravelMode::Boat);
         assert_eq!((game.boat.x, game.boat.y), (1, 0));
         assert_eq!(game.stats.steps_left_today, 4);
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (2, 0));
         assert_eq!(game.travel_mode, TravelMode::Boat);
         assert_eq!((game.boat.x, game.boat.y), (2, 0));
         assert_eq!(game.stats.steps_left_today, 3);
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (3, 0));
         assert_eq!(game.travel_mode, TravelMode::Walk);
         assert_eq!((game.boat.x, game.boat.y), (2, 0));
@@ -797,19 +843,19 @@ mod tests {
         game.character.mount = Mount::Fly;
         game.stats.steps_left_today = 5;
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (1, 0));
         assert_eq!(game.stats.steps_left_today, 4);
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (2, 0));
         assert_eq!(game.stats.steps_left_today, 3);
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (3, 0));
         assert_eq!(game.stats.steps_left_today, 2);
 
-        assert!(game_step_basic(&mut game, &mut map, &resources, 1, 0).moved());
+        assert!(game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0).moved());
         assert_eq!((game.position.x, game.position.y), (4, 0));
         assert_eq!(game.stats.steps_left_today, 1);
     }
@@ -828,7 +874,7 @@ mod tests {
         game.stats.steps_left_today = 33;
         game.stats.days_left = 10;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -862,7 +908,7 @@ mod tests {
         game.boat.y = 0;
         game.stats.steps_left_today = 5;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -889,7 +935,7 @@ mod tests {
         game.stats.steps_left_today = 5;
 
         assert_eq!(
-            game_step_basic(&mut game, &mut map, &resources, 0, 0),
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 0, 0),
             StepResult::NoDirection
         );
         assert_eq!(game.position.in_town.as_str(), "town0");
@@ -905,7 +951,7 @@ mod tests {
         game.stats.steps_left_today = 1;
         game.stats.days_left = 10;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -937,7 +983,7 @@ mod tests {
         game.stats.gold = 100;
         game.stats.commission_weekly = 25;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -968,7 +1014,7 @@ mod tests {
         game.stats.steps_left_today = 1;
         game.stats.days_left = 1;
 
-        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
 
         assert_eq!(
             result,
@@ -1142,7 +1188,7 @@ mod tests {
     }
 
     fn move_interaction(game: &mut Game, map: &mut Map, resources: &Resources) -> StepInteraction {
-        match game_step_basic(game, map, resources, 1, 0) {
+        match game_step_basic(game, map, &mut Fog::new(), resources, 1, 0) {
             StepResult::Moved { interaction, .. } => interaction,
             other => panic!("expected movement, got {other:?}"),
         }
