@@ -1,6 +1,6 @@
 use crate::tables::{
     parse_troop_abilities, ArtifactDef, ArtifactPower, ClassDef, FixedStr, RankDef, SpellDef,
-    SpellKind, TroopDef, VillainDef, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX, CAT_PATH_LEN,
+    SpellKind, TroopDef, VillainDef, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX, CAT_ID_LEN, CAT_PATH_LEN,
     CAT_SPELLS_MAX, CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
     TROOP_TIER_COUNTS,
 };
@@ -501,6 +501,11 @@ impl Default for ResCastle {
 pub struct ResTuning {
     pub instant_army_multiplier: [i32; 4],
     pub search_cost_days: i32,
+    /// The consolation stack a defeated hero is sent home with. Left empty
+    /// by the pack, this resolves after the troop catalog is parsed to the
+    /// cheapest troop by recruit cost.
+    pub temp_death_troop: FixedStr<CAT_ID_LEN>,
+    pub temp_death_count: i32,
 }
 
 impl Default for ResTuning {
@@ -508,6 +513,8 @@ impl Default for ResTuning {
         Self {
             instant_army_multiplier: [3, 2, 1, 1],
             search_cost_days: 10,
+            temp_death_troop: FixedStr::empty(),
+            temp_death_count: 20,
         }
     }
 }
@@ -612,6 +619,7 @@ impl Resources {
         resources.parse_artifacts(&root)?;
         resources.parse_classes(&root)?;
         resources.parse_villains(&root)?;
+        resources.resolve_temp_death()?;
         Ok(resources)
     }
 
@@ -933,6 +941,55 @@ impl Resources {
         )?;
         self.tuning.search_cost_days =
             optional_i32_field(tuning, "search_cost_days", self.tuning.search_cost_days)?;
+        if let Some(temp_death) = tuning.get("temp_death") {
+            if temp_death.is_object() {
+                // C reads the troop with json_str's "" default, so a block
+                // that names no troop CLEARS any earlier value rather than
+                // leaving it standing.
+                self.tuning
+                    .temp_death_troop
+                    .copy_from_str(optional_string_field(temp_death, "troop")?.unwrap_or(""));
+                self.tuning.temp_death_count =
+                    optional_i32_field(temp_death, "count", self.tuning.temp_death_count)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate the temp-death knobs and fill in the default troop. Ports
+    /// the tail of OpenBounty's resource load, which runs this AFTER the
+    /// troop catalog exists.
+    ///
+    /// The order matters: validation comes first and an EMPTY troop id
+    /// passes it, so the fallback below is reached. A pack that names a
+    /// troop the catalog lacks is rejected instead.
+    fn resolve_temp_death(&mut self) -> Result<(), ResourceError> {
+        let configured = self.tuning.temp_death_troop;
+        let troop_ok = configured.is_empty()
+            || self.troops[..self.troops_count]
+                .iter()
+                .any(|troop| troop.id.as_str() == configured.as_str());
+        if self.tuning.temp_death_count <= 0 || !troop_ok {
+            return Err(ResourceError::InvalidField("tuning.temp_death"));
+        }
+        if !configured.is_empty() {
+            return Ok(());
+        }
+        // The cheapest troop by recruit cost, first in catalog order on a
+        // tie. A catalog with no troops leaves the id empty, which the
+        // temp-death transition then treats as "no consolation stack".
+        let mut best: Option<&TroopDef> = None;
+        for troop in &self.troops[..self.troops_count] {
+            if troop.id.is_empty() {
+                continue;
+            }
+            if best.is_none_or(|current| troop.recruit_cost < current.recruit_cost) {
+                best = Some(troop);
+            }
+        }
+        if let Some(best) = best {
+            self.tuning.temp_death_troop.copy_from_str(best.id.as_str());
+        }
         Ok(())
     }
 

@@ -1409,6 +1409,78 @@ impl Game {
         true
     }
 
+    /// Send a defeated hero home with nothing. Ports `GameTempDeath`.
+    ///
+    /// Everything is forfeit: the army, the siege weapons, and the boat --
+    /// the boat explicitly, because the zone switch below would otherwise
+    /// carry it to the home spawn and materialise a rental on dry land at
+    /// the King's castle.
+    pub fn temp_death(&mut self, resources: &Resources, map: &mut Map, fog: &mut Fog) {
+        for slot in 0..GAME_ARMY_SLOTS {
+            self.army[slot].id = FixedStr::empty();
+            self.army[slot].count = 0;
+        }
+        self.stats.siege_weapons = 0;
+
+        // The consolation stack. A configured troop the catalog lacks is
+        // rejected at load, so a miss here means an empty catalog, and the
+        // hero is sent home with no army at all.
+        if let Some(troop) = resources.troop_by_id(resources.tuning.temp_death_troop.as_str()) {
+            self.army[0].id.copy_from_str(troop.id.as_str());
+            self.army[0].count = resources.tuning.temp_death_count;
+        }
+
+        self.boat.has_boat = false;
+        self.boat.x = -1;
+        self.boat.y = -1;
+        self.boat.zone = FixedStr::empty();
+
+        for index in 0..resources.zone_count() {
+            let Some(zone) = resources.zone_by_index(index) else {
+                continue;
+            };
+            if !zone.is_home {
+                continue;
+            }
+            let (home_x, home_y) = (zone.home_spawn_x, zone.home_spawn_y);
+            let zone_id = zone.id;
+            self.switch_zone(resources, map, fog, zone_id.as_str());
+            // The switch put the hero on the zone's hero_spawn; the home
+            // zone carries a SECOND, separate tile for this arrival.
+            self.position.x = home_x;
+            self.position.y = home_y;
+            self.position.last_x = self.position.x;
+            self.position.last_y = self.position.y;
+            break;
+        }
+        self.character.mount = Mount::Ride;
+        self.travel_mode = TravelMode::Walk;
+    }
+
+    /// Dismiss the stack in `slot`. Ports `flow_apply_dismiss_army`.
+    ///
+    /// Returns true when this was the LAST occupied stack, in which case
+    /// nothing is dismissed: the caller must confirm, because emptying the
+    /// army entirely sends the hero back to the King in disgrace.
+    pub fn dismiss_army_slot(&mut self, slot: usize) -> bool {
+        if slot >= GAME_ARMY_SLOTS {
+            return false;
+        }
+        let mut occupied = 0;
+        for index in 0..GAME_ARMY_SLOTS {
+            if !self.army[index].id.is_empty() && self.army[index].count > 0 {
+                occupied += 1;
+            }
+        }
+        if occupied <= 1 {
+            return true;
+        }
+        self.army[slot].id = FixedStr::empty();
+        self.army[slot].count = 0;
+        self.compact_army();
+        false
+    }
+
     /// Whether the whole army can take to the air. Ports `GamePlayerCanFly`.
     ///
     /// EVERY non-empty stack must qualify, so one earthbound stack grounds
@@ -3735,6 +3807,7 @@ mod tests {
     };
     use crate::combat::{combat_seed_rng, Combat, CombatMode, CombatResult, CombatTarget};
     use crate::map::{Map, Tile};
+    use crate::resources::ResourceError;
     use crate::resources::Resources;
     use crate::tables::{ArtifactPower, FixedStr};
     use crate::tile::{Interact, Terrain};
@@ -6369,6 +6442,173 @@ mod tests {
     /// Two zones, each 6x2. `home` spawns on grass, `isle` spawns on water.
     /// `gryphons` fly and are skill 3. `sprites` carry the FLY bit but are
     /// only skill 1. `peasants` do not fly at all.
+    /// A home zone whose `home_spawn` differs from its `hero_spawn`, so a
+    /// temp death can be told apart from a plain zone switch.
+    fn temp_death_fixture(tag: &str, temp_death: &str) -> Resources {
+        let dir = std::env::temp_dir();
+        let home = dir.join(format!("openbounty-{}-{}.dat", tag, std::process::id()));
+        std::fs::write(&home, b"......\n......\n").expect("home map writes");
+        Resources::from_json_str(&format!(
+            r##"{{
+              "world": {{"fog_sight": 3}},
+              "tile_codes": {{".": {{"art":"grass","terrain":"grass"}}}},
+              "zones": [
+                {{"id":"home","map":"{home}","width":6,"height":2,"is_home":true,
+                 "hero_spawn":{{"x":1,"y":0}},"home_spawn":{{"x":4,"y":1}}}}
+              ],
+              "troops": [
+                {{"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}},
+                {{"index":1,"id":"militia","skill_level":2,"hit_points":2,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":5,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}}
+              ]{temp_death}
+            }}"##,
+            home = home.display(),
+            temp_death = temp_death,
+        ))
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn a_temp_death_forfeits_everything_and_sends_the_hero_to_the_home_spawn() {
+        let resources = temp_death_fixture("tempdeath", "");
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 50;
+        game.army[1].id.copy_from_str("militia");
+        game.army[1].count = 30;
+        game.stats.siege_weapons = 3;
+        game.boat.has_boat = true;
+        game.boat.x = 2;
+        game.boat.y = 1;
+        game.boat.zone.copy_from_str("home");
+        game.character.mount = Mount::Fly;
+        game.travel_mode = TravelMode::Boat;
+
+        game.temp_death(&resources, &mut map, &mut fog);
+
+        // The default consolation troop is the CHEAPEST by recruit cost,
+        // which is militia at 5, not the catalog's first entry.
+        assert_eq!(game.army[0].id.as_str(), "militia");
+        assert_eq!(game.army[0].count, 20);
+        assert!(game.army[1].id.is_empty());
+        assert_eq!(game.stats.siege_weapons, 0);
+        // The boat is forfeit outright, not carried to the home spawn.
+        assert!(!game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (-1, -1));
+        assert!(game.boat.zone.is_empty());
+        // home_spawn (4,1), NOT the zone's hero_spawn (1,0).
+        assert_eq!(game.position.zone.as_str(), "home");
+        assert_eq!((game.position.x, game.position.y), (4, 1));
+        assert_eq!((game.position.last_x, game.position.last_y), (4, 1));
+        assert_eq!(game.character.mount, Mount::Ride);
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+    }
+
+    #[test]
+    fn a_configured_consolation_troop_wins_over_the_cheapest() {
+        let resources = temp_death_fixture(
+            "tempdeath-cfg",
+            r#","tuning":{"temp_death":{"troop":"peasants","count":7}}"#,
+        );
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        let mut game = Game::default();
+
+        game.temp_death(&resources, &mut map, &mut fog);
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 7);
+    }
+
+    #[test]
+    fn a_temp_death_troop_the_catalogue_lacks_is_refused_at_load() {
+        // C fails the whole pack load rather than silently dropping the
+        // knob, so this is a parse error, not a runtime fallback.
+        let err = Resources::from_json_str(
+            r#"{
+              "tuning": {"temp_death": {"troop": "dragons", "count": 5}},
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}
+              ]
+            }"#,
+        );
+        assert!(matches!(
+            err,
+            Err(ResourceError::InvalidField("tuning.temp_death"))
+        ));
+    }
+
+    #[test]
+    fn a_non_positive_temp_death_count_is_refused_at_load() {
+        let err =
+            Resources::from_json_str(r#"{"tuning": {"temp_death": {"count": 0}}, "troops": []}"#);
+        assert!(matches!(
+            err,
+            Err(ResourceError::InvalidField("tuning.temp_death"))
+        ));
+    }
+
+    #[test]
+    fn an_empty_catalogue_leaves_the_consolation_troop_unset() {
+        // Validation passes (an empty id is allowed) and the fallback finds
+        // nothing, so a defeated hero keeps an empty army.
+        let resources = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
+        assert!(resources.tuning.temp_death_troop.is_empty());
+    }
+
+    #[test]
+    fn dismissing_a_stack_compacts_the_army() {
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+        game.army[1].id.copy_from_str("militia");
+        game.army[1].count = 5;
+        game.army[2].id.copy_from_str("archers");
+        game.army[2].count = 3;
+
+        assert!(!game.dismiss_army_slot(1));
+        // The survivors slide down rather than leaving a hole.
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[1].id.as_str(), "archers");
+        assert!(game.army[2].id.is_empty());
+    }
+
+    #[test]
+    fn dismissing_the_last_stack_asks_first_and_dismisses_nothing() {
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+
+        // True means "this would empty the army" -- the caller must confirm,
+        // and the stack is deliberately left standing until it does.
+        assert!(game.dismiss_army_slot(0));
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+        assert_eq!(game.army[0].count, 10);
+    }
+
+    #[test]
+    fn a_zero_count_stack_does_not_count_as_occupied() {
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+        game.army[1].id.copy_from_str("militia");
+        game.army[1].count = 0;
+
+        // Only one stack is really occupied, so this is still the last one.
+        assert!(game.dismiss_army_slot(0));
+        assert_eq!(game.army[0].count, 10);
+    }
+
+    #[test]
+    fn dismissing_an_out_of_range_slot_does_nothing() {
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+
+        assert!(!game.dismiss_army_slot(GAME_ARMY_SLOTS));
+        assert_eq!(game.army[0].id.as_str(), "peasants");
+    }
+
     fn flying_fixture() -> Resources {
         Resources::from_json_str(
             r#"{
