@@ -15,7 +15,9 @@ will be selected only after headless engine parity is solid.
 
 - `engine/`: `openbounty-engine`, the only place for game rules and state.
 - `shell/`: `openbounty-shell`; do not add engine logic here. `layout.rs`
-  holds the screen geometry; the renderer backend is not wired up yet.
+  holds the screen geometry, `draw.rs` the draw-command vocabulary a view
+  emits, `font.rs` the bitmap-font metrics and `palette.rs` the VGA table.
+  The renderer backend is not wired up yet.
 - `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
   decision and what was rejected, the legacy geometry, and the work order.
   READ THIS before touching the shell.
@@ -176,7 +178,7 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 318 engine unit tests, 8 shell unit tests, 25 combat digest
+Test coverage is 318 engine unit tests, 27 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 The most recent slice is the shell layout model. Run `git log --oneline -5`

@@ -204,9 +204,11 @@ including `resources_format_template` and its `%VAR%` substitution.
 1. **Layout model.** Parse `render` in `engine/src/resources.rs`; port
    `layout_init` and the `CL_*` geometry to `shell/src/layout.rs`. No
    graphics dependency yet. DONE.
-2. **Draw-command vocabulary.** The command enum plus a headless recorder
-   backend, so view code can be tested before a window exists. Findings from
-   reading every draw site in the C shell, which settle the design:
+2. **Draw-command vocabulary.** DONE: `shell/src/draw.rs` (`DrawCmd`,
+   `DrawList`, `Sprite`, `Color`, `Rect`, `Dst`), `shell/src/font.rs` and
+   `shell/src/palette.rs`. `DrawList` is itself the headless recorder; there
+   is nothing to execute it until step 3. Findings from reading every draw
+   site in the C shell, which settled the design:
    - Six primitives across ~90 call sites: `DrawRectangle` (43),
      `DrawTexturePro` (30), `DrawRectangleLines` (12), three
      `DrawRectangleRounded`, three `DrawRectangleRoundedLines`, and three
