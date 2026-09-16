@@ -58,12 +58,14 @@ Implemented and tested:
 - Hostile foe encounters wired to that resolver: `Game::attack_hostile_foe`
   builds the target from the foe's garrison, keyed by its placement id, and
   routes the outcome through `resolve_hostile_foe`.
+- Monster-castle sieges: `Game::siege_monster_castle` fights the garrison on
+  the castle layout and flips ownership, empties the garrison, and sets
+  `own_castle` on a win. Villain castles are NOT handled there.
 
-Test coverage is 153 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 159 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is wiring hostile foe encounters to combat. Run
-`git log --oneline -5`
+The most recent slice is monster-castle sieges. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -116,13 +118,16 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-Hostile foe fights now run end to end. `CombatMode::Castle` is ported but has
-no caller yet, so castle siege entry is the direct mirror of the foe slice and
-the natural next step; foe following (`GameFoesFollow`) is the other open half
-of the foe system. Two loose ends to close along the way:
+Foe fights and monster sieges both run end to end. The next slice is villain
+sieges (`flow_apply_siege_villain`), which is much more than the monster path:
+capture is gated on the lord matching `contract.active_id`; a no-contract win
+rebuilds his army from the pack's `VillainDef` roster and records
+`villains_prefought`; a contract win also fulfills the contract, pays the
+bounty, and awards a scepter-map piece. After that, foe following
+(`GameFoesFollow`) is the other open half of the foe system.
 
-- A siege win should set `position.own_castle` the instant a castle flips to
-  the player. Only the step-onto-gate path sets it today.
+One standing omission:
+
 - `combat.rs` deliberately omits what only a rendered fight needs: combat
   spells (`combat_cast_spell` and the `spell_*` helpers, reachable only
   through a player policy -- the headless default policy never casts) and

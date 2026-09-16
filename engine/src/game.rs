@@ -1738,6 +1738,27 @@ impl Game {
             .count() as i32
     }
 
+    /// Locate a castle record by id. Unlike `find_foe` this is NOT scoped to
+    /// the hero's zone: castle ids are unique world-wide, where foe placement
+    /// ids restart their numbering in every zone.
+    fn find_castle(&self, castle_id: &str) -> Option<&CastleRecord> {
+        if castle_id.is_empty() {
+            return None;
+        }
+        self.castles
+            .iter()
+            .find(|castle| castle.id.as_str() == castle_id)
+    }
+
+    fn find_castle_index(&self, castle_id: &str) -> Option<usize> {
+        if castle_id.is_empty() {
+            return None;
+        }
+        self.castles
+            .iter()
+            .position(|castle| castle.id.as_str() == castle_id)
+    }
+
     pub fn castles_owned(&self) -> i32 {
         self.castles
             .iter()
@@ -2114,6 +2135,76 @@ impl Game {
             combat_run_headless(self, resources, CombatMode::Foe, &target, COMBAT_MAX_ROUNDS);
         let temp_death = self.resolve_hostile_foe(map, foe_id, foe_x, foe_y, outcome);
         (outcome, temp_death)
+    }
+
+    /// Lay siege to a monster-held castle: fight its garrison, then apply the
+    /// outcome. Ports OpenBounty's castle target build plus
+    /// `flow_apply_siege_monster`.
+    ///
+    /// Villain-held castles do NOT belong here -- their capture is gated on
+    /// the active contract and rebuilds the lord's army on a no-contract win.
+    ///
+    /// Returns the battle result and the `temp_death` flag the caller must
+    /// act on after a loss.
+    pub fn siege_monster_castle(
+        &mut self,
+        resources: &Resources,
+        castle_id: &str,
+    ) -> (CombatResult, bool) {
+        let garrison = self
+            .find_castle(castle_id)
+            .map(|castle| castle.garrison)
+            .unwrap_or_default();
+        // Display name only: the seed key below is what reaches the RNG.
+        let villain_id = self
+            .find_castle(castle_id)
+            .map(|castle| castle.villain_id)
+            .unwrap_or_default();
+        let name = resources
+            .villain_by_id(villain_id.as_str())
+            .map(|villain| villain.name.as_str())
+            .filter(|name| !name.is_empty())
+            .or_else(|| {
+                resources
+                    .castle_by_id(castle_id)
+                    .map(|castle| castle.name.as_str())
+                    .filter(|name| !name.is_empty())
+            })
+            .unwrap_or(castle_id);
+        let target = CombatTarget {
+            name,
+            garrison: &garrison,
+            seed_key: castle_id,
+        };
+        let outcome = combat_run_headless(
+            self,
+            resources,
+            CombatMode::Castle,
+            &target,
+            COMBAT_MAX_ROUNDS,
+        );
+        let temp_death = self.resolve_monster_siege(castle_id, outcome);
+        (outcome, temp_death)
+    }
+
+    /// Apply a completed monster-siege battle. Mirrors
+    /// `flow_apply_siege_monster`. Returns `true` only when the caller must
+    /// handle the player's loss.
+    pub fn resolve_monster_siege(&mut self, castle_id: &str, outcome: CombatResult) -> bool {
+        if outcome != CombatResult::Win {
+            return outcome == CombatResult::Loss;
+        }
+        let Some(index) = self.find_castle_index(castle_id) else {
+            return false;
+        };
+        let castle = &mut self.castles[index];
+        castle.owner_kind = CastleOwnerKind::Player;
+        castle.visited = true;
+        castle.garrison = [Unit::default(); GAME_ARMY_SLOTS];
+        // The hero just took this castle and is standing at it, so garrison
+        // transfers are legal now. Cleared on the next move, like in_town.
+        self.position.own_castle.copy_from_str(castle_id);
+        false
     }
 
     /// Apply a completed hostile-foe battle. Combat itself belongs to the
@@ -2857,12 +2948,12 @@ mod tests {
     use super::{
         ArmyStack, AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome,
         FoeState, Game, GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
-        TravelMode, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
+        TravelMode, Unit, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
     };
     use crate::combat::{combat_seed_rng, Combat, CombatMode, CombatResult, CombatTarget};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
-    use crate::tables::ArtifactPower;
+    use crate::tables::{ArtifactPower, FixedStr};
     use crate::tile::{Interact, Terrain};
 
     #[test]
@@ -3653,6 +3744,138 @@ mod tests {
             map.tile_i32(2, 0).expect("tile exists").interactive,
             Interact::None,
             "current stamp cleared"
+        );
+    }
+
+    /// Hero at a monster-held castle "keep" with the given garrison.
+    fn siege_game(hero: &[(&str, i32)], garrison: &[(&str, i32)]) -> Game {
+        let mut game = Game::default();
+        game.seed = 777;
+        game.position.zone.copy_from_str("home");
+        game.stats.leadership_current = 10_000;
+        for (slot, (id, count)) in hero.iter().enumerate() {
+            game.army[slot].id.copy_from_str(id);
+            game.army[slot].count = *count;
+        }
+        game.castles[0].id.copy_from_str("keep");
+        game.castles[0].owner_kind = CastleOwnerKind::Monsters;
+        for (slot, (id, count)) in garrison.iter().enumerate() {
+            game.castles[0].garrison[slot].id.copy_from_str(id);
+            game.castles[0].garrison[slot].count = *count;
+        }
+        game
+    }
+
+    #[test]
+    fn taking_a_monster_castle_flips_ownership_empties_it_and_allows_a_garrison() {
+        let resources = foe_combat_fixture();
+        let mut game = siege_game(&[("ogres", 40)], &[("peasants", 2)]);
+        game.stats.gold = 500;
+
+        let (outcome, temp_death) = game.siege_monster_castle(&resources, "keep");
+
+        assert_eq!(outcome, CombatResult::Win);
+        assert!(!temp_death);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Player);
+        assert!(game.castles[0].visited);
+        assert!(game.castles[0]
+            .garrison
+            .iter()
+            .all(|unit| unit.id.is_empty() && unit.count == 0));
+        // The siege win is the other way own_castle gets set, so the hero can
+        // garrison the castle it just took without stepping off and back on.
+        assert_eq!(game.position.own_castle.as_str(), "keep");
+        assert_eq!(game.stats.gold, 510, "spoils banked");
+    }
+
+    #[test]
+    fn a_failed_siege_leaves_the_castle_held_and_asks_for_temporary_death() {
+        let resources = foe_combat_fixture();
+        let mut game = siege_game(
+            &[("peasants", 1)],
+            &[("ogres", 40), ("ogres", 40), ("ogres", 40)],
+        );
+        game.stats.gold = 500;
+
+        let (outcome, temp_death) = game.siege_monster_castle(&resources, "keep");
+
+        assert_eq!(outcome, CombatResult::Loss);
+        assert!(temp_death);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Monsters);
+        assert_eq!(game.castles[0].garrison[0].count, 40, "garrison intact");
+        assert!(game.position.own_castle.is_empty(), "no marker on a loss");
+        assert_eq!(game.stats.gold, 500);
+    }
+
+    #[test]
+    fn a_siege_win_lets_the_hero_garrison_the_castle_immediately() {
+        let resources = foe_combat_fixture();
+        let mut game = siege_game(&[("ogres", 40), ("peasants", 5)], &[("peasants", 1)]);
+
+        assert_eq!(
+            game.siege_monster_castle(&resources, "keep").0,
+            CombatResult::Win
+        );
+
+        // The marker set by the win is exactly what the garrison core requires.
+        assert_eq!(game.garrison_troop("keep", 1), GarrisonOutcome::Ok);
+        assert_eq!(game.castles[0].garrison[0].id.as_str(), "peasants");
+    }
+
+    #[test]
+    fn a_castle_the_engine_cannot_find_fields_no_defenders() {
+        let resources = foe_combat_fixture();
+        let mut game = siege_game(&[("ogres", 10)], &[("ogres", 99)]);
+
+        let (outcome, _) = game.siege_monster_castle(&resources, "no_such_castle");
+
+        assert_eq!(outcome, CombatResult::Win, "an empty AI side loses at once");
+        assert_eq!(game.army[0].count, 10);
+        // Nothing to apply the win to: the real castle is untouched.
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Monsters);
+        assert!(game.position.own_castle.is_empty());
+    }
+
+    #[test]
+    fn a_castle_siege_is_fought_on_the_castle_layout_not_the_open_field() {
+        let garrison = [
+            Unit {
+                id: FixedStr::from_str("peasants"),
+                count: 3,
+            },
+            Unit::default(),
+            Unit::default(),
+            Unit::default(),
+            Unit::default(),
+        ];
+        let game = siege_game(&[("ogres", 5)], &[("peasants", 3)]);
+        let mut castle = Combat::default();
+        let mut field = Combat::default();
+        let target = CombatTarget {
+            name: "keep",
+            garrison: &garrison,
+            seed_key: "keep",
+        };
+        combat_seed_rng(&mut castle, &game, CombatMode::Castle, &target);
+        combat_seed_rng(&mut field, &game, CombatMode::Foe, &target);
+
+        // Mode is mixed into the seed, so the same defenders fight from a
+        // different RNG stream depending on where they are met.
+        assert_ne!(castle.rng_state, field.rng_state);
+    }
+
+    #[test]
+    fn the_same_siege_always_resolves_the_same_way() {
+        let resources = foe_combat_fixture();
+        let mut results = Vec::new();
+        for _ in 0..4 {
+            let mut game = siege_game(&[("ogres", 9)], &[("peasants", 30)]);
+            let (outcome, _) = game.siege_monster_castle(&resources, "keep");
+            results.push((outcome, game.stats.gold, game.army[0].count));
+        }
+        assert!(
+            results.windows(2).all(|pair| pair[0] == pair[1]),
+            "a siege must be a pure function of seed, identity and mode: {results:?}"
         );
     }
 
