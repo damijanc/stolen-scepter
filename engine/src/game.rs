@@ -22,6 +22,11 @@ pub const GAME_MAX_PLACEMENTS: usize = 128;
 pub const GAME_MAX_HOSTILE_PER_ZONE: usize = 35;
 pub const GAME_MAX_FOES: usize = 160;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
+/// Villain roster slots a `VillainDef` can declare.
+pub const VILLAIN_ARMY_SLOTS: usize = 5;
+/// Highest villain index a set-free siege records in `villains_prefought`.
+/// OpenBounty hardcodes 17 here rather than using the array's own length.
+pub const VILLAINS_PREFOUGHT_CAP: i32 = 17;
 /// Recruit cap standing in for the home castle's bottomless pool, OpenBounty's
 /// `1 << 28`. Large enough never to bind before gold or leadership do.
 pub const CASTLE_POOL_CAP: i32 = 1 << 28;
@@ -116,6 +121,23 @@ pub enum GarrisonOutcome {
     Ok = 0,
     Refused = 1,
     WouldLeaveNoArmy = 2,
+}
+
+/// Outcome of a villain-castle siege. OpenBounty returns only a temp-death
+/// bool and builds its dialog inline; the engine reports which branch ran so
+/// a shell can write the message.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VillainSiegeOutcome {
+    /// The hero lost. The caller must run the temporary-death handling.
+    Repelled = 0,
+    /// Won holding the matching contract: the castle is taken and the
+    /// contract fulfilled.
+    Captured = 1,
+    /// Won without the contract: the Lord keeps his castle, rebuilds from his
+    /// starting roster, and the defeat is remembered as pre-fought.
+    SetFree = 2,
+    /// Won, but no castle record matched the id, so nothing was applied.
+    NoCastle = 3,
 }
 
 /// Outcome of a town spell purchase, mirroring OpenBounty's `SpellBuyResult`.
@@ -550,6 +572,11 @@ pub struct Game {
     pub seed_index: i32,
     pub seed_from_catalog: bool,
     pub seed: u64,
+    /// Oracle/demo session flag, transient and never serialized. When set,
+    /// rank promotion still fires automatically on capturing a villain -- the
+    /// legacy behavior the autoplay search depends on. Real play leaves it
+    /// false, so the hero is promoted only via an audience with the King.
+    pub oracle_mode: bool,
     pub scepter: ScepterState,
     pub character: Character,
     pub stats: Stats,
@@ -580,6 +607,7 @@ impl Default for Game {
             seed_index: 0,
             seed_from_catalog: false,
             seed: 0,
+            oracle_mode: false,
             scepter: ScepterState::default(),
             character: Character::default(),
             stats: Stats::default(),
@@ -2151,6 +2179,14 @@ impl Game {
         resources: &Resources,
         castle_id: &str,
     ) -> (CombatResult, bool) {
+        let outcome = self.fight_castle_garrison(resources, castle_id);
+        let temp_death = self.resolve_monster_siege(castle_id, outcome);
+        (outcome, temp_death)
+    }
+
+    /// Fight a castle's garrison on the siege layout. C builds this target in
+    /// one branch shared by both siege flows, so both callers share it here.
+    fn fight_castle_garrison(&mut self, resources: &Resources, castle_id: &str) -> CombatResult {
         let garrison = self
             .find_castle(castle_id)
             .map(|castle| castle.garrison)
@@ -2176,15 +2212,97 @@ impl Game {
             garrison: &garrison,
             seed_key: castle_id,
         };
-        let outcome = combat_run_headless(
+        combat_run_headless(
             self,
             resources,
             CombatMode::Castle,
             &target,
             COMBAT_MAX_ROUNDS,
-        );
-        let temp_death = self.resolve_monster_siege(castle_id, outcome);
-        (outcome, temp_death)
+        )
+    }
+
+    /// Lay siege to a villain-held castle: fight the lord's army, then apply
+    /// the outcome. Ports `flow_apply_siege_villain`.
+    ///
+    /// Capture is gated on the lord matching the hero's active contract.
+    /// Without it the Lord is set free: he keeps his castle and rebuilds from
+    /// his starting roster, the spoils already credited by the combat core
+    /// stand, and the defeat is remembered so pre-weakening a late lord
+    /// before his contract window stays a legitimate play.
+    pub fn siege_villain_castle(
+        &mut self,
+        resources: &Resources,
+        castle_id: &str,
+    ) -> (CombatResult, VillainSiegeOutcome) {
+        let result = self.fight_castle_garrison(resources, castle_id);
+        let outcome = self.resolve_villain_siege(resources, castle_id, result);
+        (result, outcome)
+    }
+
+    /// Apply a completed villain-siege battle. Mirrors
+    /// `flow_apply_siege_villain`.
+    pub fn resolve_villain_siege(
+        &mut self,
+        resources: &Resources,
+        castle_id: &str,
+        outcome: CombatResult,
+    ) -> VillainSiegeOutcome {
+        if outcome != CombatResult::Win {
+            return VillainSiegeOutcome::Repelled;
+        }
+        let Some(index) = self.find_castle_index(castle_id) else {
+            return VillainSiegeOutcome::NoCastle;
+        };
+        // Snapshot the lord's id before the castle is cleared: the contract
+        // is fulfilled against it afterwards.
+        let caught_vid = self.castles[index].villain_id;
+        let captured = resources.villain_by_id(caught_vid.as_str()).copied();
+        let contract_match = !caught_vid.is_empty()
+            && !self.contract.active_id.is_empty()
+            && caught_vid.as_str() == self.contract.active_id.as_str();
+
+        if contract_match {
+            let castle = &mut self.castles[index];
+            castle.owner_kind = CastleOwnerKind::Player;
+            castle.visited = true;
+            castle.villain_id = FixedStr::empty();
+            castle.garrison = [Unit::default(); GAME_ARMY_SLOTS];
+            // The hero is standing at the castle it just took.
+            self.position.own_castle.copy_from_str(castle_id);
+        } else {
+            let castle = &mut self.castles[index];
+            castle.garrison = [Unit::default(); GAME_ARMY_SLOTS];
+            if let Some(villain) = captured {
+                for slot in 0..GAME_ARMY_SLOTS.min(VILLAIN_ARMY_SLOTS) {
+                    if villain.army_troops[slot].is_empty() || villain.army_counts[slot] <= 0 {
+                        continue;
+                    }
+                    castle.garrison[slot]
+                        .id
+                        .copy_from_str(villain.army_troops[slot].as_str());
+                    castle.garrison[slot].count = villain.army_counts[slot];
+                }
+                // C guards this with a hardcoded 17, NOT the length of
+                // villains_prefought (CAT_VILLAINS_MAX, 32), so a pack with
+                // more than 17 villains records nothing for the later ones.
+                if villain.index >= 0 && villain.index < VILLAINS_PREFOUGHT_CAP {
+                    self.contract.villains_prefought[villain.index as usize] = true;
+                }
+            }
+        }
+
+        if contract_match {
+            self.fulfill_contract(resources, caught_vid.as_str());
+            // Real play promotes only at an audience with the King; the
+            // oracle session keeps the legacy on-capture promotion so its
+            // search stays byte-identical to the baseline.
+            if self.oracle_mode {
+                self.maybe_rank_up(resources);
+            }
+            VillainSiegeOutcome::Captured
+        } else {
+            VillainSiegeOutcome::SetFree
+        }
     }
 
     /// Apply a completed monster-siege battle. Mirrors
@@ -2948,7 +3066,7 @@ mod tests {
     use super::{
         ArmyStack, AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome,
         FoeState, Game, GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
-        TravelMode, Unit, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
+        TravelMode, Unit, VillainSiegeOutcome, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
     };
     use crate::combat::{combat_seed_rng, Combat, CombatMode, CombatResult, CombatTarget};
     use crate::map::{Map, Tile};
@@ -3877,6 +3995,202 @@ mod tests {
             results.windows(2).all(|pair| pair[0] == pair[1]),
             "a siege must be a pure function of seed, identity and mode: {results:?}"
         );
+    }
+
+    /// Troops plus two lords with starting rosters, for villain sieges.
+    fn villain_siege_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+                {"index":1,"id":"ogres","skill_level":4,"hit_points":5,"move_rate":2,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":40,"spoils_factor":4,"abilities":"","morale_group":"A"}
+              ],
+              "villains": [
+                {"index":0,"id":"lord0","name":"Lord Zero","zone":"home","reward":1000,
+                 "army":[{"troop":"peasants","count":7},{"troop":"ogres","count":3}]},
+                {"index":1,"id":"lord1","name":"Lord One","zone":"home","reward":2000,
+                 "army":[{"troop":"ogres","count":9}]}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// Hero at villain-held castle "keep", with a beatable garrison.
+    fn villain_siege_game(villain_id: &str, active_contract: &str) -> Game {
+        let mut game = Game::default();
+        game.seed = 31;
+        game.position.zone.copy_from_str("home");
+        game.stats.leadership_current = 10_000;
+        game.army[0].id.copy_from_str("ogres");
+        game.army[0].count = 60;
+        game.castles[0].id.copy_from_str("keep");
+        game.castles[0].owner_kind = CastleOwnerKind::Villain;
+        game.castles[0].villain_id.copy_from_str(villain_id);
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 1;
+        game.contract.active_id.copy_from_str(active_contract);
+        game
+    }
+
+    #[test]
+    fn capturing_a_lord_under_contract_takes_the_castle_and_fulfills_it() {
+        let resources = villain_siege_fixture();
+        let mut game = villain_siege_game("lord0", "lord0");
+        let gold_before = game.stats.gold;
+
+        let (result, outcome) = game.siege_villain_castle(&resources, "keep");
+
+        assert_eq!(result, CombatResult::Win);
+        assert_eq!(outcome, VillainSiegeOutcome::Captured);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Player);
+        assert!(game.castles[0].visited);
+        assert!(game.castles[0].villain_id.is_empty());
+        assert!(game.castles[0].garrison.iter().all(|u| u.count == 0));
+        assert_eq!(game.position.own_castle.as_str(), "keep");
+        // The contract pays its bounty on top of the battle's spoils.
+        assert!(game.contract.villains_caught[0]);
+        assert!(game.contract.active_id.is_empty());
+        assert!(game.stats.gold > gold_before + 1_000);
+    }
+
+    #[test]
+    fn beating_a_lord_without_the_contract_sets_him_free_to_rebuild() {
+        let resources = villain_siege_fixture();
+        // Holding lord1's contract while attacking lord0.
+        let mut game = villain_siege_game("lord0", "lord1");
+
+        let (result, outcome) = game.siege_villain_castle(&resources, "keep");
+
+        assert_eq!(result, CombatResult::Win);
+        assert_eq!(outcome, VillainSiegeOutcome::SetFree);
+        // He keeps the castle and his identity.
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+        assert_eq!(game.castles[0].villain_id.as_str(), "lord0");
+        assert!(game.position.own_castle.is_empty());
+        // And rebuilds from his starting roster, not the army just beaten.
+        assert_eq!(game.castles[0].garrison[0].id.as_str(), "peasants");
+        assert_eq!(game.castles[0].garrison[0].count, 7);
+        assert_eq!(game.castles[0].garrison[1].id.as_str(), "ogres");
+        assert_eq!(game.castles[0].garrison[1].count, 3);
+        // The defeat is remembered; the contract is untouched.
+        assert!(game.contract.villains_prefought[0]);
+        assert!(!game.contract.villains_caught[0]);
+        assert_eq!(game.contract.active_id.as_str(), "lord1");
+    }
+
+    #[test]
+    fn a_lord_with_no_contract_at_all_is_still_only_set_free() {
+        let resources = villain_siege_fixture();
+        let mut game = villain_siege_game("lord0", "");
+
+        let (_, outcome) = game.siege_villain_castle(&resources, "keep");
+
+        // An empty active contract can never match, even against an empty
+        // villain id -- C requires both to be non-empty.
+        assert_eq!(outcome, VillainSiegeOutcome::SetFree);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+        assert!(game.contract.villains_prefought[0]);
+    }
+
+    #[test]
+    fn an_unheld_castle_with_no_lord_never_matches_an_empty_contract() {
+        let resources = villain_siege_fixture();
+        let mut game = villain_siege_game("", "");
+
+        let (_, outcome) = game.siege_villain_castle(&resources, "keep");
+
+        assert_eq!(outcome, VillainSiegeOutcome::SetFree);
+        assert!(game.position.own_castle.is_empty());
+        // No villain to rebuild from, so the castle is simply emptied.
+        assert!(game.castles[0].garrison.iter().all(|u| u.count == 0));
+    }
+
+    #[test]
+    fn losing_a_villain_siege_changes_nothing_and_asks_for_temporary_death() {
+        let resources = villain_siege_fixture();
+        let mut game = villain_siege_game("lord0", "lord0");
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 1;
+        game.castles[0].garrison[0].id.copy_from_str("ogres");
+        game.castles[0].garrison[0].count = 40;
+        game.castles[0].garrison[1].id.copy_from_str("ogres");
+        game.castles[0].garrison[1].count = 40;
+
+        let (result, outcome) = game.siege_villain_castle(&resources, "keep");
+
+        assert_eq!(result, CombatResult::Loss);
+        assert_eq!(outcome, VillainSiegeOutcome::Repelled);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+        assert_eq!(game.castles[0].villain_id.as_str(), "lord0");
+        assert!(!game.contract.villains_prefought[0]);
+        assert!(!game.contract.villains_caught[0]);
+    }
+
+    #[test]
+    fn rank_promotion_on_capture_is_an_oracle_only_behavior() {
+        let resources = villain_siege_fixture();
+        let mut game = villain_siege_game("lord0", "lord0");
+        let rank_before = game.character.cls.rank_index;
+
+        game.siege_villain_castle(&resources, "keep");
+
+        // Real play promotes only at an audience with the King.
+        assert_eq!(game.character.cls.rank_index, rank_before);
+        assert!(!game.oracle_mode, "a real session never sets this");
+    }
+
+    #[test]
+    fn an_oracle_session_still_promotes_on_capture() {
+        // Same shape as villain_siege_fixture, plus a class whose second rank
+        // needs two villains, so the promotion is observable.
+        let resources = Resources::from_json_str(
+            r#"{
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":2,"melee":[1,2],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A"},
+                {"index":1,"id":"ogres","skill_level":4,"hit_points":5,"move_rate":2,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":40,"spoils_factor":4,"abilities":"","morale_group":"A"}
+              ],
+              "villains": [
+                {"index":0,"id":"lord0","name":"Lord Zero","zone":"home","reward":1000,
+                 "army":[{"troop":"peasants","count":7}]}
+              ],
+              "classes": [
+                {
+                  "index": 0,
+                  "id": "knight",
+                  "starting_gold": 1000,
+                  "ranks": [
+                    {"id":"general","name":"General","villains_needed":0,"leadership":100,"max_spells":1,"spell_power":1,"commission":10,"knows_magic":false},
+                    {"id":"captain","name":"Captain","villains_needed":1,"leadership":50,"max_spells":2,"spell_power":3,"commission":20,"knows_magic":false}
+                  ]
+                }
+              ]
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = villain_siege_game("lord0", "lord0");
+        game.character.cls.id.copy_from_str("knight");
+        game.character.cls.rank_index = 0;
+        game.oracle_mode = true;
+
+        let (_, outcome) = game.siege_villain_castle(&resources, "keep");
+
+        assert_eq!(outcome, VillainSiegeOutcome::Captured);
+        // The oracle branch is live: capturing the lord promoted the hero,
+        // which real play would defer to an audience with the King.
+        assert_eq!(game.character.cls.rank_index, 1);
+    }
+
+    #[test]
+    fn a_missing_castle_reports_nothing_to_apply() {
+        let resources = villain_siege_fixture();
+        let mut game = villain_siege_game("lord0", "lord0");
+
+        let (result, outcome) = game.siege_villain_castle(&resources, "no_such_castle");
+
+        assert_eq!(result, CombatResult::Win, "an empty AI side loses at once");
+        assert_eq!(outcome, VillainSiegeOutcome::NoCastle);
+        assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
     }
 
     #[test]

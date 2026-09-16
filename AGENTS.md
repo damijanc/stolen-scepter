@@ -58,14 +58,18 @@ Implemented and tested:
 - Hostile foe encounters wired to that resolver: `Game::attack_hostile_foe`
   builds the target from the foe's garrison, keyed by its placement id, and
   routes the outcome through `resolve_hostile_foe`.
-- Monster-castle sieges: `Game::siege_monster_castle` fights the garrison on
-  the castle layout and flips ownership, empties the garrison, and sets
-  `own_castle` on a win. Villain castles are NOT handled there.
+- Castle sieges, both kinds. `Game::siege_monster_castle` flips ownership,
+  empties the garrison, and sets `own_castle` on a win.
+  `Game::siege_villain_castle` gates capture on the active contract: without
+  it the Lord is set free, keeps his castle, rebuilds from the pack roster,
+  and is recorded in `villains_prefought`.
+- `Game.oracle_mode`, the transient autoplay flag that keeps the legacy
+  promote-on-capture behavior. Real play promotes only at an audience.
 
-Test coverage is 159 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 167 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is monster-castle sieges. Run `git log --oneline -5`
+The most recent slice is villain-castle sieges. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -118,16 +122,20 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-Foe fights and monster sieges both run end to end. The next slice is villain
-sieges (`flow_apply_siege_villain`), which is much more than the monster path:
-capture is gated on the lord matching `contract.active_id`; a no-contract win
-rebuilds his army from the pack's `VillainDef` roster and records
-`villains_prefought`; a contract win also fulfills the contract, pays the
-bounty, and awards a scepter-map piece. After that, foe following
-(`GameFoesFollow`) is the other open half of the foe system.
+Every combat entry point now resolves: foes, monster castles, villain
+castles. The next slice is foe following (`GameFoesFollow`), the remaining
+open half of the foe system -- foes chase the hero between steps, and the
+attack flow already depends on that having happened (a foe can relocate
+between a flow being queued and resolved, which is why `resolve_hostile_foe`
+clears the stamp at BOTH the stale and current tiles).
 
-One standing omission:
+After that the state model should be stable enough for JSON v8 save/load.
 
+Two standing omissions:
+
+- A villain siege's "Capture" dialog is built inline in C and pushed through
+  `player_io_message`. The engine returns `VillainSiegeOutcome` instead so a
+  shell can write the text; the message queue itself is unported.
 - `combat.rs` deliberately omits what only a rendered fight needs: combat
   spells (`combat_cast_spell` and the `spell_*` helpers, reachable only
   through a player policy -- the headless default policy never casts) and
