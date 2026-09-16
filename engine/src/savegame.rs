@@ -7,6 +7,7 @@ use crate::map::Map;
 use crate::resources::Resources;
 use crate::rng::seed_from_index;
 use crate::state_serialize::{build_snapshot_full, SAVE_VERSION};
+use crate::tables::FixedStr;
 
 /// Why a save could not be written or read. Mirrors OpenBounty's
 /// `SaveResult` minus its OK case, which Rust expresses as `Ok(())`.
@@ -546,10 +547,66 @@ fn read_map_state(
     Ok(())
 }
 
+/// Lightweight summary for the save-slot picker, with no map or fog load.
+/// Ports OpenBounty's `SaveHeader`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SaveHeader {
+    pub exists: bool,
+    pub name: FixedStr<32>,
+    pub class_id: FixedStr<24>,
+    /// Denormalized for display, so the picker needs no class catalog.
+    pub rank_title: FixedStr<32>,
+    pub zone: FixedStr<24>,
+    pub days_left: i32,
+    pub gold: i32,
+    pub pack_id: FixedStr<64>,
+    /// Whole-pack zip hash. Advisory only; the Rust engine never writes it,
+    /// but a save written by the C engine carries one.
+    pub pack_hash: FixedStr<17>,
+}
+
+/// Read just enough of a save to list it in a slot picker. Ports
+/// `SaveGameReadHeader`, which applies the version guard but NOT the
+/// cross-pack guard: the picker shows a save from another pack, and the
+/// refusal comes later when it is actually loaded.
+pub fn save_read_header(path: &std::path::Path) -> Result<SaveHeader, SaveError> {
+    let text = std::fs::read_to_string(path).map_err(|_| SaveError::Io)?;
+    let root: serde_json::Value = serde_json::from_str(&text).map_err(|_| SaveError::Parse)?;
+
+    if root.get("version").and_then(|v| v.as_u64()) != Some(SAVE_VERSION as u64) {
+        return Err(SaveError::Version);
+    }
+
+    let mut header = SaveHeader {
+        exists: true,
+        ..SaveHeader::default()
+    };
+    if let Some(character) = root.get("character") {
+        header.name.copy_from_str(as_str(character.get("name")));
+        header
+            .class_id
+            .copy_from_str(as_str(character.get("class")));
+        header
+            .rank_title
+            .copy_from_str(as_str(character.get("rank_title")));
+    }
+    if let Some(stats) = root.get("stats") {
+        header.days_left = as_i32(stats.get("days_left")).unwrap_or(0);
+        header.gold = as_i32(stats.get("gold")).unwrap_or(0);
+    }
+    if let Some(position) = root.get("position") {
+        header.zone.copy_from_str(as_str(position.get("zone")));
+    }
+    header.pack_id.copy_from_str(as_str(root.get("pack_id")));
+    header
+        .pack_hash
+        .copy_from_str(as_str(root.get("pack_hash")));
+    Ok(header)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tables::FixedStr;
     use crate::tile::Interact;
 
     fn save_resources() -> Resources {
@@ -896,5 +953,72 @@ mod tests {
         assert_eq!(loaded.foe_count, 0);
         assert!(loaded.army[0].id.is_empty());
         assert!(loaded.character.name.is_empty());
+    }
+
+    #[test]
+    fn a_header_summarises_a_save_without_loading_the_world() {
+        let resources = save_resources();
+        let game = populated_game();
+        let map = Map::new(8, 4);
+        let fog = Fog::new();
+        let path = temp_path("header");
+        save_write(&path, &game, &resources, &map, &fog).expect("write succeeds");
+
+        let header = save_read_header(&path).expect("header reads");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(header.exists);
+        assert_eq!(header.name.as_str(), "Arthur");
+        assert_eq!(header.class_id.as_str(), "knight");
+        assert_eq!(header.rank_title.as_str(), "Captain");
+        assert_eq!(header.zone.as_str(), "home");
+        assert_eq!(header.days_left, 300);
+        assert_eq!(header.gold, 4_321);
+        assert_eq!(header.pack_id.as_str(), "openbounty");
+        // The Rust engine never writes pack_hash.
+        assert!(header.pack_hash.is_empty());
+    }
+
+    #[test]
+    fn a_header_still_enforces_the_version_guard() {
+        let path = temp_path("header-version");
+        std::fs::write(&path, r#"{"version": 8}"#).expect("write");
+        let result = save_read_header(&path);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(result, Err(SaveError::Version));
+    }
+
+    #[test]
+    fn a_header_reads_a_save_from_another_pack_rather_than_refusing_it() {
+        let path = temp_path("header-pack");
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version": {SAVE_VERSION}, "pack_id": "someone_elses_pack",
+                     "character": {{"name": "Stranger"}}}}"#
+            ),
+        )
+        .expect("write");
+
+        // The picker lists it; the refusal comes later, at load time.
+        let header = save_read_header(&path).expect("header reads");
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(header.pack_id.as_str(), "someone_elses_pack");
+        assert_eq!(header.name.as_str(), "Stranger");
+    }
+
+    #[test]
+    fn a_missing_or_malformed_save_has_no_header() {
+        assert_eq!(
+            save_read_header(&temp_path("header-missing")),
+            Err(SaveError::Io)
+        );
+
+        let path = temp_path("header-garbage");
+        std::fs::write(&path, "not json at all").expect("write");
+        let result = save_read_header(&path);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(result, Err(SaveError::Parse));
     }
 }

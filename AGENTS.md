@@ -69,6 +69,10 @@ Implemented and tested:
 - v11 save read/write (`engine/src/savegame.rs`), guarded on an exact
   `version` match and on `pack_id`. A whole-struct round-trip test is the
   acceptance check -- keep it, it has already caught two real bugs.
+- `save_read_header`, the slot-picker summary. It applies the version guard
+  but deliberately NOT the `pack_id` guard: C lists a foreign-pack save and
+  refuses it later, at load. `SaveHeader.pack_hash` exists because a C-written
+  save carries one; the Rust engine never writes it.
 - The save-shaped snapshot: `build_snapshot_full` emits `pack_id`, `boat`
   and `map_state` (hex fog rows per discovered continent, the ACTIVE zone's
   live fog winning over its stale per-continent snapshot). `pack_hash` is
@@ -84,10 +88,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 204 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 208 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is v11 save read/write. Run `git log --oneline -5`
+The most recent slice is the save-slot header reader. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -140,19 +144,15 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-The foe and combat systems are closed: foes wander, collide, and every
-encounter resolves. The state model has been stable for several slices, so
-JSON v8 save/load is the next target -- note it must cover the fields added
-recently (`home_castle`, `own_castle`, castle `flow`, `economy.siege_cost`)
-and must NOT serialize `oracle_mode`, which C keeps transient.
+The foe, combat, and save/load systems are all closed. Everything ported so
+far is reachable from `game_step_basic`; there are no dangling engine cores
+left to wire up, and no headless gap left that the C engine fills.
 
-Everything ported so far is reachable from `game_step_basic`; there are no
-dangling engine cores left to wire up.
-
-Save/load is done, so the remaining gaps are the shell-facing ones: the
-`player_io` message/prompt queue (the engine currently returns outcome enums
-where C queues a dialog), the combat spells and `CombatTurnRecord` noted
-below, and `SaveGameReadHeader`, the save-summary reader the load menu uses.
+What remains is shell-facing, which makes the next decision a scoping one
+rather than a porting one: the `player_io` message/prompt queue (the engine
+returns outcome enums where C queues a dialog), and the two combat omissions
+noted below. All three only pay off once a shell exists to consume them, so
+consider selecting the shell before porting more of its scaffolding.
 
 Traps the save slice turned up, worth knowing before touching that format:
 
@@ -198,10 +198,6 @@ Note that the town-flow callers live in `reference/src/views.c` (for example
 `town_do_boat`), not in `flow_resolve.c` or `player_io.c`. Those callers hold
 only dialogs; the state mutation belongs in the engine.
 
-Other major gaps, in rough dependency order:
-
-- Town/castle action flows, including home-castle recruitment.
-- Full headless combat: setup, turn loop, AI, player-army writeback, and spoils.
-- Foe following and collision-triggered flows.
-- Fog and zone navigation flows.
-- JSON v8 save/load compatibility and OpenBounty snapshot differentials.
+The gap list that used to close this file -- town/castle flows, headless
+combat, foe following, fog, and save/load -- is now entirely ported. Do not
+re-add items here without checking `Current Engine State` first.
