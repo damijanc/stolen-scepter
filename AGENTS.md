@@ -78,6 +78,12 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- The weekly economy queries. `Game::weekly_net_gold` judges the boat fare
+  on the POST-CREDIT wallet, mirroring `apply_week_end`, which banks the
+  commission and pays upkeep before it looks at the fare; a poor hero whose
+  commission covers the fare IS charged. `Game::weekly_outgoings` bills the
+  fare unconditionally -- that is the pair's whole difference.
+  `step::spend_week` runs the calendar to the next boundary.
 - Defeat and dismissal. `Game::temp_death` ports `GameTempDeath`: army,
   siege weapons and boat are all forfeit (the boat explicitly, or the zone
   switch would materialise a rental on dry land at the King's castle), and
@@ -128,10 +134,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 272 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 278 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is defeat and dismissal. Run `git log --oneline -5`
+The most recent slice is the weekly economy queries. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -197,10 +203,12 @@ declared functions from `reference/engine/include/*.h` and grep each against
 `prompt_*`, `screen_*`, `views_*`, `pack_*`, `SavePath*`) and correctly out
 of scope, but that sweep is what surfaced the endgame.
 
-Known-unported engine cores that sweep still reports, none yet judged worth
-a slice: `GameSpendWeek`, `GameWeeklyNetGold`/`GameWeeklyOutgoings`, and
-`puzzle_grid_entity`. Confirm against the C before assuming any of these is
-really missing.
+One known-unported engine core the sweep still reports: `puzzle_grid_entity`,
+the fixed 5x5 table naming which villain or artifact gates each puzzle cell
+(non-negative = villain index, negative = artifact encoded as -(index)-1).
+The rule around it is that a revealed cell (i,j) shows the scepter zone's map
+tile at `(scepter.x - 2 + i, scepter.y - 2 + j)`, clamped to the map -- so it
+is engine data, not presentation, and is the obvious next slice.
 
 Three slices running, the gap had the same tell, which is worth looking for
 directly: state the engine STORES and SAVES but never reads or writes.
@@ -259,6 +267,9 @@ Three habits these cores rewarded:
   fixed point and `calc_distance` pre-shifts on top of it. `try_build_bridge`
   says it builds "max 2 tiles (or up to 5 water tiles)", but its `built >= 2`
   break makes the loop's bound of 5 unreachable; the cap is always 2.
+  `GameSpendWeek`'s `to_spend <= 0` clamp is likewise unreachable: `%`
+  truncates toward zero, so the subtraction lands at 1 or more either way.
+  Port such a guard, but do not claim a test covers it.
 - Check what a resource default already computed before asserting a fallback.
   `GameGateDestinations` reads `gate_x >= 0 ? gate_x : x`, which looks like a
   live fallback, but a castle's `gate_y` already defaults to `y + 1` (its

@@ -460,6 +460,34 @@ pub fn spend_days(game: &mut Game, resources: &Resources, days: i32) -> (i32, i3
     (weeks, total_commission)
 }
 
+/// Run the calendar to the end of the current week. Ports `GameSpendWeek`.
+///
+/// C derives the days already passed inline here rather than calling
+/// `GameWeekId`, which needs the same figure but divides where this one takes
+/// a remainder. Both derivations are ported as written.
+pub fn spend_week(game: &mut Game, resources: &Resources) -> (i32, i32) {
+    let mut week_days = resources.time.week_days;
+    if week_days < 1 {
+        week_days = 5;
+    }
+    let difficulty = usize::try_from(game.character.difficulty)
+        .ok()
+        .filter(|difficulty| *difficulty < resources.time.days_per_difficulty.len())
+        .unwrap_or(0);
+    let start_days = resources.time.days_per_difficulty[difficulty];
+    let passed = start_days.wrapping_sub(game.stats.days_left);
+    let into_week = passed % week_days;
+    let mut to_spend = week_days.wrapping_sub(into_week);
+    // C's guard, ported although it is unreachable: `%` truncates toward
+    // zero, so `into_week` lands in 0..week_days for a non-negative `passed`
+    // and is non-positive otherwise, leaving `to_spend` at 1 or more either
+    // way. Landing exactly on a boundary already yields a whole week.
+    if to_spend <= 0 {
+        to_spend = week_days;
+    }
+    spend_days(game, resources, to_spend)
+}
+
 /// Dig where the hero stands. Ports `flow_apply_search`, minus the yes/no
 /// prompt: C bails unless the answer was yes, so the engine core takes the
 /// yes as given and the shell asks the question.
@@ -492,8 +520,8 @@ pub fn search_here(game: &mut Game, resources: &Resources) -> SearchOutcome {
 #[cfg(test)]
 mod tests {
     use super::{
-        game_step_basic, search_here, spend_days, FoeCollision, SearchOutcome, StepInteraction,
-        StepResult,
+        game_step_basic, search_here, spend_days, spend_week, FoeCollision, SearchOutcome,
+        StepInteraction, StepResult,
     };
     use crate::fog::Fog;
     use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
@@ -1287,6 +1315,33 @@ mod tests {
         tile.sign_title.copy_from_str(title);
         tile.sign_body.copy_from_str(body);
         tile
+    }
+
+    #[test]
+    fn spending_a_week_stops_on_the_next_boundary() {
+        let resources = search_fixture();
+        let mut game = digger();
+        // days_per_difficulty[0] is 900, so 897 left means 3 days passed and
+        // 2 remain in this 5-day week.
+        game.stats.days_left = 897;
+
+        let (weeks, _) = spend_week(&mut game, &resources);
+        assert_eq!(weeks, 1);
+        assert_eq!(game.stats.days_left, 895);
+    }
+
+    #[test]
+    fn spending_a_week_from_a_boundary_spends_a_whole_one() {
+        let resources = search_fixture();
+        let mut game = digger();
+        // 895 of 900 left puts the hero exactly on a boundary, where
+        // `to_spend` is a full week rather than zero. C's `to_spend <= 0`
+        // clamp is NOT what produces that and cannot be reached at all.
+        game.stats.days_left = 895;
+
+        let (weeks, _) = spend_week(&mut game, &resources);
+        assert_eq!(weeks, 1);
+        assert_eq!(game.stats.days_left, 890);
     }
 
     fn search_fixture() -> Resources {

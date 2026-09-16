@@ -1409,6 +1409,42 @@ impl Game {
         true
     }
 
+    /// What the coming week will actually leave in the purse. Ports
+    /// `GameWeeklyNetGold`.
+    ///
+    /// The boat fare is judged on the POST-CREDIT wallet, mirroring
+    /// `apply_week_end`, which banks the commission and pays the upkeep
+    /// before it looks at the fare. Judging on the pre-credit wallet would
+    /// predict "repossessed, not charged" for a poor hero whose commission
+    /// covers the fare, overstating weekly income by the whole fare.
+    pub fn weekly_net_gold(&self, resources: &Resources) -> i32 {
+        let mut net = self
+            .stats
+            .commission_weekly
+            .wrapping_sub(self.army_weekly_upkeep(resources));
+        if self.boat.has_boat {
+            let boat_cost = self.boat_cost(resources);
+            if self.stats.gold.wrapping_add(net) >= boat_cost {
+                net = net.wrapping_sub(boat_cost);
+            }
+            // Otherwise the boat is repossessed rather than charged for.
+        }
+        net
+    }
+
+    /// What the coming week CHARGES, gross. Ports `GameWeeklyOutgoings`.
+    ///
+    /// Unlike [`Game::weekly_net_gold`], the fare counts unconditionally --
+    /// this is the bill, not what the wallet can meet.
+    pub fn weekly_outgoings(&self, resources: &Resources) -> i32 {
+        let boat = if self.boat.has_boat {
+            self.boat_cost(resources)
+        } else {
+            0
+        };
+        self.army_weekly_upkeep(resources).wrapping_add(boat)
+    }
+
     /// Send a defeated hero home with nothing. Ports `GameTempDeath`.
     ///
     /// Everything is forfeit: the army, the siege weapons, and the boat --
@@ -6439,9 +6475,73 @@ mod tests {
         game
     }
 
-    /// Two zones, each 6x2. `home` spawns on grass, `isle` spawns on water.
-    /// `gryphons` fly and are skill 3. `sprites` carry the FLY bit but are
-    /// only skill 1. `peasants` do not fly at all.
+    fn economy_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "economy": {"boat_cost_normal": 500, "boat_cost_cheap": 100},
+              "troops": [
+                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}
+              ]
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn weekly_net_gold_judges_the_boat_fare_on_the_post_credit_wallet() {
+        let resources = economy_fixture();
+        let mut game = Game::default();
+        game.stats.commission_weekly = 600;
+        game.boat.has_boat = true;
+        game.stats.gold = 0;
+
+        // Broke right now, but the 600 commission lands before the 500 fare
+        // is judged, so the fare IS charged: 600 - 500 = 100.
+        assert_eq!(game.weekly_net_gold(&resources), 100);
+    }
+
+    #[test]
+    fn a_fare_the_post_credit_wallet_cannot_meet_is_not_charged() {
+        let resources = economy_fixture();
+        let mut game = Game::default();
+        game.stats.commission_weekly = 400;
+        game.boat.has_boat = true;
+        game.stats.gold = 0;
+
+        // 0 + 400 < 500, so the boat is repossessed rather than charged for
+        // and the week nets the full commission.
+        assert_eq!(game.weekly_net_gold(&resources), 400);
+    }
+
+    #[test]
+    fn weekly_outgoings_bills_the_fare_whatever_the_wallet_holds() {
+        let resources = economy_fixture();
+        let mut game = Game::default();
+        game.stats.commission_weekly = 400;
+        game.boat.has_boat = true;
+        game.stats.gold = 0;
+
+        // The gross bill counts the fare unconditionally, which is exactly
+        // where it parts company with weekly_net_gold above.
+        assert_eq!(game.weekly_outgoings(&resources), 500);
+        game.boat.has_boat = false;
+        assert_eq!(game.weekly_outgoings(&resources), 0);
+    }
+
+    #[test]
+    fn the_weekly_figures_both_count_army_upkeep() {
+        let resources = economy_fixture();
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 20;
+        game.stats.commission_weekly = 1_000;
+        let upkeep = game.army_weekly_upkeep(&resources);
+        assert!(upkeep > 0, "the fixture troop must cost something to keep");
+
+        assert_eq!(game.weekly_net_gold(&resources), 1_000 - upkeep);
+        assert_eq!(game.weekly_outgoings(&resources), upkeep);
+    }
+
     /// A home zone whose `home_spawn` differs from its `hero_spawn`, so a
     /// temp death can be told apart from a plain zone switch.
     fn temp_death_fixture(tag: &str, temp_death: &str) -> Resources {
@@ -6609,6 +6709,8 @@ mod tests {
         assert_eq!(game.army[0].id.as_str(), "peasants");
     }
 
+    /// `gryphons` fly and are skill 3. `sprites` carry the FLY bit but are
+    /// only skill 1. `peasants` do not fly at all.
     fn flying_fixture() -> Resources {
         Resources::from_json_str(
             r#"{
@@ -6871,6 +6973,7 @@ mod tests {
         assert_eq!(game.compute_score(&resources), 50);
     }
 
+    /// Two zones, each 6x2. `home` spawns on grass, `isle` spawns on water.
     fn zone_fixture() -> Resources {
         Resources::from_json_str(
             r##"{
