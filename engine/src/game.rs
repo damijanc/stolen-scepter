@@ -8,7 +8,7 @@ use crate::tables::{
     class_stats_at_rank, ArtifactPower, FixedStr, CAT_ARTIFACTS_MAX, CAT_ID_LEN, CAT_SPELLS_MAX,
     CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB,
 };
-use crate::tile::Interact;
+use crate::tile::{Interact, Terrain};
 
 pub const GAME_NAME_LEN: usize = 16;
 pub const GAME_ID_LEN: usize = 24;
@@ -22,6 +22,9 @@ pub const GAME_MAX_PLACEMENTS: usize = 128;
 pub const GAME_MAX_HOSTILE_PER_ZONE: usize = 35;
 pub const GAME_MAX_FOES: usize = 160;
 pub const CONTRACT_CYCLE_MAX: usize = 8;
+/// How far, on each axis, a foe may be from the hero's previous tile and
+/// still give chase.
+pub const GAME_FOE_FOLLOW_RANGE: i32 = 2;
 /// Villain roster slots a `VillainDef` can declare.
 pub const VILLAIN_ARMY_SLOTS: usize = 5;
 /// Highest villain index a set-free siege records in `villains_prefought`.
@@ -2165,6 +2168,129 @@ impl Game {
         (outcome, temp_death)
     }
 
+    /// True when any OTHER live foe in `zone` already holds (x, y).
+    fn foe_occupies(&self, zone: &str, x: i32, y: i32, except: usize) -> bool {
+        self.foes[..self.foe_count]
+            .iter()
+            .enumerate()
+            .any(|(index, foe)| {
+                index != except
+                    && foe.alive
+                    && foe.x == x
+                    && foe.y == y
+                    && foe.zone.as_str() == zone
+            })
+    }
+
+    /// Advance every live in-zone foe one step toward the hero's PREVIOUS
+    /// tile. Ports `GameFoesFollow`.
+    ///
+    /// Returns the index of the foe that stepped onto the hero, which is the
+    /// collision that triggers the attack flow.
+    pub fn foes_follow(&mut self, map: &mut Map) -> Option<usize> {
+        let (tx, ty) = (self.position.last_x, self.position.last_y);
+        let (hero_x, hero_y) = (self.position.x, self.position.y);
+        let zone = self.position.zone;
+        let mut collided = None;
+
+        // Stamp re-sync: a foe that stepped onto the hero is left unstamped
+        // while they share a tile, and nothing else re-stamps it once the
+        // hero moves away. Restore the invariant before reading the map for
+        // standability below, skipping the hero's tile so a foe standing
+        // there stays unstamped and the collision contract holds.
+        for index in 0..self.foe_count {
+            let foe = self.foes[index];
+            if !foe.alive || foe.zone != zone {
+                continue;
+            }
+            if foe.x == hero_x && foe.y == hero_y {
+                continue;
+            }
+            map.stamp_foe(foe.x, foe.y, foe.placement_id.as_str());
+        }
+
+        // Friendly and hostile foes both follow; the distinction only matters
+        // at attack time.
+        for index in 0..self.foe_count {
+            let foe = self.foes[index];
+            if !foe.alive || foe.zone != zone {
+                continue;
+            }
+            if (foe.x - tx).abs() > GAME_FOE_FOLLOW_RANGE
+                || (foe.y - ty).abs() > GAME_FOE_FOLLOW_RANGE
+            {
+                continue;
+            }
+
+            // Evaluate all nine neighbourhood cells. The center is always
+            // eligible, so a foe may stand still; non-center cells must be
+            // real, foe-standable ground.
+            let mut best_dist = u32::MAX;
+            let (mut best_x, mut best_y) = (foe.x, foe.y);
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    let (nx, ny) = (foe.x + dx, foe.y + dy);
+                    if map.tile_i32(nx, ny).is_none() {
+                        continue;
+                    }
+                    let is_center = dx == 0 && dy == 0;
+                    let is_hero_tile = nx == hero_x && ny == hero_y;
+                    // A flying hero is untouchable: the foe may neither step
+                    // onto them nor chase across the water and trees they are
+                    // flying over. The oracle session keeps the legacy
+                    // behavior its search is tuned against.
+                    if is_hero_tile && self.character.mount == Mount::Fly && !self.oracle_mode {
+                        continue;
+                    }
+                    // Only for the anti-stacking exemption, never for
+                    // walkability: a foe standing on the hero is the combat
+                    // trigger, not a stack, so a second foe may still target
+                    // that tile. Drops away in the boat, where the hero sits
+                    // on water no land foe can occupy anyway.
+                    let hero_reachable = is_hero_tile && self.travel_mode != TravelMode::Boat;
+                    // The hero's tile gets NO standability exemption: the
+                    // original tests the map byte of all eight non-center
+                    // cells without caring where the player is, so a hero
+                    // standing on desert, a bridge, a town or any other
+                    // interactive tile simply cannot be reached.
+                    if !is_center && !foe_can_stand(map, nx, ny) {
+                        continue;
+                    }
+                    if !is_center
+                        && !hero_reachable
+                        && self.foe_occupies(zone.as_str(), nx, ny, index)
+                    {
+                        continue;
+                    }
+                    let dist = foe_dist_sq(nx, ny, tx, ty);
+                    if dist < best_dist {
+                        best_dist = dist;
+                        best_x = nx;
+                        best_y = ny;
+                    }
+                }
+            }
+            if best_x == foe.x && best_y == foe.y {
+                continue;
+            }
+
+            // Foe stamp only: never clear a pickup the hero-tile exception
+            // let the foe stand on.
+            map.clear_foe_stamp(foe.x, foe.y);
+            self.foes[index].x = best_x;
+            self.foes[index].y = best_y;
+
+            if best_x == hero_x && best_y == hero_y {
+                // Stepped onto the hero: surface it and leave the tile
+                // unstamped, since the hero is standing on it.
+                collided = Some(index);
+                continue;
+            }
+            map.stamp_foe(best_x, best_y, foe.placement_id.as_str());
+        }
+        collided
+    }
+
     /// Lay siege to a monster-held castle: fight its garrison, then apply the
     /// outcome. Ports OpenBounty's castle target build plus
     /// `flow_apply_siege_monster`.
@@ -3041,6 +3167,58 @@ fn chest_rand(seed: u64, x: i32, y: i32, salt: u32) -> u32 {
     h.wrapping_mul(1_664_525).wrapping_add(1_013_904_223)
 }
 
+fn foe_dist_sq(x1: i32, y1: i32, x2: i32, y2: i32) -> u32 {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    (dx * dx + dy * dy) as u32
+}
+
+/// Keep foes off the eight tiles around a castle gate. OpenBounty flags this
+/// as a house rule rather than a restoration: the original's bare 0x00 test
+/// does not prevent it, because the approach tile below a gate is grass.
+fn adjacent_to_castle_gate(map: &Map, x: i32, y: i32) -> bool {
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            if map
+                .tile_i32(x + dx, y + dy)
+                .is_some_and(|tile| tile.interactive == Interact::CastleGate)
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Whether a foe may occupy a tile. Deliberately stricter than terrain
+/// walkability: the original accepts a candidate only when the map byte is
+/// 0x00, i.e. plain grass. Desert is a non-zero byte, which is what makes it
+/// a refuge -- foes neither cross it nor attack into it -- while the hero
+/// still crosses it at full day cost. Bridges fall through to GRASS in
+/// `TerrainFromArt`, so they need their own rejection or a foe walks over
+/// water after the hero.
+fn foe_can_stand(map: &Map, x: i32, y: i32) -> bool {
+    let Some(tile) = map.tile_i32(x, y) else {
+        return false;
+    };
+    if tile.blocks_foot {
+        return false;
+    }
+    if tile.terrain != Terrain::Grass {
+        return false;
+    }
+    if tile.is_bridge {
+        return false;
+    }
+    if tile.interactive != Interact::None {
+        return false;
+    }
+    !adjacent_to_castle_gate(map, x, y)
+}
+
 fn first_number_in_id(id: &str) -> Option<i32> {
     let start = id
         .char_indices()
@@ -3065,7 +3243,7 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 mod tests {
     use super::{
         ArmyStack, AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome,
-        FoeState, Game, GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
+        FoeState, Game, GarrisonOutcome, Mount, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
         TravelMode, Unit, VillainSiegeOutcome, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
     };
     use crate::combat::{combat_seed_rng, Combat, CombatMode, CombatResult, CombatTarget};
@@ -4191,6 +4369,195 @@ mod tests {
         assert_eq!(result, CombatResult::Win, "an empty AI side loses at once");
         assert_eq!(outcome, VillainSiegeOutcome::NoCastle);
         assert_eq!(game.castles[0].owner_kind, CastleOwnerKind::Villain);
+    }
+
+    /// An all-grass board with the hero at (hx, hy) having come from
+    /// (last_x, last_y), and one live foe at (fx, fy).
+    fn follow_game(hero: (i32, i32), last: (i32, i32), foe_at: (i32, i32)) -> (Game, Map) {
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.x = hero.0;
+        game.position.y = hero.1;
+        game.position.last_x = last.0;
+        game.position.last_y = last.1;
+        let mut foe = FoeState::default();
+        foe.zone = game.position.zone;
+        foe.x = foe_at.0;
+        foe.y = foe_at.1;
+        foe.placement_id.copy_from_str("band0");
+        foe.alive = true;
+        game.foes[0] = foe;
+        game.foe_count = 1;
+        let map = Map::new(8, 8);
+        (game, map)
+    }
+
+    #[test]
+    fn a_foe_steps_toward_the_tile_the_hero_just_left() {
+        // Hero moved from (4,4) to (5,4); the foe chases the PREVIOUS tile.
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (2, 4));
+
+        assert_eq!(game.foes_follow(&mut map), None);
+
+        assert_eq!((game.foes[0].x, game.foes[0].y), (3, 4));
+        assert_eq!(
+            map.tile_i32(3, 4).expect("tile exists").interactive,
+            Interact::Foe
+        );
+        assert_eq!(
+            map.tile_i32(3, 4).expect("tile exists").id.as_str(),
+            "band0"
+        );
+        assert_eq!(
+            map.tile_i32(2, 4).expect("tile exists").interactive,
+            Interact::None,
+            "old stamp cleared"
+        );
+    }
+
+    #[test]
+    fn a_foe_out_of_follow_range_stays_put() {
+        // Range is 2 per axis, measured from the hero's previous tile.
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (7, 4));
+        assert_eq!(game.foes_follow(&mut map), None);
+        assert_eq!((game.foes[0].x, game.foes[0].y), (7, 4));
+
+        // At exactly range 2 it gives chase. Here the closest cell to the
+        // hero's previous tile IS the hero's current tile, so the chase ends
+        // in a collision rather than a plain step.
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (6, 4));
+        assert_eq!(game.foes_follow(&mut map), Some(0));
+        assert_eq!((game.foes[0].x, game.foes[0].y), (5, 4));
+    }
+
+    #[test]
+    fn stepping_onto_the_hero_is_reported_as_a_collision_and_left_unstamped() {
+        // Foe adjacent to the hero, who has not moved.
+        let (mut game, mut map) = follow_game((4, 4), (4, 4), (5, 4));
+
+        assert_eq!(game.foes_follow(&mut map), Some(0));
+
+        assert_eq!((game.foes[0].x, game.foes[0].y), (4, 4));
+        assert_eq!(
+            map.tile_i32(4, 4).expect("tile exists").interactive,
+            Interact::None,
+            "the hero is standing there, so the foe is not stamped"
+        );
+    }
+
+    #[test]
+    fn desert_is_a_refuge_because_foes_will_not_enter_it() {
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (2, 4));
+        // Wall the approach with desert: walkable for the hero, not for foes.
+        for y in 0..8 {
+            map.tile_mut_i32(3, y).expect("tile exists").terrain = Terrain::Desert;
+        }
+
+        assert_eq!(game.foes_follow(&mut map), None);
+
+        assert_eq!(
+            (game.foes[0].x, game.foes[0].y),
+            (2, 4),
+            "no standable cell beats standing still"
+        );
+    }
+
+    #[test]
+    fn a_bridge_is_not_foe_standable_either() {
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (2, 4));
+        for y in 0..8 {
+            map.tile_mut_i32(3, y).expect("tile exists").is_bridge = true;
+        }
+
+        assert_eq!(game.foes_follow(&mut map), None);
+        assert_eq!((game.foes[0].x, game.foes[0].y), (2, 4));
+    }
+
+    #[test]
+    fn foes_keep_off_the_tiles_around_a_castle_gate() {
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (2, 4));
+        // A gate at (3,3) puts the eight tiles around it off limits -- the
+        // house rule that stops a foe parking on the doorstep of the hero's
+        // own castle. (3,4) is the closest cell to the hero's previous tile
+        // and is one of those eight, so the foe must settle for (3,5), which
+        // is two rows from the gate and therefore free.
+        map.tile_mut_i32(3, 3).expect("tile exists").interactive = Interact::CastleGate;
+
+        assert_eq!(game.foes_follow(&mut map), None);
+
+        assert_ne!((game.foes[0].x, game.foes[0].y), (3, 4), "on the doorstep");
+        assert_eq!((game.foes[0].x, game.foes[0].y), (3, 5));
+    }
+
+    #[test]
+    fn two_foes_never_stack_on_the_same_tile() {
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (2, 4));
+        let mut other = game.foes[0];
+        other.placement_id.copy_from_str("band1");
+        other.x = 2;
+        other.y = 5;
+        game.foes[1] = other;
+        game.foe_count = 2;
+
+        game.foes_follow(&mut map);
+
+        assert_ne!(
+            (game.foes[0].x, game.foes[0].y),
+            (game.foes[1].x, game.foes[1].y)
+        );
+    }
+
+    #[test]
+    fn a_flying_hero_cannot_be_reached_unless_the_oracle_is_driving() {
+        let (mut game, mut map) = follow_game((4, 4), (4, 4), (5, 4));
+        game.character.mount = Mount::Fly;
+
+        assert_eq!(
+            game.foes_follow(&mut map),
+            None,
+            "no collision while flying"
+        );
+        assert_ne!((game.foes[0].x, game.foes[0].y), (4, 4));
+
+        // The oracle session keeps the legacy reachable-hero behavior.
+        let (mut game, mut map) = follow_game((4, 4), (4, 4), (5, 4));
+        game.character.mount = Mount::Fly;
+        game.oracle_mode = true;
+        assert_eq!(game.foes_follow(&mut map), Some(0));
+    }
+
+    #[test]
+    fn only_live_foes_in_the_hero_zone_follow() {
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (3, 4));
+        game.foes[0].alive = false;
+        assert_eq!(game.foes_follow(&mut map), None);
+        assert_eq!((game.foes[0].x, game.foes[0].y), (3, 4));
+
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (3, 4));
+        game.foes[0].zone.copy_from_str("away");
+        assert_eq!(game.foes_follow(&mut map), None);
+        assert_eq!((game.foes[0].x, game.foes[0].y), (3, 4));
+    }
+
+    #[test]
+    fn the_resync_restamps_a_foe_the_hero_has_walked_away_from() {
+        // The foe is on the tile the hero just left, unstamped from the
+        // collision that put it there. Nothing else re-stamps it.
+        let (mut game, mut map) = follow_game((5, 4), (4, 4), (4, 4));
+        assert_eq!(
+            map.tile_i32(4, 4).expect("tile exists").interactive,
+            Interact::None
+        );
+
+        game.foes_follow(&mut map);
+
+        // Wherever it ended up, it carries a stamp again rather than
+        // lingering as a phantom the occupancy check cannot see.
+        let (fx, fy) = (game.foes[0].x, game.foes[0].y);
+        assert_eq!(
+            map.tile_i32(fx, fy).expect("tile exists").interactive,
+            Interact::Foe
+        );
     }
 
     #[test]

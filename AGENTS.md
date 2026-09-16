@@ -64,12 +64,18 @@ Implemented and tested:
   it the Lord is set free, keeps his castle, rebuilds from the pack roster,
   and is recorded in `villains_prefought`.
 - `Game.oracle_mode`, the transient autoplay flag that keeps the legacy
-  promote-on-capture behavior. Real play promotes only at an audience.
+  promote-on-capture behavior and the legacy reachable-flying-hero behavior.
+  Real play promotes only at an audience and cannot be caught while flying.
+- Foe following (`Game::foes_follow`): live in-zone foes chase the hero's
+  PREVIOUS tile, refuse anything but plain grass (desert and bridges are
+  barriers, which is what makes desert a refuge), keep clear of the ring
+  around a castle gate, never stack, and report the collision that triggers
+  the attack flow.
 
-Test coverage is 167 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 177 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is villain-castle sieges. Run `git log --oneline -5`
+The most recent slice is foe following. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -122,14 +128,14 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-Every combat entry point now resolves: foes, monster castles, villain
-castles. The next slice is foe following (`GameFoesFollow`), the remaining
-open half of the foe system -- foes chase the hero between steps, and the
-attack flow already depends on that having happened (a foe can relocate
-between a flow being queued and resolved, which is why `resolve_hostile_foe`
-clears the stamp at BOTH the stale and current tiles).
+The foe and combat systems are closed: foes wander, collide, and every
+encounter resolves. The state model has been stable for several slices, so
+JSON v8 save/load is the next target -- note it must cover the fields added
+recently (`home_castle`, `own_castle`, castle `flow`, `economy.siege_cost`)
+and must NOT serialize `oracle_mode`, which C keeps transient.
 
-After that the state model should be stable enough for JSON v8 save/load.
+`Game::foes_follow` has no caller yet: C drives it from the step loop, so
+wiring it into `game_step_basic` is a small follow-up worth doing first.
 
 Two standing omissions:
 
