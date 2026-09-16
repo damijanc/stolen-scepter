@@ -14,7 +14,11 @@ will be selected only after headless engine parity is solid.
 ## Layout
 
 - `engine/`: `openbounty-engine`, the only place for game rules and state.
-- `shell/`: `openbounty-shell` stub; do not add engine logic here.
+- `shell/`: `openbounty-shell`; do not add engine logic here. `layout.rs`
+  holds the screen geometry; the renderer backend is not wired up yet.
+- `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
+  decision and what was rejected, the legacy geometry, and the work order.
+  READ THIS before touching the shell.
 - `engine/tests/combat_digests.rs`: 25 OpenBounty combat digest goldens.
 - `engine/tests/render_free.rs`: rejects renderer and UI dependencies in the
   engine manifest.
@@ -78,6 +82,16 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- The pack's `render` block (`Resources::render`), and the screen geometry
+  derived from it in `shell/src/layout.rs` (`layout_init` plus the `CL_*`
+  macro family). Legacy resolves to the DOS 320x200; modern is pack-declared.
+  DIVERGENCE, deliberate: C REJECTS a pack declaring no `render.mode` at
+  resource-load time. This engine is render-free and never reads the block,
+  so refusing a pack over it would put a presentation contract in the wrong
+  crate. `Resources` records the declaration as-is and `Layout::from_resources`
+  enforces the contract, along with the odd-viewport rule. A real run refuses
+  the same packs, one layer later -- and 219 engine fixtures do not have to
+  declare a geometry they never use.
 - `Game::discard_spell`, porting `flow_apply_discard_spell` -- what answers
   a `SpellCast::OfferDiscard`. Its bound is a hard-coded 14 catalog slots
   (the stock 7 combat + 7 adventure), NOT the spell array's capacity, so a
@@ -162,10 +176,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 303 engine unit tests, 25 combat digest goldens, and one
-render-free boundary test.
+Test coverage is 307 engine unit tests, 8 shell unit tests, 25 combat digest
+goldens, and one render-free boundary test.
 
-The most recent slice is the spell discard. Run `git log --oneline -5`
+The most recent slice is the shell layout model. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 

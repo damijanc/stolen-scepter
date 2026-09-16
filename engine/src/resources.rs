@@ -129,6 +129,33 @@ impl Default for ResChest {
     }
 }
 
+/// Which geometry a pack is authored for. Ports `RenderMode`.
+///
+/// There is no default and no guess: legacy art is drawn for a 48x34 tile
+/// and modern art for a square one, so a pack must say which it means.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RenderMode {
+    /// Nothing declared, which is fatal at load.
+    #[default]
+    None,
+    /// 320x200, 48x34 tiles, a 5x5 viewport.
+    Legacy,
+    /// Pack-declared tile size and viewport.
+    Modern,
+}
+
+/// Render geometry declared by the pack. Ports `ResRender`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ResRender {
+    pub mode: RenderMode,
+    /// Modern only. Legacy forces 48x34 whatever the pack declares.
+    pub tile_w: i32,
+    pub tile_h: i32,
+    /// Viewport in tiles. Must be odd on both axes.
+    pub tiles_w: i32,
+    pub tiles_h: i32,
+}
+
 /// The final-score formula's knobs. Ports `ResScoring`.
 ///
 /// `difficulty_multiplier[0]` is unused while `easy_halves` is set, and is
@@ -529,6 +556,7 @@ pub struct Resources {
     pub world: ResWorld,
     pub contract: ResContract,
     pub economy: ResEconomy,
+    pub render: ResRender,
     pub tuning: ResTuning,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
@@ -560,6 +588,7 @@ impl Default for Resources {
             world: ResWorld::default(),
             contract: ResContract::default(),
             economy: ResEconomy::default(),
+            render: ResRender::default(),
             tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
@@ -607,6 +636,7 @@ impl Resources {
         resources.parse_world(&root)?;
         resources.parse_contract(&root)?;
         resources.parse_economy(&root)?;
+        resources.parse_render(&root)?;
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
@@ -921,6 +951,50 @@ impl Resources {
             "max_spells_base",
             &mut self.economy.chest.max_spells_base,
         )?;
+        Ok(())
+    }
+
+    /// Record the pack's `render` declaration. Ports the reading half of
+    /// C's `render` block parser.
+    ///
+    /// DIVERGENCE, deliberate. C REJECTS a pack that declares no valid
+    /// `render.mode`, because its `resources_load` serves a shell that
+    /// cannot lay out a screen without one. This engine is render-free and
+    /// never reads these values, so refusing a pack over them would put a
+    /// presentation contract in the wrong crate. The declaration is recorded
+    /// as-is -- `RenderMode::None` for a pack that declares nothing -- and
+    /// `shell::layout` enforces the contract where C's `layout_init`
+    /// consumes it. A real run still refuses the same packs, one layer later.
+    ///
+    /// The viewport validation (odd axes, minimum sizes) moves with it, for
+    /// the same reason.
+    fn parse_render(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(render) = root.get("render") else {
+            return Ok(());
+        };
+        let mode = render
+            .get("mode")
+            .and_then(|mode| mode.as_str())
+            .unwrap_or("");
+        match mode {
+            // Legacy IGNORES any declared tile or viewport size. A pack that
+            // sets tile_w in legacy mode gets no effect from it.
+            "legacy" => {
+                self.render.mode = RenderMode::Legacy;
+                self.render.tile_w = 48;
+                self.render.tile_h = 34;
+                self.render.tiles_w = 5;
+                self.render.tiles_h = 5;
+            }
+            "modern" => {
+                self.render.mode = RenderMode::Modern;
+                self.render.tile_w = optional_i32_field(render, "tile_w", 96)?;
+                self.render.tile_h = optional_i32_field(render, "tile_h", 96)?;
+                self.render.tiles_w = optional_i32_field(render, "tiles_w", 7)?;
+                self.render.tiles_h = optional_i32_field(render, "tiles_h", 7)?;
+            }
+            _ => self.render.mode = RenderMode::None,
+        }
         Ok(())
     }
 
@@ -1962,11 +2036,62 @@ const fn default_morale_chart() -> [[u8; 5]; 5] {
 
 #[cfg(test)]
 mod tests {
-    use super::Resources;
+    use super::{RenderMode, Resources};
     use crate::tables::{
         parse_troop_abilities, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY, TROOP_ABIL_LEECH,
         TROOP_ABIL_UNDEAD,
     };
+
+    #[test]
+    fn legacy_render_mode_forces_the_dos_geometry() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy", "tile_w": 96, "tiles_w": 9}, "troops": []}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(resources.render.mode, RenderMode::Legacy);
+        // The declared tile_w and tiles_w are IGNORED: legacy is 48x34 tiles
+        // on a 5x5 viewport whatever the pack asks for.
+        assert_eq!((resources.render.tile_w, resources.render.tile_h), (48, 34));
+        assert_eq!((resources.render.tiles_w, resources.render.tiles_h), (5, 5));
+    }
+
+    #[test]
+    fn modern_render_mode_reads_the_pack_geometry() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "modern", "tile_w": 64, "tiles_h": 9}, "troops": []}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(resources.render.mode, RenderMode::Modern);
+        assert_eq!((resources.render.tile_w, resources.render.tile_h), (64, 96));
+        assert_eq!((resources.render.tiles_w, resources.render.tiles_h), (7, 9));
+    }
+
+    #[test]
+    fn an_undeclared_render_mode_loads_as_none_rather_than_failing() {
+        // C rejects the pack here. This engine never reads the block, so it
+        // records None and leaves the contract to shell::layout, which is
+        // where C's layout_init consumes it.
+        let resources =
+            Resources::from_json_str(r#"{"troops": []}"#).expect("a pack without render loads");
+        assert_eq!(resources.render.mode, RenderMode::None);
+
+        let resources = Resources::from_json_str(r#"{"render": {"mode": "vga"}, "troops": []}"#)
+            .expect("an unknown mode loads");
+        assert_eq!(resources.render.mode, RenderMode::None);
+    }
+
+    #[test]
+    fn an_even_modern_viewport_is_recorded_not_refused_here() {
+        // The odd-axis rule belongs to layout, so the loader keeps what the
+        // pack said and lets the shell reject it.
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "modern", "tiles_w": 4}, "troops": []}"#,
+        )
+        .expect("fixture parses");
+        assert_eq!(resources.render.tiles_w, 4);
+    }
 
     #[test]
     fn parses_troop_catalog_subset() {

@@ -1,0 +1,194 @@
+# Shell And Renderer Plan
+
+Status: agreed 2026-09-16. The engine port is complete (303 unit tests, 25
+combat digest goldens, one render-free boundary test); this document covers
+the shell, which is currently a three-line stub.
+
+Read `AGENTS.md` first. Everything there still applies -- parity-first
+translation, one-line commit messages, approval before every commit.
+
+## What the engine already gives you
+
+Verified by running the real pack (`reference/assets/kings-bounty/game.json`,
+loaded with `Resources::from_json_file` so `resource_root` resolves the map
+paths) through 20,000 steps on the real 64x64 continentia map:
+
+```
+hero="Sir Rust" class="knight" zone="continentia" pos=(11,58) gold=7500 days=900
+army: [("militia", 20), ("archers", 2)]
+scepter buried at (22,55)
+moved=20000  days_left=400  gold=98253
+interactions: CastleGate 99, Town 48, Dwelling 28, Foe 9480,
+              Sign 361, Telecave 46, TreasureChest 6
+```
+
+So the rules run. Note that this smoke test is NOT committed: it depends on
+`reference/`, which is gitignored, so CI could not run it. Every parity claim
+in the repo rests on synthetic fixtures. Worth fixing if a redistributable
+pack ever exists.
+
+## Decisions
+
+### 1. Architecture: a draw-command layer
+
+Split the shell in two, and keep the seam strict:
+
+- **View/layout logic** takes engine state and emits a list of draw commands
+  in LOGICAL coordinates (`Blit { sprite, src, dst }`, `Rect`, `Text`). Pure
+  Rust, no graphics dependency, headlessly testable -- assert on the command
+  list the way `engine/tests/combat_digests.rs` asserts on damage.
+- **Backend** executes that list. A few hundred lines. Swappable.
+
+About 9,500 of the C shell's ~10,000 lines are view/layout logic. This is
+where a resolution change or an art overhaul lands, so the seam is what makes
+those cheap later. It is the engine/shell discipline one layer down.
+
+### 2. Backend: macroquad, with wgpu as the escape hatch
+
+Pure Rust (no C toolchain), GPU-accelerated, arbitrary resolution, render
+targets and shaders available for later effects, exports to web.
+
+Rejected, with reasons, so this is not relitigated from scratch:
+
+- **CPU framebuffer** (`pixels`/`softbuffer` + `winit`). Tempting: the legacy
+  design IS a 320x200 buffer blitted at integer scale, and it would make
+  frames golden-testable. Rejected because it is the one option that blocks
+  the stated goal of higher resolution and a graphics overhaul -- at 1080p
+  with alpha, rotation or effects you are writing a software rasteriser. The
+  draw-command layer recovers the testability without the ceiling.
+- **raylib-rs**. The reference uses raylib, so `views_render.c` would
+  transcribe almost literally. Rejected: a C dependency, and the API-affinity
+  argument turned out to be worth little. The whole C shell uses about six
+  drawing primitives across ~90 call sites: `DrawRectangle` (43),
+  `DrawTexturePro` (30), `DrawRectangleLines` (12), three rounded-rect calls,
+  three `DrawText`. The bulk of the port is layout arithmetic, not API calls.
+- **SDL2**. Mature, but a C dependency without even the reference's API
+  affinity to show for it.
+- **wgpu + winit** directly. The most future-proof and the most actively
+  maintained, but meaningfully more work before anything is on screen. With
+  the draw-command layer in place this is a backend swap, not a shell
+  rewrite, so it is deferred rather than ruled out.
+
+Do NOT add a graphics dependency to `engine/Cargo.toml`.
+`engine/tests/render_free.rs` enforces that.
+
+### 3. Fidelity: legacy first, but never hardcode its geometry
+
+Reproduce the legacy layout faithfully first, because it is the only mode
+with a reference build to check against. But drive all geometry from the
+pack's `render` block, exactly as C's `layout_init` does for its ~340 `CL_`
+macro call sites. No literal `320` may reach view code.
+
+Then `"mode": "modern"` -- square tiles, larger viewport, already a supported
+pack value -- is a config flip plus an art swap, not a port.
+
+## Reference map
+
+| Concern | C source | Rust target |
+| --- | --- | --- |
+| Geometry constants + derivation | `src/layout.h`, `src/layout.c` | `shell/src/layout.rs` |
+| `render` block parsing | `engine/resources.c` ~2473 | `engine/src/resources.rs` |
+| Main loop | `src/main.c` (1421) | `shell/src/main.rs` |
+| Town/castle/dwelling/alcove screens | `src/views.c` (950), `src/views_render.c` (887) | `shell/src/views/` |
+| Combat loop + render | `src/combat_loop.c` (714), `src/combat_render.c` (212) | `shell/src/combat/` |
+| Map render | `src/map_render.c` (206) | `shell/src/map_render.rs` |
+| Prompts / dialog | `src/prompt.c` (309), `src/encode_dialog.c` (213) | `shell/src/prompt.rs` |
+| Chrome / overlay / sprites | `src/chrome.c`, `src/overlay.c`, `src/sprites.c` | `shell/src/chrome.rs` etc. |
+| Integer-scale present | `src/present.c` | backend |
+
+## Legacy geometry, for checking the port
+
+`layout_init` derives everything from the render block:
+
+```
+map_w     = tile_w * tiles_w          48 * 5 = 240
+map_h     = tile_h * tiles_h          34 * 5 = 170
+sidebar_w = tile_w                    48
+screen_w  = 16 + map_w + sidebar_w + 16       = 320
+screen_h  = 8 + 9 + 5 + map_h + 8             = 200
+```
+
+Fixed chrome bands, in pixels, which do NOT scale with tile size (they are
+text and border furniture):
+
+```
+FRAME_TOP_H 8   FRAME_BOTTOM_H 8   FRAME_LEFT_W 16   FRAME_RIGHT_W 16
+BAR_H 5   BAR_Y 17
+STATUS_X 16   STATUS_Y 8   STATUS_W screen_w-32   STATUS_H 9
+MAP_X 16   MAP_Y 22 (= 8 + 9 + 5)
+SIDEBAR_X MAP_X+MAP_W   SIDEBAR_Y MAP_Y   SIDEBAR_H MAP_H
+BOTTOM_Y MAP_Y+MAP_H (192)
+PANEL_X MAP_X-5   PANEL_W MAP_W+5   PANEL_H 68   PANEL_Y MAP_Y+MAP_H-PANEL_H
+PANEL_PAD_X 4   PANEL_COLS 30
+```
+
+The panel is 5px wider than the map, borrowed from the decorative left frame,
+so a 30-character line fits with a margin. `DrawRectangleLines` takes 1px per
+edge, so the map's own 240px left only 238px of interior against 30*8 = 240px
+of cells. The margin is one-sided by construction: the right edge is pinned
+to the sidebar.
+
+Presentation scale: `default_scale` is 2 for legacy (320x200 is tiny) and 1
+for modern (already large; 800x702 at 2x exceeds 1080p). Clamps are
+`SCALE_MIN 2`, `SCALE_MAX 5` desktop, `SCALE_MAX_WEB 3`.
+
+## Parity traps in the render block
+
+- `render.mode` is REQUIRED. A pack declaring neither `legacy` nor `modern`
+  is REJECTED at load, not guessed at, because legacy art is drawn for a
+  48x34 tile and modern art for a square one. This is a load-time contract
+  like `tuning.temp_death`.
+- Legacy IGNORES any declared `tile_w`/`tile_h`/`tiles_w`/`tiles_h` and
+  forces 48/34/5/5. Only modern reads them, defaulting to 96/96/7/7. A pack
+  that sets `tile_w` in legacy mode gets no effect from it.
+- The viewport must be ODD on both axes and at least 3x3, with tiles at least
+  8px. `map_render` centres the hero with `RADIUS = tiles / 2`; an even count
+  leaves him half a tile off.
+
+## Asset inventory
+
+- 311 RGBA PNGs under `art/`: `tiles`, `troops`, `villains`, `classes`,
+  `combat`, `sprites`, `ui`, `font`.
+- Font is `art/font/kb-font.png`, a single 1024x8 RGBA strip -- 128 glyphs of
+  8x8. Drawn via `DrawTexturePro`, not raylib's `DrawText` (only 3 of those
+  in the whole shell).
+- `palettes/palette.bin`.
+- Audio under `audio/`.
+
+## Pack sections the engine ignores
+
+These are parsed by nobody today and are the shell's to claim:
+
+`strings` (20 groups; C's `resources.h` declares 143 banner strings),
+`render`, `colors`, `controls`, `audio`, `sprites`, `title`, `credits`,
+`ending`, `pack_name`, `pack_kind`.
+
+The engine deliberately returns outcome VALUES where C queues TEXT --
+`AdventureCast`, `SearchOutcome`, `SpellCast`, `VillainSiegeOutcome` and the
+rest. So the shell owns a banner/template layer that does not exist yet,
+including `resources_format_template` and its `%VAR%` substitution.
+
+## Work order
+
+1. **Layout model.** Parse `render` in `engine/src/resources.rs`; port
+   `layout_init` and the `CL_*` geometry to `shell/src/layout.rs`. No
+   graphics dependency yet. THIS IS THE CURRENT SLICE.
+2. **Draw-command vocabulary.** The command enum plus a headless recorder
+   backend, so view code can be tested before a window exists.
+3. **Backend.** macroquad window, integer-scale present, sprite atlas load,
+   bitmap font, input mapping.
+4. **Chrome + map viewport.** First thing actually on screen.
+5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
+6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.
+7. **Prompts and the decision loop**, wiring to the engine's outcome enums.
+8. **Combat loop and rendering**, then `CombatTurnRecord` once its consumer
+   exists and its shape is known.
+
+## Still deliberately unported in the engine
+
+- `CombatTurnRecord`: write-only replay data for animation. Its shape depends
+  on what the renderer wants to replay, so it waits for step 8.
+- `player_io.c`: the FIFO carries header/body TEXT, which is presentation,
+  and its `player_io_answer` routing exists to pick a `flow_apply_*` core
+  from a mirrored global `pending_flow`. All twelve of those cores are
+  directly callable engine methods here, so a shell calls the one it means.
