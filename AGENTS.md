@@ -78,6 +78,17 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- Zone switching (`Game::switch_zone`): stashes the outgoing continent's fog,
+  loads the destination, re-applies consumed tiles, spawns the hero, and
+  matches travel mode to the spawn terrain (a water spawn puts the hero
+  afloat; a land spawn moors an owned boat at the spawn instead of sinking
+  it). `switch_zone_bytes` is the same core with the tiles supplied directly,
+  matching the seam `Map` already draws between its path and byte loaders.
+- The gate spells' engine half: `Game::gate_destinations` builds the visited,
+  eligible list sorted case-insensitively by name, and `Game::gate_teleport`
+  strands the boat in the origin zone, lands the hero on foot, and spends one
+  charge by spell id. Both are shell-facing APIs with no in-engine caller, as
+  in C -- that is the design, not an unwired core.
 - Adventure spells (`engine/src/spells_adventure.rs`): the id-to-effect
   table, the cast cores, and the spellbook dispatcher. Each cast returns an
   `AdventureCast` carrying the values a banner template needs instead of
@@ -95,10 +106,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 229 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 241 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the adventure spells. Run `git log --oneline -5`
+The most recent slice is zone switching. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -151,13 +162,6 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-Zone switching is the next slice, and it is the last engine-side gap of any
-size. `GameSwitchZone` and `GameGateTeleport` (`engine/game.c`) are unported,
-which is why the two gate spells classify and arm but cannot teleport --
-`AdventureCast::GateArmed` counts eligible destinations and stops. Porting
-`GameSwitchZone` closes the gates and the continent-to-continent travel that
-`WorldProgress.continent_fog` was already built for.
-
 Do not trust a "nothing left" claim in this file, including one written by a
 previous slice. Two such claims have already proved wrong: the save format
 was v11 where a plan doc said v8, and `spells_adventure.c` plus
@@ -165,10 +169,22 @@ was v11 where a plan doc said v8, and `spells_adventure.c` plus
 the headless engine as complete. Diff `reference/engine/*.c` against
 `engine/src/` before concluding a system is closed.
 
-After zone switching, what remains really is shell-facing: the `player_io`
-message/prompt queue (the engine returns outcome enums where C queues a
-dialog) and the two combat omissions noted below. Those only pay off once a
-shell exists, so consider selecting the shell before porting its scaffolding.
+One known divergence, found while porting zone switching and deliberately
+left alone. C sizes `zones_discovered`, `orbs_found` and `continent_fog` at
+`GAME_CONTINENTS` (4) and enforces a capacity contract in `GameInit`:
+a pack declaring more zones calls `fatal_user_error` rather than being
+truncated. The Rust port sizes the first two at `RES_MAX_ZONES` (8) and
+enforces nothing, so a 5-zone pack would mark zone 4 discovered where C
+refuses to start at all. `switch_zone` ports C's `zi < GAME_CONTINENTS`
+guards exactly; `resolve_navmap` (older code) bounds by the Rust array
+length instead. Unreachable for any pack C would load. Fixing it means
+deciding how a library crate should express a fatal pack error, which is its
+own slice.
+
+What remains is shell-facing: the `player_io` message/prompt queue (the
+engine returns outcome enums where C queues a dialog) and the two combat
+omissions noted below. Those only pay off once a shell exists, so consider
+selecting the shell before porting its scaffolding.
 
 Traps the save slice turned up, worth knowing before touching that format:
 
@@ -203,6 +219,11 @@ Three habits these cores rewarded:
   fixed point and `calc_distance` pre-shifts on top of it. `try_build_bridge`
   says it builds "max 2 tiles (or up to 5 water tiles)", but its `built >= 2`
   break makes the loop's bound of 5 unreachable; the cap is always 2.
+- Check what a resource default already computed before asserting a fallback.
+  `GameGateDestinations` reads `gate_x >= 0 ? gate_x : x`, which looks like a
+  live fallback, but a castle's `gate_y` already defaults to `y + 1` (its
+  south face) and `gate_x` to `x`, so the fallback is dead for castles and
+  live only for towns, whose gate defaults to -1.
 - When a test you just wrote fails, check the C before changing the code. Two
   combat tests failed on first run and both times the port was right and the
   expectation was wrong -- the second was an out-of-control stack targeting
@@ -217,5 +238,5 @@ Note that the town-flow callers live in `reference/src/views.c` (for example
 only dialogs; the state mutation belongs in the engine.
 
 The gap list that used to close this file -- town/castle flows, headless
-combat, foe following, fog, and save/load -- is ported. Zone switching is
-the one item left; see the head of this section.
+combat, foe following, fog, save/load, and zone switching -- is ported.
+Re-derive any new gap from the C tree, not from this list.

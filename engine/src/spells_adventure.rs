@@ -6,10 +6,12 @@
 //! [`AdventureCast`] carrying the values a shell needs to fill the matching
 //! banner template, and the banner text itself stays outside the engine.
 //!
-//! The two gate spells classify and arm here but do not teleport. C's
-//! `GameGateTeleport` runs through `GameSwitchZone`, which is not ported yet,
-//! so [`AdventureCast::GateArmed`] reports the eligible destination count and
-//! stops there.
+//! The two gate spells classify and arm here but do not teleport, which is
+//! C's split too: a cast only opens the picker, and the shell then calls
+//! [`Game::gate_destinations`] for the list and [`Game::gate_teleport`] for
+//! the move. [`AdventureCast::GateArmed`] reports the eligible count, and C
+//! really does count destinations twice -- once in `cast_castle_gate` and
+//! again in `GameGateDestinations`. Both scans are ported as written.
 
 use crate::game::{CastleOwnerKind, Game, GAME_CASTLES, GAME_TOWNS};
 use crate::map::Map;

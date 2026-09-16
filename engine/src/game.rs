@@ -418,6 +418,59 @@ impl Default for Position {
     }
 }
 
+/// Display name length for a gate list row. Ports `GateDestination.name`.
+pub const GATE_DEST_NAME_LEN: usize = 64;
+
+/// The largest gate list either kind can produce. Ports
+/// `GAME_GATE_DESTS_MAX`.
+pub const GAME_GATE_DESTS_MAX: usize = if GAME_TOWNS > GAME_CASTLES {
+    GAME_TOWNS
+} else {
+    GAME_CASTLES
+};
+
+/// One row of a gate spell's destination picker. Ports `GateDestination`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GateDestination {
+    pub name: FixedStr<GATE_DEST_NAME_LEN>,
+    pub zone: FixedStr<GAME_ID_LEN>,
+    /// Landing tile, taken from the gate coordinates with the plain x/y as
+    /// the fallback.
+    pub x: i32,
+    pub y: i32,
+}
+
+/// Which list a gate spell is asking for. Ports `GateDestKind`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GateDestKind {
+    /// Castle Gate, which excludes the home/audience castle.
+    Castle,
+    Town,
+}
+
+/// Case-insensitive name order, with the zone as a stable tiebreak. Ports
+/// `gate_name_icmp` and `gate_dest_cmp`. Note that C lowercases only while
+/// both strings still have characters: the trailing comparison that decides
+/// a prefix pair uses the raw bytes.
+fn gate_dest_cmp(a: &GateDestination, b: &GateDestination) -> std::cmp::Ordering {
+    let (left, right) = (a.name.as_str().as_bytes(), b.name.as_str().as_bytes());
+    let mut index = 0usize;
+    while index < left.len() && index < right.len() {
+        let ca = left[index].to_ascii_lowercase();
+        let cb = right[index].to_ascii_lowercase();
+        if ca != cb {
+            return ca.cmp(&cb);
+        }
+        index += 1;
+    }
+    let tail_a = left.get(index).copied().unwrap_or(0);
+    let tail_b = right.get(index).copied().unwrap_or(0);
+    match tail_a.cmp(&tail_b) {
+        std::cmp::Ordering::Equal => a.zone.as_str().cmp(b.zone.as_str()),
+        ordering => ordering,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BoatState {
     pub has_boat: bool,
@@ -1064,6 +1117,296 @@ impl Game {
             seq += 1;
         }
         None
+    }
+
+    /// Stash the fog of the zone the hero is leaving. Ports the opening block
+    /// of `GameSwitchZone`, which runs BEFORE the map load and therefore
+    /// still happens when that load goes on to fail.
+    fn snapshot_outgoing_fog(&mut self, resources: &Resources, fog: &Fog) {
+        if self.position.zone.is_empty() {
+            return;
+        }
+        let Some(outgoing) = resources.zone_index_by_id(self.position.zone.as_str()) else {
+            return;
+        };
+        if outgoing < GAME_CONTINENTS {
+            self.world.continent_fog[outgoing] = *fog;
+        }
+    }
+
+    /// Finish a zone switch once the destination's tiles are in hand: place
+    /// the hero at the spawn, match travel mode to the spawn terrain, and
+    /// restore or initialise fog. The tail of `GameSwitchZone`.
+    fn enter_loaded_zone(
+        &mut self,
+        resources: &Resources,
+        map: &mut Map,
+        fog: &mut Fog,
+        zone_id: &str,
+        loaded: Map,
+    ) -> bool {
+        let Some(zone_index) = resources.zone_index_by_id(zone_id) else {
+            return false;
+        };
+        let (spawn_x, spawn_y) = match resources.zone_by_index(zone_index) {
+            // C reads `map->hero_spawn_x`, which `MapLoadZone` copies
+            // straight off the zone record; the Rust map carries no such
+            // field, so read the record itself.
+            Some(zone) => (zone.hero_spawn_x, zone.hero_spawn_y),
+            None => return false,
+        };
+
+        *map = loaded;
+        // Re-apply consumed tiles so picked-up artifacts and chests stay gone.
+        map.apply_consumed(self, zone_id);
+
+        self.position.zone.copy_from_str(zone_id);
+        self.position.x = spawn_x;
+        self.position.y = spawn_y;
+        self.position.last_x = self.position.x;
+        self.position.last_y = self.position.y;
+
+        // Match the travel mode to the spawn terrain. A cross-continent
+        // arrival can land on open ocean or on land, and without this,
+        // sailing home would leave the hero in a boat standing on grass.
+        let spawn = map.tile_i32(self.position.x, self.position.y);
+        let on_water = spawn.is_some_and(|tile| tile.terrain == Terrain::Water && !tile.is_bridge);
+        if on_water {
+            self.travel_mode = TravelMode::Boat;
+            self.boat.has_boat = true;
+            self.boat.x = self.position.x;
+            self.boat.y = self.position.y;
+            self.boat.zone.copy_from_str(zone_id);
+        } else {
+            self.travel_mode = TravelMode::Walk;
+            // Keep the boat, moored at the spawn, so the hero can sail away
+            // again.
+            if self.boat.has_boat {
+                self.boat.x = self.position.x;
+                self.boat.y = self.position.y;
+                self.boat.zone.copy_from_str(zone_id);
+            }
+        }
+
+        // A continent revisited by boat or gate keeps what it had revealed;
+        // a first visit starts blank.
+        if zone_index < GAME_CONTINENTS && self.world.zones_discovered[zone_index] {
+            *fog = self.world.continent_fog[zone_index];
+        } else {
+            *fog = Fog::default();
+        }
+        fog.reveal(
+            map,
+            self.position.x,
+            self.position.y,
+            resources.world.fog_sight,
+        );
+        if zone_index < GAME_CONTINENTS {
+            self.world.zones_discovered[zone_index] = true;
+        }
+        true
+    }
+
+    /// Move the hero to `zone_id`, loading that zone's map from the pack.
+    /// Ports `GameSwitchZone`.
+    pub fn switch_zone(
+        &mut self,
+        resources: &Resources,
+        map: &mut Map,
+        fog: &mut Fog,
+        zone_id: &str,
+    ) -> bool {
+        if resources.zone_index_by_id(zone_id).is_none() {
+            return false;
+        }
+        self.snapshot_outgoing_fog(resources, fog);
+        let Ok(loaded) = Map::load_zone_with_placements(resources, zone_id, self) else {
+            return false;
+        };
+        self.enter_loaded_zone(resources, map, fog, zone_id, loaded)
+    }
+
+    /// [`Game::switch_zone`] with the destination's tiles supplied directly
+    /// instead of read from the pack, matching the seam `Map` already draws
+    /// between its path and byte loaders.
+    pub fn switch_zone_bytes(
+        &mut self,
+        resources: &Resources,
+        map: &mut Map,
+        fog: &mut Fog,
+        zone_id: &str,
+        bytes: &[u8],
+    ) -> bool {
+        let Some(zone) = resources.zone_by_id(zone_id) else {
+            return false;
+        };
+        self.snapshot_outgoing_fog(resources, fog);
+        let Ok(loaded) = Map::load_zone_bytes_with_placements(resources, zone, bytes, self) else {
+            return false;
+        };
+        self.enter_loaded_zone(resources, map, fog, zone_id, loaded)
+    }
+
+    /// Visited, gate-eligible destinations of `kind`, sorted by display name
+    /// and written into `out`. Returns how many were written. Ports
+    /// `GameGateDestinations`: the engine owns visited-eligibility so the
+    /// shell never inspects `towns`/`castles` itself.
+    pub fn gate_destinations(
+        &self,
+        resources: &Resources,
+        kind: GateDestKind,
+        out: &mut [GateDestination],
+    ) -> usize {
+        if out.is_empty() {
+            return 0;
+        }
+        let mut written = 0usize;
+        match kind {
+            GateDestKind::Castle => {
+                let count = resources.castle_count().min(GAME_CASTLES);
+                for index in 0..count {
+                    if written >= out.len() {
+                        break;
+                    }
+                    if !self.castles[index].visited {
+                        continue;
+                    }
+                    let Some(castle) = resources.castle_by_index(index) else {
+                        continue;
+                    };
+                    if castle.is_home() {
+                        continue;
+                    }
+                    if castle.zone.is_empty() {
+                        continue;
+                    }
+                    out[written].name.copy_from_str(if castle.name.is_empty() {
+                        castle.id.as_str()
+                    } else {
+                        castle.name.as_str()
+                    });
+                    out[written].zone.copy_from_str(castle.zone.as_str());
+                    out[written].x = if castle.gate_x >= 0 {
+                        castle.gate_x
+                    } else {
+                        castle.x
+                    };
+                    out[written].y = if castle.gate_y >= 0 {
+                        castle.gate_y
+                    } else {
+                        castle.y
+                    };
+                    written += 1;
+                }
+            }
+            GateDestKind::Town => {
+                let count = resources.town_count().min(GAME_TOWNS);
+                for index in 0..count {
+                    if written >= out.len() {
+                        break;
+                    }
+                    if !self.towns[index].visited {
+                        continue;
+                    }
+                    let Some(town) = resources.town_by_index(index) else {
+                        continue;
+                    };
+                    if town.zone.is_empty() {
+                        continue;
+                    }
+                    out[written].name.copy_from_str(if town.name.is_empty() {
+                        town.id.as_str()
+                    } else {
+                        town.name.as_str()
+                    });
+                    out[written].zone.copy_from_str(town.zone.as_str());
+                    out[written].x = if town.gate_x >= 0 {
+                        town.gate_x
+                    } else {
+                        town.x
+                    };
+                    out[written].y = if town.gate_y >= 0 {
+                        town.gate_y
+                    } else {
+                        town.y
+                    };
+                    written += 1;
+                }
+            }
+        }
+        if written > 1 {
+            // C sorts with qsort, which is unstable; the zone tiebreak makes
+            // that immaterial for anything but two destinations sharing both
+            // a name and a zone. A stable sort keeps even that case
+            // deterministic.
+            out[..written].sort_by(gate_dest_cmp);
+        }
+        written
+    }
+
+    /// Teleport the hero through a gate spell. Ports `GameGateTeleport`: any
+    /// boat is LEFT BEHIND at the cast tile in the origin zone, the hero
+    /// always arrives on foot, and one charge of `spell_id` is spent.
+    pub fn gate_teleport(
+        &mut self,
+        resources: &Resources,
+        map: &mut Map,
+        fog: &mut Fog,
+        destination: &GateDestination,
+        spell_id: &str,
+    ) -> bool {
+        if destination.zone.is_empty() {
+            return false;
+        }
+
+        // Snapshot the abandoned boat BEFORE the zone switch, which would
+        // otherwise carry it to the destination spawn, and restore it after
+        // so the boat's zone stays the origin zone.
+        let mut left_behind = BoatState::default();
+        let mut have_left = false;
+        if self.travel_mode == TravelMode::Boat {
+            left_behind.has_boat = true;
+            left_behind.x = self.position.x;
+            left_behind.y = self.position.y;
+            left_behind.zone.copy_from_str(self.position.zone.as_str());
+            have_left = true;
+        } else if self.boat.has_boat {
+            // A docked boat, with the hero on foot, also stays where it is.
+            left_behind = self.boat;
+            have_left = true;
+        }
+
+        if !self.switch_zone(resources, map, fog, destination.zone.as_str()) {
+            return false;
+        }
+
+        // Always arrive on foot at the gate's landing tile. Note that no fog
+        // is revealed here: `switch_zone` revealed around the zone's SPAWN,
+        // and C never re-reveals after moving the hero, so the landing tile
+        // stays dark until the next step.
+        if destination.x >= 0 && destination.y >= 0 {
+            self.position.x = destination.x;
+            self.position.y = destination.y;
+            self.position.last_x = destination.x;
+            self.position.last_y = destination.y;
+        }
+        self.travel_mode = TravelMode::Walk;
+
+        // Override the re-attach `switch_zone` performed at the spawn.
+        if have_left {
+            self.boat = left_behind;
+        }
+
+        // The charge is spent by spell id, not by effect, and only if one is
+        // actually held.
+        if let Some(spell) = resources.spell_by_id(spell_id) {
+            if let Ok(index) = usize::try_from(spell.index) {
+                if index < self.spells.counts.len() && self.spells.counts[index] > 0 {
+                    self.spells.counts[index] = self.spells.counts[index].wrapping_sub(1);
+                }
+            }
+        }
+        true
     }
 
     pub fn add_placement(&mut self, zone: &str, x: i32, y: i32, kind: Interact, id: &str) {
@@ -3251,8 +3594,9 @@ fn normalize_dwelling_kind(kind: &str) -> &str {
 mod tests {
     use super::{
         ArmyStack, AudienceOutcome, BoatActionOutcome, BoatState, CastleOwnerKind, ChestOutcome,
-        FoeState, Game, GarrisonOutcome, Mount, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
-        TravelMode, Unit, VillainSiegeOutcome, CASTLE_POOL_CAP, GAME_ARMY_SLOTS,
+        FoeState, Fog, Game, GarrisonOutcome, GateDestKind, GateDestination, Mount, RecruitOutcome,
+        SiegeBuyOutcome, SpellBuyOutcome, TravelMode, Unit, VillainSiegeOutcome, CASTLE_POOL_CAP,
+        GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
     };
     use crate::combat::{combat_seed_rng, Combat, CombatMode, CombatResult, CombatTarget};
     use crate::map::{Map, Tile};
@@ -5885,5 +6229,329 @@ mod tests {
         game.foes[0] = foe;
         game.foe_count = 1;
         game
+    }
+
+    /// Two zones, each 6x2. `home` spawns on grass, `isle` spawns on water.
+    fn zone_fixture() -> Resources {
+        Resources::from_json_str(
+            r##"{
+              "world": {"fog_sight": 3},
+              "tile_codes": {
+                ".": {"art":"grass","terrain":"grass"},
+                "W": {"art":"water","terrain":"water"}
+              },
+              "zones": [
+                {"id":"home","map":"maps/home.dat","width":6,"height":2,"hero_spawn":{"x":1,"y":0}},
+                {"id":"isle","map":"maps/isle.dat","width":6,"height":2,"hero_spawn":{"x":4,"y":1}}
+              ],
+              "castles": [
+                {"index":0,"id":"kings_castle","name":"Zeta Keep","zone":"home","x":5,"y":0,"special":{"flow":"audience"}},
+                {"index":1,"id":"castle1","name":"alpha Hold","zone":"isle","x":2,"y":1,"gate":{"x":3,"y":1}},
+                {"index":2,"id":"castle2","name":"Beta Tower","zone":"home","x":4,"y":0}
+              ],
+              "towns": [
+                {"index":0,"id":"town0","name":"Riverton","zone":"home","x":1,"y":1},
+                {"index":1,"id":"town1","zone":"isle","x":0,"y":0}
+              ],
+              "troops": [],
+              "spells": [
+                {"index":0,"id":"town_gate","name":"Town Gate","kind":"adventure","cost":100}
+              ]
+            }"##,
+        )
+        .expect("fixture parses")
+    }
+
+    const HOME_TILES: &[u8] = b"......\n......\n";
+    const ISLE_TILES: &[u8] = b"......\nWWWWWW\n";
+
+    #[test]
+    fn switching_zones_spawns_the_hero_and_reveals_fog_there() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "home", HOME_TILES));
+        assert_eq!(game.position.zone.as_str(), "home");
+        assert_eq!((game.position.x, game.position.y), (1, 0));
+        // last_x/last_y follow the spawn, so nothing chases a stale tile.
+        assert_eq!((game.position.last_x, game.position.last_y), (1, 0));
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        assert!(game.world.zones_discovered[0]);
+        assert!(fog.seen[0][1]);
+    }
+
+    #[test]
+    fn a_water_spawn_puts_the_hero_in_a_boat() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+
+        // `isle` spawns at (4,1), which its second row makes open water.
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "isle", ISLE_TILES));
+        assert_eq!(game.travel_mode, TravelMode::Boat);
+        assert!(game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (4, 1));
+        assert_eq!(game.boat.zone.as_str(), "isle");
+    }
+
+    #[test]
+    fn a_land_spawn_moors_an_owned_boat_at_the_spawn_rather_than_sinking_it() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        game.boat.has_boat = true;
+        game.boat.x = 9;
+        game.boat.y = 9;
+        game.boat.zone.copy_from_str("elsewhere");
+
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "home", HOME_TILES));
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        assert!(game.boat.has_boat);
+        assert_eq!((game.boat.x, game.boat.y), (1, 0));
+        assert_eq!(game.boat.zone.as_str(), "home");
+    }
+
+    #[test]
+    fn a_revisited_zone_keeps_the_fog_it_had_and_a_first_visit_starts_blank() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+
+        // home spawns at (1,0) and reveals x 0..3; isle spawns at (4,1) and
+        // reveals x 2..5. Column 0 is therefore home's alone.
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "home", HOME_TILES));
+        assert!(fog.seen[1][0]);
+
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "isle", ISLE_TILES));
+        // A first visit to `isle` starts blank, so home's column is gone.
+        assert!(!fog.seen[1][0]);
+
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "home", HOME_TILES));
+        // Coming back restores what home had revealed.
+        assert!(fog.seen[1][0]);
+    }
+
+    #[test]
+    fn an_unknown_zone_is_refused_and_leaves_the_outgoing_fog_alone() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        assert!(game.switch_zone_bytes(&resources, &mut map, &mut fog, "home", HOME_TILES));
+        let snapshot = game.world.continent_fog[0];
+
+        assert!(!game.switch_zone_bytes(&resources, &mut map, &mut fog, "atlantis", HOME_TILES));
+        // The zone check comes before the snapshot, so nothing was stashed.
+        assert_eq!(game.world.continent_fog[0], snapshot);
+        assert_eq!(game.position.zone.as_str(), "home");
+    }
+
+    #[test]
+    fn gate_destinations_sort_by_name_ignoring_case_and_skip_the_home_castle() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        for castle in game.castles.iter_mut().take(3) {
+            castle.visited = true;
+        }
+
+        let mut out = [GateDestination::default(); GAME_GATE_DESTS_MAX];
+        let written = game.gate_destinations(&resources, GateDestKind::Castle, &mut out);
+        // "Zeta Keep" is the audience castle and never appears, and a
+        // lowercase "alpha Hold" still sorts before "Beta Tower".
+        assert_eq!(written, 2);
+        assert_eq!(out[0].name.as_str(), "alpha Hold");
+        assert_eq!(out[1].name.as_str(), "Beta Tower");
+        // castle1 declares a gate tile, so that wins.
+        assert_eq!((out[0].x, out[0].y), (3, 1));
+        assert_eq!(out[0].zone.as_str(), "isle");
+        // castle2 declares none, but a castle's gate_y still defaults to
+        // y + 1 -- the tile at its south face -- so the `gate_x < 0` x/y
+        // fallback in GameGateDestinations is unreachable for castles.
+        assert_eq!((out[1].x, out[1].y), (4, 1));
+    }
+
+    #[test]
+    fn a_town_without_a_name_falls_back_to_its_id_and_the_list_honours_the_cap() {
+        let resources = zone_fixture();
+        let mut game = Game::default();
+        game.towns[0].visited = true;
+        game.towns[1].visited = true;
+
+        let mut out = [GateDestination::default(); GAME_GATE_DESTS_MAX];
+        let written = game.gate_destinations(&resources, GateDestKind::Town, &mut out);
+        assert_eq!(written, 2);
+        // "Riverton" sorts before the nameless town1, which lists as its id.
+        assert_eq!(out[0].name.as_str(), "Riverton");
+        assert_eq!(out[1].name.as_str(), "town1");
+        // A town's gate defaults to -1 rather than to a south face, so here
+        // the x/y fallback really does supply the landing tile.
+        assert_eq!((out[0].x, out[0].y), (1, 1));
+
+        // A short buffer stops early rather than overrunning.
+        let mut one = [GateDestination::default(); 1];
+        assert_eq!(
+            game.gate_destinations(&resources, GateDestKind::Town, &mut one),
+            1
+        );
+    }
+
+    #[test]
+    fn an_unvisited_destination_never_lists() {
+        let resources = zone_fixture();
+        let game = Game::default();
+        let mut out = [GateDestination::default(); GAME_GATE_DESTS_MAX];
+        assert_eq!(
+            game.gate_destinations(&resources, GateDestKind::Castle, &mut out),
+            0
+        );
+        assert_eq!(
+            game.gate_destinations(&resources, GateDestKind::Town, &mut out),
+            0
+        );
+    }
+
+    /// The same two zones, but with their maps written to real files so a
+    /// teleport can load them the way the pack would. `resolve_map_path`
+    /// passes an absolute path through untouched.
+    fn zone_fixture_on_disk(tag: &str) -> Resources {
+        let dir = std::env::temp_dir();
+        let home = dir.join(format!(
+            "openbounty-{}-home-{}.dat",
+            tag,
+            std::process::id()
+        ));
+        let isle = dir.join(format!(
+            "openbounty-{}-isle-{}.dat",
+            tag,
+            std::process::id()
+        ));
+        std::fs::write(&home, HOME_TILES).expect("home map writes");
+        std::fs::write(&isle, ISLE_TILES).expect("isle map writes");
+        Resources::from_json_str(&format!(
+            r##"{{
+              "world": {{"fog_sight": 3}},
+              "tile_codes": {{
+                ".": {{"art":"grass","terrain":"grass"}},
+                "W": {{"art":"water","terrain":"water"}}
+              }},
+              "zones": [
+                {{"id":"home","map":"{home}","width":6,"height":2,"hero_spawn":{{"x":1,"y":0}}}},
+                {{"id":"isle","map":"{isle}","width":6,"height":2,"hero_spawn":{{"x":4,"y":1}}}}
+              ],
+              "towns": [{{"index":0,"id":"town0","name":"Riverton","zone":"home","x":1,"y":1}}],
+              "troops": [],
+              "spells": [
+                {{"index":0,"id":"town_gate","name":"Town Gate","kind":"adventure","cost":100}}
+              ]
+            }}"##,
+            home = home.display(),
+            isle = isle.display(),
+        ))
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn a_gate_strands_the_boat_in_the_origin_zone_and_lands_the_hero_on_foot() {
+        let resources = zone_fixture_on_disk("gate-boat");
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        // The isle spawn is open water, so the hero starts afloat at (4,1).
+        assert!(game.switch_zone(&resources, &mut map, &mut fog, "isle"));
+        assert_eq!(game.travel_mode, TravelMode::Boat);
+        game.spells.counts[0] = 2;
+
+        let mut destination = GateDestination::default();
+        destination.zone.copy_from_str("home");
+        destination.x = 5;
+        destination.y = 1;
+        assert!(game.gate_teleport(&resources, &mut map, &mut fog, &destination, "town_gate"));
+
+        // The hero arrives on foot at the landing tile, not at home's spawn.
+        assert_eq!(game.position.zone.as_str(), "home");
+        assert_eq!((game.position.x, game.position.y), (5, 1));
+        assert_eq!((game.position.last_x, game.position.last_y), (5, 1));
+        assert_eq!(game.travel_mode, TravelMode::Walk);
+        // The boat stayed where it was cast from, overriding the re-attach
+        // switch_zone performed at home's spawn.
+        assert!(game.boat.has_boat);
+        assert_eq!(game.boat.zone.as_str(), "isle");
+        assert_eq!((game.boat.x, game.boat.y), (4, 1));
+        assert_eq!(game.spells.counts[0], 1);
+    }
+
+    #[test]
+    fn a_gate_leaves_its_landing_tile_fogged() {
+        let resources = zone_fixture_on_disk("gate-fog");
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        assert!(game.switch_zone(&resources, &mut map, &mut fog, "isle"));
+        game.spells.counts[0] = 1;
+
+        let mut destination = GateDestination::default();
+        destination.zone.copy_from_str("home");
+        destination.x = 5;
+        destination.y = 1;
+        assert!(game.gate_teleport(&resources, &mut map, &mut fog, &destination, "town_gate"));
+
+        // switch_zone revealed around home's SPAWN at (1,0) and C never
+        // re-reveals after moving the hero, so the tile actually landed on
+        // stays dark until the next step.
+        assert!(fog.seen[0][1]);
+        assert!(!fog.seen[1][5]);
+    }
+
+    #[test]
+    fn a_gate_to_an_unknown_zone_changes_nothing_and_keeps_the_charge() {
+        let resources = zone_fixture_on_disk("gate-unknown");
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        assert!(game.switch_zone(&resources, &mut map, &mut fog, "home"));
+        game.spells.counts[0] = 1;
+
+        let mut destination = GateDestination::default();
+        destination.zone.copy_from_str("atlantis");
+        assert!(!game.gate_teleport(&resources, &mut map, &mut fog, &destination, "town_gate"));
+        assert_eq!(game.position.zone.as_str(), "home");
+        assert_eq!(game.spells.counts[0], 1);
+
+        // An empty destination zone is refused before anything is touched.
+        let blank = GateDestination::default();
+        assert!(!game.gate_teleport(&resources, &mut map, &mut fog, &blank, "town_gate"));
+        assert_eq!(game.spells.counts[0], 1);
+    }
+
+    #[test]
+    fn a_gate_with_no_charge_still_teleports() {
+        let resources = zone_fixture_on_disk("gate-free");
+        let mut game = Game::default();
+        let mut map = Map::new(1, 1);
+        let mut fog = Fog::default();
+        assert!(game.switch_zone(&resources, &mut map, &mut fog, "isle"));
+
+        let mut destination = GateDestination::default();
+        destination.zone.copy_from_str("home");
+        destination.x = 2;
+        destination.y = 0;
+        // C spends a charge only if one is held; it never gates the move on
+        // one, because the caller has already checked.
+        assert!(game.gate_teleport(&resources, &mut map, &mut fog, &destination, "town_gate"));
+        assert_eq!(game.position.zone.as_str(), "home");
+        assert_eq!(game.spells.counts[0], 0);
+        // An unknown spell id is likewise no obstacle.
+        assert!(game.gate_teleport(
+            &resources,
+            &mut map,
+            &mut fog,
+            &destination,
+            "no_such_spell"
+        ));
     }
 }
