@@ -78,6 +78,12 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- The endgame. `step::search_here` ports `flow_apply_search`: digging on the
+  Scepter tile sets `stats.won` and costs nothing, and any other dig spends
+  `tuning.search_cost_days` and can run the calendar out.
+  `step::spend_days` ports `GameSpendDays` (it lives beside `end_day`, as in
+  C, which puts it in `step.rs` rather than with the rest of `game.c`).
+  `Game::compute_score` ports `GameComputeScore` with its counters.
 - Zone switching (`Game::switch_zone`): stashes the outgoing continent's fog,
   loads the destination, re-applies consumed tiles, spawns the hero, and
   matches travel mode to the spawn terrain (a water spawn puts the hero
@@ -106,10 +112,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 241 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 254 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is zone switching. Run `git log --oneline -5`
+The most recent slice is the endgame. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -163,11 +169,24 @@ failures easier to attribute. Do not add renderer/UI crates to
 ## Good Next Work
 
 Do not trust a "nothing left" claim in this file, including one written by a
-previous slice. Two such claims have already proved wrong: the save format
-was v11 where a plan doc said v8, and `spells_adventure.c` plus
-`GameSwitchZone` were both live engine cores at a point this file described
-the headless engine as complete. Diff `reference/engine/*.c` against
-`engine/src/` before concluding a system is closed.
+previous slice. THREE such claims have now proved wrong: the save format was
+v11 where a plan doc said v8; `spells_adventure.c` and `GameSwitchZone` were
+both live engine cores while this file called the headless engine complete;
+and the win condition itself (`flow_apply_search`, `GameSpendDays`,
+`GameComputeScore`) was unported one slice after that.
+
+The check that actually works is mechanical, not from memory: extract the
+declared functions from `reference/engine/include/*.h` and grep each against
+`engine/src/`. Most misses are host-side (`player_io_*`, `dialog_*`,
+`prompt_*`, `screen_*`, `views_*`, `pack_*`, `SavePath*`) and correctly out
+of scope, but that sweep is what surfaced the endgame.
+
+Known-unported engine cores that sweep still reports, none yet judged worth
+a slice: `flow_apply_dismiss_army`/`dismiss_last` (army dismissal and its
+temp-death chain), `GameSpendWeek`, the flying/landing set (`GameCanLandAt`,
+`GameLandHere`, `GamePlayerCanFly`, `GameMountFly`, `GameTroopFlies`),
+`GameWeeklyNetGold`/`GameWeeklyOutgoings`, and `puzzle_grid_entity`. Confirm
+against the C before assuming any of these is really missing.
 
 One known divergence, found while porting zone switching and deliberately
 left alone. C sizes `zones_discovered`, `orbs_found` and `continent_fog` at
@@ -238,5 +257,5 @@ Note that the town-flow callers live in `reference/src/views.c` (for example
 only dialogs; the state mutation belongs in the engine.
 
 The gap list that used to close this file -- town/castle flows, headless
-combat, foe following, fog, save/load, and zone switching -- is ported.
-Re-derive any new gap from the C tree, not from this list.
+combat, foe following, fog, save/load, zone switching, and the endgame -- is
+ported. Re-derive any new gap from the C tree, not from this list.

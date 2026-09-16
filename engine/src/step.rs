@@ -420,9 +420,81 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
     }
 }
 
+/// What a dig turned up. C's `flow_apply_search` reports this through three
+/// out-parameters plus a bool return.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SearchOutcome {
+    /// The hero was standing on the buried Scepter. The game is won and
+    /// `stats.won` is now set; no days are spent.
+    Won,
+    /// Nothing here. `week_commission` is non-zero only when the days spent
+    /// crossed a week boundary, which the shell must settle for parity.
+    NothingFound { weeks: i32, week_commission: i32 },
+    /// The search ran the calendar out. C reports this instead of the
+    /// "revealed nothing" message.
+    OutOfTime,
+}
+
+/// Advance the calendar by `days`, returning the number of week boundaries
+/// crossed and the commission credited across them. Ports `GameSpendDays`.
+///
+/// C keeps this next to its own file-local `end_day`; so does this port,
+/// even though that puts it in `step.rs` rather than alongside the rest of
+/// `game.c`.
+pub fn spend_days(game: &mut Game, resources: &Resources, days: i32) -> (i32, i32) {
+    let days = days.min(game.stats.days_left);
+    let mut weeks = 0_i32;
+    let mut total_commission = 0_i32;
+    let mut spent = 0_i32;
+    while spent < days && !game.stats.game_over {
+        let mut advance = StepAdvance::default();
+        end_day(game, resources, &mut advance);
+        if advance.week_ended {
+            weeks = weeks.wrapping_add(1);
+        }
+        if advance.commission_paid > 0 {
+            total_commission = total_commission.wrapping_add(advance.commission_paid);
+        }
+        spent = spent.wrapping_add(1);
+    }
+    (weeks, total_commission)
+}
+
+/// Dig where the hero stands. Ports `flow_apply_search`, minus the yes/no
+/// prompt: C bails unless the answer was yes, so the engine core takes the
+/// yes as given and the shell asks the question.
+///
+/// Finding the Scepter costs nothing. Anything else costs
+/// `tuning.search_cost_days`, which is why a fruitless dig can end the game.
+pub fn search_here(game: &mut Game, resources: &Resources) -> SearchOutcome {
+    let on_scepter = game.scepter.zone.as_str() == game.position.zone.as_str()
+        && game.scepter.x == game.position.x
+        && game.scepter.y == game.position.y;
+    if on_scepter {
+        // C persists the win on the Game as well as reporting it, so
+        // consumers that never see the return value can still observe it.
+        game.stats.won = true;
+        return SearchOutcome::Won;
+    }
+
+    let (weeks, paid) = spend_days(game, resources, resources.tuning.search_cost_days);
+    if game.stats.game_over {
+        return SearchOutcome::OutOfTime;
+    }
+    SearchOutcome::NothingFound {
+        weeks,
+        // C reports the commission only when a boundary was actually
+        // crossed, even though the accumulator is the same either way.
+        week_commission: if weeks > 0 { paid } else { 0 },
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{game_step_basic, FoeCollision, StepInteraction, StepResult};
+    use super::{
+        game_step_basic, search_here, spend_days, FoeCollision, SearchOutcome, StepInteraction,
+        StepResult,
+    };
     use crate::fog::Fog;
     use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
     use crate::map::{Map, Tile};
@@ -1215,6 +1287,130 @@ mod tests {
         tile.sign_title.copy_from_str(title);
         tile.sign_body.copy_from_str(body);
         tile
+    }
+
+    fn search_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 33, "week_days": 5},
+              "tuning": {"search_cost_days": 10},
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    fn digger() -> Game {
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.x = 3;
+        game.position.y = 4;
+        game.scepter.zone.copy_from_str("home");
+        game.scepter.x = 9;
+        game.scepter.y = 9;
+        game.stats.days_left = 100;
+        game
+    }
+
+    #[test]
+    fn digging_on_the_scepter_wins_and_costs_no_days() {
+        let resources = search_fixture();
+        let mut game = digger();
+        game.scepter.x = game.position.x;
+        game.scepter.y = game.position.y;
+
+        assert_eq!(search_here(&mut game, &resources), SearchOutcome::Won);
+        // The win is persisted, not merely returned.
+        assert!(game.stats.won);
+        assert_eq!(game.stats.days_left, 100);
+    }
+
+    #[test]
+    fn the_scepter_only_counts_in_its_own_zone() {
+        let resources = search_fixture();
+        let mut game = digger();
+        game.scepter.x = game.position.x;
+        game.scepter.y = game.position.y;
+        game.scepter.zone.copy_from_str("isle");
+
+        // Same coordinates, different continent: still a fruitless dig.
+        assert!(matches!(
+            search_here(&mut game, &resources),
+            SearchOutcome::NothingFound { .. }
+        ));
+        assert!(!game.stats.won);
+    }
+
+    #[test]
+    fn a_fruitless_dig_spends_the_search_cost_and_reports_a_crossed_week() {
+        let resources = search_fixture();
+        let mut game = digger();
+        game.stats.days_left = 52;
+        game.stats.commission_weekly = 25;
+        game.stats.gold = 0;
+
+        // 10 days from 52 lands on 42, crossing the boundaries at 50 and 45.
+        assert_eq!(
+            search_here(&mut game, &resources),
+            SearchOutcome::NothingFound {
+                weeks: 2,
+                week_commission: 50
+            }
+        );
+        assert_eq!(game.stats.days_left, 42);
+        assert_eq!(game.stats.gold, 50);
+    }
+
+    #[test]
+    fn spending_days_that_cross_no_week_boundary_credits_nothing() {
+        let resources = search_fixture();
+        let mut game = digger();
+        game.stats.days_left = 53;
+        game.stats.commission_weekly = 25;
+        game.stats.gold = 0;
+
+        // 53 down to 51 touches no multiple of the 5-day week. A full dig
+        // cannot show this: 10 days always spans two boundaries.
+        assert_eq!(spend_days(&mut game, &resources, 2), (0, 0));
+        assert_eq!(game.stats.days_left, 51);
+        assert_eq!(game.stats.gold, 0);
+    }
+
+    #[test]
+    fn a_dig_cannot_spend_more_days_than_remain() {
+        let resources = search_fixture();
+        let mut game = digger();
+        game.stats.days_left = 3;
+
+        // C clamps `days` to days_left, so the loop stops at the calendar's
+        // end rather than running days_left negative.
+        assert_eq!(search_here(&mut game, &resources), SearchOutcome::OutOfTime);
+        assert_eq!(game.stats.days_left, 0);
+        assert!(game.stats.game_over);
+    }
+
+    #[test]
+    fn spending_days_stops_as_soon_as_the_game_is_over() {
+        let resources = search_fixture();
+        let mut game = digger();
+        game.stats.days_left = 4;
+
+        let (weeks, commission) = spend_days(&mut game, &resources, 4);
+        assert_eq!(game.stats.days_left, 0);
+        assert!(game.stats.game_over);
+        // The final end_day returns before the week block, so a game-ending
+        // day never credits commission even when it lands on a boundary.
+        assert_eq!((weeks, commission), (0, 0));
+    }
+
+    #[test]
+    fn spending_zero_or_negative_days_changes_nothing() {
+        let resources = search_fixture();
+        let mut game = digger();
+
+        assert_eq!(spend_days(&mut game, &resources, 0), (0, 0));
+        assert_eq!(spend_days(&mut game, &resources, -5), (0, 0));
+        assert_eq!(game.stats.days_left, 100);
     }
 
     fn time_fixture() -> Resources {

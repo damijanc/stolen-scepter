@@ -129,12 +129,40 @@ impl Default for ResChest {
     }
 }
 
+/// The final-score formula's knobs. Ports `ResScoring`.
+///
+/// `difficulty_multiplier[0]` is unused while `easy_halves` is set, and is
+/// kept only for layout parity with the original.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResScoring {
+    pub per_villain: i32,
+    pub per_artifact: i32,
+    pub per_castle: i32,
+    pub kill_penalty: i32,
+    pub difficulty_multiplier: [i32; 5],
+    pub easy_halves: bool,
+}
+
+impl Default for ResScoring {
+    fn default() -> Self {
+        Self {
+            per_villain: 500,
+            per_artifact: 250,
+            per_castle: 100,
+            kill_penalty: 1,
+            difficulty_multiplier: [0, 1, 2, 4, 8],
+            easy_halves: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResEconomy {
     pub boat_cost_normal: i32,
     pub boat_cost_cheap: i32,
     pub siege_cost: i32,
     pub chest: ResChest,
+    pub scoring: ResScoring,
 }
 
 impl Default for ResEconomy {
@@ -144,6 +172,7 @@ impl Default for ResEconomy {
             boat_cost_cheap: 100,
             siege_cost: 3_000,
             chest: ResChest::default(),
+            scoring: ResScoring::default(),
         }
     }
 }
@@ -471,12 +500,14 @@ impl Default for ResCastle {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResTuning {
     pub instant_army_multiplier: [i32; 4],
+    pub search_cost_days: i32,
 }
 
 impl Default for ResTuning {
     fn default() -> Self {
         Self {
             instant_army_multiplier: [3, 2, 1, 1],
+            search_cost_days: 10,
         }
     }
 }
@@ -812,6 +843,32 @@ impl Resources {
             optional_i32_field(economy, "boat_cost_cheap", self.economy.boat_cost_cheap)?;
         self.economy.siege_cost =
             optional_i32_field(economy, "siege_cost", self.economy.siege_cost)?;
+        if let Some(scoring) = economy.get("scoring") {
+            // C guards the block with cJSON_IsObject and skips a non-object
+            // silently, leaving the canonical defaults in place.
+            if scoring.is_object() {
+                let current = self.economy.scoring;
+                self.economy.scoring.per_villain =
+                    optional_i32_field(scoring, "per_villain", current.per_villain)?;
+                self.economy.scoring.per_artifact =
+                    optional_i32_field(scoring, "per_artifact", current.per_artifact)?;
+                self.economy.scoring.per_castle =
+                    optional_i32_field(scoring, "per_castle", current.per_castle)?;
+                self.economy.scoring.kill_penalty =
+                    optional_i32_field(scoring, "kill_penalty", current.kill_penalty)?;
+                parse_i32_array_into(
+                    scoring,
+                    "difficulty_multiplier",
+                    &mut self.economy.scoring.difficulty_multiplier,
+                )?;
+                if let Some(easy_halves) = scoring.get("easy_halves") {
+                    // Only a real bool overrides; C tests cJSON_IsBool first.
+                    if let Some(easy_halves) = easy_halves.as_bool() {
+                        self.economy.scoring.easy_halves = easy_halves;
+                    }
+                }
+            }
+        }
         let Some(chest) = economy.get("chest") else {
             return Ok(());
         };
@@ -874,6 +931,8 @@ impl Resources {
             "instant_army_multiplier",
             &mut self.tuning.instant_army_multiplier,
         )?;
+        self.tuning.search_cost_days =
+            optional_i32_field(tuning, "search_cost_days", self.tuning.search_cost_days)?;
         Ok(())
     }
 

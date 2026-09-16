@@ -1409,6 +1409,81 @@ impl Game {
         true
     }
 
+    /// Ports `GameVillainsCaught`. The scan covers the ARRAY EXTENT, not the
+    /// catalog count: `villains_caught` is keyed by pack-authored
+    /// `VillainDef.index`, which load validation constrains for range and
+    /// uniqueness but not for density.
+    pub fn villains_caught_count(&self) -> i32 {
+        let mut caught = 0_i32;
+        for index in 0..CAT_VILLAINS_MAX {
+            if self.contract.villains_caught[index] {
+                caught = caught.wrapping_add(1);
+            }
+        }
+        caught
+    }
+
+    /// Ports `GameArtifactsFound`, whose loop bound is a hard-coded 8 rather
+    /// than the catalog's artifact count. A pack shipping more artifacts can
+    /// have them found and still not scored.
+    pub fn artifacts_found_count(&self) -> i32 {
+        let mut found = 0_i32;
+        for index in 0..8 {
+            if self.artifacts.found[index] {
+                found = found.wrapping_add(1);
+            }
+        }
+        found
+    }
+
+    /// Ports `GameCastlesOwned`.
+    pub fn castles_owned_count(&self) -> i32 {
+        let mut owned = 0_i32;
+        for index in 0..GAME_CASTLES {
+            if self.castles[index].id.is_empty() {
+                continue;
+            }
+            if self.castles[index].owner_kind == CastleOwnerKind::Player {
+                owned = owned.wrapping_add(1);
+            }
+        }
+        owned
+    }
+
+    /// The final score. Ports `GameComputeScore`.
+    ///
+    /// Note the difficulty branch: `easy_halves` HALVES the easy score rather
+    /// than multiplying it, and `difficulty_multiplier[0]` is dead while that
+    /// flag is set. With the flag cleared, difficulty 0 falls through both
+    /// arms and is left unscaled -- the `d >= 1` test excludes it.
+    pub fn compute_score(&self, resources: &Resources) -> i32 {
+        let scoring = &resources.economy.scoring;
+        let mut score = scoring
+            .per_villain
+            .wrapping_mul(self.villains_caught_count())
+            .wrapping_add(
+                scoring
+                    .per_artifact
+                    .wrapping_mul(self.artifacts_found_count()),
+            )
+            .wrapping_add(scoring.per_castle.wrapping_mul(self.castles_owned_count()))
+            .wrapping_sub(
+                scoring
+                    .kill_penalty
+                    .wrapping_mul(self.stats.followers_killed),
+            );
+        let difficulty = self.character.difficulty;
+        if scoring.easy_halves && difficulty == 0 {
+            score /= 2;
+        } else if (1..5).contains(&difficulty) {
+            score = score.wrapping_mul(scoring.difficulty_multiplier[difficulty as usize]);
+        }
+        if score < 0 {
+            score = 0;
+        }
+        score
+    }
+
     pub fn add_placement(&mut self, zone: &str, x: i32, y: i32, kind: Interact, id: &str) {
         if self.placement_count >= GAME_MAX_PLACEMENTS {
             return;
@@ -6232,6 +6307,117 @@ mod tests {
     }
 
     /// Two zones, each 6x2. `home` spawns on grass, `isle` spawns on water.
+    fn scoring_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "economy": {"scoring": {
+                "per_villain": 500, "per_artifact": 250, "per_castle": 100,
+                "kill_penalty": 1, "difficulty_multiplier": [0,1,2,4,8],
+                "easy_halves": true
+              }},
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// One villain caught, two artifacts, one castle: 500 + 500 + 100.
+    fn scorer() -> Game {
+        let mut game = Game::default();
+        game.contract.villains_caught[0] = true;
+        game.artifacts.found[0] = true;
+        game.artifacts.found[1] = true;
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].owner_kind = CastleOwnerKind::Player;
+        game
+    }
+
+    #[test]
+    fn the_score_sums_the_catalogue_and_subtracts_the_kill_penalty() {
+        let resources = scoring_fixture();
+        let mut game = scorer();
+        game.character.difficulty = 1;
+        game.stats.followers_killed = 100;
+
+        // 500 + 500 + 100 - 100 = 1000, times multiplier[1] = 1.
+        assert_eq!(game.compute_score(&resources), 1000);
+        assert_eq!(game.villains_caught_count(), 1);
+        assert_eq!(game.artifacts_found_count(), 2);
+        assert_eq!(game.castles_owned_count(), 1);
+    }
+
+    #[test]
+    fn easy_halves_the_score_rather_than_multiplying_it() {
+        let resources = scoring_fixture();
+        let mut game = scorer();
+        game.character.difficulty = 0;
+
+        // 1100 / 2. multiplier[0] is 0 and would zero the score if the easy
+        // branch fell through to it, which is why the order matters.
+        assert_eq!(game.compute_score(&resources), 550);
+    }
+
+    #[test]
+    fn difficulty_zero_is_left_unscaled_when_easy_halves_is_off() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "economy": {"scoring": {"easy_halves": false}},
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut game = scorer();
+        game.character.difficulty = 0;
+
+        // With the flag off, difficulty 0 misses the halving AND misses the
+        // `d >= 1` multiplier arm, so it is scored raw -- multiplier[0] is
+        // dead either way.
+        assert_eq!(game.compute_score(&resources), 1100);
+    }
+
+    #[test]
+    fn a_score_driven_negative_by_kills_clamps_to_zero() {
+        let resources = scoring_fixture();
+        let mut game = scorer();
+        game.character.difficulty = 3;
+        game.stats.followers_killed = 5_000;
+
+        // The clamp runs AFTER the multiplier, so a negative subtotal is
+        // multiplied first and still lands at 0.
+        assert_eq!(game.compute_score(&resources), 0);
+    }
+
+    #[test]
+    fn only_the_first_eight_artifacts_ever_score() {
+        let mut game = Game::default();
+        for slot in game.artifacts.found.iter_mut() {
+            *slot = true;
+        }
+
+        // GameArtifactsFound's loop bound is a hard-coded 8, not the
+        // artifact count, so any artifact past the eighth is invisible to
+        // scoring even once found.
+        assert!(
+            game.artifacts.found.len() > 8,
+            "the quirk needs room to show"
+        );
+        assert_eq!(game.artifacts_found_count(), 8);
+    }
+
+    #[test]
+    fn an_empty_castle_slot_is_not_an_owned_castle() {
+        let resources = scoring_fixture();
+        let mut game = Game::default();
+        // Owner set but no id: the id guard comes first, so this is not a
+        // castle at all.
+        game.castles[0].owner_kind = CastleOwnerKind::Player;
+        game.castles[1].id.copy_from_str("real");
+        game.castles[1].owner_kind = CastleOwnerKind::Player;
+
+        assert_eq!(game.castles_owned_count(), 1);
+        assert_eq!(game.compute_score(&resources), 50);
+    }
+
     fn zone_fixture() -> Resources {
         Resources::from_json_str(
             r##"{
