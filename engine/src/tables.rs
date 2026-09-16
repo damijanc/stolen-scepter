@@ -374,3 +374,73 @@ impl Default for VillainDef {
         }
     }
 }
+
+/// Which entity gates each cell of the classic 5x5 puzzle, row-major.
+/// Ports `PUZZLE_GRID` (`engine/tables.c`).
+///
+/// A non-negative value is a villain catalog index; a negative one is an
+/// artifact index encoded as `-(index) - 1`.
+const PUZZLE_GRID: [[i32; 5]; 5] = [
+    [-1, 7, -2, 6, -3],
+    [5, 15, 14, 13, 4],
+    [-4, 12, 16, 11, -5],
+    [3, 10, 9, 8, 2],
+    [-6, 1, -7, 0, -8],
+];
+
+/// The entity gating puzzle cell `(row, col)`. Ports `puzzle_grid_entity`.
+///
+/// An out-of-range cell answers 0, which is indistinguishable from villain
+/// index 0 -- C returns the same, so a caller must bound the cell itself.
+pub fn puzzle_grid_entity(row: i32, col: i32) -> i32 {
+    if !(0..5).contains(&row) || !(0..5).contains(&col) {
+        return 0;
+    }
+    PUZZLE_GRID[row as usize][col as usize]
+}
+
+#[cfg(test)]
+mod puzzle_tests {
+    use super::puzzle_grid_entity;
+
+    #[test]
+    fn the_puzzle_grid_matches_the_original_layout() {
+        // Spot-check the corners and centre against tables.c.
+        assert_eq!(puzzle_grid_entity(0, 0), -1);
+        assert_eq!(puzzle_grid_entity(0, 4), -3);
+        assert_eq!(puzzle_grid_entity(2, 2), 16);
+        assert_eq!(puzzle_grid_entity(4, 0), -6);
+        assert_eq!(puzzle_grid_entity(4, 4), -8);
+    }
+
+    #[test]
+    fn the_grid_covers_seventeen_villains_and_eight_artifacts_exactly_once() {
+        let mut villains = vec![];
+        let mut artifacts = vec![];
+        for row in 0..5 {
+            for col in 0..5 {
+                let entity = puzzle_grid_entity(row, col);
+                if entity >= 0 {
+                    villains.push(entity);
+                } else {
+                    artifacts.push(-entity - 1);
+                }
+            }
+        }
+        villains.sort_unstable();
+        artifacts.sort_unstable();
+        // 17 villains plus 8 artifacts fill the 25 cells with no gap and no
+        // repeat, which is what makes every cell reachable by play.
+        assert_eq!(villains, (0..17).collect::<Vec<_>>());
+        assert_eq!(artifacts, (0..8).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn an_out_of_range_cell_answers_zero_like_the_original() {
+        // Indistinguishable from villain index 0: C returns the same, so a
+        // caller has to bound the cell itself.
+        assert_eq!(puzzle_grid_entity(-1, 0), 0);
+        assert_eq!(puzzle_grid_entity(0, 5), 0);
+        assert_eq!(puzzle_grid_entity(9, 9), 0);
+    }
+}

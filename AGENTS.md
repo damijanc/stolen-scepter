@@ -78,6 +78,19 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- The puzzle map. `tables::puzzle_grid_entity` ports the fixed 5x5
+  `PUZZLE_GRID`, and `Game::puzzle_cell_revealed` ports the demo's
+  `cell_revealed` rule over it. The 25 cells hold villains 0..16 and
+  artifacts 0..7 exactly once each, which a test asserts structurally.
+  `VillainDef::puzzle_cell` and `ArtifactDef::puzzle_cell` are NOT this
+  mapping: they are a flat 0..24 entity numbering the extraction tool
+  authored (its own comment calls it a "5x6 grid"), no engine code reads
+  them, and wiring the two together would be wrong.
+  NOT ported, deliberately: the window clamp that decides which map tiles a
+  revealed cell shows. C keeps it in `views_render.c` (`draw_puzzle`) and
+  `demo_scepter.c` re-implements it as `puzzle_cam`; it clamps the 5x5
+  WINDOW to `[0, width-5]`, which is not the per-cell clamp the `tables.c`
+  header comment describes. It belongs to whichever shell draws the puzzle.
 - The weekly economy queries. `Game::weekly_net_gold` judges the boat fare
   on the POST-CREDIT wallet, mirroring `apply_week_end`, which banks the
   commission and pays upkeep before it looks at the fare; a poor hero whose
@@ -134,10 +147,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 278 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 286 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the weekly economy queries. Run `git log --oneline -5`
+The most recent slice is the puzzle map. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -203,12 +216,10 @@ declared functions from `reference/engine/include/*.h` and grep each against
 `prompt_*`, `screen_*`, `views_*`, `pack_*`, `SavePath*`) and correctly out
 of scope, but that sweep is what surfaced the endgame.
 
-One known-unported engine core the sweep still reports: `puzzle_grid_entity`,
-the fixed 5x5 table naming which villain or artifact gates each puzzle cell
-(non-negative = villain index, negative = artifact encoded as -(index)-1).
-The rule around it is that a revealed cell (i,j) shows the scepter zone's map
-tile at `(scepter.x - 2 + i, scepter.y - 2 + j)`, clamped to the map -- so it
-is engine data, not presentation, and is the obvious next slice.
+The sweep now reports no unported engine core. Given that three previous
+"nothing left" claims were wrong, treat that as "re-run the sweep", not as a
+finished state -- and note the sweep is a name-matching heuristic, so it
+cannot see a core whose Rust counterpart is named similarly but does less.
 
 Three slices running, the gap had the same tell, which is worth looking for
 directly: state the engine STORES and SAVES but never reads or writes.

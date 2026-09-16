@@ -6,8 +6,8 @@ use crate::map::Map;
 use crate::resources::{Resources, RES_MAX_ZONES, RES_SPAWN_POOL_N, RES_SPAWN_TIERS};
 use crate::rng::{seed_from_index, Rng};
 use crate::tables::{
-    class_stats_at_rank, ArtifactPower, FixedStr, TroopDef, CAT_ARTIFACTS_MAX, CAT_ID_LEN,
-    CAT_SPELLS_MAX, CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
+    class_stats_at_rank, puzzle_grid_entity, ArtifactPower, FixedStr, TroopDef, CAT_ARTIFACTS_MAX,
+    CAT_ID_LEN, CAT_SPELLS_MAX, CAT_VILLAINS_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
 };
 use crate::tile::{Interact, Terrain};
 
@@ -1407,6 +1407,49 @@ impl Game {
             }
         }
         true
+    }
+
+    /// Whether puzzle cell `(row, col)` has been uncovered yet: its villain
+    /// caught, or its artifact found. Ports `cell_revealed`.
+    ///
+    /// C bounds the cell nowhere: an out-of-range cell reads entity 0, which
+    /// is villain index 0, so it reports revealed once that villain is
+    /// caught. Callers pass 0..4 and the port keeps the same shape.
+    ///
+    /// Do NOT reach for `VillainDef::puzzle_cell` or `ArtifactDef::puzzle_cell`
+    /// here. Those are a flat 0..24 entity numbering the extraction tool
+    /// authored, unrelated to a position in this grid, and no engine code
+    /// reads them.
+    pub fn puzzle_cell_revealed(&self, row: i32, col: i32) -> bool {
+        let entity = puzzle_grid_entity(row, col);
+        if entity >= 0 {
+            return usize::try_from(entity)
+                .ok()
+                .and_then(|entity| self.contract.villains_caught.get(entity))
+                .copied()
+                .unwrap_or(false);
+        }
+        // A negative entity is an artifact index encoded as -(index) - 1.
+        let artifact = entity.wrapping_neg().wrapping_sub(1);
+        usize::try_from(artifact)
+            .ok()
+            .and_then(|artifact| self.artifacts.found.get(artifact))
+            .copied()
+            .unwrap_or(false)
+    }
+
+    /// How many puzzle cells stand uncovered. Every villain caught and every
+    /// artifact found turns over one more.
+    pub fn puzzle_cells_revealed(&self) -> i32 {
+        let mut revealed = 0_i32;
+        for row in 0..5 {
+            for col in 0..5 {
+                if self.puzzle_cell_revealed(row, col) {
+                    revealed = revealed.wrapping_add(1);
+                }
+            }
+        }
+        revealed
     }
 
     /// What the coming week will actually leave in the purse. Ports
@@ -6473,6 +6516,62 @@ mod tests {
         game.foes[0] = foe;
         game.foe_count = 1;
         game
+    }
+
+    #[test]
+    fn a_puzzle_cell_uncovers_when_its_villain_is_caught() {
+        let mut game = Game::default();
+        // (2,2) is villain 16, the grid's centre.
+        assert!(!game.puzzle_cell_revealed(2, 2));
+        game.contract.villains_caught[16] = true;
+        assert!(game.puzzle_cell_revealed(2, 2));
+        // Its neighbours are unaffected.
+        assert!(!game.puzzle_cell_revealed(2, 1));
+    }
+
+    #[test]
+    fn a_puzzle_cell_uncovers_when_its_artifact_is_found() {
+        let mut game = Game::default();
+        // (0,0) holds -1, which encodes artifact index 0.
+        assert!(!game.puzzle_cell_revealed(0, 0));
+        game.artifacts.found[0] = true;
+        assert!(game.puzzle_cell_revealed(0, 0));
+        // (0,2) holds -2, artifact 1, still covered.
+        assert!(!game.puzzle_cell_revealed(0, 2));
+    }
+
+    #[test]
+    fn an_out_of_range_puzzle_cell_follows_villain_zero() {
+        let mut game = Game::default();
+        assert!(!game.puzzle_cell_revealed(9, 9));
+        // The out-of-range entity is 0, so catching villain 0 makes even a
+        // nonsense cell report revealed. C has the same hole.
+        game.contract.villains_caught[0] = true;
+        assert!(game.puzzle_cell_revealed(9, 9));
+    }
+
+    #[test]
+    fn every_catch_and_find_uncovers_exactly_one_cell() {
+        let mut game = Game::default();
+        assert_eq!(game.puzzle_cells_revealed(), 0);
+
+        for villain in 0..17 {
+            game.contract.villains_caught[villain] = true;
+        }
+        assert_eq!(game.puzzle_cells_revealed(), 17);
+
+        for artifact in 0..8 {
+            game.artifacts.found[artifact] = true;
+        }
+        assert_eq!(game.puzzle_cells_revealed(), 25);
+    }
+
+    #[test]
+    fn a_villain_beyond_the_grid_uncovers_nothing() {
+        let mut game = Game::default();
+        // The grid names villains 0..16; the catalogue holds more slots.
+        game.contract.villains_caught[20] = true;
+        assert_eq!(game.puzzle_cells_revealed(), 0);
     }
 
     fn economy_fixture() -> Resources {
