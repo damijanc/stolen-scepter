@@ -7,6 +7,7 @@ pub mod map;
 pub mod resources;
 pub mod rng;
 pub mod savegame;
+pub mod spells_adventure;
 pub mod state_serialize;
 pub mod step;
 pub mod tables;

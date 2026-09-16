@@ -465,6 +465,22 @@ impl Default for ResCastle {
     }
 }
 
+/// The `tuning` block of `game.json`. Only the knob the adventure spells
+/// need is ported: C's block also carries `search_cost_days` and a
+/// `temp_death` pair, and those belong with the cores that read them.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResTuning {
+    pub instant_army_multiplier: [i32; 4],
+}
+
+impl Default for ResTuning {
+    fn default() -> Self {
+        Self {
+            instant_army_multiplier: [3, 2, 1, 1],
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
     resource_root: FixedStr<CAT_PATH_LEN>,
@@ -475,6 +491,7 @@ pub struct Resources {
     pub world: ResWorld,
     pub contract: ResContract,
     pub economy: ResEconomy,
+    pub tuning: ResTuning,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
     town_count: usize,
@@ -505,6 +522,7 @@ impl Default for Resources {
             world: ResWorld::default(),
             contract: ResContract::default(),
             economy: ResEconomy::default(),
+            tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
             town_count: 0,
@@ -551,6 +569,7 @@ impl Resources {
         resources.parse_world(&root)?;
         resources.parse_contract(&root)?;
         resources.parse_economy(&root)?;
+        resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
         resources.parse_towns(&root)?;
@@ -836,6 +855,24 @@ impl Resources {
             chest,
             "max_spells_base",
             &mut self.economy.chest.max_spells_base,
+        )?;
+        Ok(())
+    }
+
+    fn parse_tuning(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(tuning) = root.get("tuning") else {
+            return Ok(());
+        };
+        // C guards this block with cJSON_IsObject and silently skips a
+        // non-object, where the surrounding parsers reject one. Keep C's
+        // tolerance: a malformed `tuning` leaves the defaults standing.
+        if !tuning.is_object() {
+            return Ok(());
+        }
+        parse_i32_array_into(
+            tuning,
+            "instant_army_multiplier",
+            &mut self.tuning.instant_army_multiplier,
         )?;
         Ok(())
     }

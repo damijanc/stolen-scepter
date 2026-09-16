@@ -78,6 +78,13 @@ Implemented and tested:
   live fog winning over its stale per-continent snapshot). `pack_hash` is
   not emitted -- it hashes the pack zip, which the Rust engine does not load,
   and nothing gates on it.
+- Adventure spells (`engine/src/spells_adventure.rs`): the id-to-effect
+  table, the cast cores, and the spellbook dispatcher. Each cast returns an
+  `AdventureCast` carrying the values a banner template needs instead of
+  queueing C's message. Watch the charge accounting -- it is NOT uniform:
+  time stop and raise control spend on entry, find villain spends only once
+  a contract exists, instant army spends only on success, and both the
+  bridge and the two gates spend nothing at cast time at all.
 - Fog of war (`engine/src/fog.rs`): a fixed 64x64 seen grid per continent,
   revealed by `game_step_basic` right after each move. `reveal` takes a
   radius and IGNORES it -- the original always stamps 5x5.
@@ -88,10 +95,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 208 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 229 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is the save-slot header reader. Run `git log --oneline -5`
+The most recent slice is the adventure spells. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -144,15 +151,24 @@ failures easier to attribute. Do not add renderer/UI crates to
 
 ## Good Next Work
 
-The foe, combat, and save/load systems are all closed. Everything ported so
-far is reachable from `game_step_basic`; there are no dangling engine cores
-left to wire up, and no headless gap left that the C engine fills.
+Zone switching is the next slice, and it is the last engine-side gap of any
+size. `GameSwitchZone` and `GameGateTeleport` (`engine/game.c`) are unported,
+which is why the two gate spells classify and arm but cannot teleport --
+`AdventureCast::GateArmed` counts eligible destinations and stops. Porting
+`GameSwitchZone` closes the gates and the continent-to-continent travel that
+`WorldProgress.continent_fog` was already built for.
 
-What remains is shell-facing, which makes the next decision a scoping one
-rather than a porting one: the `player_io` message/prompt queue (the engine
-returns outcome enums where C queues a dialog), and the two combat omissions
-noted below. All three only pay off once a shell exists to consume them, so
-consider selecting the shell before porting more of its scaffolding.
+Do not trust a "nothing left" claim in this file, including one written by a
+previous slice. Two such claims have already proved wrong: the save format
+was v11 where a plan doc said v8, and `spells_adventure.c` plus
+`GameSwitchZone` were both live engine cores at a point this file described
+the headless engine as complete. Diff `reference/engine/*.c` against
+`engine/src/` before concluding a system is closed.
+
+After zone switching, what remains really is shell-facing: the `player_io`
+message/prompt queue (the engine returns outcome enums where C queues a
+dialog) and the two combat omissions noted below. Those only pay off once a
+shell exists, so consider selecting the shell before porting its scaffolding.
 
 Traps the save slice turned up, worth knowing before touching that format:
 
@@ -184,7 +200,9 @@ Three habits these cores rewarded:
   the test name. `GameKnownSpells` is documented as counting distinct spells
   but sums `counts[]`. `calc_distance` is documented as "squared-distance
   x 256" but actually scales by 2^24, because `isqrt32` already returns 16.16
-  fixed point and `calc_distance` pre-shifts on top of it.
+  fixed point and `calc_distance` pre-shifts on top of it. `try_build_bridge`
+  says it builds "max 2 tiles (or up to 5 water tiles)", but its `built >= 2`
+  break makes the loop's bound of 5 unreachable; the cap is always 2.
 - When a test you just wrote fails, check the C before changing the code. Two
   combat tests failed on first run and both times the port was right and the
   expectation was wrong -- the second was an out-of-control stack targeting
@@ -199,5 +217,5 @@ Note that the town-flow callers live in `reference/src/views.c` (for example
 only dialogs; the state mutation belongs in the engine.
 
 The gap list that used to close this file -- town/castle flows, headless
-combat, foe following, fog, and save/load -- is now entirely ported. Do not
-re-add items here without checking `Current Engine State` first.
+combat, foe following, fog, and save/load -- is ported. Zone switching is
+the one item left; see the head of this section.
