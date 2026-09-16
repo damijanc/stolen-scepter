@@ -11,6 +11,10 @@ pub const CAT_VILLAINS_MAX: usize = 32;
 pub const CAT_ARTIFACTS_MAX: usize = 16;
 pub const TROOP_TIER_COUNTS: usize = 4;
 
+/// Longest animation a pack may declare, C's `OB_ANIM_FRAMES_MAX`. Both the
+/// catalogs and the role-fixed sprite manifest share this cap.
+pub const ANIM_FRAMES_MAX: usize = 16;
+
 pub const TROOP_ABIL_FLY: i32 = 1 << 0;
 pub const TROOP_ABIL_REGEN: i32 = 1 << 1;
 pub const TROOP_ABIL_MAGIC: i32 = 1 << 2;
@@ -125,6 +129,13 @@ pub struct TroopDef {
     pub growth_per_week: i32,
     pub morale_group: u8,
     pub tier_counts: [i32; TROOP_TIER_COUNTS],
+    /// Still image. Only a renderer reads it, but the pack declares it here
+    /// alongside the troop it belongs to.
+    pub sprite: FixedStr<CAT_PATH_LEN>,
+    /// Idle animation. `anim_count` is the declared cycle length, and 0 means
+    /// the troop ships no animation, so a consumer falls back to `sprite`.
+    pub anim_count: usize,
+    pub anim: [FixedStr<CAT_PATH_LEN>; ANIM_FRAMES_MAX],
 }
 
 impl Default for TroopDef {
@@ -148,6 +159,9 @@ impl Default for TroopDef {
             growth_per_week: 0,
             morale_group: b'A',
             tier_counts: [0; TROOP_TIER_COUNTS],
+            sprite: FixedStr::empty(),
+            anim_count: 0,
+            anim: [FixedStr::empty(); ANIM_FRAMES_MAX],
         }
     }
 }
@@ -190,6 +204,9 @@ impl TroopDef {
             growth_per_week: 0,
             morale_group,
             tier_counts,
+            sprite: FixedStr::empty(),
+            anim_count: 0,
+            anim: [FixedStr::empty(); ANIM_FRAMES_MAX],
         }
     }
 }
@@ -393,6 +410,11 @@ pub struct VillainDef {
     pub puzzle_cell: i32,
     pub army_troops: [FixedStr<CAT_ID_LEN>; 5],
     pub army_counts: [i32; 5],
+    /// Wanted-poster animation, declared exactly like a troop's. A count of 0
+    /// means the pack declared none, and the shell derives
+    /// `<portrait-stem>_NN` siblings instead.
+    pub anim_count: usize,
+    pub anim: [FixedStr<CAT_PATH_LEN>; ANIM_FRAMES_MAX],
 }
 
 impl Default for VillainDef {
@@ -407,6 +429,8 @@ impl Default for VillainDef {
             puzzle_cell: -1,
             army_troops: [FixedStr::empty(); 5],
             army_counts: [0; 5],
+            anim_count: 0,
+            anim: [FixedStr::empty(); ANIM_FRAMES_MAX],
         }
     }
 }

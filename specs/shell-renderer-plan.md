@@ -237,7 +237,31 @@ including `resources_format_template` and its `%VAR%` substitution.
      canonical fallback in `palette.c` so chrome renders without the file.
      Parsing it is pure and belongs in this step.
 3. **Backend.** macroquad window, integer-scale present, sprite atlas load,
-   bitmap font, input mapping.
+   bitmap font, input mapping. The art manifest comes first, because the
+   backend cannot load what the pack has not been asked about:
+   - DONE: per-catalog art. `TroopDef.sprite` / `.anim[]` and
+     `VillainDef.anim[]` were unparsed; `ClassDef.portrait`,
+     `VillainDef.portrait` and `ArtifactDef.icon` already were.
+     `parse_path_array` ports C's, including its fix: a non-string entry is
+     SKIPPED rather than burning a slot, so one bad frame does not leave a
+     hole mid-cycle. The stored COUNT is the cycle length, not the array's
+     16 slots. Verified on the shipped pack: 25 troops x 4 frames, 17
+     villains, every path on disk.
+     Note the shipped pack declares NO villain animations at all, so the
+     `<portrait-stem>_NN` sibling derivation is the live path for wanted
+     posters, not a fallback. The shell owes that.
+     Boxing `Resources.troops` and `.villains` was forced, not stylistic:
+     the two catalogs grew to ~140KB and overflowed the test stack.
+   - TODO: the role-fixed `sprites` manifest block (`resources.h` ~890):
+     hero walk/idle/boat as `ResAnimSet`, the 15 combat tiles, the font and
+     palette paths, six backdrops, two endings, the HUD panels and their
+     animations, the bar strip, chrome, splashes, class picker, orb.
+     `ResAnimSet` accepts both authoring forms -- a flat array lands in
+     `south` with `directional` false, and an object names up to four facings.
+   - TODO: `present_scale` from `src/present.c`. Pure arithmetic, so it can
+     be ported and tested before any window exists. Legacy and modern take
+     completely separate paths: legacy auto-fits with the `SCALE_MIN` floor
+     and has NO override, because the scale control is a modern-only feature.
 4. **Chrome + map viewport.** First thing actually on screen.
 5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.

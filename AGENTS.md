@@ -178,7 +178,7 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 318 engine unit tests, 27 shell unit tests, 25 combat digest
+Test coverage is 323 engine unit tests, 27 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 The most recent slice is the shell layout model. Run `git log --oneline -5`

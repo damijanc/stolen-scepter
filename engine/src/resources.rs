@@ -572,9 +572,13 @@ pub struct Resources {
     artifacts: [ArtifactDef; CAT_ARTIFACTS_MAX],
     artifacts_count: usize,
     tile_codes: Box<[ResTileCode; RES_TILE_CODE_COUNT]>,
-    troops: [TroopDef; CAT_TROOPS_MAX],
+    // Boxed, like `tile_codes` and the zone object arrays: a troop and a
+    // villain each carry a 16-slot animation of 128-byte paths, so the two
+    // catalogs together are about 140KB and overflow the stack if `Resources`
+    // is built inline.
+    troops: Box<[TroopDef; CAT_TROOPS_MAX]>,
     troops_count: usize,
-    villains: [VillainDef; CAT_VILLAINS_MAX],
+    villains: Box<[VillainDef; CAT_VILLAINS_MAX]>,
     villains_count: usize,
     morale_chart: [[u8; 5]; 5],
 }
@@ -604,9 +608,9 @@ impl Default for Resources {
             artifacts: [ArtifactDef::default(); CAT_ARTIFACTS_MAX],
             artifacts_count: 0,
             tile_codes: Box::new([ResTileCode::default(); RES_TILE_CODE_COUNT]),
-            troops: [TroopDef::default(); CAT_TROOPS_MAX],
+            troops: Box::new([TroopDef::default(); CAT_TROOPS_MAX]),
             troops_count: 0,
-            villains: [VillainDef::default(); CAT_VILLAINS_MAX],
+            villains: Box::new([VillainDef::default(); CAT_VILLAINS_MAX]),
             villains_count: 0,
             morale_chart: default_morale_chart(),
         }
@@ -1455,6 +1459,10 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
     }
     troop.max_population = optional_i32_field(value, "max_population", 0)?;
     troop.growth_per_week = optional_i32_field(value, "growth_per_week", 0)?;
+    if let Some(sprite) = optional_string_field(value, "sprite")? {
+        troop.sprite.copy_from_str(sprite);
+    }
+    troop.anim_count = parse_path_array(value, "anim", &mut troop.anim);
     Ok(troop)
 }
 
@@ -1881,6 +1889,7 @@ fn parse_villain(value: &serde_json::Value) -> Result<VillainDef, ResourceError>
     if let Some(portrait) = optional_string_field(value, "portrait")? {
         villain.portrait.copy_from_str(portrait);
     }
+    villain.anim_count = parse_path_array(value, "anim", &mut villain.anim);
     if let Some(zone) = optional_string_field(value, "zone")? {
         villain.zone.copy_from_str(zone);
     }
@@ -1896,6 +1905,40 @@ fn parse_villain(value: &serde_json::Value) -> Result<VillainDef, ResourceError>
     }
 
     Ok(villain)
+}
+
+/// Read an array of file paths into a fixed-size slot array, porting
+/// `parse_path_array`, and return how many landed.
+///
+/// A non-string entry is SKIPPED rather than consuming a slot. C's comment
+/// records why: the hand-rolled loop it replaced advanced its index outside
+/// the type check, so one bad entry left an empty frame in the middle of an
+/// animation cycle. Entries past the cap are dropped. Anything that is not an
+/// array at all reads as zero paths, never an error -- an animation is always
+/// optional.
+///
+/// For an animation the returned count IS the cycle length, so a consumer
+/// folds a tick with it rather than with the array's capacity.
+fn parse_path_array<const N: usize, const SLOTS: usize>(
+    value: &serde_json::Value,
+    key: &str,
+    out: &mut [FixedStr<N>; SLOTS],
+) -> usize {
+    let Some(entries) = value.get(key).and_then(serde_json::Value::as_array) else {
+        return 0;
+    };
+    let mut count = 0;
+    for entry in entries {
+        if count >= SLOTS {
+            break;
+        }
+        let Some(path) = entry.as_str() else {
+            continue;
+        };
+        out[count].copy_from_str(path);
+        count += 1;
+    }
+    count
 }
 
 fn string_field<'a>(
@@ -2038,8 +2081,8 @@ const fn default_morale_chart() -> [[u8; 5]; 5] {
 mod tests {
     use super::{RenderMode, Resources};
     use crate::tables::{
-        parse_troop_abilities, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY, TROOP_ABIL_LEECH,
-        TROOP_ABIL_UNDEAD,
+        parse_troop_abilities, ANIM_FRAMES_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
+        TROOP_ABIL_LEECH, TROOP_ABIL_UNDEAD,
     };
 
     #[test]
@@ -2267,5 +2310,119 @@ mod tests {
             parse_troop_abilities("FLY|ABSORB|LEECH|UNDEAD"),
             TROOP_ABIL_FLY | TROOP_ABIL_ABSORB | TROOP_ABIL_LEECH | TROOP_ABIL_UNDEAD
         );
+    }
+
+    /// A pack whose troops and villains declare their art.
+    fn art_pack(troops: &str, villains: &str) -> Resources {
+        Resources::from_json_str(&format!(
+            r#"{{
+              "world": {{"starting_zone": "home"}},
+              "zones": [{{"id":"home"}}],
+              "troops": {troops},
+              "villains": {villains}
+            }}"#
+        ))
+        .expect("fixture parses")
+    }
+
+    fn plain_troop(extra: &str) -> String {
+        format!(
+            r#"[{{"index":0,"id":"peasants","skill_level":1,"hit_points":1,
+                  "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,
+                  "spoils_factor":1,"abilities":"","morale_group":"A"{extra}}}]"#
+        )
+    }
+
+    #[test]
+    fn a_troop_carries_its_still_sprite_and_its_idle_cycle() {
+        let resources = art_pack(
+            &plain_troop(r#","sprite":"troops/peasants.png","anim":["p0.png","p1.png","p2.png"]"#),
+            "[]",
+        );
+        let troop = resources.troop_by_id("peasants").expect("troop parses");
+
+        assert_eq!(troop.sprite.as_str(), "troops/peasants.png");
+        // The count IS the cycle length, so a tick folds with 3 rather than
+        // with the array's 16 slots.
+        assert_eq!(troop.anim_count, 3);
+        assert_eq!(troop.anim[0].as_str(), "p0.png");
+        assert_eq!(troop.anim[2].as_str(), "p2.png");
+        assert_eq!(troop.anim[3].as_str(), "");
+    }
+
+    #[test]
+    fn a_troop_without_an_animation_reports_no_frames() {
+        // Count 0 is how a consumer knows to draw the still sprite instead.
+        let resources = art_pack(&plain_troop(r#","sprite":"s.png""#), "[]");
+        let troop = resources.troop_by_id("peasants").expect("troop parses");
+        assert_eq!(troop.anim_count, 0);
+        assert_eq!(troop.sprite.as_str(), "s.png");
+
+        // Neither declared at all is still a clean parse: art is optional.
+        let bare = art_pack(&plain_troop(""), "[]");
+        let troop = bare.troop_by_id("peasants").expect("troop parses");
+        assert_eq!(troop.anim_count, 0);
+        assert!(troop.sprite.is_empty());
+    }
+
+    #[test]
+    fn a_non_string_frame_is_skipped_rather_than_left_blank() {
+        // C fixed a bug here: the loop it replaced advanced its index outside
+        // the type check, so one bad entry left a hole in the middle of the
+        // cycle and the animation flickered. The good frames must close up.
+        let resources = art_pack(
+            &plain_troop(r#","anim":["a.png",7,"b.png",null,"c.png"]"#),
+            "[]",
+        );
+        let troop = resources.troop_by_id("peasants").expect("troop parses");
+
+        assert_eq!(troop.anim_count, 3);
+        assert_eq!(troop.anim[0].as_str(), "a.png");
+        assert_eq!(troop.anim[1].as_str(), "b.png");
+        assert_eq!(troop.anim[2].as_str(), "c.png");
+    }
+
+    #[test]
+    fn frames_past_the_cap_are_dropped_and_a_non_array_is_no_frames() {
+        let frames: Vec<String> = (0..20).map(|i| format!("\"f{i}.png\"")).collect();
+        let resources = art_pack(
+            &plain_troop(&format!(r#","anim":[{}]"#, frames.join(","))),
+            "[]",
+        );
+        let troop = resources.troop_by_id("peasants").expect("troop parses");
+        assert_eq!(troop.anim_count, ANIM_FRAMES_MAX);
+        assert_eq!(troop.anim[ANIM_FRAMES_MAX - 1].as_str(), "f15.png");
+
+        // A wrong type where an array belongs reads as no animation, not as
+        // an error: every art declaration is optional.
+        let odd = art_pack(&plain_troop(r#","anim":"nope.png""#), "[]");
+        assert_eq!(
+            odd.troop_by_id("peasants")
+                .expect("troop parses")
+                .anim_count,
+            0
+        );
+    }
+
+    #[test]
+    fn a_villain_declares_its_wanted_poster_the_same_way_a_troop_does() {
+        let resources = art_pack(
+            "[]",
+            r#"[{"index":0,"id":"v0","name":"Zero","portrait":"villains/v0.png",
+                 "anim":["v0_00.png","v0_01.png"],"zone":"home","reward":1000},
+                {"index":1,"id":"v1","portrait":"villains/v1.png","zone":"home"}]"#,
+        );
+
+        let zero = resources.villain_by_id("v0").expect("villain parses");
+        assert_eq!(zero.portrait.as_str(), "villains/v0.png");
+        assert_eq!(zero.anim_count, 2);
+        assert_eq!(zero.anim[1].as_str(), "v0_01.png");
+
+        // Undeclared means the shell derives `<portrait-stem>_NN` siblings,
+        // so a count of 0 does NOT mean "no animation" for a villain the way
+        // it does for a troop.
+        let one = resources.villain_by_id("v1").expect("villain parses");
+        assert_eq!(one.anim_count, 0);
+        assert_eq!(one.portrait.as_str(), "villains/v1.png");
     }
 }
