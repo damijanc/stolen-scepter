@@ -66,6 +66,9 @@ Implemented and tested:
 - `Game.oracle_mode`, the transient autoplay flag that keeps the legacy
   promote-on-capture behavior and the legacy reachable-flying-hero behavior.
   Real play promotes only at an audience and cannot be caught while flying.
+- v11 save read/write (`engine/src/savegame.rs`), guarded on an exact
+  `version` match and on `pack_id`. A whole-struct round-trip test is the
+  acceptance check -- keep it, it has already caught two real bugs.
 - The save-shaped snapshot: `build_snapshot_full` emits `pack_id`, `boat`
   and `map_state` (hex fog rows per discovered continent, the ACTIVE zone's
   live fog winning over its stale per-continent snapshot). `pack_hash` is
@@ -81,10 +84,10 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 197 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 204 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is completing the save snapshot. Run `git log --oneline -5`
+The most recent slice is v11 save read/write. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -146,14 +149,20 @@ and must NOT serialize `oracle_mode`, which C keeps transient.
 Everything ported so far is reachable from `game_step_basic`; there are no
 dangling engine cores left to wire up.
 
-The save format is v11, NOT the v8 named in older drafts of
-`specs/parity-port-plan.md`. The snapshot now carries every save-relevant
-key, so what remains is the file I/O: `SaveGameWrite` is just the snapshot
-printed to a file, while `SaveGameRead` (~500 lines of
-`reference/engine/savegame.c`) parses it back and enforces two guards --
-a `version` that must equal 11 exactly, and a `pack_id` that must match the
-loaded pack or the load is refused. A write/read round-trip test is the
-natural acceptance check.
+Save/load is done, so the remaining gaps are the shell-facing ones: the
+`player_io` message/prompt queue (the engine currently returns outcome enums
+where C queues a dialog), the combat spells and `CombatTurnRecord` noted
+below, and `SaveGameReadHeader`, the save-summary reader the load menu uses.
+
+Traps the save slice turned up, worth knowing before touching that format:
+
+- Castle garrisons name the troop `"troop"` (C's shared build/parse_unit_array
+  pair); foe garrisons name it `"id"`, written inline. Both are C's shape.
+- `Interact::as_str` is not injective: `None` and `Alcove` both encode as
+  "none", so an alcove placement decodes as `None`. C has the same hole.
+- A load upgrades `continent_fog[active]` to the live fog rather than
+  preserving whatever the source game held there, so whole-struct round-trip
+  equality needs that one slot accounted for.
 
 Two standing omissions:
 

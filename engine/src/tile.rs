@@ -92,6 +92,28 @@ impl Interact {
         }
     }
 
+    /// Inverse of `as_str`. Ports `InteractFromString`, including its
+    /// "chest" alias and its lack of an "alcove" case -- both `None` and
+    /// `Alcove` encode as "none", so an alcove placement decodes as `None`.
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "castle_gate" => Self::CastleGate,
+            "town" => Self::Town,
+            "treasure_chest" | "chest" => Self::TreasureChest,
+            "sign" => Self::Sign,
+            "artifact" => Self::Artifact,
+            "dwelling_plains" => Self::DwellingPlains,
+            "dwelling_forest" => Self::DwellingForest,
+            "dwelling_hills" => Self::DwellingHills,
+            "dwelling_dungeon" => Self::DwellingDungeon,
+            "orb" => Self::Orb,
+            "telecave" => Self::Telecave,
+            "navmap" => Self::Navmap,
+            "foe" => Self::Foe,
+            _ => Self::None,
+        }
+    }
+
     pub fn from_dwelling_kind(kind: &str) -> Self {
         match kind {
             "forest" => Self::DwellingForest,
