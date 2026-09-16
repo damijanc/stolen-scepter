@@ -70,12 +70,13 @@ Implemented and tested:
   PREVIOUS tile, refuse anything but plain grass (desert and bridges are
   barriers, which is what makes desert a refuge), keep clear of the ring
   around a castle gate, never stack, and report the collision that triggers
-  the attack flow.
+  the attack flow. `game_step_basic` drives the pass on every step and
+  surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 177 engine unit tests, 25 combat digest goldens, and one
+Test coverage is 182 engine unit tests, 25 combat digest goldens, and one
 render-free boundary test.
 
-The most recent slice is foe following. Run `git log --oneline -5`
+The most recent slice is driving foe following from the step loop. Run `git log --oneline -5`
 for the exact tip rather than trusting a hash written here; the working tree
 should be clean before you start.
 
@@ -134,8 +135,8 @@ JSON v8 save/load is the next target -- note it must cover the fields added
 recently (`home_castle`, `own_castle`, castle `flow`, `economy.siege_cost`)
 and must NOT serialize `oracle_mode`, which C keeps transient.
 
-`Game::foes_follow` has no caller yet: C drives it from the step loop, so
-wiring it into `game_step_basic` is a small follow-up worth doing first.
+Everything ported so far is reachable from `game_step_basic`; there are no
+dangling engine cores left to wire up.
 
 Two standing omissions:
 

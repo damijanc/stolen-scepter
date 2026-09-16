@@ -78,7 +78,20 @@ pub enum StepResult {
         move_cost: i32,
         advance: StepAdvance,
         interaction: StepInteraction,
+        /// A foe walked onto the hero during this step's follow pass. The
+        /// shell opens the attack or recruit prompt against it; `friendly`
+        /// says which.
+        collision: Option<FoeCollision>,
     },
+}
+
+/// A foe that stepped onto the hero, and the tile they now share.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FoeCollision {
+    pub id: String,
+    pub friendly: bool,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl StepResult {
@@ -162,7 +175,25 @@ pub fn game_step_basic(
     }
 
     let terrain_costs_full_day = !flying && tile.terrain == Terrain::Desert;
+    // Timestop freezes the world, so the foe-follow pass is skipped with it.
+    // Sample the flag BEFORE consuming the step: consume_step decrements
+    // time_stop, so reading it afterwards cannot tell "last frozen step" from
+    // "not frozen at all".
+    let frozen = game.stats.time_stop > 0;
     let advance = consume_step(game, resources, terrain_costs_full_day);
+    let collision = if frozen {
+        None
+    } else {
+        game.foes_follow(map).map(|index| {
+            let foe = game.foes[index];
+            FoeCollision {
+                id: foe.placement_id.as_str().to_owned(),
+                friendly: foe.friendly,
+                x: game.position.x,
+                y: game.position.y,
+            }
+        })
+    };
     let interaction = resolve_interaction(game, map, resources, &tile, nx, ny);
 
     StepResult::Moved {
@@ -170,6 +201,7 @@ pub fn game_step_basic(
         move_cost: step_move_cost(tile.terrain, flying),
         advance,
         interaction,
+        collision,
     }
 }
 
@@ -384,8 +416,8 @@ fn end_day(game: &mut Game, resources: &Resources, advance: &mut StepAdvance) {
 
 #[cfg(test)]
 mod tests {
-    use super::{game_step_basic, StepInteraction, StepResult};
-    use crate::game::{CastleOwnerKind, Game, Mount, TravelMode};
+    use super::{game_step_basic, FoeCollision, StepInteraction, StepResult};
+    use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
     use crate::map::{Map, Tile};
     use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
@@ -419,7 +451,8 @@ mod tests {
                 terrain: Terrain::Grass,
                 move_cost: 1,
                 advance: Default::default(),
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -453,7 +486,8 @@ mod tests {
                     week_ended: false,
                     commission_paid: 0
                 },
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -479,6 +513,110 @@ mod tests {
         assert!(result.moved());
         assert_eq!(game.stats.time_stop, 1);
         assert_eq!(game.stats.steps_left_today, 33);
+    }
+
+    /// A grass strip with the hero at (1, 0) and one live foe at (3, 0).
+    fn following_foe_game(friendly: bool) -> (Game, Map, Resources) {
+        let map =
+            Map::from_tiles(6, 1, vec![Tile::plain_grass(); 6]).expect("fixture dimensions match");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.x = 1;
+        game.position.y = 0;
+        game.stats.steps_left_today = 40;
+        let mut foe = FoeState::default();
+        foe.zone = game.position.zone;
+        foe.x = 3;
+        foe.y = 0;
+        foe.placement_id.copy_from_str("band0");
+        foe.alive = true;
+        foe.friendly = friendly;
+        game.foes[0] = foe;
+        game.foe_count = 1;
+        (game, map, time_fixture())
+    }
+
+    fn step_collision(result: &StepResult) -> Option<FoeCollision> {
+        match result {
+            StepResult::Moved { collision, .. } => collision.clone(),
+            other => panic!("expected movement, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn step_basic_advances_foes_during_the_step() {
+        let (mut game, mut map, resources) = following_foe_game(false);
+
+        // Hero retreats (1,0) -> (0,0). The foe chases the tile just left,
+        // (1,0), closing to (2,0) without reaching the hero.
+        let result = game_step_basic(&mut game, &mut map, &resources, -1, 0);
+
+        assert_eq!(step_collision(&result), None);
+        assert_eq!((game.foes[0].x, game.foes[0].y), (2, 0));
+        assert_eq!(
+            map.tile_i32(2, 0).expect("tile exists").interactive,
+            Interact::Foe,
+            "the follow pass ran inside the step"
+        );
+    }
+
+    #[test]
+    fn step_basic_reports_the_foe_that_walked_onto_the_hero() {
+        let (mut game, mut map, resources) = following_foe_game(false);
+
+        // Hero advances (1,0) -> (2,0). The cell closest to the tile it left
+        // IS the tile it moved to, so the foe walks onto the hero.
+        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+
+        let collision = step_collision(&result).expect("the foe reached the hero");
+        assert_eq!(collision.id, "band0");
+        assert!(!collision.friendly);
+        assert_eq!(
+            (collision.x, collision.y),
+            (game.position.x, game.position.y)
+        );
+        assert_eq!((game.foes[0].x, game.foes[0].y), (2, 0));
+    }
+
+    #[test]
+    fn step_basic_marks_a_friendly_collision_so_the_shell_can_pick_the_prompt() {
+        let (mut game, mut map, resources) = following_foe_game(true);
+
+        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+
+        let collision = step_collision(&result).expect("the foe reached the hero");
+        assert!(collision.friendly);
+    }
+
+    #[test]
+    fn step_basic_freezes_foes_while_time_stop_is_banked() {
+        let (mut game, mut map, resources) = following_foe_game(false);
+        game.stats.time_stop = 2;
+
+        let result = game_step_basic(&mut game, &mut map, &resources, 1, 0);
+
+        assert_eq!(step_collision(&result), None);
+        assert_eq!(
+            (game.foes[0].x, game.foes[0].y),
+            (3, 0),
+            "timestop freezes the world, foes included"
+        );
+        // The flag is sampled before the step consumes it, so the last frozen
+        // step still freezes.
+        assert_eq!(game.stats.time_stop, 1);
+    }
+
+    #[test]
+    fn step_basic_resumes_following_on_the_step_after_time_stop_lapses() {
+        let (mut game, mut map, resources) = following_foe_game(false);
+        game.stats.time_stop = 1;
+
+        game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        assert_eq!((game.foes[0].x, game.foes[0].y), (3, 0), "still frozen");
+        assert_eq!(game.stats.time_stop, 0);
+
+        game_step_basic(&mut game, &mut map, &resources, 1, 0);
+        assert_ne!((game.foes[0].x, game.foes[0].y), (3, 0), "moving again");
     }
 
     #[test]
@@ -559,7 +697,8 @@ mod tests {
                 terrain: Terrain::Water,
                 move_cost: 1,
                 advance: Default::default(),
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -697,7 +836,8 @@ mod tests {
                 terrain: Terrain::Desert,
                 move_cost: 1,
                 advance: Default::default(),
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!(game.stats.steps_left_today, 32);
@@ -730,7 +870,8 @@ mod tests {
                 terrain: Terrain::Water,
                 move_cost: 1,
                 advance: Default::default(),
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -776,7 +917,8 @@ mod tests {
                     week_ended: false,
                     commission_paid: 0
                 },
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!(game.stats.steps_left_today, 33);
@@ -807,7 +949,8 @@ mod tests {
                     week_ended: true,
                     commission_paid: 25
                 },
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!(game.stats.days_left, 5);
@@ -837,7 +980,8 @@ mod tests {
                     week_ended: false,
                     commission_paid: 0
                 },
-                interaction: StepInteraction::None
+                interaction: StepInteraction::None,
+                collision: None
             }
         );
         assert_eq!(game.stats.days_left, 0);
