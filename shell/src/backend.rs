@@ -19,13 +19,15 @@ use std::collections::HashMap;
 
 use macroquad::prelude::{
     clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
-    get_internal_gl, load_file, load_texture, screen_height, screen_width, Color as MqColor,
-    DrawTextureParams, FilterMode, Rect as MqRect, Texture2D, Vec2,
+    get_internal_gl, is_key_down, is_key_pressed, load_file, load_texture, screen_height,
+    screen_width, Color as MqColor, DrawTextureParams, FilterMode, KeyCode, Rect as MqRect,
+    Texture2D, Vec2,
 };
 use openbounty_engine::resources::Resources;
 
 use crate::draw::{Color, DrawCmd, DrawList, Rect, Sprite};
 use crate::font;
+use crate::input::{Key, KeySource};
 use crate::layout::Layout;
 use crate::palette::Palette;
 use crate::present::{Present, Target};
@@ -348,5 +350,62 @@ fn corners(x: f32, y: f32, w: f32, h: f32, radius: f32) -> [(f32, f32); 4] {
 fn set_clip(rect: Option<(i32, i32, i32, i32)>) {
     unsafe {
         get_internal_gl().quad_gl.scissor(rect);
+    }
+}
+
+/// Reads keys from macroquad. The mapping from our [`Key`] to macroquad's
+/// `KeyCode` is the only place the two vocabularies meet.
+pub struct MacroquadKeys;
+
+impl MacroquadKeys {
+    fn code(key: Key) -> KeyCode {
+        match key {
+            Key::Up => KeyCode::Up,
+            Key::Down => KeyCode::Down,
+            Key::Left => KeyCode::Left,
+            Key::Right => KeyCode::Right,
+            Key::Kp1 => KeyCode::Kp1,
+            Key::Kp2 => KeyCode::Kp2,
+            Key::Kp3 => KeyCode::Kp3,
+            Key::Kp4 => KeyCode::Kp4,
+            Key::Kp5 => KeyCode::Kp5,
+            Key::Kp6 => KeyCode::Kp6,
+            Key::Kp7 => KeyCode::Kp7,
+            Key::Kp8 => KeyCode::Kp8,
+            Key::Kp9 => KeyCode::Kp9,
+            Key::Home => KeyCode::Home,
+            Key::End => KeyCode::End,
+            Key::PageUp => KeyCode::PageUp,
+            Key::PageDown => KeyCode::PageDown,
+            Key::Escape => KeyCode::Escape,
+            Key::A => KeyCode::A,
+            Key::C => KeyCode::C,
+            Key::D => KeyCode::D,
+            Key::F => KeyCode::F,
+            Key::I => KeyCode::I,
+            Key::L => KeyCode::L,
+            Key::M => KeyCode::M,
+            Key::N => KeyCode::N,
+            Key::O => KeyCode::O,
+            Key::P => KeyCode::P,
+            Key::Q => KeyCode::Q,
+            Key::S => KeyCode::S,
+            Key::U => KeyCode::U,
+            Key::V => KeyCode::V,
+            Key::W => KeyCode::W,
+            Key::Y => KeyCode::Y,
+            Key::LeftControl => KeyCode::LeftControl,
+            Key::RightControl => KeyCode::RightControl,
+        }
+    }
+}
+
+impl KeySource for MacroquadKeys {
+    fn pressed(&self, key: Key) -> bool {
+        is_key_pressed(Self::code(key))
+    }
+
+    fn down(&self, key: Key) -> bool {
+        is_key_down(Self::code(key))
     }
 }

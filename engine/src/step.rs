@@ -253,7 +253,15 @@ fn step_move_cost(terrain: Terrain, flying: bool) -> i32 {
     }
 }
 
-fn consume_step(
+/// Spend one step's worth of time, porting `GameOnStep`.
+///
+/// Public because the shell needs it directly: resting in place (numpad 5)
+/// burns a step without moving, and has to drive the day and week rollover
+/// exactly as a real step does. `game.h` exports it for the same reason.
+///
+/// A banked time stop absorbs the step instead, and desert costs the whole
+/// remaining day rather than one step.
+pub fn consume_step(
     game: &mut Game,
     resources: &Resources,
     terrain_costs_full_day: bool,
@@ -537,8 +545,8 @@ pub fn search_here(game: &mut Game, resources: &Resources) -> SearchOutcome {
 #[cfg(test)]
 mod tests {
     use super::{
-        game_step_basic, search_here, spend_days, spend_week, FoeCollision, SearchOutcome,
-        StepInteraction, StepResult,
+        consume_step, game_step_basic, search_here, spend_days, spend_week, FoeCollision,
+        SearchOutcome, StepInteraction, StepResult,
     };
     use crate::fog::Fog;
     use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
@@ -1680,5 +1688,38 @@ mod tests {
         assert!(!result.moved(), "water is not walkable on foot");
         assert_eq!(game.position.facing, Facing::North);
         assert!(!game.position.facing_left);
+    }
+
+    #[test]
+    fn resting_in_place_burns_a_step_and_rolls_the_day_like_a_real_one() {
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.stats.steps_left_today = 2;
+        game.stats.days_left = 10;
+
+        let advance = consume_step(&mut game, &resources, false);
+        assert_eq!(game.stats.steps_left_today, 1);
+        assert!(!advance.day_ended);
+
+        // The last step of the day rolls it over, refilling the allowance.
+        let advance = consume_step(&mut game, &resources, false);
+        assert!(advance.day_ended);
+        assert_eq!(game.stats.days_left, 9);
+        assert_eq!(game.stats.steps_left_today, resources.time.day_steps);
+    }
+
+    #[test]
+    fn a_banked_time_stop_absorbs_a_rest_instead_of_the_day() {
+        let resources = time_fixture();
+        let mut game = Game::default();
+        game.stats.steps_left_today = 1;
+        game.stats.days_left = 10;
+        game.stats.time_stop = 3;
+
+        let advance = consume_step(&mut game, &resources, false);
+        assert_eq!(game.stats.time_stop, 2);
+        assert_eq!(game.stats.steps_left_today, 1, "the step is not spent");
+        assert!(!advance.day_ended);
+        assert_eq!(game.stats.days_left, 10);
     }
 }

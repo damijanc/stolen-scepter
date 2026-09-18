@@ -379,6 +379,23 @@ including `resources_format_template` and its `%VAR%` substitution.
    Still TODO: the views' own strings, which arrive with each view.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.
 7. **Prompts and the decision loop**, wiring to the engine's outcome enums.
+   - DONE: the key bindings (`shell/src/input.rs`) and the loop skeleton in
+     `main.rs`. Input takes a `KeySource` rather than calling macroquad, so
+     the whole binding table is tested without a window; `backend.rs` has the
+     only mapping between our `Key` and macroquad's `KeyCode`.
+     C's else-if chains are load-bearing and are ported as ORDERED tables: a
+     diagonal key overwrites both axes after the cardinal pass, opposing keys
+     resolve to the first checked rather than cancelling, and two letters in
+     one frame resolve by position in the chain. Quit sits last, so any other
+     bound letter beats it.
+     NOT ported: gamepad support. C's `poll_gamepad` is additive and no-ops
+     with no pad connected, so a keyboard player sees no difference.
+     `step::consume_step` was made public to serve Rest (numpad 5); it ports
+     `GameOnStep`, which `game.h` exports for the same reason.
+     Wired so far: move, Fly, Land, End Week, Rest, Ctrl+Q (the status-bar
+     prompt, which is why chrome has a `FastQuit` mode). Every other action
+     prints "not wired up yet" rather than swallowing the key, and step
+     interactions print to stdout, until the dialog and view layers land.
 8. **Combat loop and rendering**, then `CombatTurnRecord` once its consumer
    exists and its shape is known.
 

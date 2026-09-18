@@ -16,13 +16,13 @@ will be selected only after headless engine parity is solid.
 - `engine/`: `openbounty-engine`, the only place for game rules and state.
 - `shell/`: `openbounty-shell`; do not add engine logic here. `layout.rs`
   holds the screen geometry, `draw.rs` the draw-command vocabulary a view
-  emits, `font.rs` the bitmap-font metrics, `palette.rs` the VGA table and
-  `present.rs` the integer-scale blit and `sprites.rs` the pack art a
-  `Sprite` resolves to, `map_render.rs` the overworld viewport, `anim.rs` the
-  hero's animation clock, `chrome.rs` the frame and status bar, `banner.rs`
-  pack text and its `%VAR%` substitution. `backend.rs`
-  is the ONLY module that knows macroquad exists; keep it that way. Run it with
-  `cargo run -p openbounty-shell -- <path to game.json>`.
+  emits, `font.rs` the bitmap-font metrics, `palette.rs` the VGA table,
+  `present.rs` the integer-scale blit, `sprites.rs` the pack art a `Sprite`
+  resolves to, `map_render.rs` the overworld viewport, `anim.rs` the hero's
+  animation clock, `chrome.rs` the frame and status bar, `banner.rs` pack text
+  and its `%VAR%` substitution, and `input.rs` the key bindings. `backend.rs`
+  is the ONLY module that knows macroquad exists; keep it that way. Run it
+  with `cargo run -p openbounty-shell -- <path to game.json>`.
 - `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
   decision and what was rejected, the legacy geometry, and the work order.
   READ THIS before touching the shell.
@@ -183,7 +183,7 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 332 engine unit tests, 88 shell unit tests, 25 combat digest
+Test coverage is 334 engine unit tests, 98 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 The most recent slice is the shell layout model. Run `git log --oneline -5`
