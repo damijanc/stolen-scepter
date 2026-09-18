@@ -652,6 +652,7 @@ impl Default for ResZoneSalt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResZone {
     pub id: FixedStr<RES_ID_LEN>,
+    pub name: FixedStr<RES_NAME_LEN>,
     pub map_path: FixedStr<CAT_PATH_LEN>,
     pub width: i32,
     pub height: i32,
@@ -681,6 +682,7 @@ impl Default for ResZone {
     fn default() -> Self {
         Self {
             id: FixedStr::empty(),
+            name: FixedStr::empty(),
             map_path: FixedStr::empty(),
             width: 64,
             height: 64,
@@ -2064,6 +2066,8 @@ fn parse_rank(value: &serde_json::Value) -> Result<RankDef, ResourceError> {
 fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
     let mut zone = ResZone::default();
     zone.id.copy_from_str(string_field(value, "id")?);
+    zone.name
+        .copy_from_str(optional_string_field(value, "name")?.unwrap_or(""));
     if let Some(map) = optional_string_field(value, "map")? {
         let legacy = "assets/kings-bounty/";
         let map = map.strip_prefix(legacy).unwrap_or(map);
@@ -2688,6 +2692,7 @@ mod tests {
               "zones": [
                 {
                   "id":"home",
+                  "name":"Home Land",
                   "is_home":true,
                   "hero_spawn":{"x":1,"y":2},
                   "home_spawn":{"x":3,"y":4},
@@ -2762,6 +2767,12 @@ mod tests {
         assert_eq!(resources.zone_by_id("home").unwrap().home_spawn_x, 3);
         assert_eq!(resources.zone_by_id("home").unwrap().magic_alcove_x, 5);
         assert_eq!(resources.zone_by_id("home").unwrap().magic_alcove_y, 6);
+        assert_eq!(
+            resources.zone_by_id("home").unwrap().name.as_str(),
+            "Home Land"
+        );
+        // A zone that declares no name keeps an empty one, not a panic.
+        assert_eq!(resources.zone_by_id("fallback").unwrap().name.as_str(), "");
         let home = resources.zone_by_id("home").unwrap();
         assert_eq!(home.chest_count, 1);
         assert_eq!((home.chests[0].x, home.chests[0].y), (10, 11));
