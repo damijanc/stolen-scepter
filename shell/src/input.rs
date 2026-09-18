@@ -13,13 +13,17 @@
 
 use std::collections::BTreeSet;
 
-/// The keys the overworld reads.
+/// The keys the shell reads. The overworld bindings use a subset of these;
+/// the bottom-frame prompt (`crate::prompt`) reads the rest -- digits, Enter,
+/// Backspace -- which is why they share this one vocabulary rather than a
+/// second enum.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Key {
     Up,
     Down,
     Left,
     Right,
+    Kp0,
     Kp1,
     Kp2,
     Kp3,
@@ -34,7 +38,21 @@ pub enum Key {
     PageUp,
     PageDown,
     Escape,
+    Enter,
+    KpEnter,
+    Backspace,
+    Digit0,
+    Digit1,
+    Digit2,
+    Digit3,
+    Digit4,
+    Digit5,
+    Digit6,
+    Digit7,
+    Digit8,
+    Digit9,
     A,
+    B,
     C,
     D,
     F,
@@ -57,6 +75,34 @@ pub enum Key {
     LeftControl,
     RightControl,
 }
+
+/// The top-row digit keys, 0..9, in order.
+pub const DIGITS: [Key; 10] = [
+    Key::Digit0,
+    Key::Digit1,
+    Key::Digit2,
+    Key::Digit3,
+    Key::Digit4,
+    Key::Digit5,
+    Key::Digit6,
+    Key::Digit7,
+    Key::Digit8,
+    Key::Digit9,
+];
+
+/// The numpad digit keys, 0..9, in order.
+pub const NUMPAD_DIGITS: [Key; 10] = [
+    Key::Kp0,
+    Key::Kp1,
+    Key::Kp2,
+    Key::Kp3,
+    Key::Kp4,
+    Key::Kp5,
+    Key::Kp6,
+    Key::Kp7,
+    Key::Kp8,
+    Key::Kp9,
+];
 
 /// Where key state comes from. `pressed` is a rising edge -- true for the one
 /// frame the key went down -- and `down` is the held state, which only the

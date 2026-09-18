@@ -18,6 +18,7 @@ pub mod layout;
 pub mod map_render;
 pub mod palette;
 pub mod present;
+pub mod prompt;
 pub mod sprites;
 
 use macroquad::prelude::{get_time, next_frame, Conf};
