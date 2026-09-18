@@ -387,6 +387,7 @@ async fn main() {
                 Action::ViewCharacter => views.set(ViewKind::Character),
                 Action::ViewArmy => views.set(ViewKind::Army),
                 Action::ViewContract => views.set(ViewKind::Contract),
+                Action::ViewPuzzle => views.set(ViewKind::Puzzle),
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.

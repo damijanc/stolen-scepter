@@ -11,7 +11,9 @@
 //! the way the engine's combat digests are.
 
 use openbounty_engine::game::{CastleOwnerKind, Game, GAME_ARMY_SLOTS, GAME_CASTLES};
+use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
+use openbounty_engine::tables::puzzle_grid_entity;
 
 use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
@@ -49,12 +51,20 @@ pub enum ViewKind {
     Character,
     Army,
     Contract,
+    Puzzle,
 }
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct Views {
     stack: Vec<ViewKind>,
+    /// When the puzzle view became active, for its reveal animation.
+    puzzle_open_time: f64,
+    /// Whether the puzzle view was active the previous frame.
+    puzzle_was_active: bool,
+    /// The scepter's continent, lazy-loaded for the puzzle's terrain backdrop.
+    puzzle_map: Option<Map>,
+    puzzle_zone: String,
 }
 
 impl Views {
@@ -82,11 +92,11 @@ impl Views {
     }
 
     /// True when the active view swaps the status bar to "Press 'ESC' to
-    /// exit". The character and army views always do; the contract view only
-    /// when a contract is actually active.
+    /// exit". The character, army and puzzle views always do; the contract
+    /// view only when a contract is actually active.
     pub fn wants_exit_hint(&self, game: &Game) -> bool {
         match self.active() {
-            Some(ViewKind::Character | ViewKind::Army) => true,
+            Some(ViewKind::Character | ViewKind::Army | ViewKind::Puzzle) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             None => false,
         }
@@ -94,7 +104,7 @@ impl Views {
 
     /// Draw the active view over the map area.
     pub fn draw(
-        &self,
+        &mut self,
         list: &mut DrawList,
         layout: &Layout,
         palette: &Palette,
@@ -103,6 +113,14 @@ impl Views {
         game: &Game,
         time: f64,
     ) {
+        // The puzzle reveal animation resets its clock each time the view
+        // becomes active.
+        let puzzle_active = self.active() == Some(ViewKind::Puzzle);
+        if puzzle_active && !self.puzzle_was_active {
+            self.puzzle_open_time = time;
+        }
+        self.puzzle_was_active = puzzle_active;
+
         match self.active() {
             Some(ViewKind::Character) => draw_character(list, layout, palette, resources, game),
             Some(ViewKind::Army) => {
@@ -111,7 +129,136 @@ impl Views {
             Some(ViewKind::Contract) => {
                 draw_contract(list, layout, palette, resources, catalog, game, time)
             }
+            Some(ViewKind::Puzzle) => {
+                self.draw_puzzle(list, layout, palette, resources, catalog, game, time)
+            }
             None => {}
+        }
+    }
+
+    /// Ports `draw_puzzle`: a 5x5 grid of villain faces and artifact icons
+    /// over the scepter's terrain, each cell flipping from its cover to the
+    /// revealed tile as the corresponding entity is caught or found.
+    fn draw_puzzle(
+        &mut self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+        game: &Game,
+        time: f64,
+    ) {
+        // The puzzle covers only the map area, not the sidebar.
+        list.rect(
+            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
+            palette.clr(Pal::DGrey),
+        );
+        list.rect_lines(
+            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
+            palette.clr(Pal::DRed),
+        );
+
+        let cell_w = layout.map_w / 5;
+        let cell_h = layout.map_h / 5;
+        let grid_x = MAP_X;
+        let grid_y = MAP_Y;
+
+        // Load the scepter's continent once, and again if it changes.
+        let scepter_zone = game.scepter.zone.as_str();
+        if scepter_zone.is_empty() {
+            self.puzzle_map = None;
+            self.puzzle_zone.clear();
+        } else if self.puzzle_zone != scepter_zone {
+            match Map::load_zone(resources, scepter_zone) {
+                Ok(map) => {
+                    self.puzzle_map = Some(map);
+                    self.puzzle_zone = scepter_zone.to_owned();
+                }
+                Err(_) => {
+                    self.puzzle_map = None;
+                    self.puzzle_zone.clear();
+                }
+            }
+        }
+
+        // Centre a 5x5 window on the scepter, clamped to the map bounds.
+        let mut cam_x = game.scepter.x - 2;
+        let mut cam_y = game.scepter.y - 2;
+        if let Some(map) = &self.puzzle_map {
+            cam_x = cam_x.clamp(0, map.width as i32 - 5);
+            cam_y = cam_y.clamp(0, map.height as i32 - 5);
+        }
+
+        // Cells reveal one every 150ms: artifacts first, then villains, in
+        // row-major order within each pass.
+        let reveal_step = ((time - self.puzzle_open_time) / 0.150) as i32;
+        let anim_tick = (time * 2.0) as i32;
+
+        let mut seq = [[0i32; 5]; 5];
+        {
+            let mut n = 0;
+            for row in 0..5 {
+                for col in 0..5 {
+                    if puzzle_grid_entity(row, col) < 0 {
+                        seq[row as usize][col as usize] = n;
+                        n += 1;
+                    }
+                }
+            }
+            for row in 0..5 {
+                for col in 0..5 {
+                    if puzzle_grid_entity(row, col) >= 0 {
+                        seq[row as usize][col as usize] = n;
+                        n += 1;
+                    }
+                }
+            }
+        }
+
+        for row in 0..5 {
+            for col in 0..5 {
+                let id = puzzle_grid_entity(row, col);
+                let x = grid_x + col * cell_w;
+                let y = grid_y + row * cell_h;
+
+                let (mut caught, face) = if id < 0 {
+                    let artifact = (-id - 1) as usize;
+                    (
+                        game.artifacts.found[artifact],
+                        Some(Sprite::ViewIcon(artifact)),
+                    )
+                } else {
+                    let villain = id as usize;
+                    (
+                        game.contract.villains_caught[villain],
+                        villain_sprite(catalog, id, anim_tick),
+                    )
+                };
+
+                // The reveal animation holds the cover until the cell's turn.
+                if reveal_step < seq[row as usize][col as usize] {
+                    caught = false;
+                }
+
+                if caught {
+                    // Revealed: the scepter terrain underneath, or black.
+                    list.rect(Rect::new(x, y, cell_w, cell_h), palette.clr(Pal::Black));
+                    if let Some(map) = &self.puzzle_map {
+                        if let Some(tile) = map.tile_i32(cam_x + col, cam_y + row) {
+                            if !tile.art.is_empty() {
+                                list.blit(Sprite::Tile(tile.art), Dst::rect(x, y, cell_w, cell_h));
+                            }
+                        }
+                    }
+                } else if let Some(face) = face {
+                    // Cover: the entity's face, or the grey panel when the
+                    // pack names no art for it (the backend skips the blit).
+                    list.blit(face, Dst::rect(x, y, cell_w, cell_h));
+                } else {
+                    list.rect(Rect::new(x, y, cell_w, cell_h), palette.clr(Pal::DGrey));
+                }
+            }
         }
     }
 }
@@ -734,6 +881,7 @@ fn draw_contract(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::draw::DrawCmd;
 
     fn fixtures() -> (Resources, Layout, SpriteCatalog) {
         let resources = Resources::from_json_str(
@@ -861,7 +1009,7 @@ mod tests {
         let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
-        let views = Views::new();
+        let mut views = Views::new();
 
         let mut list = DrawList::new();
         views.draw(
@@ -1028,5 +1176,93 @@ mod tests {
         assert!(list.has_text_containing("Bald."));
         assert!(list.has_text_containing("Crimes:"));
         assert!(list.has_text_containing("Treason."));
+    }
+
+    fn puzzle_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "villains": [
+                  {"index":0,"id":"v0","name":"V0","portrait":"v.png","zone":"home","reward":100}
+                ],
+                "artifacts": [
+                  {"index":0,"id":"a0","name":"A0","icon":"a.png","power":"increased_damage","effect":"e"}
+                ]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    /// Draw the puzzle twice: once to latch the open time, once at a late time
+    /// so the reveal animation has played out and every cell shows its true
+    /// caught/found state.
+    fn draw_puzzle_fully(
+        views: &mut Views,
+        resources: &Resources,
+        layout: &Layout,
+        game: &Game,
+    ) -> DrawList {
+        let palette = Palette::fallback();
+        let catalog = SpriteCatalog::from_resources(resources);
+        let mut list = DrawList::new();
+        views.draw(&mut list, layout, &palette, resources, &catalog, game, 0.0);
+        list.clear();
+        views.draw(
+            &mut list, layout, &palette, resources, &catalog, game, 100.0,
+        );
+        list
+    }
+
+    fn black_rects(list: &DrawList) -> usize {
+        list.as_slice()
+            .iter()
+            .filter(|cmd| matches!(cmd, DrawCmd::Rect { color, .. } if *color == Color::BLACK))
+            .count()
+    }
+
+    #[test]
+    fn a_fresh_puzzle_shows_covers_and_no_reveals() {
+        let (resources, layout, _) = puzzle_fixtures();
+        let game = Game::default();
+        // No scepter zone: no terrain, and nothing is caught or found.
+        let mut views = Views::new();
+        views.set(ViewKind::Puzzle);
+
+        let list = draw_puzzle_fully(&mut views, &resources, &layout, &game);
+
+        assert_eq!(black_rects(&list), 0, "nothing is revealed yet");
+        // Villain 0 (cell 4,3) and artifact 0 (cell 0,0) still show covers.
+        assert!(!list.blits_of(Sprite::ViewIcon(0)).is_empty());
+        assert!(!list
+            .blits_of(Sprite::VillainAnim {
+                villain: 0,
+                frame: 0
+            })
+            .is_empty());
+    }
+
+    #[test]
+    fn caught_and_found_entities_reveal_their_cells() {
+        let (resources, layout, _) = puzzle_fixtures();
+        let mut game = Game::default();
+        // Artifact 0 sits at cell (0,0); villain 0 at cell (4,3).
+        game.artifacts.found[0] = true;
+        game.contract.villains_caught[0] = true;
+        let mut views = Views::new();
+        views.set(ViewKind::Puzzle);
+
+        let list = draw_puzzle_fully(&mut views, &resources, &layout, &game);
+
+        // The found artifact and caught villain no longer draw their covers.
+        assert!(list.blits_of(Sprite::ViewIcon(0)).is_empty());
+        assert!(list
+            .blits_of(Sprite::VillainAnim {
+                villain: 0,
+                frame: 0
+            })
+            .is_empty());
+        // Both revealed cells draw black (no scepter terrain is loaded).
+        assert_eq!(black_rects(&list), 2);
     }
 }
