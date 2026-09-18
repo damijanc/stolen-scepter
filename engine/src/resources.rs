@@ -7,6 +7,7 @@ use crate::tables::{
 use crate::tile::Terrain;
 
 pub const RES_MAX_CASTLES: usize = 32;
+pub const RES_MAX_NEIGHBORS: usize = 8;
 pub const RES_MAX_PREFERRED_TROOPS: usize = 16;
 pub const RES_MAX_TOWNS: usize = 32;
 pub const RES_MAX_ZONE_OBJECTS: usize = 256;
@@ -665,6 +666,8 @@ pub struct ResZone {
     pub home_spawn_y: i32,
     pub magic_alcove_x: i32,
     pub magic_alcove_y: i32,
+    pub neighbor_count: usize,
+    pub neighbors: [FixedStr<RES_ID_LEN>; RES_MAX_NEIGHBORS],
     pub sign_count: usize,
     pub signs: Box<[ResSign; RES_MAX_ZONE_OBJECTS]>,
     pub castle_count: usize,
@@ -695,6 +698,8 @@ impl Default for ResZone {
             home_spawn_y: -1,
             magic_alcove_x: -1,
             magic_alcove_y: -1,
+            neighbor_count: 0,
+            neighbors: [FixedStr::empty(); RES_MAX_NEIGHBORS],
             sign_count: 0,
             signs: Box::new([ResSign::default(); RES_MAX_ZONE_OBJECTS]),
             castle_count: 0,
@@ -2093,6 +2098,16 @@ fn parse_zone(value: &serde_json::Value) -> Result<ResZone, ResourceError> {
         zone.magic_alcove_x = optional_i32_field(magic_alcove, "x", -1)?;
         zone.magic_alcove_y = optional_i32_field(magic_alcove, "y", -1)?;
     }
+    // C skips a non-array `neighbors` and any non-string entry silently,
+    // keeping the defaults, so a stray value never burns a slot.
+    if let Some(neighbors) = value.get("neighbors").and_then(serde_json::Value::as_array) {
+        for neighbor in neighbors.iter().take(RES_MAX_NEIGHBORS) {
+            if let Some(id) = neighbor.as_str() {
+                zone.neighbors[zone.neighbor_count].copy_from_str(id);
+                zone.neighbor_count += 1;
+            }
+        }
+    }
     if let Some(signs) = value.get("signs") {
         let signs = signs
             .as_array()
@@ -2698,6 +2713,7 @@ mod tests {
                   "id":"home",
                   "name":"Home Land",
                   "is_home":true,
+                  "neighbors":["fallback"],
                   "hero_spawn":{"x":1,"y":2},
                   "home_spawn":{"x":3,"y":4},
                   "magic_alcove":{"x":5,"y":6},
@@ -2778,6 +2794,8 @@ mod tests {
         // A zone that declares no name keeps an empty one, not a panic.
         assert_eq!(resources.zone_by_id("fallback").unwrap().name.as_str(), "");
         let home = resources.zone_by_id("home").unwrap();
+        assert_eq!(home.neighbor_count, 1);
+        assert_eq!(home.neighbors[0].as_str(), "fallback");
         assert_eq!(home.chest_count, 1);
         assert_eq!((home.chests[0].x, home.chests[0].y), (10, 11));
         assert_eq!(home.chests[0].id.as_str(), "chest0");
