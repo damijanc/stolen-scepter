@@ -38,6 +38,7 @@ use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{Game, TravelMode, GAME_ARMY_SLOTS};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
+use openbounty_engine::spells_adventure::{AdventureCast, SpellCast};
 use openbounty_engine::step::{
     consume_step, game_step_basic, search_here, spend_week, SearchOutcome, StepInteraction,
     StepResult,
@@ -45,7 +46,7 @@ use openbounty_engine::step::{
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
-use views::{controls_visible, worldmap_has_orb, ViewKind, Views};
+use views::{controls_visible, worldmap_has_orb, SpellsInput, ViewKind, Views};
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -66,6 +67,10 @@ enum PendingFlow {
     /// Sail to a discovered neighbor continent; the ids are pending.
     Navigate {
         zones: Vec<String>,
+    },
+    /// A combat spell was chosen in the field; the charge is pending discard.
+    DiscardSpell {
+        spell_idx: i32,
     },
 }
 
@@ -185,7 +190,68 @@ fn dispatch_answer(
                 }
             }
         }
+        PendingFlow::DiscardSpell { spell_idx } => {
+            if answer == PromptResult::Yes {
+                game.discard_spell(spell_idx);
+            }
+        }
         PendingFlow::None => {}
+    }
+}
+
+/// Route a chosen spellbook slot into the engine and present the result,
+/// porting the shell half of `dispatch_adventure_spell`. The bridge-direction
+/// and gate-picker continuations are their own slices; until then a cast that
+/// arms them is reported and left alone.
+fn dispatch_spell(
+    game: &mut Game,
+    resources: &Resources,
+    spell_idx: i32,
+    prompt: &mut Prompt,
+    dialog: &mut Dialog,
+    pending: &mut PendingFlow,
+) {
+    match game.dispatch_adventure_spell(resources, spell_idx) {
+        SpellCast::NotKnown => {
+            dialog.open("", interact::spell_banner(resources, "spell_not_known"));
+        }
+        SpellCast::Unavailable => {
+            dialog.open("", interact::spell_banner(resources, "spell_unavailable"));
+        }
+        SpellCast::OfferDiscard => {
+            let display = resources
+                .spell_by_index(spell_idx)
+                .map(|spell| spell.name.as_str())
+                .unwrap_or("");
+            let name = if display.is_empty() {
+                "This spell"
+            } else {
+                display
+            };
+            let header = if display.is_empty() { "Spell" } else { display };
+            let body =
+                format!("{name} cannot be cast in the field.\n\nDiscard it to free a spell slot?");
+            prompt.yes_no(header, &body);
+            *pending = PendingFlow::DiscardSpell { spell_idx };
+        }
+        SpellCast::Applied(cast) => match &cast {
+            AdventureCast::BridgeArmed => {
+                // Bridge direction prompt is the next slice.
+                eprintln!("bridge spell armed (not yet wired)");
+            }
+            AdventureCast::GateArmed { .. } => {
+                // Gate destination picker is the next slice.
+                eprintln!("gate spell armed (not yet wired)");
+            }
+            AdventureCast::NoCharge => {}
+            _ => {
+                if let Some((header, body)) =
+                    interact::adventure_cast_message(resources, game, &cast)
+                {
+                    dialog.open(&header, &body);
+                }
+            }
+        },
     }
 }
 
@@ -343,6 +409,27 @@ async fn main() {
             } else if keys.any_pressed() {
                 views.dismiss();
             }
+        } else if views.active() == Some(ViewKind::Spells) {
+            // Left/Right switch columns, A-G cast from the current column,
+            // ESC cancels. Any other key dismisses the read-only book.
+            match views.spells_update(&keys) {
+                SpellsInput::Cast(spell_idx) => {
+                    dispatch_spell(
+                        &mut game,
+                        &resources,
+                        spell_idx,
+                        &mut prompt,
+                        &mut dialog,
+                        &mut pending,
+                    );
+                }
+                SpellsInput::Handled => {}
+                SpellsInput::None => {
+                    if keys.any_pressed() {
+                        views.dismiss();
+                    }
+                }
+            }
         } else if views.is_active() {
             // The worldmap alone treats SPACE specially: with the crystal orb
             // it toggles fog-only vs whole-map; without it SPACE dismisses
@@ -443,6 +530,15 @@ async fn main() {
                 Action::ViewPuzzle => views.set(ViewKind::Puzzle),
                 Action::ViewMap => views.set(ViewKind::Worldmap),
                 Action::ViewControls => views.set(ViewKind::Controls),
+                Action::CastSpell => {
+                    if !game.stats.knows_magic {
+                        let (header, body) = interact::no_spell_banner(&resources);
+                        dialog.open(&header, &body);
+                    } else {
+                        views.set(ViewKind::Spells);
+                        views.spells_set_cast_mode(true);
+                    }
+                }
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.

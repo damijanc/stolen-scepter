@@ -12,6 +12,7 @@
 
 use openbounty_engine::game::{ChestOutcome, ChestRoll, Game};
 use openbounty_engine::resources::Resources;
+use openbounty_engine::spells_adventure::AdventureCast;
 use openbounty_engine::step::StepInteraction;
 
 use crate::banner;
@@ -378,6 +379,222 @@ pub fn no_continents(resources: &Resources) -> (String, String) {
     )
 }
 
+/// Spell banner defaults, porting `load_banner_defaults`. The pack overrides
+/// them under `strings.banners`.
+const DEFAULT_SPELL_UNAVAILABLE: &str = "That spell is not available.";
+const DEFAULT_SPELL_NOT_KNOWN: &str = "You don't have that spell.";
+const DEFAULT_SPELL_UNKNOWN: &str = "Unknown spell.";
+const DEFAULT_SPELL_TIME_STOP: &str = "Time has stopped for %STEPS% steps.";
+const DEFAULT_SPELL_FIND_VILLAIN_NO_CONTRACT: &str = "You have no contract.";
+const DEFAULT_SPELL_FIND_VILLAIN_SUCCESS: &str = "You have found %CASTLE%!";
+const DEFAULT_SPELL_FIND_VILLAIN_NONE: &str = "Your search reveals nothing.";
+const DEFAULT_SPELL_CASTLE_GATE_NONE: &str = "You have not visited\nany castles yet.";
+const DEFAULT_SPELL_TOWN_GATE_NONE: &str = "You have not visited\nany towns yet.";
+const DEFAULT_SPELL_INSTANT_ARMY_FIZZLE: &str = "Spell fizzles.";
+const DEFAULT_SPELL_INSTANT_ARMY_NO_ROOM: &str = "Your army has no room!";
+const DEFAULT_SPELL_INSTANT_ARMY_SUCCESS: &str = "%QTY% %TROOP%\nhave joined your army.";
+const DEFAULT_SPELL_RAISE_CONTROL_SUCCESS: &str = "Your leadership has\nincreased by %AMOUNT%.";
+const DEFAULT_NO_SPELL_BANNER: &str = "You have not been trained in\n\
+    the art of spellcasting yet.\n\
+    Visit the Archmage Aurange\n\
+    in Continentia at 11,19 for\n\
+    this ability.";
+
+/// A plain spell-refusal message body, keyed by its banner name. Used for the
+/// `spell_not_known` and `spell_unavailable` refusals, which have no header.
+pub fn spell_banner<'a>(resources: &'a Resources, key: &str) -> &'a str {
+    let default = match key {
+        "spell_not_known" => DEFAULT_SPELL_NOT_KNOWN,
+        "spell_unavailable" => DEFAULT_SPELL_UNAVAILABLE,
+        "spell_unknown" => DEFAULT_SPELL_UNKNOWN,
+        _ => "",
+    };
+    banner::text(resources, "banners", key, default)
+}
+
+/// A spell's display name, C's `spell_header`: the catalog name when the id
+/// resolves and is non-empty, else the fallback the caller supplies.
+pub fn spell_header(resources: &Resources, id: &str, fallback: &str) -> String {
+    resources
+        .spell_by_id(id)
+        .map(|spell| {
+            if spell.name.is_empty() {
+                fallback
+            } else {
+                spell.name.as_str()
+            }
+        })
+        .unwrap_or(fallback)
+        .to_owned()
+}
+
+/// The "you have not been trained in magic" banner for the U action, porting
+/// the shell's no-spell branch of `INPUT_ACTION_CAST_SPELL`. The alcove
+/// coordinates are substituted from the first zone that declares one.
+pub fn no_spell_banner(resources: &Resources) -> (String, String) {
+    let mut zone_label = "";
+    let mut alcove_x = 0;
+    let mut alcove_y = 0;
+    for index in 0..resources.zone_count() {
+        if let Some(zone) = resources.zone_by_index(index) {
+            if zone.magic_alcove_x >= 0 && zone.magic_alcove_y >= 0 {
+                zone_label = if zone.name.is_empty() {
+                    zone.id.as_str()
+                } else {
+                    zone.name.as_str()
+                };
+                alcove_x = zone.magic_alcove_x;
+                alcove_y = zone.magic_alcove_y;
+                break;
+            }
+        }
+    }
+    let x = alcove_x.to_string();
+    let y = alcove_y.to_string();
+    let body = banner::formatted(
+        resources,
+        "banners",
+        "no_spell_banner",
+        DEFAULT_NO_SPELL_BANNER,
+        &[("ZONE", zone_label), ("X", &x), ("Y", &y)],
+    );
+    (String::new(), body)
+}
+
+/// Turn an adventure-cast outcome into the `(header, body)` dialog it presents,
+/// porting the `player_io_message` calls in each C `cast_*`.
+///
+/// Returns `None` for the outcomes that need more than a dialog: `NoCharge`
+/// (silent), `BridgeArmed` (a direction prompt) and `GateArmed` (a destination
+/// picker). The caller routes those.
+pub fn adventure_cast_message(
+    resources: &Resources,
+    game: &Game,
+    cast: &AdventureCast,
+) -> Option<(String, String)> {
+    let spell = |id, fallback| spell_header(resources, id, fallback);
+    let text = |key, default| banner::text(resources, "banners", key, default).to_owned();
+    match cast {
+        AdventureCast::Unknown => {
+            Some((String::new(), text("spell_unknown", DEFAULT_SPELL_UNKNOWN)))
+        }
+        AdventureCast::NoCharge => None,
+        AdventureCast::TimeStop { banked, .. } => {
+            let steps = banked.to_string();
+            Some((
+                spell("time_stop", "Time Stop"),
+                banner::formatted(
+                    resources,
+                    "banners",
+                    "spell_time_stop",
+                    DEFAULT_SPELL_TIME_STOP,
+                    &[("STEPS", &steps)],
+                ),
+            ))
+        }
+        AdventureCast::FindVillainNoContract => Some((
+            spell("find_villain", "Find Villain"),
+            text(
+                "spell_find_villain_no_contract",
+                DEFAULT_SPELL_FIND_VILLAIN_NO_CONTRACT,
+            ),
+        )),
+        AdventureCast::FindVillain { castle } => {
+            let body = match castle {
+                Some(index) => {
+                    let label = game
+                        .castles
+                        .get(*index)
+                        .map(|record| record.id.as_str())
+                        .and_then(|id| resources.castle_by_id(id))
+                        .map(|castle| {
+                            if castle.name.is_empty() {
+                                castle.id.as_str()
+                            } else {
+                                castle.name.as_str()
+                            }
+                        })
+                        .unwrap_or("");
+                    banner::formatted(
+                        resources,
+                        "banners",
+                        "spell_find_villain_success",
+                        DEFAULT_SPELL_FIND_VILLAIN_SUCCESS,
+                        &[("CASTLE", label)],
+                    )
+                }
+                None => text("spell_find_villain_none", DEFAULT_SPELL_FIND_VILLAIN_NONE),
+            };
+            Some((spell("find_villain", "Find Villain"), body))
+        }
+        AdventureCast::BridgeArmed => None,
+        AdventureCast::GateNone { mode } => {
+            let (key, default, id, fallback) = match mode {
+                openbounty_engine::spells_adventure::GateMode::Castle => (
+                    "spell_castle_gate_none",
+                    DEFAULT_SPELL_CASTLE_GATE_NONE,
+                    "castle_gate",
+                    "Castle Gate",
+                ),
+                openbounty_engine::spells_adventure::GateMode::Town => (
+                    "spell_town_gate_none",
+                    DEFAULT_SPELL_TOWN_GATE_NONE,
+                    "town_gate",
+                    "Town Gate",
+                ),
+            };
+            Some((spell(id, fallback), text(key, default)))
+        }
+        AdventureCast::GateArmed { .. } => None,
+        AdventureCast::InstantArmyFizzle => Some((
+            spell("instant_army", "Instant Army"),
+            text(
+                "spell_instant_army_fizzle",
+                DEFAULT_SPELL_INSTANT_ARMY_FIZZLE,
+            ),
+        )),
+        AdventureCast::InstantArmyNoRoom => Some((
+            spell("instant_army", "Instant Army"),
+            text(
+                "spell_instant_army_no_room",
+                DEFAULT_SPELL_INSTANT_ARMY_NO_ROOM,
+            ),
+        )),
+        AdventureCast::InstantArmy { troop, count } => {
+            let troop_name = resources
+                .troop_by_id(troop.as_str())
+                .map(|t| t.name.as_str())
+                .unwrap_or("");
+            let qty = count.to_string();
+            // DIVERGENCE: C renders %QTY% through its fuzzy count-bucket
+            // labels, which this engine does not port; the raw count stands in.
+            Some((
+                spell("instant_army", "Instant Army"),
+                banner::formatted(
+                    resources,
+                    "banners",
+                    "spell_instant_army_success",
+                    DEFAULT_SPELL_INSTANT_ARMY_SUCCESS,
+                    &[("QTY", &qty), ("TROOP", troop_name)],
+                ),
+            ))
+        }
+        AdventureCast::RaiseControl { amount } => {
+            let amount = amount.to_string();
+            Some((
+                spell("raise_control", "Raise Control"),
+                banner::formatted(
+                    resources,
+                    "banners",
+                    "spell_raise_control_success",
+                    DEFAULT_SPELL_RAISE_CONTROL_SUCCESS,
+                    &[("AMOUNT", &amount)],
+                ),
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,5 +869,107 @@ mod tests {
         assert_eq!(header, "Go to which continent?");
         assert!(body.contains("1. Forestria"));
         assert!(body.contains("2. Saharia"));
+    }
+
+    fn spell_resources() -> Resources {
+        Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [
+                 {"index":0,"id":"ogres","name":"Ogres","skill_level":1,"hit_points":1,
+                  "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":1,
+                  "spoils_factor":1,"abilities":"","morale_group":"A"}
+               ],
+               "zones": [
+                 {"id":"home","name":"Continentia","magic_alcove":{"x":11,"y":19}}
+               ],
+               "spells": [
+                 {"id":"time_stop","name":"Time Stop","kind":"adventure"}
+               ]}"#,
+        )
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn spell_header_resolves_a_name_and_falls_back() {
+        let resources = spell_resources();
+        assert_eq!(spell_header(&resources, "time_stop", "TS"), "Time Stop");
+        assert_eq!(spell_header(&resources, "missing", "TS"), "TS");
+    }
+
+    #[test]
+    fn no_spell_banner_substitutes_the_alcove_location() {
+        let resources = spell_resources();
+        let (header, body) = no_spell_banner(&resources);
+        assert!(header.is_empty());
+        assert!(body.contains("Continentia"));
+        assert!(body.contains("11"));
+        assert!(body.contains("19"));
+    }
+
+    #[test]
+    fn time_stop_reports_the_banked_steps() {
+        let resources = spell_resources();
+        let game = Game::default();
+        let (header, body) = adventure_cast_message(
+            &resources,
+            &game,
+            &AdventureCast::TimeStop {
+                steps: 3,
+                banked: 7,
+            },
+        )
+        .expect("a dialog");
+        assert_eq!(header, "Time Stop");
+        assert!(body.contains("7"));
+    }
+
+    #[test]
+    fn find_villain_without_a_castle_reads_nothing() {
+        let resources = spell_resources();
+        let game = Game::default();
+        let (header, body) = adventure_cast_message(
+            &resources,
+            &game,
+            &AdventureCast::FindVillain { castle: None },
+        )
+        .expect("a dialog");
+        assert_eq!(header, "Find Villain");
+        assert!(body.contains("nothing"));
+    }
+
+    #[test]
+    fn bridge_and_gate_arms_are_not_dialogs() {
+        let resources = spell_resources();
+        let game = Game::default();
+        assert_eq!(
+            adventure_cast_message(&resources, &game, &AdventureCast::BridgeArmed),
+            None
+        );
+        assert_eq!(
+            adventure_cast_message(
+                &resources,
+                &game,
+                &AdventureCast::GateArmed {
+                    mode: openbounty_engine::spells_adventure::GateMode::Town,
+                    destinations: 3,
+                }
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn a_gate_with_no_destinations_reads_the_refusal() {
+        let resources = spell_resources();
+        let game = Game::default();
+        let (header, body) = adventure_cast_message(
+            &resources,
+            &game,
+            &AdventureCast::GateNone {
+                mode: openbounty_engine::spells_adventure::GateMode::Town,
+            },
+        )
+        .expect("a dialog");
+        assert_eq!(header, "Town Gate");
+        assert!(body.contains("towns"));
     }
 }

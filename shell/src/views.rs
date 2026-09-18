@@ -22,6 +22,7 @@ use openbounty_engine::tile::Terrain;
 use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::font;
+use crate::input::{Key, KeySource};
 use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
 use crate::present::Present;
@@ -51,6 +52,16 @@ const DEFAULT_CTL_TITLE: &str = " Controls ";
 const DEFAULT_CTL_ON: &str = "On";
 const DEFAULT_CTL_OFF: &str = "Off";
 
+/// Spells-view strings, overridden under `strings.spells_view`.
+const DEFAULT_SV_TITLE: &str = "Spells";
+const DEFAULT_SV_COMBAT: &str = "Combat";
+const DEFAULT_SV_ADVENTURE: &str = "Adventuring";
+
+/// The A-G keys the spells view reads, in order. C indexes `KEY_A + i`, which
+/// only works because raylib's letters are contiguous; this enum is sparse, so
+/// the seven keys are spelled out.
+const SPELL_KEYS: [Key; 7] = [Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G];
+
 /// Contract-view labels C compiles in; the pack overrides them under
 /// `strings.contract_view`.
 const DEFAULT_CV_TITLE_NO_CONTRACT: &str = "You have no Contract!";
@@ -73,6 +84,18 @@ pub enum ViewKind {
     Puzzle,
     Worldmap,
     Controls,
+    Spells,
+}
+
+/// What one frame of spells-view input did, porting `views_spells_update`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpellsInput {
+    /// A spell was chosen; the view has already dismissed itself.
+    Cast(i32),
+    /// A navigation key (Left/Right/ESC) was handled; the view stays open.
+    Handled,
+    /// Nothing was handled; the caller may dismiss on any other key.
+    None,
 }
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
@@ -92,6 +115,12 @@ pub struct Views {
     /// Which visible row the controls panel highlights. Ports C's
     /// `g_controls_cursor` static.
     controls_cursor: i32,
+    /// Whether the spells view is in cast mode (opened with U) rather than the
+    /// read-only view the game menu opens. Ports `spell_state.active`.
+    spells_cast_mode: bool,
+    /// Which spells column the A-G keys address: 0 combat, 1 adventure.
+    /// Ports `spell_state.column`.
+    spells_column: i32,
 }
 
 impl Views {
@@ -124,9 +153,13 @@ impl Views {
     /// separately by [`StatusMode::Worldmap`](crate::chrome::StatusMode).
     pub fn wants_exit_hint(&self, game: &Game) -> bool {
         match self.active() {
-            Some(ViewKind::Character | ViewKind::Army | ViewKind::Puzzle | ViewKind::Controls) => {
-                true
-            }
+            Some(
+                ViewKind::Character
+                | ViewKind::Army
+                | ViewKind::Puzzle
+                | ViewKind::Controls
+                | ViewKind::Spells,
+            ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
         }
@@ -173,6 +206,52 @@ impl Views {
         game.stats.options[row] = (game.stats.options[row] + 1) % range;
     }
 
+    /// Arm (or disarm) the spells view's cast mode, porting
+    /// `views_spells_set_mode`. Cast mode always starts on the adventure
+    /// column, as C does for an overworld cast.
+    pub fn spells_set_cast_mode(&mut self, cast_mode: bool) {
+        self.spells_cast_mode = cast_mode;
+        self.spells_column = 1;
+    }
+
+    /// Read one frame of spells-view input, porting `views_spells_update`.
+    ///
+    /// DIVERGENCE, deliberate: C's `views_spells_update` returns false after
+    /// a Left/Right and `main.c` then falls through to `ui_any_key_pressed`,
+    /// so the very column switch is defeated by an immediate dismiss. This
+    /// port treats Left/Right as handled so the column actually switches.
+    pub fn spells_update(&mut self, keys: &dyn KeySource) -> SpellsInput {
+        if !self.spells_cast_mode {
+            return SpellsInput::None;
+        }
+        let mut handled = false;
+        if keys.pressed(Key::Left) {
+            self.spells_column = 0;
+            handled = true;
+        }
+        if keys.pressed(Key::Right) {
+            self.spells_column = 1;
+            handled = true;
+        }
+        if keys.pressed(Key::Escape) {
+            self.spells_cast_mode = false;
+            self.dismiss();
+            handled = true;
+        }
+        for (i, key) in SPELL_KEYS.iter().enumerate() {
+            if keys.pressed(*key) {
+                let chosen = self.spells_column * 7 + i as i32;
+                self.dismiss();
+                return SpellsInput::Cast(chosen);
+            }
+        }
+        if handled {
+            SpellsInput::Handled
+        } else {
+            SpellsInput::None
+        }
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -212,6 +291,7 @@ impl Views {
             Some(ViewKind::Controls) => {
                 self.draw_controls(list, layout, palette, resources, game, present)
             }
+            Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
             None => {}
         }
     }
@@ -585,6 +665,94 @@ impl Views {
             };
             let vw = font::measure_width(&value);
             list.text(&value, x + w - CTL_PAD - vw, ty, fg);
+        }
+    }
+
+    /// Ports `draw_spells`: the two-column spellbook. Combat spells (0..6) on
+    /// the left, adventuring spells (7..13) on the right, each row dimming
+    /// when the hero holds no charge.
+    fn draw_spells(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        game: &Game,
+    ) {
+        list.rect(
+            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
+            palette.clr(Pal::DGrey),
+        );
+        list.rect_lines(
+            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
+            palette.clr(Pal::DRed),
+        );
+
+        let title = banner::text(resources, "spells_view", "title", DEFAULT_SV_TITLE);
+        list.text_centered(
+            title,
+            MAP_X + layout.map_w / 2,
+            MAP_Y + VIEW_PAD,
+            palette.clr(Pal::Yellow),
+        );
+
+        let head_y = MAP_Y + VIEW_PAD + font::GLYPH_H + 4;
+        let col_l = MAP_X + VIEW_PAD + 4;
+        let col_r = MAP_X + layout.map_w / 2 + 4;
+        list.text(
+            banner::text(resources, "spells_view", "combat_col", DEFAULT_SV_COMBAT),
+            col_l,
+            head_y,
+            palette.clr(Pal::Yellow),
+        );
+        list.text(
+            banner::text(
+                resources,
+                "spells_view",
+                "adventure_col",
+                DEFAULT_SV_ADVENTURE,
+            ),
+            col_r,
+            head_y,
+            palette.clr(Pal::Yellow),
+        );
+
+        let row_y = head_y + font::GLYPH_H + 4;
+        let row_h = font::GLYPH_H + 1;
+        for i in 0..7 {
+            let combat = resources.spell_by_index(i);
+            let adventure = resources.spell_by_index(i + 7);
+            let cc = game.spells.counts[i as usize];
+            let ca = game.spells.counts[(i + 7) as usize];
+            let lc = if cc > 0 {
+                palette.clr(Pal::White)
+            } else {
+                palette.clr(Pal::DGrey)
+            };
+            let rc = if ca > 0 {
+                palette.clr(Pal::White)
+            } else {
+                palette.clr(Pal::DGrey)
+            };
+
+            if let Some(spell) = combat {
+                let label = format!(
+                    "{:2} {} {}",
+                    cc,
+                    char::from(b'A' + i as u8),
+                    spell.name.as_str()
+                );
+                list.text(&label, col_l, row_y + i * row_h, lc);
+            }
+            if let Some(spell) = adventure {
+                let label = format!(
+                    "{} {:<12} {:2}",
+                    char::from(b'A' + i as u8),
+                    spell.name.as_str(),
+                    ca
+                );
+                list.text(&label, col_r, row_y + i * row_h, rc);
+            }
         }
     }
 }
@@ -1274,6 +1442,7 @@ fn draw_contract(
 mod tests {
     use super::*;
     use crate::draw::DrawCmd;
+    use crate::input::Keys;
     use openbounty_engine::map::Tile;
 
     /// A trivial map and fog for views that ignore them; only the worldmap
@@ -1930,5 +2099,101 @@ mod tests {
 
         assert!(list.has_text_containing("2 Scale"));
         assert!(list.has_text_containing("Auto"));
+    }
+
+    fn spells_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "spells": [
+                  {"id":"fireball","name":"Fireball","kind":"combat","cost":50},
+                  {},{},{},{},{},{},
+                  {"id":"time_stop","name":"Time Stop","kind":"adventure"}
+                ]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    #[test]
+    fn the_spells_view_draws_two_columns_with_counts() {
+        let (resources, layout, _) = spells_fixtures();
+        let mut game = Game::default();
+        game.spells.counts[0] = 2;
+        game.spells.counts[7] = 1;
+        let palette = Palette::fallback();
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+
+        let mut list = DrawList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        let catalog = SpriteCatalog::from_resources(&resources);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+        );
+
+        assert!(list.has_text_containing("Combat"));
+        assert!(list.has_text_containing("Adventuring"));
+        assert!(list.has_text_containing("Fireball"));
+        assert!(list.has_text_containing("Time Stop"));
+        // The combat row carries its count on the left, the adventure row on
+        // the right.
+        assert!(list.has_text_containing("2 A Fireball"));
+        assert!(list.has_text_containing("A Time Stop"));
+    }
+
+    #[test]
+    fn the_spells_view_is_read_only_outside_cast_mode() {
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+        assert_eq!(
+            views.spells_update(&Keys::pressed(&[Key::A])),
+            SpellsInput::None
+        );
+    }
+
+    #[test]
+    fn cast_mode_defaults_to_the_adventure_column() {
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+        views.spells_set_cast_mode(true);
+
+        // A in the default (adventure) column casts slot 7 + 0.
+        assert_eq!(
+            views.spells_update(&Keys::pressed(&[Key::A])),
+            SpellsInput::Cast(7)
+        );
+    }
+
+    #[test]
+    fn left_and_right_switch_columns_without_dismissing() {
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+        views.spells_set_cast_mode(true);
+
+        assert_eq!(
+            views.spells_update(&Keys::pressed(&[Key::Left])),
+            SpellsInput::Handled
+        );
+        assert_eq!(
+            views.spells_update(&Keys::pressed(&[Key::C])),
+            SpellsInput::Cast(2)
+        );
+    }
+
+    #[test]
+    fn escape_cancels_cast_mode_and_dismisses() {
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+        views.spells_set_cast_mode(true);
+
+        assert_eq!(
+            views.spells_update(&Keys::pressed(&[Key::Escape])),
+            SpellsInput::Handled
+        );
+        assert!(!views.is_active());
+        assert_eq!(views.active(), None);
     }
 }
