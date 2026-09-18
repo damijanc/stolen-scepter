@@ -14,6 +14,7 @@ pub const RES_MAX_ZONE_OBJECTS: usize = 256;
 pub const RES_MAX_ZONES: usize = 8;
 pub const RES_ID_LEN: usize = 32;
 pub const RES_NAME_LEN: usize = 48;
+pub const RES_VDESC_TEXT_LEN: usize = 320;
 pub const RES_SIGN_BODY_LEN: usize = 128;
 pub const RES_SIGN_TITLE_LEN: usize = 64;
 pub const RES_MAX_CASTLE_DECOR: usize = 32;
@@ -825,6 +826,27 @@ impl Default for ResTuning {
     }
 }
 
+/// A wanted-poster description, keyed by villain id. The `features` and
+/// `crimes` blocks are drawn verbatim, newlines and all.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResVillainDesc {
+    pub id: FixedStr<RES_ID_LEN>,
+    pub alias: FixedStr<RES_NAME_LEN>,
+    pub features: FixedStr<RES_VDESC_TEXT_LEN>,
+    pub crimes: FixedStr<RES_VDESC_TEXT_LEN>,
+}
+
+impl Default for ResVillainDesc {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            alias: FixedStr::empty(),
+            features: FixedStr::empty(),
+            crimes: FixedStr::empty(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
     resource_root: FixedStr<CAT_PATH_LEN>,
@@ -873,6 +895,9 @@ pub struct Resources {
     troops_count: usize,
     villains: Box<[VillainDef; CAT_VILLAINS_MAX]>,
     villains_count: usize,
+    // Boxed like the catalogs above: 32 entries of ~720 bytes each.
+    villain_descs: Box<[ResVillainDesc; CAT_VILLAINS_MAX]>,
+    villain_desc_count: usize,
     morale_chart: [[u8; 5]; 5],
 }
 
@@ -909,6 +934,8 @@ impl Default for Resources {
             troops_count: 0,
             villains: Box::new([VillainDef::default(); CAT_VILLAINS_MAX]),
             villains_count: 0,
+            villain_descs: Box::new([ResVillainDesc::default(); CAT_VILLAINS_MAX]),
+            villain_desc_count: 0,
             morale_chart: default_morale_chart(),
         }
     }
@@ -954,6 +981,7 @@ impl Resources {
         resources.parse_artifacts(&root)?;
         resources.parse_classes(&root)?;
         resources.parse_villains(&root)?;
+        resources.parse_villain_descs(&root)?;
         resources.resolve_temp_death()?;
         Ok(resources)
     }
@@ -1148,6 +1176,13 @@ impl Resources {
         self.villains[..self.villains_count]
             .iter()
             .find(|villain| villain.id.as_str() == id)
+    }
+
+    /// The wanted-poster description for a villain, keyed by id.
+    pub fn villain_desc(&self, villain_id: &str) -> Option<&ResVillainDesc> {
+        self.villain_descs[..self.villain_desc_count]
+            .iter()
+            .find(|desc| desc.id.as_str() == villain_id)
     }
 
     pub fn morale_result(&self, my_group: u8, their_group: u8) -> u8 {
@@ -1862,6 +1897,33 @@ impl Resources {
             self.villains[slot] = villain;
         }
         self.villains_count = villains.len();
+        Ok(())
+    }
+
+    fn parse_villain_descs(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        let Some(descs) = root.get("villain_descriptions") else {
+            return Ok(());
+        };
+        let Some(descs) = descs.as_object() else {
+            return Ok(());
+        };
+        for (id, value) in descs {
+            if self.villain_desc_count >= CAT_VILLAINS_MAX {
+                break;
+            }
+            let desc = &mut self.villain_descs[self.villain_desc_count];
+            desc.id.copy_from_str(id);
+            if let Some(alias) = optional_string_field(value, "alias")? {
+                desc.alias.copy_from_str(alias);
+            }
+            if let Some(features) = optional_string_field(value, "features")? {
+                desc.features.copy_from_str(features);
+            }
+            if let Some(crimes) = optional_string_field(value, "crimes")? {
+                desc.crimes.copy_from_str(crimes);
+            }
+            self.villain_desc_count += 1;
+        }
         Ok(())
     }
 }
@@ -3146,5 +3208,29 @@ mod tests {
         let odd = sprite_pack(r#""nope""#);
         assert_eq!(odd.sprites.combat_count, RES_COMBAT_TILES);
         assert_eq!(odd.sprites.font.as_str(), FONT_DEFAULT);
+    }
+
+    #[test]
+    fn villain_descriptions_are_keyed_by_villain_id() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [],
+                "villain_descriptions": {
+                  "murray": {"alias":"None","features":"Bald.","crimes":"Treason."},
+                  "hack": {"alias":"The Spitter","features":"Beard."}
+                }}"#,
+        )
+        .expect("fixture parses");
+
+        let murray = resources.villain_desc("murray").expect("present");
+        assert_eq!(murray.alias.as_str(), "None");
+        assert_eq!(murray.features.as_str(), "Bald.");
+        assert_eq!(murray.crimes.as_str(), "Treason.");
+
+        let hack = resources.villain_desc("hack").expect("present");
+        assert_eq!(hack.alias.as_str(), "The Spitter");
+        // A missing block stays empty, not a panic.
+        assert!(hack.crimes.is_empty());
+
+        assert!(resources.villain_desc("absent").is_none());
     }
 }
