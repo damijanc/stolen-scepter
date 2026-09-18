@@ -271,10 +271,23 @@ including `resources_format_template` and its `%VAR%` substitution.
      empty, so `Sprite::Orb` has nothing to draw today.
      Watch out: `combat` appears BOTH at the top level of game.json (a
      section nobody parses) and inside `sprites` (the tileset). Unrelated.
-   - TODO: `present_scale` from `src/present.c`. Pure arithmetic, so it can
-     be ported and tested before any window exists. Legacy and modern take
-     completely separate paths: legacy auto-fits with the `SCALE_MIN` floor
-     and has NO override, because the scale control is a modern-only feature.
+   - DONE: `present_scale` (`shell/src/present.rs`). Legacy and modern take
+     completely separate paths, and the legacy branch returns BEFORE the
+     override is ever read -- the scale control is modern-only and must not
+     change legacy behaviour. Legacy floors at `SCALE_MIN` (2); modern's
+     auto-fit floors at the pack's own `default_scale` (1). The ceiling
+     applies last on both.
+     The floor can make the target OVERHANG the window: legacy in a 500x300
+     window still renders 640x400, so `blit_rect` returns a negative origin
+     and the edges crop. That is deliberate -- the alternative is
+     non-uniform pixels.
+     C resizes the window inside `present_set_scale`; here that is the
+     backend's job, via `requested_window_size`. Growing the window is the
+     point of the control: clamping the choice to what already fits made
+     every option collapse to the current scale.
+   - TODO: the macroquad backend itself. Window, texture load, the font strip
+     with its four twirl-glyph patches (`font::TWIRL_GLYPHS`), input mapping,
+     and a `DrawList` executor.
 4. **Chrome + map viewport.** First thing actually on screen.
 5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.
