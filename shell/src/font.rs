@@ -25,7 +25,19 @@ pub const fn line_height() -> i32 {
 
 /// Which glyph a byte draws. Out-of-strip bytes fall back to the space glyph
 /// rather than to nothing, so a stray byte leaves a gap of the right width.
+///
+/// The four spinner codes are redirected to the printable glyphs that carry
+/// their shapes. C instead patches those glyphs INTO the strip's control
+/// slots after loading, which needs pixel surgery on the image; redirecting
+/// the index draws exactly the same thing with none.
 pub const fn glyph_index(byte: u8) -> usize {
+    let mut i = 0;
+    while i < TWIRL_GLYPHS.len() {
+        if TWIRL_GLYPHS[i].0 == byte {
+            return TWIRL_GLYPHS[i].1 as usize;
+        }
+        i += 1;
+    }
     if (byte as usize) < GLYPH_COUNT {
         byte as usize
     } else {
@@ -34,11 +46,11 @@ pub const fn glyph_index(byte: u8) -> usize {
 }
 
 /// Glyphs the pack's font PNG does not export, which the original stores at
-/// control-code positions. Each pair is `(destination code, source char)`, and
-/// the loader copies the printable glyph into the control slot so a string
-/// using the code draws the right shape.
+/// control-code positions. Each pair is `(control code, the printable glyph
+/// carrying its shape)`.
 ///
-/// These are the four spinner frames: `|`, `/`, `-`, `\`.
+/// These are the four spinner frames: `|`, `/`, `-`, `\`. [`glyph_index`]
+/// applies the redirection, so nothing has to edit the loaded strip.
 pub const TWIRL_GLYPHS: [(u8, u8); 4] = [(0x1D, b'|'), (0x05, b'/'), (0x1F, b'-'), (0x1C, b'\\')];
 
 /// Width and height of `text` in pixels, porting `bfont_measure`.
@@ -128,6 +140,18 @@ mod tests {
         let text = "\u{e9}";
         assert_eq!(text.len(), 2);
         assert_eq!(measure(text), (2 * GLYPH_W, GLYPH_H));
+    }
+
+    #[test]
+    fn a_spinner_code_draws_the_printable_glyph_that_has_its_shape() {
+        // The font PNG leaves these control slots blank, so drawing the code
+        // directly would show nothing where the spinner should turn.
+        assert_eq!(glyph_index(0x1D), b'|' as usize);
+        assert_eq!(glyph_index(0x05), b'/' as usize);
+        assert_eq!(glyph_index(0x1F), b'-' as usize);
+        assert_eq!(glyph_index(0x1C), b'\\' as usize);
+        // A control code that is not one of the four is left alone.
+        assert_eq!(glyph_index(0x01), 1);
     }
 
     #[test]

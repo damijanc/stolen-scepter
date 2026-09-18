@@ -300,13 +300,37 @@ including `resources_format_template` and its `%VAR%` substitution.
      name nothing are all accounted for: no hero idle, view icons 12-13 are
      empty by C's own comment, `orb` is empty in the pack, and the HUD
      animations declare 4 frames so 4..7 correctly name none.
-   - TODO: the macroquad backend itself. Window, texture load (feed it what
-     the catalog names), the font strip with its four twirl-glyph patches
-     (`font::TWIRL_GLYPHS`), input mapping, and a `DrawList` executor.
+   - DONE: the macroquad backend (`shell/src/backend.rs`, macroquad 0.4.16
+     with default features off). It loads what the catalog names and walks a
+     `DrawList`. It is the ONLY module that knows a graphics library exists.
+     Verified against the shipped pack: 310 textures, no missing art, frames
+     running without a panic. The PIXELS have not been checked by eye.
+     DIVERGENCE, deliberate: C renders into a 320x200 render target and blits
+     that at an integer scale; this applies the scale per command with no
+     intermediate target. Same result at an integer scale with nearest
+     sampling, avoids macroquad's y-flipped render textures, and is sharper
+     when a sprite's own size differs from the layout cell it fills.
+     Backend traps found the hard way:
+     * macroquad's `draw_rectangle_lines` draws a band of thickness/2 INSIDE
+       the rect, so a one-logical-pixel border needs `thickness = 2 * scale`.
+       raylib insets by the full thickness, and that inset is load-bearing.
+     * macroquad has NO rounded-rectangle primitive. `Frame::rounded` builds
+       one from a cross of rectangles plus corner circles.
+     * The scissor is reachable only through `get_internal_gl().quad_gl`,
+       which already converts to the GL origin, so it takes top-left window
+       coordinates.
+     * Tile art is preloaded rather than cached lazily, because
+       `load_texture` is async and there is no awaiting mid-frame.
+       `sprites::tile_art_names` enumerates the legend PLUS
+       `map::OBJECT_ART_NAMES`.
+     The four twirl glyphs are handled by redirecting the glyph INDEX in
+     `font::glyph_index` rather than by patching the loaded strip, as C does.
+     Same pixels, no image surgery.
      NOTE: `shell` is a BIN-only crate, so an integration test under
      `shell/tests/` cannot link it. Either keep shell tests as unit tests or
      split out a `lib.rs` when one is first needed.
-4. **Chrome + map viewport.** First thing actually on screen.
+4. **Chrome + map viewport.** First thing actually on screen. `main.rs` holds
+   a `smoke_scene` placeholder to be replaced by `chrome.rs`.
 5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.
 7. **Prompts and the decision loop**, wiring to the engine's outcome enums.

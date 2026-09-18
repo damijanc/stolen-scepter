@@ -150,9 +150,13 @@ impl SpriteCatalog {
         }
 
         let mut view_icon = vec![String::new(); VIEW_ICON_SLOTS];
-        for index in 0..resources.artifacts_count().min(VIEW_ICON_ARTIFACTS) {
+        for (index, slot) in view_icon
+            .iter_mut()
+            .take(resources.artifacts_count().min(VIEW_ICON_ARTIFACTS))
+            .enumerate()
+        {
             if let Some(artifact) = resources.artifact_by_index(index as i32) {
-                view_icon[index] = artifact.icon.as_str().to_owned();
+                *slot = artifact.icon.as_str().to_owned();
             }
         }
         for (offset, path) in sprites.view_icons_extra[..sprites.view_icons_extra_count]
@@ -317,6 +321,45 @@ impl SpriteCatalog {
         Some(frames[slot].as_str())
     }
 
+    /// Every distinct art path this catalog can name, so a backend can load
+    /// them all up front.
+    ///
+    /// Tile art is NOT here: the map names it, not the manifest. See
+    /// [`tile_art_path`] and [`tile_art_names`].
+    pub fn all_paths(&self) -> Vec<&str> {
+        let mut paths: Vec<&str> = Vec::new();
+        for anim in [&self.hero_walk, &self.hero_idle, &self.hero_boat] {
+            paths.extend(anim.frames.iter().flatten().map(String::as_str));
+        }
+        for group in [
+            &self.class_portrait,
+            &self.villain_portrait,
+            &self.view_icon,
+            &self.troop_still,
+            &self.combat_tile,
+        ] {
+            paths.extend(group.iter().map(String::as_str));
+        }
+        for group in [&self.villain_anim, &self.troop_anim] {
+            paths.extend(group.iter().flatten().map(String::as_str));
+        }
+        paths.extend(ROLE_FIXED_SPRITES.iter().filter_map(|s| self.path(*s)));
+        for frame in 0..ANIM_FRAMES_MAX_I32 {
+            paths.extend(
+                [
+                    Sprite::HudSiegeAnim { frame },
+                    Sprite::HudMagicAnim { frame },
+                ]
+                .iter()
+                .filter_map(|s| self.path(*s)),
+            );
+        }
+        paths.retain(|path| !path.is_empty());
+        paths.sort_unstable();
+        paths.dedup();
+        paths
+    }
+
     /// The bitmap font strip and the VGA palette, which a backend loads once.
     pub fn font_path(&self) -> &str {
         self.sprites.font.as_str()
@@ -325,6 +368,66 @@ impl SpriteCatalog {
     pub fn palette_path(&self) -> &str {
         self.sprites.palette.as_str()
     }
+}
+
+/// Longest animation a pack may declare, as an `i32` for frame indices.
+const ANIM_FRAMES_MAX_I32: i32 = openbounty_engine::tables::ANIM_FRAMES_MAX as i32;
+
+/// Every sprite that names exactly one file, for enumeration. Indexed and
+/// animated slots are walked separately.
+const ROLE_FIXED_SPRITES: [Sprite; 25] = [
+    Sprite::PuzzleCover,
+    Sprite::Backdrop(Backdrop::Town),
+    Sprite::Backdrop(Backdrop::Castle),
+    Sprite::Backdrop(Backdrop::Plains),
+    Sprite::Backdrop(Backdrop::Forest),
+    Sprite::Backdrop(Backdrop::HillCave),
+    Sprite::Backdrop(Backdrop::Dungeon),
+    Sprite::EndingWin,
+    Sprite::EndingLose,
+    Sprite::HudContractSilhouette,
+    Sprite::HudSiegeSilhouette,
+    Sprite::HudMagicSilhouette,
+    Sprite::HudPuzzleGrid,
+    Sprite::HudGoldPurse,
+    Sprite::HudBarStrip,
+    Sprite::ChromeOverworld,
+    Sprite::SplashLogo,
+    Sprite::SplashTitle,
+    Sprite::ClassPicker,
+    Sprite::ClassHighlight,
+    Sprite::Orb,
+    Sprite::EndGrass,
+    Sprite::EndCarpet,
+    Sprite::EndHero,
+    Sprite::EndThrone,
+];
+
+/// Where a tile's art lives. The pack layout is fixed: `art/tiles/<art>.png`,
+/// which C's `tile_cache` also hardcodes.
+pub fn tile_art_path(art: &str) -> String {
+    format!("art/tiles/{art}.png")
+}
+
+/// Every tile art name a map can ask for: the pack's legend, plus the names
+/// the map module stamps for placed objects.
+///
+/// The second half matters because the .dat carries pure terrain, so a
+/// castle gate or a chest never appears in a legend. Enumerating only the
+/// legend would leave every object unable to draw.
+pub fn tile_art_names(resources: &Resources) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    for code in 0..=u8::MAX {
+        if let Some(tile) = resources.tile_code(code) {
+            if !tile.art.is_empty() {
+                seen.insert(tile.art.as_str().to_owned());
+            }
+        }
+    }
+    for name in openbounty_engine::map::OBJECT_ART_NAMES {
+        seen.insert(name.to_owned());
+    }
+    seen.into_iter().collect()
 }
 
 /// Wanted-poster frames for a villain whose pack declares none.
