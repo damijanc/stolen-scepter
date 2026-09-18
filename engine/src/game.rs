@@ -81,8 +81,9 @@ pub enum AudienceOutcome {
     FinalRank = 2,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ChestOutcome {
+    #[default]
     Gold = 0,
     Leadership = 1,
     Commission = 2,
@@ -160,6 +161,21 @@ pub enum SpellBuyOutcome {
 pub struct ChestPending {
     pub pending_gold: i32,
     pub pending_leadership: i32,
+}
+
+/// Everything a chest roll leaves for the shell to render, plus the deferred
+/// gold/leadership choice. C's `GameRollChest` formats the message text inline
+/// with the same numbers; the engine here returns the values instead.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ChestRoll {
+    pub outcome: ChestOutcome,
+    /// The gold outcome's pending choice; zeroed for every other outcome.
+    pub pending: ChestPending,
+    /// Commission / spell power / max spells: the `+N` delta.
+    pub points: i32,
+    /// New spell: the count and the spell's catalog id.
+    pub spell_count: i32,
+    pub spell_id: FixedStr<CAT_ID_LEN>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -941,7 +957,7 @@ impl Game {
         zone_index: usize,
         x: i32,
         y: i32,
-    ) -> (ChestOutcome, ChestPending) {
+    ) -> ChestRoll {
         let mut copy = self.clone();
         copy.chest_outcome(resources, zone_index, x, y, false)
     }
@@ -952,7 +968,7 @@ impl Game {
         zone_index: usize,
         x: i32,
         y: i32,
-    ) -> (ChestOutcome, ChestPending) {
+    ) -> ChestRoll {
         self.chest_outcome(resources, zone_index, x, y, true)
     }
 
@@ -963,7 +979,7 @@ impl Game {
         x: i32,
         y: i32,
         apply: bool,
-    ) -> (ChestOutcome, ChestPending) {
+    ) -> ChestRoll {
         let tier = zone_index.min(3);
         let chest = &resources.economy.chest;
         let chance = (chest_rand(self.seed, x, y, 1) % 100) as i32 + 1;
@@ -980,13 +996,14 @@ impl Game {
             if self.has_power(resources, ArtifactPower::DoubleLeadership) {
                 leadership *= 2;
             }
-            return (
-                ChestOutcome::Gold,
-                ChestPending {
+            return ChestRoll {
+                outcome: ChestOutcome::Gold,
+                pending: ChestPending {
                     pending_gold: gold,
                     pending_leadership: leadership,
                 },
-            );
+                ..ChestRoll::default()
+            };
         }
 
         if chance < chest.chance_commission[tier] {
@@ -1000,14 +1017,22 @@ impl Game {
             if apply {
                 self.stats.commission_weekly += points;
             }
-            return (ChestOutcome::Commission, ChestPending::default());
+            return ChestRoll {
+                outcome: ChestOutcome::Commission,
+                points,
+                ..ChestRoll::default()
+            };
         }
 
         if chance < chest.chance_spell_power[tier] {
             if apply {
                 self.stats.spell_power += 1;
             }
-            return (ChestOutcome::SpellPower, ChestPending::default());
+            return ChestRoll {
+                outcome: ChestOutcome::SpellPower,
+                points: 1,
+                ..ChestRoll::default()
+            };
         }
 
         if chance < chest.chance_max_spells[tier] {
@@ -1018,23 +1043,42 @@ impl Game {
             if apply {
                 self.stats.max_spells += points;
             }
-            return (ChestOutcome::MaxSpells, ChestPending::default());
+            return ChestRoll {
+                outcome: ChestOutcome::MaxSpells,
+                points,
+                ..ChestRoll::default()
+            };
         }
 
         if chance < chest.chance_new_spell[tier] {
             let spell_count = resources.spells_count();
             if spell_count == 0 {
-                return (ChestOutcome::Empty, ChestPending::default());
+                return ChestRoll {
+                    outcome: ChestOutcome::Empty,
+                    ..ChestRoll::default()
+                };
             }
             let spell_type = (chest_rand(self.seed, x, y, 4) % spell_count as u32) as usize;
             let spell_num = (chest_rand(self.seed, x, y, 5) % (tier as u32 + 1)) as i32 + 1;
             if apply && spell_type < self.spells.counts.len() {
                 self.spells.counts[spell_type] += spell_num;
             }
-            return (ChestOutcome::NewSpell, ChestPending::default());
+            let spell_id = resources
+                .spell_by_index(spell_type as i32)
+                .map(|spell| spell.id)
+                .unwrap_or_default();
+            return ChestRoll {
+                outcome: ChestOutcome::NewSpell,
+                spell_count: spell_num,
+                spell_id,
+                ..ChestRoll::default()
+            };
         }
 
-        (ChestOutcome::Empty, ChestPending::default())
+        ChestRoll {
+            outcome: ChestOutcome::Empty,
+            ..ChestRoll::default()
+        }
     }
 
     pub fn accept_chest_gold(&mut self, gold: i32) {
@@ -4017,21 +4061,26 @@ mod tests {
             ..Game::default()
         };
 
-        let (peek, peek_pending) = game.peek_chest(&resources, 0, 4, 0);
-        let (rolled, pending) = game.roll_chest(&resources, 0, 4, 0);
+        let peek = game.peek_chest(&resources, 0, 4, 0);
+        let rolled = game.roll_chest(&resources, 0, 4, 0);
 
-        assert_eq!(rolled, ChestOutcome::Gold);
+        assert_eq!(rolled.outcome, ChestOutcome::Gold);
         assert_eq!(peek, rolled);
-        assert_eq!(peek_pending, pending);
-        assert!(pending.pending_gold > 0);
+        assert!(rolled.pending.pending_gold > 0);
         assert_eq!(game.stats.gold, 0);
         assert_eq!(game.stats.leadership_base, 0);
 
-        game.accept_chest_gold(pending.pending_gold);
-        assert_eq!(game.stats.gold, pending.pending_gold);
-        game.accept_chest_leadership(pending.pending_leadership);
-        assert_eq!(game.stats.leadership_base, pending.pending_leadership);
-        assert_eq!(game.stats.leadership_current, pending.pending_leadership);
+        game.accept_chest_gold(rolled.pending.pending_gold);
+        assert_eq!(game.stats.gold, rolled.pending.pending_gold);
+        game.accept_chest_leadership(rolled.pending.pending_leadership);
+        assert_eq!(
+            game.stats.leadership_base,
+            rolled.pending.pending_leadership
+        );
+        assert_eq!(
+            game.stats.leadership_current,
+            rolled.pending.pending_leadership
+        );
     }
 
     #[test]
@@ -4055,11 +4104,13 @@ mod tests {
             ..Game::default()
         };
 
-        let (outcome, pending) = game.roll_chest(&resources, 0, 4, 0);
+        let roll = game.roll_chest(&resources, 0, 4, 0);
 
-        assert_eq!(outcome, ChestOutcome::NewSpell);
-        assert_eq!(pending.pending_gold, 0);
-        assert_eq!(pending.pending_leadership, 0);
+        assert_eq!(roll.outcome, ChestOutcome::NewSpell);
+        assert_eq!(roll.spell_count, 1);
+        assert_eq!(roll.spell_id.as_str(), "bridge");
+        assert_eq!(roll.pending.pending_gold, 0);
+        assert_eq!(roll.pending.pending_leadership, 0);
         assert_eq!(game.spells.counts[0], 1);
     }
 

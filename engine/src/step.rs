@@ -1,5 +1,5 @@
 use crate::fog::Fog;
-use crate::game::{CastleOwnerKind, ChestOutcome, ChestPending, Game, Mount, TravelMode};
+use crate::game::{CastleOwnerKind, ChestRoll, Game, Mount, TravelMode};
 use crate::map::{Map, Tile};
 use crate::resources::Resources;
 use crate::tables::{Facing, FixedStr};
@@ -25,8 +25,7 @@ pub enum StepInteraction {
     },
     TreasureChest {
         id: String,
-        outcome: ChestOutcome,
-        pending: ChestPending,
+        roll: ChestRoll,
     },
     Sign {
         id: String,
@@ -340,13 +339,9 @@ fn resolve_interaction(
         }
         Interact::TreasureChest => {
             let zone_index = resources.zone_index_by_id(zone.as_str()).unwrap_or(0);
-            let (outcome, pending) = game.roll_chest(resources, zone_index, x, y);
+            let roll = game.roll_chest(resources, zone_index, x, y);
             consume_tile(game, map, zone.as_str(), x, y);
-            StepInteraction::TreasureChest {
-                id,
-                outcome,
-                pending,
-            }
+            StepInteraction::TreasureChest { id, roll }
         }
         Interact::Sign => StepInteraction::Sign {
             id,
@@ -1232,13 +1227,12 @@ mod tests {
             }
         );
 
-        let (chest_outcome, chest_pending) = game.peek_chest(&resources, 0, 4, 0);
+        let chest_roll = game.peek_chest(&resources, 0, 4, 0);
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),
             StepInteraction::TreasureChest {
                 id: "chest0".to_owned(),
-                outcome: chest_outcome,
-                pending: chest_pending
+                roll: chest_roll
             }
         );
         assert_consumed(&game, &map, "home", 4, 0);
