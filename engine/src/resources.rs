@@ -23,6 +23,9 @@ pub const RES_TILE_CODE_COUNT: usize = 256;
 pub const RES_SPAWN_TIERS: usize = 4;
 pub const RES_SPAWN_POOL_N: usize = 5;
 pub const RES_CHEST_TIERS: usize = 4;
+pub const RES_MAX_CONTROLS: usize = 8;
+pub const RES_CONTROL_LABEL_LEN: usize = 24;
+pub const RES_CONTROL_TYPE_LEN: usize = 16;
 /// Length of an art path in the sprite manifest, C's `RES_PATH_LEN`.
 pub const RES_PATH_LEN: usize = 128;
 /// The combat tileset, in the fixed role order the renderer indexes by.
@@ -202,6 +205,48 @@ impl ResColors {
             3 => self.difficulty_impossible,
             _ => self.difficulty_easy,
         }
+    }
+}
+
+/// One row of the controls settings panel, C's `ResControls.items` entry.
+///
+/// `kind` is C's `type` field ("bool" or "numeric"); the field name changes
+/// because `type` is a Rust keyword. `def` and `id` are parsed but nothing
+/// reads them -- the live option values come from `world.default_options` and
+/// are stored in `Game.stats.options`, exactly as in C.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResControl {
+    pub id: FixedStr<RES_ID_LEN>,
+    pub label: FixedStr<RES_CONTROL_LABEL_LEN>,
+    pub kind: FixedStr<RES_CONTROL_TYPE_LEN>,
+    pub range: i32,
+    pub def: i32,
+    pub hidden: bool,
+}
+
+impl Default for ResControl {
+    fn default() -> Self {
+        Self {
+            id: FixedStr::empty(),
+            label: FixedStr::empty(),
+            kind: FixedStr::empty(),
+            range: 2,
+            def: 0,
+            hidden: false,
+        }
+    }
+}
+
+/// The controls settings block, C's `Resources.controls`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
+pub struct ResControls {
+    pub count: usize,
+    pub items: [ResControl; RES_MAX_CONTROLS],
+}
+
+impl ResControls {
+    pub fn by_index(&self, index: usize) -> Option<&ResControl> {
+        self.items.get(index).filter(|_| index < self.count)
     }
 }
 
@@ -864,6 +909,7 @@ pub struct Resources {
     pub sprites: Box<ResSprites>,
     pub ending: ResEnding,
     pub colors: ResColors,
+    pub controls: ResControls,
     /// Every string the pack declares, as `group -> key -> text`.
     ///
     /// C names all ~250 of them as struct fields with compiled-in defaults.
@@ -914,6 +960,7 @@ impl Default for Resources {
             sprites: Box::new(ResSprites::default()),
             ending: ResEnding::default(),
             colors: ResColors::default(),
+            controls: ResControls::default(),
             strings: std::collections::BTreeMap::new(),
             tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
@@ -968,6 +1015,7 @@ impl Resources {
         resources.parse_sprites(&root);
         resources.parse_ending(&root);
         resources.parse_colors(&root);
+        resources.parse_controls(&root)?;
         resources.parse_strings(&root);
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
@@ -1018,6 +1066,14 @@ impl Resources {
         self.zones[..self.zone_count]
             .iter()
             .position(|zone| zone.id.as_str() == id)
+    }
+
+    pub fn controls_count(&self) -> usize {
+        self.controls.count
+    }
+
+    pub fn control_by_index(&self, index: usize) -> Option<&ResControl> {
+        self.controls.by_index(index)
     }
 
     pub fn castle_count(&self) -> usize {
@@ -1360,6 +1416,46 @@ impl Resources {
                 }
             }
         }
+    }
+
+    fn parse_controls(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
+        self.controls = ResControls::default();
+        let Some(settings) = root.get("controls").and_then(|c| c.get("settings")) else {
+            return Ok(());
+        };
+        let settings = settings
+            .as_array()
+            .ok_or(ResourceError::InvalidField("controls.settings"))?;
+
+        let mut n = 0;
+        for value in settings.iter() {
+            if n >= RES_MAX_CONTROLS {
+                break;
+            }
+            // C skips a non-object entry without consuming a slot.
+            if !value.is_object() {
+                continue;
+            }
+            let mut control = ResControl::default();
+            if let Some(id) = optional_string_field(value, "id")? {
+                control.id.copy_from_str(id);
+            }
+            if let Some(label) = optional_string_field(value, "label")? {
+                control.label.copy_from_str(label);
+            }
+            if let Some(kind) = optional_string_field(value, "type")? {
+                control.kind.copy_from_str(kind);
+            } else {
+                control.kind.copy_from_str("bool");
+            }
+            control.range = optional_i32_field(value, "range", 2)?;
+            control.def = optional_i32_field(value, "default", 0)?;
+            control.hidden = optional_bool_field(value, "hidden", false)?;
+            self.controls.items[n] = control;
+            n += 1;
+        }
+        self.controls.count = n;
+        Ok(())
     }
 
     /// Read every string group the pack declares.
@@ -3232,5 +3328,49 @@ mod tests {
         assert!(hack.crimes.is_empty());
 
         assert!(resources.villain_desc("absent").is_none());
+    }
+
+    #[test]
+    fn controls_parse_the_settings_rows_in_order() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [],
+                "controls": {"settings": [
+                  {"id":"delay","label":"Delay","type":"numeric","range":10,"default":5},
+                  {"id":"sounds","label":"Sounds"},
+                  {"id":"cga","label":"CGA","type":"numeric","range":8,"hidden":true}
+                ]}}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(resources.controls_count(), 3);
+
+        let delay = resources.control_by_index(0).expect("present");
+        assert_eq!(delay.id.as_str(), "delay");
+        assert_eq!(delay.label.as_str(), "Delay");
+        assert_eq!(delay.kind.as_str(), "numeric");
+        assert_eq!(delay.range, 10);
+        assert_eq!(delay.def, 5);
+        assert!(!delay.hidden);
+
+        // A missing `type` defaults to "bool", C's json_str fallback.
+        let sounds = resources.control_by_index(1).expect("present");
+        assert_eq!(sounds.kind.as_str(), "bool");
+        assert_eq!(sounds.range, 2);
+        assert_eq!(sounds.def, 0);
+
+        let cga = resources.control_by_index(2).expect("present");
+        assert!(cga.hidden);
+
+        assert!(resources.control_by_index(3).is_none());
+    }
+
+    #[test]
+    fn a_missing_or_empty_controls_block_yields_no_rows() {
+        let resources = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
+        assert_eq!(resources.controls_count(), 0);
+
+        let resources = Resources::from_json_str(r#"{"troops": [], "controls": {"settings": []}}"#)
+            .expect("fixture parses");
+        assert_eq!(resources.controls_count(), 0);
     }
 }
