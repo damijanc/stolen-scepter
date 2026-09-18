@@ -10,7 +10,7 @@
 //! [`crate::draw::DrawList`] commands, so the layout is testable headlessly
 //! the way the engine's combat digests are.
 
-use openbounty_engine::game::Game;
+use openbounty_engine::game::{Game, GAME_ARMY_SLOTS};
 use openbounty_engine::resources::Resources;
 
 use crate::banner;
@@ -18,6 +18,7 @@ use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
+use crate::sprites::SpriteCatalog;
 
 /// The character portrait's legacy size. C defaults to 96x102 and the shipped
 /// pack's class portraits are exactly that, so the belt below it is placed a
@@ -29,6 +30,7 @@ const PORTRAIT_H: i32 = 102;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewKind {
     Character,
+    Army,
 }
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
@@ -62,9 +64,9 @@ impl Views {
     }
 
     /// True when the active view swaps the status bar to "Press 'ESC' to
-    /// exit". The character view always does.
+    /// exit". The character and army views always do.
     pub fn wants_exit_hint(&self) -> bool {
-        matches!(self.active(), Some(ViewKind::Character))
+        matches!(self.active(), Some(ViewKind::Character | ViewKind::Army))
     }
 
     /// Draw the active view over the map area.
@@ -74,10 +76,15 @@ impl Views {
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
+        catalog: &SpriteCatalog,
         game: &Game,
+        tick: i32,
     ) {
         match self.active() {
             Some(ViewKind::Character) => draw_character(list, layout, palette, resources, game),
+            Some(ViewKind::Army) => {
+                draw_army(list, layout, palette, resources, catalog, game, tick)
+            }
             None => {}
         }
     }
@@ -282,11 +289,203 @@ fn draw_character(
     }
 }
 
+/// A troop's animated frame, falling back to its still sprite. Mirrors the
+/// helper `map_render` uses, since the army view animates the same way.
+fn troop_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite> {
+    let index = usize::try_from(index).ok()?;
+    let frames = catalog.troop_anim_len(index);
+    if frames > 0 {
+        return Some(Sprite::TroopAnim {
+            troop: index,
+            frame: crate::sprites::frame_index(tick, frames) as i32,
+        });
+    }
+    catalog
+        .troop_frame(index, tick)
+        .map(|_| Sprite::TroopStill(index))
+}
+
+/// Morale of one army slot: any 'L' against another stack reads Low, all 'H'
+/// reads High, a lone stack reads High, else Normal. Ports `army_slot_morale`.
+fn army_slot_morale<'a>(
+    resources: &'a Resources,
+    game: &Game,
+    slot: usize,
+    normal: &'a str,
+    low: &'a str,
+    high: &'a str,
+) -> &'a str {
+    let Some(me) = resources.troop_by_id(game.army[slot].id.as_str()) else {
+        return normal;
+    };
+    let mut others = 0;
+    let mut low_count = 0;
+    let mut high_count = 0;
+    for other in 0..GAME_ARMY_SLOTS {
+        if other == slot {
+            continue;
+        }
+        if game.army[other].id.is_empty() || game.army[other].count == 0 {
+            continue;
+        }
+        let Some(other_troop) = resources.troop_by_id(game.army[other].id.as_str()) else {
+            continue;
+        };
+        others += 1;
+        match resources.morale_result(me.morale_group, other_troop.morale_group) {
+            b'L' => low_count += 1,
+            b'H' => high_count += 1,
+            _ => {}
+        }
+    }
+    if others == 0 {
+        high
+    } else if low_count > 0 {
+        low
+    } else if high_count == others {
+        high
+    } else {
+        normal
+    }
+}
+
+/// Ports `draw_army`: five rows, one per troop stack, with a sprite, the
+/// roster text, and two columns of stats.
+fn draw_army(
+    list: &mut DrawList,
+    layout: &Layout,
+    palette: &Palette,
+    resources: &Resources,
+    catalog: &SpriteCatalog,
+    game: &Game,
+    tick: i32,
+) {
+    let vx = MAP_X;
+    let vw = layout.map_w + layout.sidebar_w;
+    let view_y = MAP_Y;
+    let view_h = layout.map_h;
+
+    list.rect(Rect::new(vx, view_y, vw, view_h), palette.clr(Pal::DGrey));
+    list.rect_lines(Rect::new(vx, view_y, vw, view_h), palette.clr(Pal::DRed));
+
+    let row_h = 34;
+    let pad = 2;
+    let sprite_w = 48;
+    let sprite_h = 34;
+    let white = palette.clr(Pal::White);
+
+    let skill = banner::text(resources, "army_view", "skill", "SL:");
+    let move_lbl = banner::text(resources, "army_view", "move", "MV:");
+    let morale_lbl = banner::text(resources, "army_view", "morale", "Morale:");
+    let hp_lbl = banner::text(resources, "army_view", "hit_points", "HitPts:");
+    let damage_lbl = banner::text(resources, "army_view", "damage", "Damage:");
+    let cost_lbl = banner::text(resources, "army_view", "g_cost", "G-Cost:");
+    let out_of_control = banner::text(resources, "ui", "out_of_control", "OUT OF CONTROL");
+    let morale_normal = banner::text(resources, "morale", "normal", "Normal");
+    let morale_low = banner::text(resources, "morale", "low", "Low");
+    let morale_high = banner::text(resources, "morale", "high", "High");
+
+    for slot in 0..GAME_ARMY_SLOTS {
+        let ry = view_y + pad + slot as i32 * row_h;
+
+        // The green sprite cell is drawn even for an empty slot.
+        list.rect(
+            Rect::new(vx + pad, ry, sprite_w, sprite_h),
+            palette.clr(Pal::DGreen),
+        );
+
+        if game.army[slot].id.is_empty() || game.army[slot].count == 0 {
+            continue;
+        }
+        let Some(troop) = resources.troop_by_id(game.army[slot].id.as_str()) else {
+            continue;
+        };
+
+        if let Some(sprite) = troop_sprite(catalog, troop.index, tick) {
+            list.blit(sprite, Dst::rect(vx + pad, ry, sprite_w, sprite_h));
+        }
+
+        // Left column: count+name, skill+move, morale.
+        let tx = vx + pad + sprite_w + 4;
+        let ty = ry + 2;
+        list.text(
+            &format!("{:3} {}", game.army[slot].count, troop.name.as_str()),
+            tx,
+            ty,
+            white,
+        );
+        list.text(
+            &format!(
+                "{}{:2} {}{:2}",
+                skill, troop.skill_level, move_lbl, troop.move_rate
+            ),
+            tx,
+            ty + font::GLYPH_H,
+            white,
+        );
+
+        // A stack whose hit points exceed leadership is out of control.
+        let free_lead = game.stats.leadership_current - troop.hit_points * game.army[slot].count;
+        let (morale_text, morale_color) = if free_lead < 0 {
+            (out_of_control.to_owned(), palette.clr(Pal::Red))
+        } else {
+            let label = army_slot_morale(
+                resources,
+                game,
+                slot,
+                morale_normal,
+                morale_low,
+                morale_high,
+            );
+            (format!("{}{}", morale_lbl, label), white)
+        };
+        list.text(&morale_text, tx, ty + font::GLYPH_H * 2, morale_color);
+
+        // Right column: hit points, damage range, gold cost.
+        let rx = tx + 16 * font::GLYPH_W;
+        list.text(
+            &format!("{}{}", hp_lbl, troop.hit_points * game.army[slot].count),
+            rx,
+            ty,
+            white,
+        );
+        list.text(
+            &format!(
+                "{}{}-{}",
+                damage_lbl,
+                troop.melee_min * game.army[slot].count,
+                troop.melee_max * game.army[slot].count
+            ),
+            rx,
+            ty + font::GLYPH_H,
+            white,
+        );
+        list.text(
+            &format!(
+                "{}{}",
+                cost_lbl,
+                (troop.recruit_cost / 10) * game.army[slot].count
+            ),
+            rx,
+            ty + font::GLYPH_H * 2,
+            white,
+        );
+
+        // A thin rule between occupied rows.
+        if slot < GAME_ARMY_SLOTS - 1 {
+            list.rect(
+                Rect::new(vx + pad, ry + row_h - 1, vw - 2 * pad, 1),
+                palette.clr(Pal::DRed),
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn fixtures() -> (Resources, Layout) {
+    fn fixtures() -> (Resources, Layout, SpriteCatalog) {
         let resources = Resources::from_json_str(
             r#"{"render": {"mode": "legacy"}, "troops": [],
                 "classes": [
@@ -299,7 +498,8 @@ mod tests {
         )
         .expect("fixture parses");
         let layout = Layout::from_resources(&resources).expect("lays out");
-        (resources, layout)
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
     }
 
     fn knight_game() -> Game {
@@ -340,14 +540,14 @@ mod tests {
 
     #[test]
     fn the_character_view_draws_the_name_and_stats() {
-        let (resources, layout) = fixtures();
+        let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &game);
+        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
 
         let labels: Vec<&str> = list.texts().iter().map(|(_, _, t)| *t).collect();
         assert!(labels[0].starts_with("Sir Rust the General"));
@@ -363,7 +563,7 @@ mod tests {
 
     #[test]
     fn the_inventory_belt_draws_an_artifact_icon_when_found() {
-        let (resources, layout) = fixtures();
+        let (resources, layout, catalog) = fixtures();
         let mut game = knight_game();
         game.artifacts.found[0] = true;
         let palette = Palette::fallback();
@@ -371,7 +571,7 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &game);
+        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
 
         assert!(!list.blits_of(Sprite::ViewIcon(0)).is_empty());
         assert!(list.blits_of(Sprite::ViewIcon(1)).is_empty());
@@ -387,43 +587,116 @@ mod tests {
         )
         .expect("fixture parses");
         let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
         let game = knight_game();
         let palette = Palette::fallback();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &game);
+        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
         assert!(list.has_text_containing("GP"));
         assert!(!list.has_text_containing("Gold"));
     }
 
     #[test]
     fn an_inactive_view_draws_nothing() {
-        let (resources, layout) = fixtures();
+        let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
         let views = Views::new();
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &game);
+        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
         assert!(list.is_empty());
     }
 
     #[test]
     fn a_zero_value_draws_no_number() {
-        let (resources, layout) = fixtures();
+        let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &game);
+        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
 
         // "Followers killed" is 0, so its number must not appear.
         let texts = list.texts();
         assert!(texts.iter().any(|(_, _, t)| *t == "Followers killed"));
         assert!(!texts.iter().any(|(_, _, t)| *t == "0"));
+    }
+
+    fn army_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [
+                {"index":0,"id":"peasants","name":"Peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","anim":["a0.png","a1.png"]},
+                {"index":1,"id":"ogres","name":"Ogres","skill_level":3,"hit_points":20,"move_rate":2,"melee":[5,10],"ranged":[0,0,0],"recruit_cost":100,"spoils_factor":1,"abilities":"","morale_group":"D"}
+            ]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    #[test]
+    fn a_lone_stack_reads_high_morale() {
+        let (resources, _, _) = army_fixtures();
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+
+        assert_eq!(
+            army_slot_morale(&resources, &game, 0, "Normal", "Low", "High"),
+            "High"
+        );
+    }
+
+    #[test]
+    fn a_low_morale_relationship_reads_low() {
+        let (resources, _, _) = army_fixtures();
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("ogres");
+        game.army[0].count = 5;
+        game.army[1].id.copy_from_str("peasants");
+        game.army[1].count = 5;
+
+        // Ogres (D) against peasants (A) reads 'L', so the ogre row is Low.
+        assert_eq!(
+            army_slot_morale(&resources, &game, 0, "Normal", "Low", "High"),
+            "Low"
+        );
+    }
+
+    #[test]
+    fn the_army_view_draws_the_roster_and_out_of_control() {
+        let (resources, layout, catalog) = army_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 100;
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+        game.army[1].id.copy_from_str("ogres");
+        game.army[1].count = 6; // 6 * 20 hp = 120 > 100 leadership.
+
+        let palette = Palette::fallback();
+        let mut views = Views::new();
+        views.set(ViewKind::Army);
+
+        let mut list = DrawList::new();
+        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+
+        assert!(list.has_text_containing("Peasants"));
+        assert!(list.has_text_containing("Ogres"));
+        assert!(list.has_text_containing("SL: 1 MV: 1"));
+        assert!(list.has_text_containing("OUT OF CONTROL"));
+        // The 6-strong ogre stack is out of control; the peasants (A vs D)
+        // stay in control and report Normal morale.
+        assert!(list.has_text_containing("Morale:Normal"));
+        // A troop with declared art draws an animated frame.
+        assert!(!list
+            .blits_of(Sprite::TroopAnim { troop: 0, frame: 0 })
+            .is_empty());
     }
 }

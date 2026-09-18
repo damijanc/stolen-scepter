@@ -385,6 +385,7 @@ async fn main() {
                     }
                 }
                 Action::ViewCharacter => views.set(ViewKind::Character),
+                Action::ViewArmy => views.set(ViewKind::Army),
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.
@@ -468,7 +469,17 @@ async fn main() {
         .draw(&mut list);
 
         // A view covers the map area while the overworld keeps running below.
-        views.draw(&mut list, &layout, backend.palette(), &resources, &game);
+        // The army view animates its troops on an ~8 Hz clock, as C does.
+        let army_tick = (get_time() * 8.0) as i32;
+        views.draw(
+            &mut list,
+            &layout,
+            backend.palette(),
+            &resources,
+            &catalog,
+            &game,
+            army_tick,
+        );
 
         // The prompt replaces the bottom frame; the dialog draws LAST so it
         // covers a prompt that is up at the same time, exactly as C's overlay
