@@ -1949,6 +1949,9 @@ fn parse_troop(value: &serde_json::Value) -> Result<TroopDef, ResourceError> {
     if let Some(dwelling) = optional_string_field(value, "dwelling")? {
         troop.dwelling.copy_from_str(dwelling);
     }
+    if let Some(name) = optional_string_field(value, "name")? {
+        troop.name.copy_from_str(name);
+    }
     troop.max_population = optional_i32_field(value, "max_population", 0)?;
     troop.growth_per_week = optional_i32_field(value, "growth_per_week", 0)?;
     if let Some(sprite) = optional_string_field(value, "sprite")? {
@@ -2741,7 +2744,7 @@ mod tests {
                 {"index":1,"id":"castle1","zone":"fallback","x":8,"y":9,"gate":{"x":10,"y":11},"special":{"excluded_from_contract":true}}
               ],
               "troops": [
-                {"index":0,"id":"peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20],"dwelling":"plains","max_population":100,"growth_per_week":20},
+                {"index":0,"id":"peasants","name":"Peasants","skill_level":1,"hit_points":1,"move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,"spoils_factor":1,"abilities":"","morale_group":"A","tier_counts":[5,10,15,20],"dwelling":"plains","max_population":100,"growth_per_week":20},
                 {"index":1,"id":"vampires","skill_level":5,"hit_points":30,"move_rate":1,"melee":[3,6],"ranged":[0,0,0],"recruit_cost":1500,"spoils_factor":150,"abilities":"FLY|LEECH|UNDEAD","morale_group":"E","dwelling":"castle"}
               ],
               "classes": [
@@ -2831,6 +2834,7 @@ mod tests {
         let peasants = resources.troop_by_id("peasants").unwrap();
         assert_eq!(peasants.hit_points, 1);
         assert_eq!(peasants.id.as_str(), "peasants");
+        assert_eq!(peasants.name.as_str(), "Peasants");
         assert_eq!(peasants.tier_counts, [5, 10, 15, 20]);
         assert_eq!(peasants.dwelling.as_str(), "plains");
         assert_eq!(peasants.max_population, 100);

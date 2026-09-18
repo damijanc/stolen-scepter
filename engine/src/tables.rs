@@ -113,6 +113,7 @@ impl<const N: usize> std::fmt::Debug for FixedStr<N> {
 pub struct TroopDef {
     pub index: i32,
     pub id: FixedStr<CAT_ID_LEN>,
+    pub name: FixedStr<CAT_NAME_LEN>,
     pub skill_level: i32,
     pub hit_points: i32,
     pub move_rate: i32,
@@ -143,6 +144,7 @@ impl Default for TroopDef {
         Self {
             index: -1,
             id: FixedStr::empty(),
+            name: FixedStr::empty(),
             skill_level: 0,
             hit_points: 0,
             move_rate: 0,
@@ -188,6 +190,7 @@ impl TroopDef {
         Self {
             index,
             id: FixedStr::from_str(id),
+            name: FixedStr::empty(),
             skill_level,
             hit_points,
             move_rate,
