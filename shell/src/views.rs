@@ -10,7 +10,7 @@
 //! [`crate::draw::DrawList`] commands, so the layout is testable headlessly
 //! the way the engine's combat digests are.
 
-use openbounty_engine::game::{Game, GAME_ARMY_SLOTS};
+use openbounty_engine::game::{CastleOwnerKind, Game, GAME_ARMY_SLOTS, GAME_CASTLES};
 use openbounty_engine::resources::Resources;
 
 use crate::banner;
@@ -26,11 +26,29 @@ use crate::sprites::SpriteCatalog;
 const PORTRAIT_W: i32 = 96;
 const PORTRAIT_H: i32 = 102;
 
+/// The wanted-poster face and the no-contract silhouette are both 48x34.
+const FACE_W: i32 = 48;
+const FACE_H: i32 = 34;
+
+/// Contract-view labels C compiles in; the pack overrides them under
+/// `strings.contract_view`.
+const DEFAULT_CV_TITLE_NO_CONTRACT: &str = "You have no Contract!";
+const DEFAULT_CV_LABEL_NAME: &str = "Name: %VALUE%";
+const DEFAULT_CV_LABEL_ALIAS: &str = "Alias: %VALUE%";
+const DEFAULT_CV_LABEL_REWARD: &str = "Reward: %VALUE% gold";
+const DEFAULT_CV_LABEL_LAST_SEEN: &str = "Last Seen: %VALUE%";
+const DEFAULT_CV_LABEL_CASTLE: &str = "Castle: %VALUE%";
+const DEFAULT_CV_ALIAS_NONE: &str = "None";
+const DEFAULT_CV_CASTLE_UNKNOWN: &str = "Unknown";
+const DEFAULT_CV_FEATURES_HEADER: &str = "Distinguishing Features:";
+const DEFAULT_CV_CRIMES_HEADER: &str = "Crimes:";
+
 /// Which overlay is on top of the stack.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewKind {
     Character,
     Army,
+    Contract,
 }
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
@@ -64,9 +82,14 @@ impl Views {
     }
 
     /// True when the active view swaps the status bar to "Press 'ESC' to
-    /// exit". The character and army views always do.
-    pub fn wants_exit_hint(&self) -> bool {
-        matches!(self.active(), Some(ViewKind::Character | ViewKind::Army))
+    /// exit". The character and army views always do; the contract view only
+    /// when a contract is actually active.
+    pub fn wants_exit_hint(&self, game: &Game) -> bool {
+        match self.active() {
+            Some(ViewKind::Character | ViewKind::Army) => true,
+            Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
+            None => false,
+        }
     }
 
     /// Draw the active view over the map area.
@@ -78,12 +101,15 @@ impl Views {
         resources: &Resources,
         catalog: &SpriteCatalog,
         game: &Game,
-        tick: i32,
+        time: f64,
     ) {
         match self.active() {
             Some(ViewKind::Character) => draw_character(list, layout, palette, resources, game),
             Some(ViewKind::Army) => {
-                draw_army(list, layout, palette, resources, catalog, game, tick)
+                draw_army(list, layout, palette, resources, catalog, game, time)
+            }
+            Some(ViewKind::Contract) => {
+                draw_contract(list, layout, palette, resources, catalog, game, time)
             }
             None => {}
         }
@@ -358,8 +384,10 @@ fn draw_army(
     resources: &Resources,
     catalog: &SpriteCatalog,
     game: &Game,
-    tick: i32,
+    time: f64,
 ) {
+    // Troops tick-animate at ~8 Hz, matching C's `GetTime() * 8.0`.
+    let tick = (time * 8.0) as i32;
     let vx = MAP_X;
     let vw = layout.map_w + layout.sidebar_w;
     let view_y = MAP_Y;
@@ -481,6 +509,228 @@ fn draw_army(
     }
 }
 
+/// A villain's wanted-poster face: the animated frame when the pack declares
+/// one, else the still portrait.
+fn villain_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite> {
+    let index = usize::try_from(index).ok()?;
+    let frames = catalog.villain_anim_len(index);
+    if frames > 0 {
+        return Some(Sprite::VillainAnim {
+            villain: index,
+            frame: crate::sprites::frame_index(tick, frames) as i32,
+        });
+    }
+    if catalog.path(Sprite::VillainPortrait(index)).is_some() {
+        Some(Sprite::VillainPortrait(index))
+    } else {
+        None
+    }
+}
+
+/// Draw a multi-line block, respecting embedded newlines, returning the y just
+/// past the last line. Ports `draw_text_block`.
+fn draw_text_block(list: &mut DrawList, text: &str, x: i32, y: i32, color: Color) -> i32 {
+    let mut ly = y;
+    for line in text.split('\n') {
+        list.text(line, x, ly, color);
+        ly += font::GLYPH_H;
+    }
+    ly
+}
+
+/// Ports `draw_contract`: a rounded blue panel with the villain's face and a
+/// wanted-poster description, or a "no contract" placeholder.
+fn draw_contract(
+    list: &mut DrawList,
+    layout: &Layout,
+    palette: &Palette,
+    resources: &Resources,
+    catalog: &SpriteCatalog,
+    game: &Game,
+    time: f64,
+) {
+    let panel_x = MAP_X + 2;
+    let panel_y = MAP_Y + layout.tile_h;
+    let panel_w = layout.map_w + layout.sidebar_w - 4;
+    let pad = 4;
+    let white = palette.clr(Pal::White);
+    let yellow = palette.clr(Pal::Yellow);
+
+    let cv_title_no_contract = banner::text(
+        resources,
+        "contract_view",
+        "title_no_contract",
+        DEFAULT_CV_TITLE_NO_CONTRACT,
+    );
+
+    if game.contract.active_id.is_empty() {
+        let panel_h = layout.tile_h * 3;
+        list.rounded_panel(
+            Rect::new(panel_x, panel_y, panel_w, panel_h),
+            palette.clr(Pal::DBlue),
+            yellow,
+        );
+        let tx = panel_x + pad;
+        let ty = panel_y + pad;
+        // Silhouette box with a yellow outline.
+        list.rect_lines(Rect::new(tx - 1, ty - 1, FACE_W + 2, FACE_H + 2), yellow);
+        list.blit(
+            Sprite::HudContractSilhouette,
+            Dst::rect(tx, ty, FACE_W, FACE_H),
+        );
+        list.text_centered(
+            cv_title_no_contract,
+            panel_x + panel_w / 2,
+            panel_y + panel_h / 2 - font::GLYPH_H / 2,
+            white,
+        );
+        return;
+    }
+
+    let Some(villain) = resources.villain_by_id(game.contract.active_id.as_str()) else {
+        return;
+    };
+
+    let panel_h = layout.tile_h * 4;
+    list.rounded_panel(
+        Rect::new(panel_x, panel_y, panel_w, panel_h),
+        palette.clr(Pal::DBlue),
+        yellow,
+    );
+
+    let tx = panel_x + pad;
+    let ty = panel_y + pad;
+
+    // Villain face, animated at ~2 Hz, with a yellow outline.
+    let tick = (time * 2.0) as i32;
+    if let Some(sprite) = villain_sprite(catalog, villain.index, tick) {
+        list.blit(sprite, Dst::rect(tx, ty, FACE_W, FACE_H));
+    }
+    list.rect_lines(Rect::new(tx - 1, ty - 1, FACE_W + 2, FACE_H + 2), yellow);
+
+    let desc = resources.villain_desc(villain.id.as_str());
+    let alias_none = banner::text(
+        resources,
+        "contract_view",
+        "alias_none",
+        DEFAULT_CV_ALIAS_NONE,
+    );
+    let castle_unknown = banner::text(
+        resources,
+        "contract_view",
+        "castle_unknown",
+        DEFAULT_CV_CASTLE_UNKNOWN,
+    );
+
+    let mut sy = ty;
+    let sx = tx + FACE_W + font::GLYPH_W;
+
+    // Header band, all in yellow.
+    let name_line = banner::formatted(
+        resources,
+        "contract_view",
+        "label_name",
+        DEFAULT_CV_LABEL_NAME,
+        &[("VALUE", villain.name.as_str())],
+    );
+    list.text(&name_line, sx, sy, yellow);
+    sy += font::GLYPH_H;
+
+    let alias = desc
+        .filter(|desc| !desc.alias.is_empty())
+        .map(|desc| desc.alias.as_str())
+        .unwrap_or(alias_none);
+    let alias_line = banner::formatted(
+        resources,
+        "contract_view",
+        "label_alias",
+        DEFAULT_CV_LABEL_ALIAS,
+        &[("VALUE", alias)],
+    );
+    list.text(&alias_line, sx, sy, yellow);
+    sy += font::GLYPH_H;
+
+    let reward_line = banner::formatted(
+        resources,
+        "contract_view",
+        "label_reward",
+        DEFAULT_CV_LABEL_REWARD,
+        &[("VALUE", &villain.reward.to_string())],
+    );
+    list.text(&reward_line, sx, sy, yellow);
+    sy += font::GLYPH_H;
+
+    // Last Seen is the villain's home zone name, falling back to its id.
+    let zone_label = resources
+        .zone_by_id(villain.zone.as_str())
+        .filter(|zone| !zone.name.is_empty())
+        .map(|zone| zone.name.as_str())
+        .unwrap_or(villain.zone.as_str());
+    let last_seen_line = banner::formatted(
+        resources,
+        "contract_view",
+        "label_last_seen",
+        DEFAULT_CV_LABEL_LAST_SEEN,
+        &[("VALUE", zone_label)],
+    );
+    list.text(&last_seen_line, sx, sy, yellow);
+    sy += font::GLYPH_H;
+
+    // Castle: the known villain-owned castle with a matching villain id.
+    let mut castle_name = castle_unknown;
+    for castle in &game.castles[..GAME_CASTLES] {
+        if castle.id.is_empty() {
+            continue;
+        }
+        if castle.owner_kind != CastleOwnerKind::Villain {
+            continue;
+        }
+        if castle.villain_id.as_str() != villain.id.as_str() {
+            continue;
+        }
+        if castle.known {
+            castle_name = castle.id.as_str();
+        }
+        break;
+    }
+    let castle_line = banner::formatted(
+        resources,
+        "contract_view",
+        "label_castle",
+        DEFAULT_CV_LABEL_CASTLE,
+        &[("VALUE", castle_name)],
+    );
+    list.text(&castle_line, sx, sy, yellow);
+    sy += font::GLYPH_H + 2;
+
+    // Features block.
+    if let Some(desc) = desc.filter(|desc| !desc.features.is_empty()) {
+        let header = banner::text(
+            resources,
+            "contract_view",
+            "features_header",
+            DEFAULT_CV_FEATURES_HEADER,
+        );
+        list.text(header, panel_x + pad, sy, yellow);
+        sy += font::GLYPH_H;
+        sy = draw_text_block(list, desc.features.as_str(), panel_x + pad, sy, white);
+        sy += 2;
+    }
+
+    // Crimes block.
+    if let Some(desc) = desc.filter(|desc| !desc.crimes.is_empty()) {
+        let header = banner::text(
+            resources,
+            "contract_view",
+            "crimes_header",
+            DEFAULT_CV_CRIMES_HEADER,
+        );
+        list.text(header, panel_x + pad, sy, yellow);
+        sy += font::GLYPH_H;
+        draw_text_block(list, desc.crimes.as_str(), panel_x + pad, sy, white);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -532,10 +782,11 @@ mod tests {
 
     #[test]
     fn the_character_view_requests_the_exit_hint() {
+        let game = knight_game();
         let mut views = Views::new();
-        assert!(!views.wants_exit_hint());
+        assert!(!views.wants_exit_hint(&game));
         views.set(ViewKind::Character);
-        assert!(views.wants_exit_hint());
+        assert!(views.wants_exit_hint(&game));
     }
 
     #[test]
@@ -547,7 +798,9 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
 
         let labels: Vec<&str> = list.texts().iter().map(|(_, _, t)| *t).collect();
         assert!(labels[0].starts_with("Sir Rust the General"));
@@ -571,7 +824,9 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
 
         assert!(!list.blits_of(Sprite::ViewIcon(0)).is_empty());
         assert!(list.blits_of(Sprite::ViewIcon(1)).is_empty());
@@ -594,7 +849,9 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
         assert!(list.has_text_containing("GP"));
         assert!(!list.has_text_containing("Gold"));
     }
@@ -607,7 +864,9 @@ mod tests {
         let views = Views::new();
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
         assert!(list.is_empty());
     }
 
@@ -620,7 +879,9 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
 
         // "Followers killed" is 0, so its number must not appear.
         let texts = list.texts();
@@ -685,7 +946,9 @@ mod tests {
         views.set(ViewKind::Army);
 
         let mut list = DrawList::new();
-        views.draw(&mut list, &layout, &palette, &resources, &catalog, &game, 0);
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
 
         assert!(list.has_text_containing("Peasants"));
         assert!(list.has_text_containing("Ogres"));
@@ -698,5 +961,72 @@ mod tests {
         assert!(!list
             .blits_of(Sprite::TroopAnim { troop: 0, frame: 0 })
             .is_empty());
+    }
+
+    fn contract_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "zones": [{"id":"home","name":"Continentia"}],
+                "villains": [
+                  {"index":0,"id":"murray","name":"Murray","portrait":"m.png","zone":"home","reward":1000}
+                ],
+                "villain_descriptions": {
+                  "murray": {"alias":"None","features":"Bald.","crimes":"Treason."}
+                }}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    #[test]
+    fn the_contract_view_requests_the_exit_hint_only_with_a_contract() {
+        let mut views = Views::new();
+        views.set(ViewKind::Contract);
+        let mut game = Game::default();
+        assert!(!views.wants_exit_hint(&game));
+        game.contract.active_id.copy_from_str("murray");
+        assert!(views.wants_exit_hint(&game));
+    }
+
+    #[test]
+    fn the_contract_view_shows_a_placeholder_without_a_contract() {
+        let (resources, layout, catalog) = contract_fixtures();
+        let game = Game::default();
+        let palette = Palette::fallback();
+        let mut views = Views::new();
+        views.set(ViewKind::Contract);
+
+        let mut list = DrawList::new();
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
+        assert!(list.has_text_containing("You have no Contract!"));
+    }
+
+    #[test]
+    fn the_contract_view_shows_the_wanted_poster() {
+        let (resources, layout, catalog) = contract_fixtures();
+        let mut game = Game::default();
+        game.contract.active_id.copy_from_str("murray");
+        let palette = Palette::fallback();
+        let mut views = Views::new();
+        views.set(ViewKind::Contract);
+
+        let mut list = DrawList::new();
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+        );
+
+        assert!(list.has_text_containing("Name: Murray"));
+        assert!(list.has_text_containing("Alias: None"));
+        assert!(list.has_text_containing("Reward: 1000 gold"));
+        assert!(list.has_text_containing("Last Seen: Continentia"));
+        assert!(list.has_text_containing("Castle: Unknown"));
+        assert!(list.has_text_containing("Distinguishing Features:"));
+        assert!(list.has_text_containing("Bald."));
+        assert!(list.has_text_containing("Crimes:"));
+        assert!(list.has_text_containing("Treason."));
     }
 }

@@ -386,6 +386,7 @@ async fn main() {
                 }
                 Action::ViewCharacter => views.set(ViewKind::Character),
                 Action::ViewArmy => views.set(ViewKind::Army),
+                Action::ViewContract => views.set(ViewKind::Contract),
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.
@@ -448,7 +449,7 @@ async fn main() {
             game: &game,
             mode: if fast_quit {
                 StatusMode::FastQuit
-            } else if views.wants_exit_hint() {
+            } else if views.wants_exit_hint(&game) {
                 StatusMode::ExitHint
             } else {
                 StatusMode::Adventure
@@ -469,8 +470,8 @@ async fn main() {
         .draw(&mut list);
 
         // A view covers the map area while the overworld keeps running below.
-        // The army view animates its troops on an ~8 Hz clock, as C does.
-        let army_tick = (get_time() * 8.0) as i32;
+        // Each view derives its own animation clock from the wall time, as C
+        // does with GetTime().
         views.draw(
             &mut list,
             &layout,
@@ -478,7 +479,7 @@ async fn main() {
             &resources,
             &catalog,
             &game,
-            army_tick,
+            get_time(),
         );
 
         // The prompt replaces the bottom frame; the dialog draws LAST so it
