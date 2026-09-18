@@ -191,8 +191,10 @@ nothing in the engine reads or serializes it.
 These are parsed by nobody today and are the shell's to claim:
 
 `strings` (20 groups; C's `resources.h` declares 143 banner strings),
-`render`, `colors`, `controls`, `audio`, `sprites`, `title`, `credits`,
-`ending`, `pack_name`, `pack_kind`.
+`colors`, `controls`, `audio`, `title`, `credits`, `ending`, `combat` (the
+top-level one, not the tileset), `pack_name`, `pack_kind`, `version`.
+
+`render` and `sprites` are parsed now.
 
 The engine deliberately returns outcome VALUES where C queues TEXT --
 `AdventureCast`, `SearchOutcome`, `SpellCast`, `VillainSiegeOutcome` and the
@@ -252,12 +254,23 @@ including `resources_format_template` and its `%VAR%` substitution.
      posters, not a fallback. The shell owes that.
      Boxing `Resources.troops` and `.villains` was forced, not stylistic:
      the two catalogs grew to ~140KB and overflowed the test stack.
-   - TODO: the role-fixed `sprites` manifest block (`resources.h` ~890):
-     hero walk/idle/boat as `ResAnimSet`, the 15 combat tiles, the font and
-     palette paths, six backdrops, two endings, the HUD panels and their
-     animations, the bar strip, chrome, splashes, class picker, orb.
-     `ResAnimSet` accepts both authoring forms -- a flat array lands in
-     `south` with `directional` false, and an object names up to four facings.
+   - DONE: the role-fixed `sprites` manifest (`ResSprites`, `ResAnimSet`).
+     Infallible, as C's is: every entry is optional presentation data, and a
+     wrong type keeps the default rather than refusing the pack.
+     The defaults are NOT decoration. The shipped pack declares no
+     `sprites.combat`, no `font` and no `palette`, so all three come entirely
+     from the values that used to be compiled into the C shell. C's guard
+     around the combat array -- read the count only when the key IS an array,
+     because a missing key reports zero and writing that through would wipe
+     the defaults -- is therefore load-bearing for the real pack, not an edge
+     case.
+     Also from the shipped pack: hero `walk` and `boat` are flat 4-frame
+     arrays with `directional` false, and there is NO `idle`. So the mirrored
+     single-strip path and the "hold frame 0 standing still" idle fallback
+     are the live behaviour, not legacy compatibility. `sprites.ui.orb` is
+     empty, so `Sprite::Orb` has nothing to draw today.
+     Watch out: `combat` appears BOTH at the top level of game.json (a
+     section nobody parses) and inside `sprites` (the tileset). Unrelated.
    - TODO: `present_scale` from `src/present.c`. Pure arithmetic, so it can
      be ported and tested before any window exists. Legacy and modern take
      completely separate paths: legacy auto-fits with the `SCALE_MIN` floor

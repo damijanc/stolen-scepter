@@ -1,8 +1,8 @@
 use crate::tables::{
-    parse_troop_abilities, ArtifactDef, ArtifactPower, ClassDef, FixedStr, RankDef, SpellDef,
-    SpellKind, TroopDef, VillainDef, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX, CAT_ID_LEN, CAT_PATH_LEN,
-    CAT_SPELLS_MAX, CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS, CLASS_MAX_STARTING_TROOPS,
-    TROOP_TIER_COUNTS,
+    parse_troop_abilities, ArtifactDef, ArtifactPower, ClassDef, Facing, FixedStr, RankDef,
+    SpellDef, SpellKind, TroopDef, VillainDef, ANIM_FRAMES_MAX, CAT_ARTIFACTS_MAX, CAT_CLASSES_MAX,
+    CAT_ID_LEN, CAT_PATH_LEN, CAT_SPELLS_MAX, CAT_TROOPS_MAX, CAT_VILLAINS_MAX, CLASS_MAX_RANKS,
+    CLASS_MAX_STARTING_TROOPS, FACE_COUNT, TROOP_TIER_COUNTS,
 };
 use crate::tile::Terrain;
 
@@ -21,6 +21,163 @@ pub const RES_TILE_CODE_COUNT: usize = 256;
 pub const RES_SPAWN_TIERS: usize = 4;
 pub const RES_SPAWN_POOL_N: usize = 5;
 pub const RES_CHEST_TIERS: usize = 4;
+/// Length of an art path in the sprite manifest, C's `RES_PATH_LEN`.
+pub const RES_PATH_LEN: usize = 128;
+/// The combat tileset, in the fixed role order the renderer indexes by.
+pub const RES_COMBAT_TILES: usize = 15;
+/// Cap on `ui.view_icons_extra`.
+pub const RES_EXTRA_ICONS: usize = 8;
+
+/// One animation, authored either as a single strip or as four facings.
+///
+/// `directional` false means the pack declared a flat array: the frames sit in
+/// [`Facing::South`] and a renderer mirrors them east and west, which is how
+/// every pack worked before facings existed. True means the pack declared the
+/// object form, so a renderer picks a facing and never mirrors -- an
+/// asymmetric figure then keeps its shield on the right arm walking west.
+///
+/// `count` is per facing because nothing requires the four to match: a pack
+/// may ship a six-frame walk east and a four-frame walk north.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ResAnimSet {
+    pub directional: bool,
+    pub count: [usize; FACE_COUNT],
+    pub frames: [[FixedStr<RES_PATH_LEN>; ANIM_FRAMES_MAX]; FACE_COUNT],
+}
+
+impl ResAnimSet {
+    /// Frames declared for `facing`, which is empty when the pack authored
+    /// none for it.
+    pub fn frames_for(&self, facing: Facing) -> &[FixedStr<RES_PATH_LEN>] {
+        let slot = facing as usize;
+        &self.frames[slot][..self.count[slot]]
+    }
+
+    /// True when the pack declared any frames at all, for any facing.
+    pub fn is_present(&self) -> bool {
+        self.count.iter().any(|count| *count > 0)
+    }
+}
+
+/// The role-fixed art manifest: everything that is not per-catalog-entry.
+///
+/// These paths used to be compiled into the C shell, which meant a pack could
+/// not name its own font, palette or battle art. They are pack data now, with
+/// the old hardcoded values kept as defaults so a pack that declares nothing
+/// still loads.
+///
+/// Nothing in the engine reads any of this; it is recorded here because
+/// `Resources` is the pack reader, exactly as C's `resources.c` is.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResSprites {
+    pub hero_walk: ResAnimSet,
+    pub hero_idle: ResAnimSet,
+    pub hero_boat: ResAnimSet,
+
+    pub combat_count: usize,
+    pub combat: [FixedStr<RES_PATH_LEN>; RES_COMBAT_TILES],
+
+    pub font: FixedStr<RES_PATH_LEN>,
+    pub palette: FixedStr<RES_PATH_LEN>,
+
+    pub puzzle_cover: FixedStr<RES_PATH_LEN>,
+    pub town_backdrop: FixedStr<RES_PATH_LEN>,
+    pub castle_backdrop: FixedStr<RES_PATH_LEN>,
+    pub plains_backdrop: FixedStr<RES_PATH_LEN>,
+    pub forest_backdrop: FixedStr<RES_PATH_LEN>,
+    pub hillcave_backdrop: FixedStr<RES_PATH_LEN>,
+    pub dungeon_backdrop: FixedStr<RES_PATH_LEN>,
+    pub ending_win: FixedStr<RES_PATH_LEN>,
+    pub ending_lose: FixedStr<RES_PATH_LEN>,
+    pub orb: FixedStr<RES_PATH_LEN>,
+    pub view_icons_extra_count: usize,
+    pub view_icons_extra: [FixedStr<RES_PATH_LEN>; RES_EXTRA_ICONS],
+    pub chrome_overworld: FixedStr<RES_PATH_LEN>,
+    pub splash_logo: FixedStr<RES_PATH_LEN>,
+    pub splash_title: FixedStr<RES_PATH_LEN>,
+    pub class_picker: FixedStr<RES_PATH_LEN>,
+    pub class_highlight: FixedStr<RES_PATH_LEN>,
+
+    pub hud_contract_silhouette: FixedStr<RES_PATH_LEN>,
+    pub hud_siege_silhouette: FixedStr<RES_PATH_LEN>,
+    pub hud_siege_animation_count: usize,
+    pub hud_siege_animation: [FixedStr<RES_PATH_LEN>; ANIM_FRAMES_MAX],
+    pub hud_magic_silhouette: FixedStr<RES_PATH_LEN>,
+    pub hud_magic_animation_count: usize,
+    pub hud_magic_animation: [FixedStr<RES_PATH_LEN>; ANIM_FRAMES_MAX],
+    pub hud_puzzle_grid: FixedStr<RES_PATH_LEN>,
+    pub hud_gold_purse: FixedStr<RES_PATH_LEN>,
+    pub hud_bar_strip: FixedStr<RES_PATH_LEN>,
+}
+
+impl Default for ResSprites {
+    /// Everything empty, matching the zeroed struct C starts a load with. The
+    /// defaults below are installed by the parser, not by this, because C
+    /// installs them there.
+    fn default() -> Self {
+        Self {
+            hero_walk: ResAnimSet::default(),
+            hero_idle: ResAnimSet::default(),
+            hero_boat: ResAnimSet::default(),
+            combat_count: 0,
+            combat: [FixedStr::empty(); RES_COMBAT_TILES],
+            font: FixedStr::empty(),
+            palette: FixedStr::empty(),
+            puzzle_cover: FixedStr::empty(),
+            town_backdrop: FixedStr::empty(),
+            castle_backdrop: FixedStr::empty(),
+            plains_backdrop: FixedStr::empty(),
+            forest_backdrop: FixedStr::empty(),
+            hillcave_backdrop: FixedStr::empty(),
+            dungeon_backdrop: FixedStr::empty(),
+            ending_win: FixedStr::empty(),
+            ending_lose: FixedStr::empty(),
+            orb: FixedStr::empty(),
+            view_icons_extra_count: 0,
+            view_icons_extra: [FixedStr::empty(); RES_EXTRA_ICONS],
+            chrome_overworld: FixedStr::empty(),
+            splash_logo: FixedStr::empty(),
+            splash_title: FixedStr::empty(),
+            class_picker: FixedStr::empty(),
+            class_highlight: FixedStr::empty(),
+            hud_contract_silhouette: FixedStr::empty(),
+            hud_siege_silhouette: FixedStr::empty(),
+            hud_siege_animation_count: 0,
+            hud_siege_animation: [FixedStr::empty(); ANIM_FRAMES_MAX],
+            hud_magic_silhouette: FixedStr::empty(),
+            hud_magic_animation_count: 0,
+            hud_magic_animation: [FixedStr::empty(); ANIM_FRAMES_MAX],
+            hud_puzzle_grid: FixedStr::empty(),
+            hud_gold_purse: FixedStr::empty(),
+            hud_bar_strip: FixedStr::empty(),
+        }
+    }
+}
+
+/// The battle art the C shell carried as a static array before a pack could
+/// name its own. Installed before parsing, so a pack that declares no
+/// `sprites.combat` still gets a full tileset.
+pub const COMBAT_TILE_DEFAULTS: [&str; RES_COMBAT_TILES] = [
+    "art/combat/field_grass.png",
+    "art/combat/obstacle_01.png",
+    "art/combat/obstacle_02.png",
+    "art/combat/obstacle_03.png",
+    "art/combat/castle_spike.png",
+    "art/combat/castle_wall_01.png",
+    "art/combat/castle_wall_02.png",
+    "art/combat/castle_wall_03.png",
+    "art/combat/castle_wall_04.png",
+    "art/combat/castle_wall_05.png",
+    "art/combat/castle_wall_06.png",
+    "art/combat/cursor_01.png",
+    "art/combat/cursor_02.png",
+    "art/combat/cursor_03.png",
+    "art/combat/cursor_04.png",
+];
+
+/// Likewise compiled into the shell before the manifest existed.
+pub const FONT_DEFAULT: &str = "art/font/kb-font.png";
+pub const PALETTE_DEFAULT: &str = "palettes/palette.bin";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResTileCode {
@@ -557,6 +714,10 @@ pub struct Resources {
     pub contract: ResContract,
     pub economy: ResEconomy,
     pub render: ResRender,
+    /// Boxed because the manifest is about 35KB: three 8KB animation sets
+    /// plus the path tables. `Resources` is built inline, so an unboxed one
+    /// overflows the stack.
+    pub sprites: Box<ResSprites>,
     pub tuning: ResTuning,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
@@ -593,6 +754,7 @@ impl Default for Resources {
             contract: ResContract::default(),
             economy: ResEconomy::default(),
             render: ResRender::default(),
+            sprites: Box::new(ResSprites::default()),
             tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
@@ -641,6 +803,7 @@ impl Resources {
         resources.parse_contract(&root)?;
         resources.parse_economy(&root)?;
         resources.parse_render(&root)?;
+        resources.parse_sprites(&root);
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
@@ -972,6 +1135,88 @@ impl Resources {
     ///
     /// The viewport validation (odd axes, minimum sizes) moves with it, for
     /// the same reason.
+    /// Read the role-fixed art manifest, porting `parse_sprites`.
+    ///
+    /// Infallible on purpose, as C's is: every entry is optional presentation
+    /// data, and a wrong type leaves the default standing rather than refusing
+    /// the pack. Defaults are installed FIRST and unconditionally, so they
+    /// survive a pack with no `sprites` block at all.
+    fn parse_sprites(&mut self, root: &serde_json::Value) {
+        for (slot, path) in COMBAT_TILE_DEFAULTS.iter().enumerate() {
+            self.sprites.combat[slot].copy_from_str(path);
+        }
+        self.sprites.combat_count = RES_COMBAT_TILES;
+        self.sprites.font.copy_from_str(FONT_DEFAULT);
+        self.sprites.palette.copy_from_str(PALETTE_DEFAULT);
+
+        let Some(obj) = root.get("sprites").filter(|v| v.is_object()) else {
+            return;
+        };
+
+        if let Some(hero) = obj.get("hero").filter(|v| v.is_object()) {
+            parse_anim_set(hero.get("walk"), &mut self.sprites.hero_walk);
+            parse_anim_set(hero.get("idle"), &mut self.sprites.hero_idle);
+            parse_anim_set(hero.get("boat"), &mut self.sprites.hero_boat);
+        }
+
+        // Guarded on the key being an array. `parse_path_array` reports zero
+        // for a missing key, and writing that through would WIPE the defaults
+        // installed above rather than leave them alone.
+        if obj.get("combat").is_some_and(serde_json::Value::is_array) {
+            self.sprites.combat_count = parse_path_array(obj, "combat", &mut self.sprites.combat);
+        }
+
+        // The fallback is the current value, so an absent or malformed key
+        // keeps the default.
+        let font = json_str_or(obj, "font", self.sprites.font.as_str()).to_owned();
+        self.sprites.font.copy_from_str(&font);
+        let palette = json_str_or(obj, "palette", self.sprites.palette.as_str()).to_owned();
+        self.sprites.palette.copy_from_str(&palette);
+
+        if let Some(ui) = obj.get("ui").filter(|v| v.is_object()) {
+            let sprites = &mut self.sprites;
+            for (key, slot) in [
+                ("puzzle_cover", &mut sprites.puzzle_cover),
+                ("town_backdrop", &mut sprites.town_backdrop),
+                ("castle_backdrop", &mut sprites.castle_backdrop),
+                ("plains_backdrop", &mut sprites.plains_backdrop),
+                ("forest_backdrop", &mut sprites.forest_backdrop),
+                ("hillcave_backdrop", &mut sprites.hillcave_backdrop),
+                ("dungeon_backdrop", &mut sprites.dungeon_backdrop),
+                ("ending_win", &mut sprites.ending_win),
+                ("ending_lose", &mut sprites.ending_lose),
+                ("orb", &mut sprites.orb),
+                ("chrome_overworld", &mut sprites.chrome_overworld),
+                ("splash_logo", &mut sprites.splash_logo),
+                ("splash_title", &mut sprites.splash_title),
+                ("class_picker", &mut sprites.class_picker),
+                ("class_highlight", &mut sprites.class_highlight),
+            ] {
+                slot.copy_from_str(json_str_or(ui, key, ""));
+            }
+            sprites.view_icons_extra_count =
+                parse_path_array(ui, "view_icons_extra", &mut sprites.view_icons_extra);
+        }
+
+        if let Some(hud) = obj.get("hud").filter(|v| v.is_object()) {
+            let sprites = &mut self.sprites;
+            for (key, slot) in [
+                ("contract_silhouette", &mut sprites.hud_contract_silhouette),
+                ("siege_silhouette", &mut sprites.hud_siege_silhouette),
+                ("magic_silhouette", &mut sprites.hud_magic_silhouette),
+                ("puzzle_grid", &mut sprites.hud_puzzle_grid),
+                ("gold_purse", &mut sprites.hud_gold_purse),
+                ("bar_strip", &mut sprites.hud_bar_strip),
+            ] {
+                slot.copy_from_str(json_str_or(hud, key, ""));
+            }
+            sprites.hud_siege_animation_count =
+                parse_path_array(hud, "siege_animation", &mut sprites.hud_siege_animation);
+            sprites.hud_magic_animation_count =
+                parse_path_array(hud, "magic_animation", &mut sprites.hud_magic_animation);
+        }
+    }
+
     fn parse_render(&mut self, root: &serde_json::Value) -> Result<(), ResourceError> {
         let Some(render) = root.get("render") else {
             return Ok(());
@@ -1924,7 +2169,15 @@ fn parse_path_array<const N: usize, const SLOTS: usize>(
     key: &str,
     out: &mut [FixedStr<N>; SLOTS],
 ) -> usize {
-    let Some(entries) = value.get(key).and_then(serde_json::Value::as_array) else {
+    parse_path_array_value(value.get(key), out)
+}
+
+/// [`parse_path_array`] against a value already in hand.
+fn parse_path_array_value<const N: usize, const SLOTS: usize>(
+    value: Option<&serde_json::Value>,
+    out: &mut [FixedStr<N>; SLOTS],
+) -> usize {
+    let Some(entries) = value.and_then(serde_json::Value::as_array) else {
         return 0;
     };
     let mut count = 0;
@@ -1939,6 +2192,41 @@ fn parse_path_array<const N: usize, const SLOTS: usize>(
         count += 1;
     }
     count
+}
+
+/// One animation, in either authoring form, porting `parse_anim_set`.
+///
+/// A flat array lands in [`Facing::South`] with `directional` false, so a pack
+/// written before facings existed parses exactly as it always did. An object
+/// names up to four facings and sets `directional`; a facing it omits simply
+/// keeps count 0 and a renderer falls back for it. Anything else leaves the
+/// set empty.
+fn parse_anim_set(value: Option<&serde_json::Value>, out: &mut ResAnimSet) {
+    *out = ResAnimSet::default();
+    let Some(value) = value else {
+        return;
+    };
+    if value.is_array() {
+        let south = Facing::South as usize;
+        out.count[south] = parse_path_array_value(Some(value), &mut out.frames[south]);
+        return;
+    }
+    if !value.is_object() {
+        return;
+    }
+    out.directional = true;
+    for (slot, key) in ["south", "east", "west", "north"].into_iter().enumerate() {
+        out.count[slot] = parse_path_array_value(value.get(key), &mut out.frames[slot]);
+    }
+}
+
+/// Read a string, falling back for an absent key OR a non-string value. Ports
+/// C's `json_str`, which never treats a wrong type as an error.
+fn json_str_or<'a>(value: &'a serde_json::Value, key: &str, fallback: &'a str) -> &'a str {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(fallback)
 }
 
 fn string_field<'a>(
@@ -2080,8 +2368,9 @@ const fn default_morale_chart() -> [[u8; 5]; 5] {
 #[cfg(test)]
 mod tests {
     use super::{RenderMode, Resources};
+    use super::{FONT_DEFAULT, PALETTE_DEFAULT, RES_COMBAT_TILES};
     use crate::tables::{
-        parse_troop_abilities, ANIM_FRAMES_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
+        parse_troop_abilities, Facing, ANIM_FRAMES_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
         TROOP_ABIL_LEECH, TROOP_ABIL_UNDEAD,
     };
 
@@ -2424,5 +2713,159 @@ mod tests {
         let one = resources.villain_by_id("v1").expect("villain parses");
         assert_eq!(one.anim_count, 0);
         assert_eq!(one.portrait.as_str(), "villains/v1.png");
+    }
+
+    /// A pack whose whole `sprites` block is `block` (or absent when empty).
+    fn sprite_pack(block: &str) -> Resources {
+        let sprites = if block.is_empty() {
+            String::new()
+        } else {
+            format!(r#","sprites": {block}"#)
+        };
+        Resources::from_json_str(&format!(
+            r#"{{
+              "world": {{"starting_zone": "home"}},
+              "zones": [{{"id":"home"}}],
+              "troops": []
+              {sprites}
+            }}"#
+        ))
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn a_pack_that_declares_no_art_still_gets_the_shells_old_defaults() {
+        // These paths were compiled into the C shell before the manifest
+        // existed, so a pack from before it must keep working untouched.
+        let resources = sprite_pack("");
+        let sprites = &resources.sprites;
+
+        assert_eq!(sprites.font.as_str(), FONT_DEFAULT);
+        assert_eq!(sprites.palette.as_str(), PALETTE_DEFAULT);
+        assert_eq!(sprites.combat_count, RES_COMBAT_TILES);
+        assert_eq!(sprites.combat[0].as_str(), "art/combat/field_grass.png");
+        assert_eq!(sprites.combat[14].as_str(), "art/combat/cursor_04.png");
+        // Everything else has no default; an absent entry is simply empty.
+        assert!(sprites.chrome_overworld.is_empty());
+        assert!(!sprites.hero_walk.is_present());
+    }
+
+    #[test]
+    fn a_sprites_block_without_combat_leaves_the_tileset_alone() {
+        // The trap C's comment records: reading a missing key reports zero
+        // frames, and writing that count through would WIPE the defaults
+        // rather than leave them standing.
+        let resources = sprite_pack(r#"{"font":"art/font/mine.png"}"#);
+        assert_eq!(resources.sprites.combat_count, RES_COMBAT_TILES);
+        assert_eq!(
+            resources.sprites.combat[0].as_str(),
+            "art/combat/field_grass.png"
+        );
+        assert_eq!(resources.sprites.font.as_str(), "art/font/mine.png");
+        // Declared keys override; undeclared ones keep their default.
+        assert_eq!(resources.sprites.palette.as_str(), PALETTE_DEFAULT);
+    }
+
+    #[test]
+    fn a_declared_combat_tileset_replaces_the_defaults() {
+        let resources = sprite_pack(r#"{"combat":["a.png","b.png"]}"#);
+        assert_eq!(resources.sprites.combat_count, 2);
+        assert_eq!(resources.sprites.combat[0].as_str(), "a.png");
+        assert_eq!(resources.sprites.combat[1].as_str(), "b.png");
+    }
+
+    #[test]
+    fn a_flat_hero_animation_is_a_single_mirrored_strip() {
+        // How every pack was authored before facings existed: the frames land
+        // in south and a renderer mirrors them going west.
+        let resources = sprite_pack(r#"{"hero":{"walk":["w0.png","w1.png","w2.png"]}}"#);
+        let walk = &resources.sprites.hero_walk;
+
+        assert!(!walk.directional);
+        assert!(walk.is_present());
+        assert_eq!(walk.count[Facing::South as usize], 3);
+        assert_eq!(walk.frames_for(Facing::South).len(), 3);
+        assert_eq!(walk.frames_for(Facing::South)[2].as_str(), "w2.png");
+        // The other three stay empty, which is what tells a renderer to
+        // mirror rather than to select.
+        assert!(walk.frames_for(Facing::West).is_empty());
+        assert!(walk.frames_for(Facing::North).is_empty());
+    }
+
+    #[test]
+    fn four_authored_facings_are_selected_rather_than_mirrored() {
+        let resources = sprite_pack(
+            r#"{"hero":{"walk":{"south":["s0.png"],"east":["e0.png","e1.png"],
+                               "west":["w0.png"],"north":["n0.png"]}}}"#,
+        );
+        let walk = &resources.sprites.hero_walk;
+
+        assert!(walk.directional);
+        assert_eq!(walk.frames_for(Facing::West)[0].as_str(), "w0.png");
+        // Nothing requires the four to be the same length.
+        assert_eq!(walk.frames_for(Facing::East).len(), 2);
+        assert_eq!(walk.frames_for(Facing::South).len(), 1);
+    }
+
+    #[test]
+    fn an_omitted_facing_stays_empty_but_the_set_is_still_directional() {
+        // A pack may author only some facings. The set stays directional, so
+        // a renderer falls back for the missing one instead of mirroring the
+        // whole animation.
+        let resources = sprite_pack(r#"{"hero":{"boat":{"south":["b0.png"]}}}"#);
+        let boat = &resources.sprites.hero_boat;
+
+        assert!(boat.directional);
+        assert!(boat.is_present());
+        assert_eq!(boat.frames_for(Facing::South).len(), 1);
+        assert!(boat.frames_for(Facing::East).is_empty());
+    }
+
+    #[test]
+    fn an_undeclared_hero_animation_is_simply_absent() {
+        // `idle` is optional: without it the hero holds frame 0 standing
+        // still, which is how packs behaved before it existed.
+        let resources = sprite_pack(r#"{"hero":{"walk":["w0.png"]}}"#);
+        assert!(resources.sprites.hero_walk.is_present());
+        assert!(!resources.sprites.hero_idle.is_present());
+        assert!(!resources.sprites.hero_idle.directional);
+    }
+
+    #[test]
+    fn the_ui_and_hud_groups_land_in_their_own_slots() {
+        let resources = sprite_pack(
+            r#"{"ui":{"chrome_overworld":"ui/chrome.png","town_backdrop":"ui/town.png",
+                      "orb":"ui/orb.png","view_icons_extra":["i0.png","i1.png"]},
+                "hud":{"bar_strip":"hud/bar.png","gold_purse":"hud/purse.png",
+                       "siege_animation":["s0.png","s1.png","s2.png"]}}"#,
+        );
+        let sprites = &resources.sprites;
+
+        assert_eq!(sprites.chrome_overworld.as_str(), "ui/chrome.png");
+        assert_eq!(sprites.town_backdrop.as_str(), "ui/town.png");
+        assert_eq!(sprites.orb.as_str(), "ui/orb.png");
+        assert_eq!(sprites.view_icons_extra_count, 2);
+        assert_eq!(sprites.view_icons_extra[1].as_str(), "i1.png");
+        assert_eq!(sprites.hud_bar_strip.as_str(), "hud/bar.png");
+        assert_eq!(sprites.hud_gold_purse.as_str(), "hud/purse.png");
+        assert_eq!(sprites.hud_siege_animation_count, 3);
+        assert_eq!(sprites.hud_magic_animation_count, 0);
+        // An entry the group omits is empty, not defaulted to anything.
+        assert!(sprites.castle_backdrop.is_empty());
+    }
+
+    #[test]
+    fn a_malformed_art_entry_keeps_the_default_instead_of_failing_the_pack() {
+        // Every entry here is optional presentation data, and C never refuses
+        // a pack over one. A number where a path belongs falls back.
+        let resources = sprite_pack(r#"{"font":7,"palette":null,"ui":"not an object"}"#);
+        assert_eq!(resources.sprites.font.as_str(), FONT_DEFAULT);
+        assert_eq!(resources.sprites.palette.as_str(), PALETTE_DEFAULT);
+        assert!(resources.sprites.chrome_overworld.is_empty());
+
+        // The whole block being the wrong type is fine too: defaults stand.
+        let odd = sprite_pack(r#""nope""#);
+        assert_eq!(odd.sprites.combat_count, RES_COMBAT_TILES);
+        assert_eq!(odd.sprites.font.as_str(), FONT_DEFAULT);
     }
 }
