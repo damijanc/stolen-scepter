@@ -7,19 +7,26 @@
 //! cargo run -p openbounty-shell -- path/to/game.json
 //! ```
 
+pub mod anim;
 pub mod backend;
 pub mod draw;
 pub mod font;
 pub mod layout;
+pub mod map_render;
 pub mod palette;
 pub mod present;
 pub mod sprites;
 
-use macroquad::prelude::{next_frame, Conf};
+use macroquad::prelude::{get_time, next_frame, Conf};
 
+use anim::HeroAnimator;
 use backend::Backend;
-use draw::{Color, DrawList, Dst, Rect, Sprite};
+use draw::{DrawList, Dst, Rect, Sprite};
 use layout::Layout;
+use map_render::MapScene;
+use openbounty_engine::fog::Fog;
+use openbounty_engine::game::Game;
+use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
 use palette::Pal;
 use present::Present;
@@ -75,18 +82,57 @@ async fn main() {
         eprintln!("missing art: {:?}", backend.missing());
     }
 
-    // A smoke scene, not the real chrome: it exists to prove the pipeline end
-    // to end -- pack load, texture load, blit, bitmap text, integer present.
-    // `chrome.rs` replaces it in the next slice.
-    let list = smoke_scene(&layout, backend.palette());
+    // A world to look at. Starting a real game is the decision loop's job
+    // (work order step 7); this seeds one so the viewport has something in
+    // it, and the hero does not move yet.
+    let mut game = Game::default();
+    game.init_seeded_with_resources(&resources, Some("sir rust"), 0, 0, 42);
+    let zone = game.position.zone.as_str().to_owned();
+    let map = match Map::load_zone_with_placements(&resources, &zone, &game) {
+        Ok(map) => map,
+        Err(err) => {
+            eprintln!("could not load zone {zone}: {err}");
+            return;
+        }
+    };
+    let mut fog = Fog::new();
+    fog.reveal(&map, game.position.x, game.position.y, 2);
+
+    // The chrome is still a placeholder; `chrome.rs` replaces it in the next
+    // slice, with the difficulty colours and banner strings the pack carries.
+    let chrome = placeholder_chrome(&layout, backend.palette());
+    let has_idle = catalog.hero(draw::HeroAnim::Idle).is_present();
+    // The hero has never stepped, because there is no input yet. He therefore
+    // stands perfectly still, which is what the shipped pack should look like.
+    let last_step = None;
+    let mut hero_anim = HeroAnimator::new();
+    let mut list = DrawList::new();
 
     loop {
+        hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
+        list.clear();
+        for cmd in chrome.as_slice() {
+            list.push(cmd.clone());
+        }
+        MapScene {
+            layout: &layout,
+            catalog: &catalog,
+            palette: backend.palette(),
+            resources: &resources,
+            game: &game,
+            map: &map,
+            fog: &fog,
+            tick: hero_anim.tick(),
+            moving: hero_anim.moving(),
+        }
+        .draw(&mut list);
+
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;
     }
 }
 
-fn smoke_scene(layout: &Layout, palette: &palette::Palette) -> DrawList {
+fn placeholder_chrome(layout: &Layout, palette: &palette::Palette) -> DrawList {
     let mut list = DrawList::new();
     list.rect(
         Rect::new(0, 0, layout.screen_w, layout.screen_h),
@@ -114,12 +160,6 @@ fn smoke_scene(layout: &Layout, palette: &palette::Palette) -> DrawList {
         layout::STATUS_X + 1,
         layout::STATUS_Y + 1,
         palette.clr(Pal::White),
-    );
-    list.text_centered(
-        "smoke scene",
-        layout::MAP_X + layout.map_w / 2,
-        layout::MAP_Y + layout.map_h / 2,
-        Color::WHITE,
     );
     list
 }

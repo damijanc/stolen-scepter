@@ -329,8 +329,40 @@ including `resources_format_template` and its `%VAR%` substitution.
      NOTE: `shell` is a BIN-only crate, so an integration test under
      `shell/tests/` cannot link it. Either keep shell tests as unit tests or
      split out a `lib.rs` when one is first needed.
-4. **Chrome + map viewport.** First thing actually on screen. `main.rs` holds
-   a `smoke_scene` placeholder to be replaced by `chrome.rs`.
+4. **Chrome + map viewport.** First thing actually on screen.
+   - DONE: the map viewport (`shell/src/map_render.rs`). It emits draw
+     commands, so all 14 of its tests read the command list back instead of a
+     screen -- camera clamping, fog edges, the flying hero, the parked boat.
+     This is the payoff of the step-2 seam.
+     DIVERGENCE, deliberate: C derives one `RADIUS` from the viewport WIDTH
+     and uses it on BOTH axes, so a non-square viewport would sit off-centre
+     vertically. This uses each axis's own radius. Both shipped modes are
+     square (5x5, 7x7), so they agree for any pack today, and the per-axis
+     form is what C's own comment describes.
+     Watch out: `Fog::reveal` IGNORES its radius and always stamps a fixed
+     5x5, which is exactly the legacy viewport. A test that wants a partly
+     fogged viewport has to write `Fog::seen` directly -- three of mine were
+     wrong until I noticed.
+     Draw order is C's `shell_frame.c`: chrome, map, hud, overlay.
+   - DONE: the hero's animation clock (`shell/src/anim.rs`), which is the
+     block driving `anim_frame` in `main.c`'s loop. It is a module rather
+     than loop code BECAUSE a renderer test cannot catch it: `map_render` is
+     handed a tick and faithfully draws the frame it names, so a tick
+     advancing once per frame draws correctly every time and still flickers.
+     That bug shipped in the first run and was caught by eye, not by tests.
+     Two rules, both visible on screen: the counter moves on its own clock
+     (0.05-0.30s by `options[0]`), not once per frame; and a hero who is not
+     mid-step snaps back to frame 0 unless the pack ships an idle animation.
+     The shipped pack ships none, so a standing hero is perfectly still.
+     `options[0]` is the delay and `options[3]` animation on/off, which the
+     pack's `controls.settings` order confirms.
+   - TODO: `chrome.rs`. `main.rs` holds a `placeholder_chrome` standing in for
+     it. Chrome needs two pack sections nobody parses yet: `colors`
+     (`difficulty_easy/normal/hard/impossible` for the status bar) and the
+     `strings` the status line uses (`quit_to_dos_prompt`,
+     `press_esc_to_exit`, `status_days_left`, `status_time_stop`). C has
+     hardcoded fallbacks for all of them, so chrome can be ported before
+     step 5 lands and wired to the pack afterwards.
 5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.
 7. **Prompts and the decision loop**, wiring to the engine's outcome enums.

@@ -247,11 +247,9 @@ impl SpriteCatalog {
     pub fn path(&self, sprite: Sprite) -> Option<&str> {
         let path = match sprite {
             Sprite::Tile(_) => return None,
-            Sprite::Hero {
-                anim,
-                facing,
-                frame,
-            } => return self.hero(anim).frame(facing, frame).map(|(path, _)| path),
+            Sprite::Hero { anim, facing, tick } => {
+                return self.hero(anim).frame(facing, tick).map(|(path, _)| path)
+            }
             Sprite::ClassPortrait(index) => self.class_portrait.get(index)?.as_str(),
             Sprite::VillainPortrait(index) => self.villain_portrait.get(index)?.as_str(),
             Sprite::VillainAnim { villain, frame } => self

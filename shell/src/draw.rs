@@ -144,12 +144,14 @@ pub enum Backdrop {
 /// indices, which are the same numeric indices the engine's tables use:
 /// classes 0..3, villains 0..16, troops 0..24, view icons 0..13.
 ///
-/// Every animated variant takes an ALREADY-FOLDED frame index, not the
-/// free-running tick. Folding it (`sprites_frame`), choosing between an
-/// authored facing and a mirrored single strip (`sprites_anim_tex`), and
-/// falling back from an animation to a still image all need to know what the
-/// pack authored. That catalog is deferred until `map_render` exists to
-/// define its shape -- the same reasoning that defers `CombatTurnRecord`.
+/// Most animated variants take an ALREADY-FOLDED frame index: their cycle is
+/// one number a view can ask the catalog for, so folding a tick against it is
+/// the view's business.
+///
+/// [`Sprite::Hero`] is the exception and carries the RAW tick. Its cycle
+/// length depends on which facing the catalog picks -- a pack may author a
+/// six-frame walk east and a four-frame walk north -- so only the catalog can
+/// fold it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Sprite {
     /// Terrain or object art, named by the pack. This is `Tile::art`, which
@@ -159,7 +161,8 @@ pub enum Sprite {
     Hero {
         anim: HeroAnim,
         facing: Facing,
-        frame: i32,
+        /// Free-running tick, NOT a frame index. See the note above.
+        tick: i32,
     },
 
     ClassPortrait(usize),
