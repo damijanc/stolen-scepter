@@ -22,6 +22,7 @@ pub mod palette;
 pub mod present;
 pub mod prompt;
 pub mod sprites;
+pub mod views;
 
 use macroquad::prelude::{get_time, next_frame, Conf};
 
@@ -44,6 +45,7 @@ use openbounty_engine::step::{
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
+use views::{ViewKind, Views};
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -265,6 +267,7 @@ async fn main() {
     let mut prompt = Prompt::default();
     let mut dialog = Dialog::default();
     let mut pending = PendingFlow::None;
+    let mut views = Views::new();
 
     loop {
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
@@ -295,6 +298,11 @@ async fn main() {
                     &mut prompt,
                     &mut dialog,
                 );
+            }
+        } else if views.is_active() {
+            // Read-only views dismiss on any key, as C does.
+            if keys.any_pressed() {
+                views.dismiss();
             }
         } else if fast_quit {
             // The prompt is modal: nothing else reads input until it is
@@ -376,6 +384,7 @@ async fn main() {
                         }
                     }
                 }
+                Action::ViewCharacter => views.set(ViewKind::Character),
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.
@@ -438,6 +447,8 @@ async fn main() {
             game: &game,
             mode: if fast_quit {
                 StatusMode::FastQuit
+            } else if views.wants_exit_hint() {
+                StatusMode::ExitHint
             } else {
                 StatusMode::Adventure
             },
@@ -455,6 +466,9 @@ async fn main() {
             moving: hero_anim.moving(),
         }
         .draw(&mut list);
+
+        // A view covers the map area while the overworld keeps running below.
+        views.draw(&mut list, &layout, backend.palette(), &resources, &game);
 
         // The prompt replaces the bottom frame; the dialog draws LAST so it
         // covers a prompt that is up at the same time, exactly as C's overlay
