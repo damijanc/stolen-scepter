@@ -15,7 +15,7 @@ use openbounty_engine::game::{
     CastleOwnerKind, Game, GAME_ARMY_SLOTS, GAME_CASTLES, GAME_CONTINENTS,
 };
 use openbounty_engine::map::Map;
-use openbounty_engine::resources::{ResColors, Resources};
+use openbounty_engine::resources::{ResColors, Resources, RES_MAX_CONTROLS};
 use openbounty_engine::tables::puzzle_grid_entity;
 use openbounty_engine::tile::Terrain;
 
@@ -24,6 +24,7 @@ use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
+use crate::present::Present;
 use crate::sprites::SpriteCatalog;
 
 /// The character portrait's legacy size. C defaults to 96x102 and the shipped
@@ -38,6 +39,17 @@ const FACE_H: i32 = 34;
 
 /// Inset around the worldmap's grid inside the map panel, C's `VIEW_PAD`.
 const VIEW_PAD: i32 = 4;
+
+/// Controls-panel geometry, C's `draw_controls` literals: a `CTL_COLS`-glyph
+/// panel with `CTL_PAD` pixels of padding, flush against the left edge of the
+/// map area.
+const CTL_PAD: i32 = 3;
+const CTL_COLS: i32 = 18;
+
+/// Controls-panel label text C compiles in, overridden under `strings.controls`.
+const DEFAULT_CTL_TITLE: &str = " Controls ";
+const DEFAULT_CTL_ON: &str = "On";
+const DEFAULT_CTL_OFF: &str = "Off";
 
 /// Contract-view labels C compiles in; the pack overrides them under
 /// `strings.contract_view`.
@@ -60,6 +72,7 @@ pub enum ViewKind {
     Contract,
     Puzzle,
     Worldmap,
+    Controls,
 }
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
@@ -76,6 +89,9 @@ pub struct Views {
     /// Whether the worldmap is showing the whole continent or just the fog the
     /// hero has revealed. Ports C's `s_worldmap_whole_map` static.
     worldmap_whole_map: bool,
+    /// Which visible row the controls panel highlights. Ports C's
+    /// `g_controls_cursor` static.
+    controls_cursor: i32,
 }
 
 impl Views {
@@ -108,7 +124,9 @@ impl Views {
     /// separately by [`StatusMode::Worldmap`](crate::chrome::StatusMode).
     pub fn wants_exit_hint(&self, game: &Game) -> bool {
         match self.active() {
-            Some(ViewKind::Character | ViewKind::Army | ViewKind::Puzzle) => true,
+            Some(ViewKind::Character | ViewKind::Army | ViewKind::Puzzle | ViewKind::Controls) => {
+                true
+            }
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
         }
@@ -126,6 +144,35 @@ impl Views {
         self.worldmap_whole_map = !self.worldmap_whole_map;
     }
 
+    /// The controls panel's highlighted visible row. Ports
+    /// `views_controls_cursor`.
+    pub fn controls_cursor(&self) -> i32 {
+        self.controls_cursor
+    }
+
+    /// Set the controls cursor, clamping a negative row to zero exactly as C
+    /// does (`views_controls_set_cursor`).
+    pub fn controls_set_cursor(&mut self, row: i32) {
+        self.controls_cursor = row.max(0);
+    }
+
+    /// Cycle one control's value in `stats.options`, porting
+    /// `views_controls_advance`. A disabled row is a no-op, and the range is
+    /// floored at 2 so a value always has somewhere to go.
+    pub fn controls_advance(&self, game: &mut Game, resources: &Resources, row: usize) {
+        let Some(control) = resources.control_by_index(row) else {
+            return;
+        };
+        if controls_row_disabled(resources, row) {
+            return;
+        }
+        if row >= game.stats.options.len() {
+            return;
+        }
+        let range = control.range.max(2);
+        game.stats.options[row] = (game.stats.options[row] + 1) % range;
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -137,6 +184,7 @@ impl Views {
         map: &Map,
         fog: &Fog,
         game: &Game,
+        present: &Present,
         time: f64,
     ) {
         // The puzzle reveal animation resets its clock each time the view
@@ -160,6 +208,9 @@ impl Views {
             }
             Some(ViewKind::Worldmap) => {
                 self.draw_worldmap(list, layout, palette, resources, map, fog, game, time)
+            }
+            Some(ViewKind::Controls) => {
+                self.draw_controls(list, layout, palette, resources, game, present)
             }
             None => {}
         }
@@ -409,6 +460,133 @@ impl Views {
         let label = format!("X={} Y={}", game.position.x, game.position.y);
         list.text(&label, gx, gy + grid_h + 2, palette.clr(Pal::White));
     }
+
+    /// Ports `draw_controls`: the settings panel flush against the map's left
+    /// edge so the live game stays visible to its right. The highlighted row
+    /// is the cursor, the three audio rows gray out because the shell has no
+    /// audio, and the modern-only Scale row is appended after the pack's.
+    ///
+    /// DIVERGENCE, deliberate: C's `draw_controls` compares the cursor against
+    /// the CONTROL index (`vis_idx[k] == cursor`) while `main.c` stores a
+    /// VISIBLE-row cursor, so a hidden control desyncs the highlight. This
+    /// port treats the cursor as the visible row (`k == cursor`), which is what
+    /// both the input loop and the row labels assume.
+    fn draw_controls(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        game: &Game,
+        present: &Present,
+    ) {
+        let vis = controls_visible(resources);
+        if vis.is_empty() {
+            return;
+        }
+        let mut cursor = self.controls_cursor;
+        if cursor >= vis.len() as i32 {
+            cursor = (vis.len() - 1) as i32;
+        }
+        if cursor < 0 {
+            cursor = 0;
+        }
+
+        let rows = vis.len() + 1 + usize::from(layout.is_modern);
+        let w = CTL_COLS * font::GLYPH_W + 2 * CTL_PAD;
+        let h = rows as i32 * (font::GLYPH_H + 2) + 2 * CTL_PAD;
+        let x = MAP_X;
+        let y = MAP_Y;
+
+        list.rounded_panel(
+            Rect::new(x, y, w, h),
+            palette.clr(Pal::DBlue),
+            palette.clr(Pal::Yellow),
+        );
+
+        let tx = x + CTL_PAD;
+        let mut ty = y + CTL_PAD;
+        list.text(
+            banner::text(resources, "controls", "title", DEFAULT_CTL_TITLE),
+            tx,
+            ty,
+            palette.clr(Pal::Yellow),
+        );
+        ty += font::GLYPH_H + 2;
+
+        let on = banner::text(resources, "controls", "on", DEFAULT_CTL_ON);
+        let off = banner::text(resources, "controls", "off", DEFAULT_CTL_OFF);
+
+        for (k, &index) in vis.iter().enumerate() {
+            let Some(control) = resources.control_by_index(index) else {
+                continue;
+            };
+            if index >= game.stats.options.len() {
+                continue;
+            }
+            let is_selected = k as i32 == cursor;
+            let disabled = controls_row_disabled(resources, index);
+            let fg = if disabled {
+                palette.clr(Pal::DGrey)
+            } else if is_selected {
+                palette.clr(Pal::Yellow)
+            } else {
+                palette.clr(Pal::White)
+            };
+
+            let label = format!("{} {}", char::from(b'1' + k as u8), control.label.as_str());
+            list.text(&label, tx, ty, fg);
+
+            let value = game.stats.options[index];
+            if control.kind.as_str() == "bool" {
+                let text = if value == 1 { on } else { off };
+                let tw = font::measure_width(text);
+                list.text(text, x + w - CTL_PAD - tw, ty, fg);
+            } else {
+                let mut range = control.range;
+                if range > 10 {
+                    range = 10;
+                }
+                let sx = x + w - CTL_PAD - range * font::GLYPH_W;
+                for n in 0..range {
+                    let nc = if disabled {
+                        palette.clr(Pal::DGrey)
+                    } else if n == value {
+                        palette.clr(Pal::Yellow)
+                    } else {
+                        palette.clr(Pal::White)
+                    };
+                    list.text(
+                        &char::from(b'0' + n as u8).to_string(),
+                        sx + n * font::GLYPH_W,
+                        ty,
+                        nc,
+                    );
+                }
+            }
+            ty += font::GLYPH_H + 2;
+        }
+
+        if layout.is_modern {
+            let is_selected = vis.len() as i32 == cursor;
+            let fg = if is_selected {
+                palette.clr(Pal::Yellow)
+            } else {
+                palette.clr(Pal::White)
+            };
+            let label = format!("{} Scale", char::from(b'1' + vis.len() as u8));
+            list.text(&label, tx, ty, fg);
+
+            let sc = present.scale_override();
+            let value = if sc <= 0 {
+                "Auto".to_owned()
+            } else {
+                format!("{sc}x")
+            };
+            let vw = font::measure_width(&value);
+            list.text(&value, x + w - CTL_PAD - vw, ty, fg);
+        }
+    }
 }
 
 /// Whether the hero owns the crystal orb for the current continent. Ports
@@ -435,6 +613,46 @@ fn terrain_minimap_color(colors: &ResColors, terrain: Terrain) -> Color {
         Terrain::Desert => colors.minimap_desert,
     };
     Color::from_argb(packed)
+}
+
+/// The control indices shown by the settings panel, in presentation order:
+/// every non-hidden setting, capped at eight. Ports the `vis_idx` build in
+/// `draw_controls` and `main.c`.
+pub fn controls_visible(resources: &Resources) -> Vec<usize> {
+    let mut visible = Vec::new();
+    for index in 0..resources.controls_count() {
+        if visible.len() >= RES_MAX_CONTROLS {
+            break;
+        }
+        let Some(control) = resources.control_by_index(index) else {
+            continue;
+        };
+        if control.hidden {
+            continue;
+        }
+        visible.push(index);
+    }
+    visible
+}
+
+/// The shell ships no audio, so the three audio-dependent rows are always
+/// grayed out, exactly as C grays them when its audio init fails.
+fn audio_available() -> bool {
+    false
+}
+
+/// True for the rows labelled Sounds / Music / Volume, C's
+/// `controls_row_is_audio`.
+fn controls_row_is_audio(resources: &Resources, row: usize) -> bool {
+    let Some(control) = resources.control_by_index(row) else {
+        return false;
+    };
+    matches!(control.label.as_str(), "Sounds" | "Music" | "Volume")
+}
+
+/// True when a row cannot be changed, C's `views_controls_row_disabled`.
+fn controls_row_disabled(resources: &Resources, row: usize) -> bool {
+    controls_row_is_audio(resources, row) && !audio_available()
 }
 
 fn stat_label<'a>(resources: &'a Resources, key: &str, default: &'a str) -> &'a str {
@@ -1125,12 +1343,13 @@ mod tests {
         let game = knight_game();
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
 
         let labels: Vec<&str> = list.texts().iter().map(|(_, _, t)| *t).collect();
@@ -1152,12 +1371,13 @@ mod tests {
         game.artifacts.found[0] = true;
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
 
         assert!(!list.blits_of(Sprite::ViewIcon(0)).is_empty());
@@ -1178,12 +1398,13 @@ mod tests {
         let game = knight_game();
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
         assert!(list.has_text_containing("GP"));
         assert!(!list.has_text_containing("Gold"));
@@ -1195,11 +1416,12 @@ mod tests {
         let game = knight_game();
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
         assert!(list.is_empty());
     }
@@ -1210,12 +1432,13 @@ mod tests {
         let game = knight_game();
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
 
         // "Followers killed" is 0, so its number must not appear.
@@ -1278,12 +1501,13 @@ mod tests {
 
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Army);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
 
         assert!(list.has_text_containing("Peasants"));
@@ -1332,12 +1556,13 @@ mod tests {
         let game = Game::default();
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Contract);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
         assert!(list.has_text_containing("You have no Contract!"));
     }
@@ -1349,12 +1574,13 @@ mod tests {
         game.contract.active_id.copy_from_str("murray");
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let mut views = Views::new();
         views.set(ViewKind::Contract);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
         );
 
         assert!(list.has_text_containing("Name: Murray"));
@@ -1395,14 +1621,15 @@ mod tests {
     ) -> DrawList {
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
+        let present = Present::new();
         let catalog = SpriteCatalog::from_resources(resources);
         let mut list = DrawList::new();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, 0.0,
+            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, &present, 0.0,
         );
         list.clear();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, 100.0,
+            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, &present, 100.0,
         );
         list
     }
@@ -1498,8 +1725,9 @@ mod tests {
         time: f64,
     ) -> DrawList {
         let mut list = DrawList::new();
+        let present = Present::new();
         views.draw(
-            &mut list, layout, palette, resources, catalog, map, fog, game, time,
+            &mut list, layout, palette, resources, catalog, map, fog, game, &present, time,
         );
         list
     }
@@ -1577,5 +1805,130 @@ mod tests {
         assert_eq!(rects_of_color(&list, palette.clr(Pal::Green)), 1);
         assert_eq!(rects_of_color(&list, palette.clr(Pal::Red)), 1);
         assert_eq!(rects_of_color(&list, palette.clr(Pal::Yellow)), 1);
+    }
+
+    fn controls_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "controls": {"settings": [
+                  {"id":"delay","label":"Delay","type":"numeric","range":10,"default":5},
+                  {"id":"sounds","label":"Sounds","type":"bool"},
+                  {"id":"animation","label":"Animation","type":"bool"},
+                  {"id":"cga","label":"CGA","type":"numeric","range":8,"hidden":true}
+                ]},
+                "strings": {"controls": {"title":" CTL ","on":"Yes","off":"No"}}}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    fn draw_controls_view(
+        views: &mut Views,
+        resources: &Resources,
+        layout: &Layout,
+        game: &Game,
+        present: &Present,
+    ) -> DrawList {
+        let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
+        let catalog = SpriteCatalog::from_resources(resources);
+        let mut list = DrawList::new();
+        views.draw(
+            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, present, 0.0,
+        );
+        list
+    }
+
+    #[test]
+    fn controls_visible_skips_hidden_rows() {
+        let (resources, _, _) = controls_fixtures();
+        assert_eq!(controls_visible(&resources), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn audio_rows_are_disabled_without_audio() {
+        let (resources, _, _) = controls_fixtures();
+        // The shell ships no audio, so Sounds/Music/Volume gray out, as C does
+        // when its audio init fails.
+        assert!(controls_row_disabled(&resources, 1));
+        assert!(!controls_row_disabled(&resources, 0));
+        assert!(!controls_row_disabled(&resources, 2));
+    }
+
+    #[test]
+    fn controls_advance_cycles_and_skips_disabled_rows() {
+        let (resources, _, _) = controls_fixtures();
+        let mut game = Game::default();
+        let views = Views::new();
+
+        views.controls_advance(&mut game, &resources, 0);
+        assert_eq!(game.stats.options[0], 2, "Delay 1 -> 2 over range 10");
+
+        views.controls_advance(&mut game, &resources, 1);
+        assert_eq!(game.stats.options[1], 1, "Sounds is disabled, a no-op");
+
+        views.controls_advance(&mut game, &resources, 2);
+        assert_eq!(game.stats.options[2], 0, "Animation bool 1 -> 0");
+    }
+
+    #[test]
+    fn the_controls_cursor_clamps_a_negative_row_to_zero() {
+        let mut views = Views::new();
+        assert_eq!(views.controls_cursor(), 0);
+        views.controls_set_cursor(3);
+        assert_eq!(views.controls_cursor(), 3);
+        views.controls_set_cursor(-1);
+        assert_eq!(views.controls_cursor(), 0);
+    }
+
+    #[test]
+    fn the_controls_view_draws_title_rows_and_values() {
+        let (resources, layout, _) = controls_fixtures();
+        let mut game = Game::default();
+        game.stats.options[0] = 4; // Delay
+        game.stats.options[1] = 1; // Sounds (on)
+        game.stats.options[2] = 0; // Animation (off)
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+        views.controls_set_cursor(1);
+        let present = Present::new();
+
+        let list = draw_controls_view(&mut views, &resources, &layout, &game, &present);
+
+        // Title and the three visible rows (CGA is hidden).
+        assert!(list.has_text_containing("CTL"));
+        assert!(list.has_text_containing("1 Delay"));
+        assert!(list.has_text_containing("2 Sounds"));
+        assert!(list.has_text_containing("3 Animation"));
+        assert!(
+            !list.has_text_containing("CGA"),
+            "the hidden row is not shown"
+        );
+        // The bool rows draw their pack-rewritten on/off labels.
+        assert!(list.has_text_containing("Yes"));
+        assert!(list.has_text_containing("No"));
+        // The numeric Delay row draws its 0..9 scale.
+        assert!(list.texts().iter().any(|(_, _, t)| *t == "4"));
+    }
+
+    #[test]
+    fn a_modern_pack_appends_the_scale_row() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "modern"}, "troops": [],
+                "controls": {"settings": [{"id":"delay","label":"Delay","type":"numeric","range":10}]}}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let game = Game::default();
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+        let present = Present::new();
+
+        let list = draw_controls_view(&mut views, &resources, &layout, &game, &present);
+
+        assert!(list.has_text_containing("2 Scale"));
+        assert!(list.has_text_containing("Auto"));
     }
 }

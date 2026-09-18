@@ -31,7 +31,7 @@ use backend::{Backend, MacroquadKeys};
 use chrome::{Chrome, StatusMode};
 use dialog::Dialog;
 use draw::DrawList;
-use input::{Action, Key, KeySource};
+use input::{Action, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
 use openbounty_engine::fog::Fog;
@@ -45,7 +45,7 @@ use openbounty_engine::step::{
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
-use views::{worldmap_has_orb, ViewKind, Views};
+use views::{controls_visible, worldmap_has_orb, ViewKind, Views};
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -226,7 +226,7 @@ async fn main() {
 
     let catalog = SpriteCatalog::from_resources(&resources);
     let backend = Backend::load(&resources, &catalog).await;
-    let present = Present::for_layout(&layout);
+    let mut present = Present::for_layout(&layout);
 
     println!(
         "loaded {} textures for a {}x{} {} screen",
@@ -298,6 +298,50 @@ async fn main() {
                     &mut prompt,
                     &mut dialog,
                 );
+            }
+        } else if views.active() == Some(ViewKind::Controls) {
+            // Navigate rows with Up/Down; Enter/Space (or a digit) advances
+            // the value; ESC or C closes. The Scale row is appended last,
+            // modern only.
+            let vis = controls_visible(&resources);
+            let count = vis.len() + usize::from(layout.is_modern);
+            let scale_row = if layout.is_modern {
+                vis.len()
+            } else {
+                usize::MAX
+            };
+            if count > 0 {
+                let cur = views.controls_cursor() as usize;
+                if keys.pressed(Key::Up) || keys.pressed(Key::Kp8) {
+                    views.controls_set_cursor(((cur + count - 1) % count) as i32);
+                } else if keys.pressed(Key::Down) || keys.pressed(Key::Kp2) {
+                    views.controls_set_cursor(((cur + 1) % count) as i32);
+                } else if keys.pressed(Key::Enter)
+                    || keys.pressed(Key::KpEnter)
+                    || keys.pressed(Key::Space)
+                {
+                    if cur == scale_row {
+                        present.advance_scale();
+                    } else {
+                        views.controls_advance(&mut game, &resources, vis[cur]);
+                    }
+                } else if keys.pressed(Key::Escape) || keys.pressed(Key::C) {
+                    views.dismiss();
+                } else {
+                    for k in 0..count.min(9) {
+                        if keys.pressed(DIGITS[1 + k]) {
+                            views.controls_set_cursor(k as i32);
+                            if k == scale_row {
+                                present.advance_scale();
+                            } else {
+                                views.controls_advance(&mut game, &resources, vis[k]);
+                            }
+                            break;
+                        }
+                    }
+                }
+            } else if keys.any_pressed() {
+                views.dismiss();
             }
         } else if views.is_active() {
             // The worldmap alone treats SPACE specially: with the crystal orb
@@ -398,6 +442,7 @@ async fn main() {
                 Action::ViewContract => views.set(ViewKind::Contract),
                 Action::ViewPuzzle => views.set(ViewKind::Puzzle),
                 Action::ViewMap => views.set(ViewKind::Worldmap),
+                Action::ViewControls => views.set(ViewKind::Controls),
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.
@@ -496,6 +541,7 @@ async fn main() {
             &map,
             &fog,
             &game,
+            &present,
             get_time(),
         );
 
