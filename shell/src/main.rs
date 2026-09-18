@@ -45,7 +45,7 @@ use openbounty_engine::step::{
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
-use views::{ViewKind, Views};
+use views::{worldmap_has_orb, ViewKind, Views};
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -300,8 +300,17 @@ async fn main() {
                 );
             }
         } else if views.is_active() {
-            // Read-only views dismiss on any key, as C does.
-            if keys.any_pressed() {
+            // The worldmap alone treats SPACE specially: with the crystal orb
+            // it toggles fog-only vs whole-map; without it SPACE dismisses
+            // like any other key. Every other read-only view dismisses on any
+            // key, as C does.
+            if views.active() == Some(ViewKind::Worldmap) && keys.pressed(Key::Space) {
+                if worldmap_has_orb(&game, &resources) {
+                    views.toggle_whole_map();
+                } else {
+                    views.dismiss();
+                }
+            } else if keys.any_pressed() {
                 views.dismiss();
             }
         } else if fast_quit {
@@ -388,6 +397,7 @@ async fn main() {
                 Action::ViewArmy => views.set(ViewKind::Army),
                 Action::ViewContract => views.set(ViewKind::Contract),
                 Action::ViewPuzzle => views.set(ViewKind::Puzzle),
+                Action::ViewMap => views.set(ViewKind::Worldmap),
                 Action::None => {}
                 // Views and saving still need layers that do not exist yet.
                 // Say so rather than swallowing the key.
@@ -450,6 +460,10 @@ async fn main() {
             game: &game,
             mode: if fast_quit {
                 StatusMode::FastQuit
+            } else if views.active() == Some(ViewKind::Worldmap) {
+                StatusMode::Worldmap {
+                    whole_map: views.whole_map(),
+                }
             } else if views.wants_exit_hint(&game) {
                 StatusMode::ExitHint
             } else {
@@ -479,6 +493,8 @@ async fn main() {
             backend.palette(),
             &resources,
             &catalog,
+            &map,
+            &fog,
             &game,
             get_time(),
         );

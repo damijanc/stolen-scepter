@@ -41,6 +41,7 @@ pub enum Key {
     Enter,
     KpEnter,
     Backspace,
+    Space,
     Digit0,
     Digit1,
     Digit2,

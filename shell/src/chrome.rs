@@ -11,6 +11,7 @@ use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::layout::{Layout, BAR_H, BAR_Y, STATUS_H, STATUS_X, STATUS_Y};
 use crate::palette::{Pal, Palette};
+use crate::views::worldmap_has_orb;
 
 /// Text C compiles in for each status-bar string, used when the pack declares
 /// none. Kept verbatim, including the surrounding spaces, which are what sit
@@ -19,6 +20,8 @@ pub const DEFAULT_QUIT_PROMPT: &str = " Quit without saving (y/n) ";
 pub const DEFAULT_EXIT_HINT: &str = "Press 'ESC' to exit";
 pub const DEFAULT_DAYS_LEFT: &str = " Options / Controls / Days Left:%DAYS% ";
 pub const DEFAULT_TIME_STOP: &str = " Options / Controls / Time Stop:%STEPS% ";
+pub const DEFAULT_WORLDMAP_YOUR_MAP: &str = "'ESC' to exit / 'SPC' your map";
+pub const DEFAULT_WORLDMAP_WHOLE_MAP: &str = "'ESC' to exit / 'SPC' whole map";
 
 /// What the status bar says. Three modes, in priority order.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,6 +30,9 @@ pub enum StatusMode {
     FastQuit,
     /// A special screen or an open dialog: centred "Press 'ESC' to exit".
     ExitHint,
+    /// The worldmap: centred hint that switches between "Press ESC" and the
+    /// SPACE toggle lines as the crystal orb and toggle state allow.
+    Worldmap { whole_map: bool },
     /// Adventure mode: days left, or the time-stop countdown instead.
     Adventure,
     /// Combat and the like supply their own line, already formatted.
@@ -106,6 +112,28 @@ impl Chrome<'_> {
                 banner::text(self.resources, "ui", "press_esc_to_exit", DEFAULT_EXIT_HINT)
                     .to_owned()
             }
+            StatusMode::Worldmap { whole_map } => {
+                if !worldmap_has_orb(self.game, self.resources) {
+                    banner::text(self.resources, "ui", "press_esc_to_exit", DEFAULT_EXIT_HINT)
+                        .to_owned()
+                } else if whole_map {
+                    banner::text(
+                        self.resources,
+                        "ui",
+                        "worldmap_hint_your_map",
+                        DEFAULT_WORLDMAP_YOUR_MAP,
+                    )
+                    .to_owned()
+                } else {
+                    banner::text(
+                        self.resources,
+                        "ui",
+                        "worldmap_hint_whole_map",
+                        DEFAULT_WORLDMAP_WHOLE_MAP,
+                    )
+                    .to_owned()
+                }
+            }
             StatusMode::Adventure => {
                 // A banked time stop replaces the day count entirely: the
                 // clock is not running, so days left would be misleading.
@@ -139,12 +167,13 @@ impl Chrome<'_> {
         // The two modal lines are centred; the rest sit against the left of
         // the bar, one pixel in from its corner.
         match self.mode {
-            StatusMode::FastQuit | StatusMode::ExitHint => list.text_centered(
-                &text,
-                STATUS_X + self.layout.status_w() / 2,
-                STATUS_Y + 1,
-                white,
-            ),
+            StatusMode::FastQuit | StatusMode::ExitHint | StatusMode::Worldmap { .. } => list
+                .text_centered(
+                    &text,
+                    STATUS_X + self.layout.status_w() / 2,
+                    STATUS_Y + 1,
+                    white,
+                ),
             _ => list.text(&text, STATUS_X + 1, STATUS_Y + 1, white),
         }
     }
@@ -352,5 +381,48 @@ mod tests {
         let mut list = DrawList::new();
         chrome_of(&layout, &palette, &resources, &game, StatusMode::Custom("")).draw(&mut list);
         assert!(list.texts().is_empty());
+    }
+
+    #[test]
+    fn the_worldmap_hint_is_plain_escape_without_the_orb() {
+        // No zone, no orb: SPACE has nothing to toggle, so the hint is the
+        // plain exit line whatever the toggle flag says.
+        let (layout, palette, resources, game) = parts("");
+        for whole_map in [false, true] {
+            let chrome = chrome_of(
+                &layout,
+                &palette,
+                &resources,
+                &game,
+                StatusMode::Worldmap { whole_map },
+            );
+            assert_eq!(chrome.status_text(), DEFAULT_EXIT_HINT);
+        }
+    }
+
+    #[test]
+    fn the_worldmap_hint_tracks_the_orb_and_the_toggle() {
+        let (layout, palette, resources, mut game) = parts(r#", "zones": [{"id":"home"}]"#);
+        game.position.zone.copy_from_str("home");
+        game.world.orbs_found[0] = true;
+
+        // Owning the orb: the hint advertises whichever side SPACE will show.
+        let chrome = chrome_of(
+            &layout,
+            &palette,
+            &resources,
+            &game,
+            StatusMode::Worldmap { whole_map: false },
+        );
+        assert_eq!(chrome.status_text(), DEFAULT_WORLDMAP_WHOLE_MAP);
+
+        let chrome = chrome_of(
+            &layout,
+            &palette,
+            &resources,
+            &game,
+            StatusMode::Worldmap { whole_map: true },
+        );
+        assert_eq!(chrome.status_text(), DEFAULT_WORLDMAP_YOUR_MAP);
     }
 }

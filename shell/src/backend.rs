@@ -382,6 +382,7 @@ impl MacroquadKeys {
             Key::Enter => KeyCode::Enter,
             Key::KpEnter => KeyCode::KpEnter,
             Key::Backspace => KeyCode::Backspace,
+            Key::Space => KeyCode::Space,
             Key::Digit0 => KeyCode::Key0,
             Key::Digit1 => KeyCode::Key1,
             Key::Digit2 => KeyCode::Key2,

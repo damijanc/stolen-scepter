@@ -10,10 +10,14 @@
 //! [`crate::draw::DrawList`] commands, so the layout is testable headlessly
 //! the way the engine's combat digests are.
 
-use openbounty_engine::game::{CastleOwnerKind, Game, GAME_ARMY_SLOTS, GAME_CASTLES};
+use openbounty_engine::fog::Fog;
+use openbounty_engine::game::{
+    CastleOwnerKind, Game, GAME_ARMY_SLOTS, GAME_CASTLES, GAME_CONTINENTS,
+};
 use openbounty_engine::map::Map;
-use openbounty_engine::resources::Resources;
+use openbounty_engine::resources::{ResColors, Resources};
 use openbounty_engine::tables::puzzle_grid_entity;
+use openbounty_engine::tile::Terrain;
 
 use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
@@ -31,6 +35,9 @@ const PORTRAIT_H: i32 = 102;
 /// The wanted-poster face and the no-contract silhouette are both 48x34.
 const FACE_W: i32 = 48;
 const FACE_H: i32 = 34;
+
+/// Inset around the worldmap's grid inside the map panel, C's `VIEW_PAD`.
+const VIEW_PAD: i32 = 4;
 
 /// Contract-view labels C compiles in; the pack overrides them under
 /// `strings.contract_view`.
@@ -52,6 +59,7 @@ pub enum ViewKind {
     Army,
     Contract,
     Puzzle,
+    Worldmap,
 }
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
@@ -65,6 +73,9 @@ pub struct Views {
     /// The scepter's continent, lazy-loaded for the puzzle's terrain backdrop.
     puzzle_map: Option<Map>,
     puzzle_zone: String,
+    /// Whether the worldmap is showing the whole continent or just the fog the
+    /// hero has revealed. Ports C's `s_worldmap_whole_map` static.
+    worldmap_whole_map: bool,
 }
 
 impl Views {
@@ -93,13 +104,26 @@ impl Views {
 
     /// True when the active view swaps the status bar to "Press 'ESC' to
     /// exit". The character, army and puzzle views always do; the contract
-    /// view only when a contract is actually active.
+    /// view only when a contract is actually active. The worldmap is handled
+    /// separately by [`StatusMode::Worldmap`](crate::chrome::StatusMode).
     pub fn wants_exit_hint(&self, game: &Game) -> bool {
         match self.active() {
             Some(ViewKind::Character | ViewKind::Army | ViewKind::Puzzle) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
-            None => false,
+            Some(ViewKind::Worldmap) | None => false,
         }
+    }
+
+    /// Whether the worldmap is revealing the whole continent (true) or only
+    /// the fog the hero has uncovered (false).
+    pub fn whole_map(&self) -> bool {
+        self.worldmap_whole_map
+    }
+
+    /// Flip the worldmap between fog-limited and whole-continent. Ports
+    /// `views_render_worldmap_toggle_hero_only`.
+    pub fn toggle_whole_map(&mut self) {
+        self.worldmap_whole_map = !self.worldmap_whole_map;
     }
 
     /// Draw the active view over the map area.
@@ -110,6 +134,8 @@ impl Views {
         palette: &Palette,
         resources: &Resources,
         catalog: &SpriteCatalog,
+        map: &Map,
+        fog: &Fog,
         game: &Game,
         time: f64,
     ) {
@@ -131,6 +157,9 @@ impl Views {
             }
             Some(ViewKind::Puzzle) => {
                 self.draw_puzzle(list, layout, palette, resources, catalog, game, time)
+            }
+            Some(ViewKind::Worldmap) => {
+                self.draw_worldmap(list, layout, palette, resources, map, fog, game, time)
             }
             None => {}
         }
@@ -261,6 +290,151 @@ impl Views {
             }
         }
     }
+
+    /// Ports `draw_worldmap`: the whole continent scaled to fit the map panel,
+    /// fog-gated (or fully revealed with the orb), town/castle markers and the
+    /// blinking hero. The exit hint is the status bar's job, drawn by
+    /// [`Chrome`](crate::chrome::Chrome).
+    fn draw_worldmap(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        map: &Map,
+        fog: &Fog,
+        game: &Game,
+        time: f64,
+    ) {
+        // draw_view_panel: the map area only, like the puzzle view.
+        list.rect(
+            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
+            palette.clr(Pal::DGrey),
+        );
+        list.rect_lines(
+            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
+            palette.clr(Pal::DRed),
+        );
+
+        if map.width == 0 || map.height == 0 {
+            return;
+        }
+
+        let reveal_all = worldmap_has_orb(game, resources) && self.worldmap_whole_map;
+
+        // Largest integer tile size that fits the padded panel.
+        let avail_w = layout.map_w - 2 * VIEW_PAD;
+        let avail_h = layout.map_h - 2 * VIEW_PAD;
+        let mut pix = (avail_w / map.width as i32).min(avail_h / map.height as i32);
+        if pix < 1 {
+            pix = 1;
+        }
+        let grid_w = pix * map.width as i32;
+        let grid_h = pix * map.height as i32;
+        let gx = MAP_X + (layout.map_w - grid_w) / 2;
+        let gy = MAP_Y + (layout.map_h - grid_h) / 2;
+
+        list.rect(Rect::new(gx, gy, grid_w, grid_h), palette.clr(Pal::Black));
+
+        for y in 0..map.height as i32 {
+            for x in 0..map.width as i32 {
+                if !reveal_all && !fog.seen(x, y) {
+                    continue;
+                }
+                let Some(tile) = map.tile_i32(x, y) else {
+                    continue;
+                };
+                list.rect(
+                    Rect::new(gx + x * pix, gy + y * pix, pix, pix),
+                    terrain_minimap_color(&resources.colors, tile.terrain),
+                );
+            }
+        }
+
+        // Towns are green markers, castles red, for the current zone only and
+        // fog-gated unless the orb has revealed the whole continent.
+        for i in 0..resources.town_count() {
+            let Some(town) = resources.town_by_index(i) else {
+                continue;
+            };
+            if town.zone.as_str() != game.position.zone.as_str() {
+                continue;
+            }
+            if town.x < 0 || town.y < 0 {
+                continue;
+            }
+            if !reveal_all && !fog.seen(town.x, town.y) {
+                continue;
+            }
+            list.rect(
+                Rect::new(gx + town.x * pix, gy + town.y * pix, pix, pix),
+                palette.clr(Pal::Green),
+            );
+        }
+        for i in 0..resources.castle_count() {
+            let Some(castle) = resources.castle_by_index(i) else {
+                continue;
+            };
+            if castle.zone.as_str() != game.position.zone.as_str() {
+                continue;
+            }
+            if castle.x < 0 || castle.y < 0 {
+                continue;
+            }
+            if !reveal_all && !fog.seen(castle.x, castle.y) {
+                continue;
+            }
+            list.rect(
+                Rect::new(gx + castle.x * pix, gy + castle.y * pix, pix, pix),
+                palette.clr(Pal::Red),
+            );
+        }
+
+        // The hero blinks yellow/red at ~3 Hz.
+        let blink = if ((time * 3.0) as i32) & 1 == 1 {
+            palette.clr(Pal::Yellow)
+        } else {
+            palette.clr(Pal::Red)
+        };
+        list.rect(
+            Rect::new(
+                gx + game.position.x * pix,
+                gy + game.position.y * pix,
+                pix,
+                pix,
+            ),
+            blink,
+        );
+
+        let label = format!("X={} Y={}", game.position.x, game.position.y);
+        list.text(&label, gx, gy + grid_h + 2, palette.clr(Pal::White));
+    }
+}
+
+/// Whether the hero owns the crystal orb for the current continent. Ports
+/// `worldmap_has_orb`, including its `zi < GAME_CONTINENTS` guard.
+pub fn worldmap_has_orb(game: &Game, resources: &Resources) -> bool {
+    let Some(zone_index) = resources.zone_index_by_id(game.position.zone.as_str()) else {
+        return false;
+    };
+    if zone_index >= GAME_CONTINENTS {
+        return false;
+    }
+    game.world.orbs_found[zone_index]
+}
+
+/// A terrain's minimap colour from the pack's packed-ARGB `colors` block,
+/// porting `terrain_minimap_color`. The no-colour fallback branch is dead in
+/// Rust: `Resources.colors` is a value, not an optional pointer.
+fn terrain_minimap_color(colors: &ResColors, terrain: Terrain) -> Color {
+    let packed = match terrain {
+        Terrain::Grass => colors.minimap_grass,
+        Terrain::Forest => colors.minimap_forest,
+        Terrain::Mountain => colors.minimap_mountain,
+        Terrain::Water => colors.minimap_water,
+        Terrain::Desert => colors.minimap_desert,
+    };
+    Color::from_argb(packed)
 }
 
 fn stat_label<'a>(resources: &'a Resources, key: &str, default: &'a str) -> &'a str {
@@ -882,6 +1056,14 @@ fn draw_contract(
 mod tests {
     use super::*;
     use crate::draw::DrawCmd;
+    use openbounty_engine::map::Tile;
+
+    /// A trivial map and fog for views that ignore them; only the worldmap
+    /// reads these, and its tests build a real one.
+    fn map_and_fog() -> (Map, Fog) {
+        let map = Map::from_tiles(1, 1, vec![Tile::plain_grass()]).expect("1x1 map");
+        (map, Fog::new())
+    }
 
     fn fixtures() -> (Resources, Layout, SpriteCatalog) {
         let resources = Resources::from_json_str(
@@ -942,12 +1124,13 @@ mod tests {
         let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
 
         let labels: Vec<&str> = list.texts().iter().map(|(_, _, t)| *t).collect();
@@ -968,12 +1151,13 @@ mod tests {
         let mut game = knight_game();
         game.artifacts.found[0] = true;
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
 
         assert!(!list.blits_of(Sprite::ViewIcon(0)).is_empty());
@@ -993,12 +1177,13 @@ mod tests {
         let catalog = SpriteCatalog::from_resources(&resources);
         let game = knight_game();
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
         assert!(list.has_text_containing("GP"));
         assert!(!list.has_text_containing("Gold"));
@@ -1009,11 +1194,12 @@ mod tests {
         let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
         assert!(list.is_empty());
     }
@@ -1023,12 +1209,13 @@ mod tests {
         let (resources, layout, catalog) = fixtures();
         let game = knight_game();
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
 
         // "Followers killed" is 0, so its number must not appear.
@@ -1090,12 +1277,13 @@ mod tests {
         game.army[1].count = 6; // 6 * 20 hp = 120 > 100 leadership.
 
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Army);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
 
         assert!(list.has_text_containing("Peasants"));
@@ -1143,12 +1331,13 @@ mod tests {
         let (resources, layout, catalog) = contract_fixtures();
         let game = Game::default();
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Contract);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
         assert!(list.has_text_containing("You have no Contract!"));
     }
@@ -1159,12 +1348,13 @@ mod tests {
         let mut game = Game::default();
         game.contract.active_id.copy_from_str("murray");
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let mut views = Views::new();
         views.set(ViewKind::Contract);
 
         let mut list = DrawList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &game, 0.0,
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, 0.0,
         );
 
         assert!(list.has_text_containing("Name: Murray"));
@@ -1204,12 +1394,15 @@ mod tests {
         game: &Game,
     ) -> DrawList {
         let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
         let catalog = SpriteCatalog::from_resources(resources);
         let mut list = DrawList::new();
-        views.draw(&mut list, layout, &palette, resources, &catalog, game, 0.0);
+        views.draw(
+            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, 0.0,
+        );
         list.clear();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, game, 100.0,
+            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, 100.0,
         );
         list
     }
@@ -1264,5 +1457,125 @@ mod tests {
             .is_empty());
         // Both revealed cells draw black (no scepter terrain is loaded).
         assert_eq!(black_rects(&list), 2);
+    }
+
+    fn worldmap_parts() -> (Resources, Layout, SpriteCatalog, Palette, Map, Fog, Game) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "zones": [{"id":"home"}],
+                "towns": [{"id":"t0","zone":"home","x":1,"y":1}],
+                "castles": [{"id":"c0","zone":"home","x":2,"y":2}]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let palette = Palette::fallback();
+        let map = Map::from_tiles(5, 5, vec![Tile::plain_grass(); 25]).expect("5x5 map");
+        let fog = Fog::new();
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.x = 0;
+        game.position.y = 0;
+        (resources, layout, catalog, palette, map, fog, game)
+    }
+
+    fn rects_of_color(list: &DrawList, color: Color) -> usize {
+        list.as_slice()
+            .iter()
+            .filter(|cmd| matches!(cmd, DrawCmd::Rect { color: c, .. } if *c == color))
+            .count()
+    }
+
+    fn draw_worldmap_view(
+        views: &mut Views,
+        resources: &Resources,
+        layout: &Layout,
+        catalog: &SpriteCatalog,
+        palette: &Palette,
+        map: &Map,
+        fog: &Fog,
+        game: &Game,
+        time: f64,
+    ) -> DrawList {
+        let mut list = DrawList::new();
+        views.draw(
+            &mut list, layout, palette, resources, catalog, map, fog, game, time,
+        );
+        list
+    }
+
+    #[test]
+    fn worldmap_has_orb_reads_the_current_zone() {
+        let (resources, _, _, _, _, _, mut game) = worldmap_parts();
+        assert!(!worldmap_has_orb(&game, &resources));
+        game.world.orbs_found[0] = true;
+        assert!(worldmap_has_orb(&game, &resources));
+    }
+
+    #[test]
+    fn the_worldmap_toggle_flips_and_the_view_never_uses_the_exit_hint() {
+        let mut views = Views::new();
+        assert!(!views.whole_map());
+        views.toggle_whole_map();
+        assert!(views.whole_map());
+        views.toggle_whole_map();
+        assert!(!views.whole_map());
+
+        // The worldmap's hint is its own status mode, not the plain exit hint.
+        let game = Game::default();
+        views.set(ViewKind::Worldmap);
+        assert!(!views.wants_exit_hint(&game));
+    }
+
+    #[test]
+    fn the_worldmap_hides_fogged_tiles_without_the_orb() {
+        let (resources, layout, catalog, palette, map, mut fog, game) = worldmap_parts();
+        fog.seen[0][0] = true;
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+
+        let list = draw_worldmap_view(
+            &mut views, &resources, &layout, &catalog, &palette, &map, &fog, &game, 0.0,
+        );
+
+        // Only the one revealed grass tile is painted (plus the black backing
+        // and the hero's own blink rect).
+        assert_eq!(rects_of_color(&list, Color::rgb(0x00, 0xAA, 0x00)), 1);
+        assert!(list.has_text_containing("X=0 Y=0"));
+    }
+
+    #[test]
+    fn the_worldmap_reveals_everything_with_the_orb() {
+        let (resources, layout, catalog, palette, map, mut fog, mut game) = worldmap_parts();
+        fog.seen[0][0] = true;
+        game.world.orbs_found[0] = true;
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+        views.toggle_whole_map();
+
+        let list = draw_worldmap_view(
+            &mut views, &resources, &layout, &catalog, &palette, &map, &fog, &game, 0.0,
+        );
+
+        assert_eq!(rects_of_color(&list, Color::rgb(0x00, 0xAA, 0x00)), 25);
+    }
+
+    #[test]
+    fn the_worldmap_marks_towns_and_castles() {
+        let (resources, layout, catalog, palette, map, mut fog, game) = worldmap_parts();
+        fog.seen[1][1] = true;
+        fog.seen[2][2] = true;
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+
+        // Time 1.0 puts the hero's blink on yellow, so it cannot be mistaken
+        // for the castle's red marker.
+        let list = draw_worldmap_view(
+            &mut views, &resources, &layout, &catalog, &palette, &map, &fog, &game, 1.0,
+        );
+
+        assert_eq!(rects_of_color(&list, palette.clr(Pal::Green)), 1);
+        assert_eq!(rects_of_color(&list, palette.clr(Pal::Red)), 1);
+        assert_eq!(rects_of_color(&list, palette.clr(Pal::Yellow)), 1);
     }
 }
