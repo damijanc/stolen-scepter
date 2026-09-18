@@ -154,6 +154,79 @@ impl Default for ResSprites {
     }
 }
 
+/// Pack-declared colours, as packed `0xAARRGGBB`.
+///
+/// The defaults are the EGA values the shell used before a pack could name
+/// its own, so a pack that declares no `colors` block looks unchanged.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResColors {
+    pub minimap_grass: u32,
+    pub minimap_forest: u32,
+    pub minimap_mountain: u32,
+    pub minimap_water: u32,
+    pub minimap_desert: u32,
+    pub minimap_fog: u32,
+    pub difficulty_easy: u32,
+    pub difficulty_normal: u32,
+    pub difficulty_hard: u32,
+    pub difficulty_impossible: u32,
+}
+
+impl Default for ResColors {
+    fn default() -> Self {
+        Self {
+            minimap_grass: 0xFF00_AA00,
+            minimap_forest: 0xFF55_FF55,
+            minimap_mountain: 0xFFAA_5500,
+            minimap_water: 0xFF55_55FF,
+            minimap_desert: 0xFFFF_FF55,
+            minimap_fog: 0xFF00_0000,
+            difficulty_easy: 0xFF00_AAAA,
+            difficulty_normal: 0xFFAA_0000,
+            difficulty_hard: 0xFF55_55FF,
+            difficulty_impossible: 0xFFAA_00AA,
+        }
+    }
+}
+
+impl ResColors {
+    /// The status-bar colour for a difficulty, C's
+    /// `status_bg_for_difficulty`. Anything outside 0..3 reads as easy, which
+    /// is what C's switch falls through to.
+    pub fn difficulty_bar(&self, difficulty: i32) -> u32 {
+        match difficulty {
+            1 => self.difficulty_normal,
+            2 => self.difficulty_hard,
+            3 => self.difficulty_impossible,
+            _ => self.difficulty_easy,
+        }
+    }
+}
+
+/// Parse `#RRGGBB` or `#AARRGGBB` into a packed `0xAARRGGBB`, porting
+/// `parse_color_hex`. Alpha defaults to opaque when the string omits it, and
+/// anything malformed reads as `None` so the caller keeps its default.
+pub fn parse_color_hex(value: &str) -> Option<u32> {
+    let digits = value.strip_prefix('#')?;
+    if digits.len() != 6 && digits.len() != 8 {
+        return None;
+    }
+    let mut packed = 0u32;
+    for byte in digits.bytes() {
+        let digit = match byte {
+            b'0'..=b'9' => u32::from(byte - b'0'),
+            b'a'..=b'f' => u32::from(byte - b'a') + 10,
+            b'A'..=b'F' => u32::from(byte - b'A') + 10,
+            _ => return None,
+        };
+        packed = (packed << 4) | digit;
+    }
+    if digits.len() == 6 {
+        packed |= 0xFF00_0000;
+    }
+    Some(packed)
+}
+
 /// The victory cartoon: its four tile images and the parameters that animate
 /// them. The tiles are sized to one map cell, so the cartoon lines up with
 /// the viewport.
@@ -759,6 +832,15 @@ pub struct Resources {
     /// overflows the stack.
     pub sprites: Box<ResSprites>,
     pub ending: ResEnding,
+    pub colors: ResColors,
+    /// Every string the pack declares, as `group -> key -> text`.
+    ///
+    /// C names all ~250 of them as struct fields with compiled-in defaults.
+    /// A map carries the same data without the wall of declarations, and the
+    /// DEFAULT moves to the one call site that needs it -- which is also what
+    /// lets a view be ported without first transcribing every string a view
+    /// that does not exist yet would want.
+    pub strings: std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>,
     pub tuning: ResTuning,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
@@ -797,6 +879,8 @@ impl Default for Resources {
             render: ResRender::default(),
             sprites: Box::new(ResSprites::default()),
             ending: ResEnding::default(),
+            colors: ResColors::default(),
+            strings: std::collections::BTreeMap::new(),
             tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
@@ -847,6 +931,8 @@ impl Resources {
         resources.parse_render(&root)?;
         resources.parse_sprites(&root);
         resources.parse_ending(&root);
+        resources.parse_colors(&root);
+        resources.parse_strings(&root);
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
@@ -929,6 +1015,12 @@ impl Resources {
         self.tile_codes
             .get(code as usize)
             .filter(|tile_code| tile_code.present)
+    }
+
+    /// One pack string, or `None` when the pack declares no such entry. Every
+    /// caller supplies its own fallback, which is the text C compiles in.
+    pub fn string(&self, group: &str, key: &str) -> Option<&str> {
+        Some(self.strings.get(group)?.get(key)?.as_str())
     }
 
     pub fn resolve_map_path(&self, zone: &ResZone) -> Option<std::path::PathBuf> {
@@ -1188,6 +1280,65 @@ impl Resources {
     ///
     /// The viewport validation (odd axes, minimum sizes) moves with it, for
     /// the same reason.
+    /// Read the pack's colours. Anything missing or malformed keeps the EGA
+    /// default rather than failing the load.
+    fn parse_colors(&mut self, root: &serde_json::Value) {
+        self.colors = ResColors::default();
+        let Some(obj) = root.get("colors") else {
+            return;
+        };
+        let colors = &mut self.colors;
+        if let Some(minimap) = obj.get("minimap_terrain") {
+            for (key, slot) in [
+                ("grass", &mut colors.minimap_grass),
+                ("forest", &mut colors.minimap_forest),
+                ("mountain", &mut colors.minimap_mountain),
+                ("water", &mut colors.minimap_water),
+                ("desert", &mut colors.minimap_desert),
+                ("fog", &mut colors.minimap_fog),
+            ] {
+                if let Some(packed) = json_color(minimap, key) {
+                    *slot = packed;
+                }
+            }
+        }
+        if let Some(bar) = obj.get("difficulty_bar") {
+            for (key, slot) in [
+                ("easy", &mut colors.difficulty_easy),
+                ("normal", &mut colors.difficulty_normal),
+                ("hard", &mut colors.difficulty_hard),
+                ("impossible", &mut colors.difficulty_impossible),
+            ] {
+                if let Some(packed) = json_color(bar, key) {
+                    *slot = packed;
+                }
+            }
+        }
+    }
+
+    /// Read every string group the pack declares.
+    ///
+    /// Only string values are kept; `villain_descriptions` and the like that
+    /// hold objects are skipped here and read by whichever view owns them.
+    fn parse_strings(&mut self, root: &serde_json::Value) {
+        self.strings.clear();
+        let Some(groups) = root.get("strings").and_then(serde_json::Value::as_object) else {
+            return;
+        };
+        for (group, entries) in groups {
+            let Some(entries) = entries.as_object() else {
+                continue;
+            };
+            let table: std::collections::BTreeMap<String, String> = entries
+                .iter()
+                .filter_map(|(key, value)| Some((key.clone(), value.as_str()?.to_owned())))
+                .collect();
+            if !table.is_empty() {
+                self.strings.insert(group.clone(), table);
+            }
+        }
+    }
+
     /// Read the victory cartoon's art and parameters, porting `parse_ending`.
     /// Infallible, like the sprite manifest: the defaults stand for anything
     /// the pack leaves out or mis-types.
@@ -2312,6 +2463,12 @@ fn json_str_or<'a>(value: &'a serde_json::Value, key: &str, fallback: &'a str) -
         .get(key)
         .and_then(serde_json::Value::as_str)
         .unwrap_or(fallback)
+}
+
+/// Read a hex colour under `key`. Missing or malformed reads as `None`, so
+/// the caller keeps whatever default it had. Ports `json_color`.
+fn json_color(value: &serde_json::Value, key: &str) -> Option<u32> {
+    parse_color_hex(value.get(key)?.as_str()?)
 }
 
 fn string_field<'a>(

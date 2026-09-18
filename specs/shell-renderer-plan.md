@@ -191,10 +191,10 @@ nothing in the engine reads or serializes it.
 These are parsed by nobody today and are the shell's to claim:
 
 `strings` (20 groups; C's `resources.h` declares 143 banner strings),
-`colors`, `controls`, `audio`, `title`, `credits`, `ending`, `combat` (the
-top-level one, not the tileset), `pack_name`, `pack_kind`, `version`.
+`controls`, `audio`, `title`, `credits`, `combat` (the top-level one, not
+the tileset), `pack_name`, `pack_kind`, `version`.
 
-`render` and `sprites` are parsed now.
+`render`, `sprites`, `ending`, `colors` and `strings` are parsed now.
 
 The engine deliberately returns outcome VALUES where C queues TEXT --
 `AdventureCast`, `SearchOutcome`, `SpellCast`, `VillainSiegeOutcome` and the
@@ -356,14 +356,27 @@ including `resources_format_template` and its `%VAR%` substitution.
      The shipped pack ships none, so a standing hero is perfectly still.
      `options[0]` is the delay and `options[3]` animation on/off, which the
      pack's `controls.settings` order confirms.
-   - TODO: `chrome.rs`. `main.rs` holds a `placeholder_chrome` standing in for
-     it. Chrome needs two pack sections nobody parses yet: `colors`
-     (`difficulty_easy/normal/hard/impossible` for the status bar) and the
-     `strings` the status line uses (`quit_to_dos_prompt`,
-     `press_esc_to_exit`, `status_days_left`, `status_time_stop`). C has
-     hardcoded fallbacks for all of them, so chrome can be ported before
-     step 5 lands and wired to the pack afterwards.
-5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
+   - DONE: `chrome.rs`, with the `colors` block and the string table it
+     needs. The frame bitmap has a TRANSPARENT interior, so the status fill
+     and the middle strip are painted BEFORE it, not around it; a test
+     asserts that order. `draw_over` is C's `chrome_draw_with_status`: no
+     full-screen black, because it is drawn over a combat field that is
+     already painted.
+5. **Banner/template layer.** DONE, pulled forward because chrome needed it.
+   `Resources.strings` is a generic `group -> key -> text` map and
+   `shell/src/banner.rs` does the `%VAR%` substitution.
+   DIVERGENCE, deliberate: C declares ~250 strings as named struct fields
+   with one central table of compiled-in defaults, so nothing can be ported
+   until every default is transcribed. Here the DEFAULT lives at the call
+   site -- `chrome::DEFAULT_DAYS_LEFT` and friends -- so each view brings
+   only its own, and the behaviour is the same either way.
+   The formatter keeps C's exact edge cases, each with a test: an unknown
+   token is emitted verbatim rather than swallowed, `%%` is not a token, a
+   key must match WHOLE (not as a prefix), and a substituted value is never
+   rescanned.
+   The `strings` table keeps only string values, so a group that mixes shapes
+   (`villain_descriptions` holds objects) still yields its strings.
+   Still TODO: the views' own strings, which arrive with each view.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.
 7. **Prompts and the decision loop**, wiring to the engine's outcome enums.
 8. **Combat loop and rendering**, then `CombatTurnRecord` once its consumer

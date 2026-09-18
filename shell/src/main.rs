@@ -9,6 +9,8 @@
 
 pub mod anim;
 pub mod backend;
+pub mod banner;
+pub mod chrome;
 pub mod draw;
 pub mod font;
 pub mod layout;
@@ -21,14 +23,14 @@ use macroquad::prelude::{get_time, next_frame, Conf};
 
 use anim::HeroAnimator;
 use backend::Backend;
-use draw::{DrawList, Dst, Rect, Sprite};
+use chrome::{Chrome, StatusMode};
+use draw::DrawList;
 use layout::Layout;
 use map_render::MapScene;
 use openbounty_engine::fog::Fog;
 use openbounty_engine::game::Game;
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
-use palette::Pal;
 use present::Present;
 use sprites::SpriteCatalog;
 
@@ -98,9 +100,6 @@ async fn main() {
     let mut fog = Fog::new();
     fog.reveal(&map, game.position.x, game.position.y, 2);
 
-    // The chrome is still a placeholder; `chrome.rs` replaces it in the next
-    // slice, with the difficulty colours and banner strings the pack carries.
-    let chrome = placeholder_chrome(&layout, backend.palette());
     let has_idle = catalog.hero(draw::HeroAnim::Idle).is_present();
     // The hero has never stepped, because there is no input yet. He therefore
     // stands perfectly still, which is what the shipped pack should look like.
@@ -111,9 +110,14 @@ async fn main() {
     loop {
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
         list.clear();
-        for cmd in chrome.as_slice() {
-            list.push(cmd.clone());
+        Chrome {
+            layout: &layout,
+            palette: backend.palette(),
+            resources: &resources,
+            game: &game,
+            mode: StatusMode::Adventure,
         }
+        .draw(&mut list);
         MapScene {
             layout: &layout,
             catalog: &catalog,
@@ -130,36 +134,4 @@ async fn main() {
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;
     }
-}
-
-fn placeholder_chrome(layout: &Layout, palette: &palette::Palette) -> DrawList {
-    let mut list = DrawList::new();
-    list.rect(
-        Rect::new(0, 0, layout.screen_w, layout.screen_h),
-        palette.clr(Pal::Black),
-    );
-    list.rect(
-        Rect::new(
-            layout::STATUS_X,
-            layout::STATUS_Y,
-            layout.status_w(),
-            layout::STATUS_H,
-        ),
-        palette.clr(Pal::DCyan),
-    );
-    list.blit(
-        Sprite::HudBarStrip,
-        Dst::rect(0, layout::BAR_Y, layout.screen_w, layout::BAR_H),
-    );
-    list.blit(
-        Sprite::ChromeOverworld,
-        Dst::rect(0, 0, layout.screen_w, layout.screen_h),
-    );
-    list.text(
-        " Options / Controls / Days Left:900 ",
-        layout::STATUS_X + 1,
-        layout::STATUS_Y + 1,
-        palette.clr(Pal::White),
-    );
-    list
 }
