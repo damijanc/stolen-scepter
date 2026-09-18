@@ -19,9 +19,9 @@ use std::collections::HashMap;
 
 use macroquad::prelude::{
     clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
-    get_internal_gl, is_key_down, is_key_pressed, load_file, load_texture, screen_height,
-    screen_width, Color as MqColor, DrawTextureParams, FilterMode, KeyCode, Rect as MqRect,
-    Texture2D, Vec2,
+    get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed, load_file, load_texture,
+    screen_height, screen_width, Color as MqColor, DrawTextureParams, FilterMode, KeyCode,
+    Rect as MqRect, Texture2D, Vec2,
 };
 use openbounty_engine::resources::Resources;
 
@@ -422,5 +422,21 @@ impl KeySource for MacroquadKeys {
 
     fn down(&self, key: Key) -> bool {
         is_key_down(Self::code(key))
+    }
+
+    fn any_pressed(&self) -> bool {
+        get_keys_pressed().iter().any(|k| {
+            !matches!(
+                k,
+                KeyCode::LeftShift
+                    | KeyCode::RightShift
+                    | KeyCode::LeftControl
+                    | KeyCode::RightControl
+                    | KeyCode::LeftAlt
+                    | KeyCode::RightAlt
+                    | KeyCode::LeftSuper
+                    | KeyCode::RightSuper
+            )
+        })
     }
 }

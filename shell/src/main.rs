@@ -11,6 +11,7 @@ pub mod anim;
 pub mod backend;
 pub mod banner;
 pub mod chrome;
+pub mod dialog;
 pub mod draw;
 pub mod font;
 pub mod input;
@@ -26,17 +27,119 @@ use macroquad::prelude::{get_time, next_frame, Conf};
 use anim::HeroAnimator;
 use backend::{Backend, MacroquadKeys};
 use chrome::{Chrome, StatusMode};
+use dialog::Dialog;
 use draw::DrawList;
 use input::{Action, Key, KeySource};
 use layout::Layout;
 use map_render::MapScene;
 use openbounty_engine::fog::Fog;
-use openbounty_engine::game::Game;
+use openbounty_engine::game::{Game, GAME_ARMY_SLOTS};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
-use openbounty_engine::step::{consume_step, game_step_basic, spend_week, StepResult};
+use openbounty_engine::step::{
+    consume_step, game_step_basic, search_here, spend_week, SearchOutcome, StepInteraction,
+    StepResult,
+};
 use present::Present;
+use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
+
+/// Which decision a prompt answer resolves, porting C's `pending_flow`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum PendingFlow {
+    #[default]
+    None,
+    Search,
+    DismissArmy,
+    /// Confirming the dismissal of the LAST stack; a yes sends the hero home.
+    DismissLast,
+}
+
+/// Text C compiles in for the prompts and dialogs the shell opens. Kept
+/// verbatim; the pack overrides them under `strings.banners` and
+/// `strings.dialog_titles`.
+const DEFAULT_DT_SEARCH: &str = "Search...";
+const DEFAULT_BODY_SEARCH: &str = "It will take %DAYS% days to\nsearch this area.\nSearch?";
+const DEFAULT_DT_DISMISS_ARMY: &str = "Dismiss Army";
+const DEFAULT_BODY_DISMISS_PICK: &str = "Dismiss which troop?";
+const DEFAULT_DT_DISMISS_LAST: &str = "Dismiss last army";
+const DEFAULT_BODY_DISMISS_LAST: &str = "If you dismiss your last\n\
+    army, you will be sent back\n\
+    to the King in disgrace.\n\
+    Dismiss last army?";
+
+/// Route a prompt answer into the engine, porting the shell half of
+/// `shell_promptdispatch.c`. The engine cores are called directly rather than
+/// through a mirrored queue; each answer either mutates game state, opens a
+/// message dialog, or chains the next prompt.
+fn dispatch_answer(
+    game: &mut Game,
+    map: &mut Map,
+    fog: &mut Fog,
+    resources: &Resources,
+    answer: PromptResult,
+    pending: &mut PendingFlow,
+    prompt: &mut Prompt,
+    dialog: &mut Dialog,
+) {
+    match *pending {
+        PendingFlow::Search => {
+            *pending = PendingFlow::None;
+            if answer == PromptResult::Yes {
+                match search_here(game, resources) {
+                    SearchOutcome::Won => {
+                        // The win cartoon and screen are the end-game slice.
+                    }
+                    SearchOutcome::NothingFound { .. } => {
+                        dialog.open("", "Your search of this area has\nrevealed nothing.");
+                    }
+                    SearchOutcome::OutOfTime => {
+                        // game_over is now set; the lose screen is the
+                        // end-game slice.
+                    }
+                }
+            }
+        }
+        PendingFlow::DismissArmy => {
+            *pending = PendingFlow::None;
+            let slot = match answer {
+                PromptResult::One => Some(0),
+                PromptResult::Two => Some(1),
+                PromptResult::Three => Some(2),
+                PromptResult::Four => Some(3),
+                PromptResult::Five => Some(4),
+                _ => None,
+            };
+            if let Some(slot) = slot {
+                // True means this was the last stack: nothing is dismissed yet,
+                // and the caller must confirm the disgrace.
+                if game.dismiss_army_slot(slot) {
+                    let body = banner::text(
+                        resources,
+                        "banners",
+                        "body_dismiss_last",
+                        DEFAULT_BODY_DISMISS_LAST,
+                    );
+                    let header = banner::text(
+                        resources,
+                        "dialog_titles",
+                        "dismiss_last",
+                        DEFAULT_DT_DISMISS_LAST,
+                    );
+                    prompt.yes_no(header, body);
+                    *pending = PendingFlow::DismissLast;
+                }
+            }
+        }
+        PendingFlow::DismissLast => {
+            *pending = PendingFlow::None;
+            if answer == PromptResult::Yes {
+                game.temp_death(resources, map, fog);
+            }
+        }
+        PendingFlow::None => {}
+    }
+}
 
 fn window_conf() -> Conf {
     // The real size needs the pack's geometry, which is not loaded yet, so
@@ -111,11 +214,43 @@ async fn main() {
     // Ctrl+Q arms a status-bar prompt rather than a dialog, which is why
     // chrome has a mode for it.
     let mut fast_quit = false;
+    // The modal layers: one prompt and one dialog at a time, mirroring C's
+    // single-slot prompt and dialog globals.
+    let mut prompt = Prompt::default();
+    let mut dialog = Dialog::default();
+    let mut pending = PendingFlow::None;
 
     loop {
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
 
-        if fast_quit {
+        // Input priority: the message dialog owns the keys while it is open
+        // (C's issue #19 gate), then the prompt, then the fast-quit status
+        // prompt, then the overworld.
+        if dialog.is_active() {
+            let ctrl = keys.down(Key::LeftControl) || keys.down(Key::RightControl);
+            if ctrl && keys.pressed(Key::Q) {
+                return;
+            }
+            if keys.any_pressed() {
+                if !dialog.advance() {
+                    dialog.dismiss();
+                }
+            }
+        } else if prompt.is_active() {
+            let answer = prompt.update(&keys);
+            if answer != PromptResult::None {
+                dispatch_answer(
+                    &mut game,
+                    &mut map,
+                    &mut fog,
+                    &resources,
+                    answer,
+                    &mut pending,
+                    &mut prompt,
+                    &mut dialog,
+                );
+            }
+        } else if fast_quit {
             // The prompt is modal: nothing else reads input until it is
             // answered.
             if keys.pressed(Key::Y) {
@@ -142,9 +277,44 @@ async fn main() {
                     consume_step(&mut game, &resources, false);
                 }
                 Action::FastQuit => fast_quit = true,
+                Action::Search => {
+                    let days = resources.tuning.search_cost_days.to_string();
+                    let body = banner::formatted(
+                        &resources,
+                        "banners",
+                        "body_search",
+                        DEFAULT_BODY_SEARCH,
+                        &[("DAYS", &days)],
+                    );
+                    let header =
+                        banner::text(&resources, "dialog_titles", "search", DEFAULT_DT_SEARCH);
+                    prompt.yes_no(header, &body);
+                    pending = PendingFlow::Search;
+                }
+                Action::DismissArmy => {
+                    let occupied = (0..GAME_ARMY_SLOTS)
+                        .filter(|&i| !game.army[i].id.is_empty() && game.army[i].count > 0)
+                        .count();
+                    if occupied > 0 {
+                        let body = banner::text(
+                            &resources,
+                            "banners",
+                            "body_dismiss_pick",
+                            DEFAULT_BODY_DISMISS_PICK,
+                        );
+                        let header = banner::text(
+                            &resources,
+                            "dialog_titles",
+                            "dismiss_army",
+                            DEFAULT_DT_DISMISS_ARMY,
+                        );
+                        prompt.numeric(header, body, GAME_ARMY_SLOTS as i32);
+                        pending = PendingFlow::DismissArmy;
+                    }
+                }
                 Action::None => {}
-                // Views, prompts and saving all need layers that do not
-                // exist yet. Say so rather than swallowing the key.
+                // Views and saving still need layers that do not exist yet.
+                // Say so rather than swallowing the key.
                 other => println!("{other:?} is not wired up yet"),
             }
 
@@ -156,8 +326,10 @@ async fn main() {
                     // The clock the hero animates on: he walks for a moment
                     // after each step, then holds still.
                     last_step = Some(get_time());
-                    if *interaction != openbounty_engine::step::StepInteraction::None {
-                        println!("{interaction:?}");
+                    match interaction {
+                        StepInteraction::Sign { title, body, .. } => dialog.open(title, body),
+                        StepInteraction::None => {}
+                        other => println!("{other:?}"),
                     }
                 }
             }
@@ -188,6 +360,16 @@ async fn main() {
             moving: hero_anim.moving(),
         }
         .draw(&mut list);
+
+        // The prompt replaces the bottom frame; the dialog draws LAST so it
+        // covers a prompt that is up at the same time, exactly as C's overlay
+        // orders them.
+        if prompt.is_active() {
+            prompt.draw(&mut list, &layout, backend.palette(), &resources);
+        }
+        if dialog.is_active() {
+            dialog.draw(&mut list, &layout, backend.palette());
+        }
 
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;

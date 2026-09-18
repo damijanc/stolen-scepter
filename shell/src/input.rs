@@ -110,6 +110,10 @@ pub const NUMPAD_DIGITS: [Key; 10] = [
 pub trait KeySource {
     fn pressed(&self, key: Key) -> bool;
     fn down(&self, key: Key) -> bool;
+    /// True when any non-modifier key went down this frame. The message
+    /// dialog advances on "any key", porting C's `ui_any_key_pressed`, which
+    /// skips the shift/control/alt/super modifiers and the lock keys.
+    fn any_pressed(&self) -> bool;
 }
 
 /// What a keypress asks for, porting `InputAction`.
@@ -264,6 +268,14 @@ impl KeySource for Keys {
     fn down(&self, key: Key) -> bool {
         self.down.contains(&key)
     }
+
+    fn any_pressed(&self) -> bool {
+        // The control modifiers are the only modifier keys in this
+        // vocabulary, so they are all `any_pressed` skips.
+        self.pressed
+            .iter()
+            .any(|k| !matches!(k, Key::LeftControl | Key::RightControl))
+    }
 }
 
 #[cfg(test)]
@@ -370,5 +382,16 @@ mod tests {
     fn an_unbound_key_does_nothing() {
         let state = poll_keys(&[Key::Escape]);
         assert_eq!(state, InputState::default());
+    }
+
+    #[test]
+    fn any_pressed_skips_the_control_modifiers() {
+        assert!(Keys::pressed(&[Key::A]).any_pressed());
+        assert!(Keys::pressed(&[Key::Enter]).any_pressed());
+        // A modifier alone is not "any key", the way C's ui_any_key_pressed
+        // skips them.
+        assert!(!Keys::pressed(&[Key::LeftControl]).any_pressed());
+        assert!(!Keys::pressed(&[Key::RightControl]).any_pressed());
+        assert!(!Keys::default().any_pressed());
     }
 }
