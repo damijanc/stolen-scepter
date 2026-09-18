@@ -34,7 +34,7 @@ use input::{Action, Key, KeySource};
 use layout::Layout;
 use map_render::MapScene;
 use openbounty_engine::fog::Fog;
-use openbounty_engine::game::{Game, GAME_ARMY_SLOTS};
+use openbounty_engine::game::{Game, TravelMode, GAME_ARMY_SLOTS};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
 use openbounty_engine::step::{
@@ -46,7 +46,7 @@ use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 enum PendingFlow {
     #[default]
     None,
@@ -61,6 +61,10 @@ enum PendingFlow {
     },
     /// The Archmage Aurange offer to teach magic for gold.
     Alcove,
+    /// Sail to a discovered neighbor continent; the ids are pending.
+    Navigate {
+        zones: Vec<String>,
+    },
 }
 
 /// Text C compiles in for the prompts and dialogs the shell opens. Kept
@@ -90,9 +94,9 @@ fn dispatch_answer(
     prompt: &mut Prompt,
     dialog: &mut Dialog,
 ) {
-    match *pending {
+    let flow = std::mem::take(pending);
+    match flow {
         PendingFlow::Search => {
-            *pending = PendingFlow::None;
             if answer == PromptResult::Yes {
                 match search_here(game, resources) {
                     SearchOutcome::Won => {
@@ -109,7 +113,6 @@ fn dispatch_answer(
             }
         }
         PendingFlow::DismissArmy => {
-            *pending = PendingFlow::None;
             let slot = match answer {
                 PromptResult::One => Some(0),
                 PromptResult::Two => Some(1),
@@ -140,13 +143,11 @@ fn dispatch_answer(
             }
         }
         PendingFlow::DismissLast => {
-            *pending = PendingFlow::None;
             if answer == PromptResult::Yes {
                 game.temp_death(resources, map, fog);
             }
         }
         PendingFlow::ChestChoice { gold, leadership } => {
-            *pending = PendingFlow::None;
             match answer {
                 // A = gold, B = distribute to the peasants for leadership.
                 PromptResult::One => game.accept_chest_gold(gold),
@@ -155,7 +156,6 @@ fn dispatch_answer(
             }
         }
         PendingFlow::Alcove => {
-            *pending = PendingFlow::None;
             if answer == PromptResult::Yes {
                 if game.accept_alcove(map, resources) {
                     let (header, body) = interact::alcove_taught(resources);
@@ -163,6 +163,23 @@ fn dispatch_answer(
                 } else {
                     let (header, body) = interact::alcove_no_gold(resources);
                     dialog.open(&header, &body);
+                }
+            }
+        }
+        PendingFlow::Navigate { zones } => {
+            let index = match answer {
+                PromptResult::One => Some(0),
+                PromptResult::Two => Some(1),
+                PromptResult::Three => Some(2),
+                PromptResult::Four => Some(3),
+                PromptResult::Five => Some(4),
+                _ => None,
+            };
+            if let Some(target) = index.and_then(|i| zones.get(i)) {
+                if game.switch_zone(resources, map, fog, target) {
+                    spend_week(game, resources);
+                } else {
+                    dialog.open("", "Cannot reach that continent.");
                 }
             }
         }
@@ -339,6 +356,24 @@ async fn main() {
                         );
                         prompt.numeric(header, body, GAME_ARMY_SLOTS as i32);
                         pending = PendingFlow::DismissArmy;
+                    }
+                }
+                Action::NewContinent => {
+                    if game.travel_mode != TravelMode::Boat {
+                        let (header, body) = interact::must_be_sailing(&resources);
+                        dialog.open(&header, &body);
+                    } else {
+                        let targets = interact::navigate_targets(&resources, &game);
+                        if targets.is_empty() {
+                            let (header, body) = interact::no_continents(&resources);
+                            dialog.open(&header, &body);
+                        } else {
+                            let (header, body) = interact::navigate_body(&resources, &targets);
+                            prompt.numeric(&header, &body, targets.len() as i32);
+                            pending = PendingFlow::Navigate {
+                                zones: targets.into_iter().map(|(id, _)| id).collect(),
+                            };
+                        }
                     }
                 }
                 Action::None => {}

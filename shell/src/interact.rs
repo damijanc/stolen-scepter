@@ -10,7 +10,7 @@
 //! Nothing here touches a graphics library, so the outcome-to-text mapping is
 //! testable headlessly the way the engine's combat digests are.
 
-use openbounty_engine::game::{ChestOutcome, ChestRoll};
+use openbounty_engine::game::{ChestOutcome, ChestRoll, Game};
 use openbounty_engine::resources::Resources;
 use openbounty_engine::step::StepInteraction;
 
@@ -80,6 +80,13 @@ const DEFAULT_ALCOVE_TAUGHT: &str = "Aurange teaches you the\n\
 const DEFAULT_ALCOVE_NO_GOLD: &str = "You have not enough gold!\n\
     %COST% is required.\n\
     Begone until you do!";
+
+/// Navigation banners, used when the hero sails to another continent.
+const DEFAULT_BODY_MUST_BE_SAILING: &str =
+    "You must be sailing to\nnavigate to another\ncontinent.";
+const DEFAULT_BODY_NO_CONTINENTS: &str = "No known continents from\nthis zone.";
+const DEFAULT_BODY_NAVIGATE_ROW: &str = "%INDEX%. %ZONE%\n";
+const DEFAULT_DT_NAVIGATE: &str = "Go to which continent?";
 
 /// The dialog (header, body) for a one-shot pick-up, or `None` when the
 /// interaction is not a plain message.
@@ -295,10 +302,86 @@ pub fn alcove_no_gold(resources: &Resources) -> (String, String) {
     (header, body)
 }
 
+/// The discovered neighbor zones the hero can sail to, as `(id, name)` pairs
+/// in pack order. C caps the list at five, the numeric prompt's ceiling.
+pub fn navigate_targets(resources: &Resources, game: &Game) -> Vec<(String, String)> {
+    let Some(current) = resources.zone_by_id(game.position.zone.as_str()) else {
+        return Vec::new();
+    };
+    let mut targets = Vec::new();
+    for slot in 0..current.neighbor_count {
+        let neighbor_id = current.neighbors[slot].as_str();
+        let Some(neighbor) = resources.zone_by_id(neighbor_id) else {
+            continue;
+        };
+        let Some(index) = resources.zone_index_by_id(neighbor_id) else {
+            continue;
+        };
+        if index >= game.world.zones_discovered.len() || !game.world.zones_discovered[index] {
+            continue;
+        }
+        if targets.len() >= 5 {
+            break;
+        }
+        let name = if neighbor.name.is_empty() {
+            neighbor.id.as_str()
+        } else {
+            neighbor.name.as_str()
+        };
+        targets.push((neighbor_id.to_owned(), name.to_owned()));
+    }
+    targets
+}
+
+/// The numbered body listing the sailable continents, and the prompt title.
+pub fn navigate_body(resources: &Resources, targets: &[(String, String)]) -> (String, String) {
+    let mut body = String::new();
+    for (index, (_, name)) in targets.iter().enumerate() {
+        body.push_str(&banner::formatted(
+            resources,
+            "banners",
+            "body_navigate_row",
+            DEFAULT_BODY_NAVIGATE_ROW,
+            &[("INDEX", &(index + 1).to_string()), ("ZONE", name)],
+        ));
+    }
+    let header =
+        banner::text(resources, "dialog_titles", "navigate", DEFAULT_DT_NAVIGATE).to_owned();
+    (header, body)
+}
+
+/// The "you must be sailing" refusal, shown without a header.
+pub fn must_be_sailing(resources: &Resources) -> (String, String) {
+    (
+        String::new(),
+        banner::text(
+            resources,
+            "banners",
+            "body_must_be_sailing",
+            DEFAULT_BODY_MUST_BE_SAILING,
+        )
+        .to_owned(),
+    )
+}
+
+/// The "no known continents" refusal, shown without a header.
+pub fn no_continents(resources: &Resources) -> (String, String) {
+    (
+        String::new(),
+        banner::text(
+            resources,
+            "banners",
+            "body_no_continents",
+            DEFAULT_BODY_NO_CONTINENTS,
+        )
+        .to_owned(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openbounty_engine::game::{ChestOutcome, ChestRoll};
+    use openbounty_engine::game::{ChestOutcome, ChestRoll, Game};
     use openbounty_engine::step::StepInteraction;
 
     fn resources(zones: &str) -> Resources {
@@ -537,5 +620,37 @@ mod tests {
         let (al_header, al_body) = alcove_already(&resources);
         assert!(al_header.is_empty());
         assert!(al_body.contains("already know magic"));
+    }
+
+    #[test]
+    fn navigate_targets_lists_only_discovered_neighbors() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "zones": [
+                  {"id":"home","neighbors":["away","far","undiscovered"]},
+                  {"id":"away","name":"Forestria"},
+                  {"id":"far","name":"Saharia"},
+                  {"id":"undiscovered"}
+                ]}"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[1] = true;
+        game.world.zones_discovered[2] = true;
+
+        let targets = navigate_targets(&resources, &game);
+        assert_eq!(
+            targets,
+            vec![
+                ("away".to_owned(), "Forestria".to_owned()),
+                ("far".to_owned(), "Saharia".to_owned()),
+            ]
+        );
+
+        let (header, body) = navigate_body(&resources, &targets);
+        assert_eq!(header, "Go to which continent?");
+        assert!(body.contains("1. Forestria"));
+        assert!(body.contains("2. Saharia"));
     }
 }
