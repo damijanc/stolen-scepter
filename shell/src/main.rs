@@ -15,6 +15,7 @@ pub mod dialog;
 pub mod draw;
 pub mod font;
 pub mod input;
+pub mod interact;
 pub mod layout;
 pub mod map_render;
 pub mod palette;
@@ -329,7 +330,15 @@ async fn main() {
                     match interaction {
                         StepInteraction::Sign { title, body, .. } => dialog.open(title, body),
                         StepInteraction::None => {}
-                        other => println!("{other:?}"),
+                        other => {
+                            if let Some((header, body)) =
+                                interact::pickup_message(&resources, other)
+                            {
+                                dialog.open(&header, &body);
+                            } else {
+                                println!("{other:?}");
+                            }
+                        }
                     }
                 }
             }
