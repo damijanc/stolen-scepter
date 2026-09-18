@@ -369,9 +369,9 @@ fn resolve_interaction(
             }
         }
         Interact::Alcove => {
-            game.stats.knows_magic = true;
-            consume_tile(game, map, zone.as_str(), x, y);
-            game.consume_magic_alcoves(resources);
+            // The offer is the shell's to make: magic is granted only when the
+            // player accepts and pays, porting `flow_apply_alcove`. C also
+            // bounces the hero off the tile, but this engine never bounces.
             StepInteraction::Alcove
         }
         Interact::Orb => {
@@ -1263,8 +1263,10 @@ mod tests {
             StepInteraction::Alcove
         );
         assert!(game.position.dwelling_troop.is_empty());
-        assert!(game.stats.knows_magic);
-        assert_consumed(&game, &map, "home", 7, 0);
+        // The alcove only OFFERS magic: the tile stays until the offer is
+        // accepted and paid, so the step neither grants nor consumes it.
+        assert!(!game.stats.knows_magic);
+        assert!(!game.is_consumed("home", 7, 0));
 
         assert_eq!(
             move_interaction(&mut game, &mut map, &resources),

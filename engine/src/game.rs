@@ -890,13 +890,30 @@ impl Game {
         }
     }
 
+    /// Accept the alcove offer: pay the cost, learn magic, and clear the tile.
+    /// Ports the success branch of `flow_apply_alcove`. Returns true when magic
+    /// was granted; false when the hero cannot afford the cost, in which case
+    /// nothing changes and the tile stays (C reports the no-gold message).
+    pub fn accept_alcove(&mut self, map: &mut Map, resources: &Resources) -> bool {
+        let cost = resources.economy.alcove_cost;
+        if self.stats.gold < cost {
+            return false;
+        }
+        self.stats.gold -= cost;
+        self.stats.knows_magic = true;
+        let (x, y) = (self.position.x, self.position.y);
+        let zone = self.position.zone.as_str().to_owned();
+        map.clear_interactive(x, y);
+        self.add_consumed(&zone, x, y);
+        true
+    }
+
     pub fn claim_artifact_by_id(&mut self, resources: &Resources, id: &str) -> bool {
         let Some(artifact) = resources.artifact_by_id(id) else {
             return false;
         };
         self.claim_artifact(resources, artifact.index)
     }
-
     pub fn claim_artifact(&mut self, resources: &Resources, index: i32) -> bool {
         if index < 0 || index as usize >= CAT_ARTIFACTS_MAX {
             return false;
@@ -5963,6 +5980,41 @@ mod tests {
         let mut mundane_game = Game::default();
         mundane_game.init_seeded_with_resources(&resources, Some("knight"), 1, 0, 42);
         assert_eq!(mundane_game.consumed_count, 0);
+    }
+
+    #[test]
+    fn accept_alcove_pays_and_grants_magic_or_refuses_without_gold() {
+        let resources =
+            Resources::from_json_str(r#"{"economy": {"alcove_cost": 500}, "troops": []}"#)
+                .expect("fixture parses");
+        let mut map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::interactive(Interact::Alcove), Tile::plain_grass()],
+        )
+        .expect("fixture dimensions match");
+
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.position.x = 0;
+        game.position.y = 0;
+
+        // Too poor: nothing changes, and the tile is not consumed.
+        game.stats.gold = 0;
+        assert!(!game.accept_alcove(&mut map, &resources));
+        assert!(!game.stats.knows_magic);
+        assert_eq!(game.stats.gold, 0);
+        assert_eq!(
+            map.tile(0, 0).map(|t| t.interactive),
+            Some(Interact::Alcove)
+        );
+
+        game.stats.gold = 1_000;
+        assert!(game.accept_alcove(&mut map, &resources));
+        assert!(game.stats.knows_magic);
+        assert_eq!(game.stats.gold, 500);
+        assert!(game.is_consumed("home", 0, 0));
+        assert_eq!(map.tile(0, 0).map(|t| t.interactive), Some(Interact::None));
     }
 
     #[test]

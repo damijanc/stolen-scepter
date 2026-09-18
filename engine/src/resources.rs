@@ -455,6 +455,7 @@ impl Default for ResScoring {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResEconomy {
+    pub alcove_cost: i32,
     pub boat_cost_normal: i32,
     pub boat_cost_cheap: i32,
     pub siege_cost: i32,
@@ -465,6 +466,7 @@ pub struct ResEconomy {
 impl Default for ResEconomy {
     fn default() -> Self {
         Self {
+            alcove_cost: 5_000,
             boat_cost_normal: 500,
             boat_cost_cheap: 100,
             siege_cost: 3_000,
@@ -1195,6 +1197,8 @@ impl Resources {
             optional_i32_field(economy, "boat_cost_cheap", self.economy.boat_cost_cheap)?;
         self.economy.siege_cost =
             optional_i32_field(economy, "siege_cost", self.economy.siege_cost)?;
+        self.economy.alcove_cost =
+            optional_i32_field(economy, "alcove_cost", self.economy.alcove_cost)?;
         if let Some(scoring) = economy.get("scoring") {
             // C guards the block with cJSON_IsObject and skips a non-object
             // silently, leaving the canonical defaults in place.
