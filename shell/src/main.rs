@@ -54,6 +54,11 @@ enum PendingFlow {
     DismissArmy,
     /// Confirming the dismissal of the LAST stack; a yes sends the hero home.
     DismissLast,
+    /// A chest offered a gold/leadership choice; the amounts are pending.
+    ChestChoice {
+        gold: i32,
+        leadership: i32,
+    },
 }
 
 /// Text C compiles in for the prompts and dialogs the shell opens. Kept
@@ -136,6 +141,15 @@ fn dispatch_answer(
             *pending = PendingFlow::None;
             if answer == PromptResult::Yes {
                 game.temp_death(resources, map, fog);
+            }
+        }
+        PendingFlow::ChestChoice { gold, leadership } => {
+            *pending = PendingFlow::None;
+            match answer {
+                // A = gold, B = distribute to the peasants for leadership.
+                PromptResult::One => game.accept_chest_gold(gold),
+                PromptResult::Two => game.accept_chest_leadership(leadership),
+                _ => {}
             }
         }
         PendingFlow::None => {}
@@ -329,6 +343,19 @@ async fn main() {
                     last_step = Some(get_time());
                     match interaction {
                         StepInteraction::Sign { title, body, .. } => dialog.open(title, body),
+                        StepInteraction::TreasureChest { roll, .. } => {
+                            if let Some(body) = interact::chest_choice(&resources, roll) {
+                                prompt.ab("", &body);
+                                pending = PendingFlow::ChestChoice {
+                                    gold: roll.pending.pending_gold,
+                                    leadership: roll.pending.pending_leadership,
+                                };
+                            } else if let Some((header, body)) =
+                                interact::chest_message(&resources, roll)
+                            {
+                                dialog.open(&header, &body);
+                            }
+                        }
                         StepInteraction::None => {}
                         other => {
                             if let Some((header, body)) =
