@@ -6,6 +6,7 @@ pub mod font;
 pub mod layout;
 pub mod palette;
 pub mod present;
+pub mod sprites;
 
 fn main() {
     println!("OpenBounty Rust shell stub: renderer backend not wired up yet.");

@@ -285,9 +285,27 @@ including `resources_format_template` and its `%VAR%` substitution.
      backend's job, via `requested_window_size`. Growing the window is the
      point of the control: clamping the choice to what already fits made
      every option collapse to the current scale.
-   - TODO: the macroquad backend itself. Window, texture load, the font strip
-     with its four twirl-glyph patches (`font::TWIRL_GLYPHS`), input mapping,
-     and a `DrawList` executor.
+   - DONE: the sprite catalog (`shell/src/sprites.rs`), porting `sprites.c`.
+     It stops one step short of C and produces PATHS, so catalog indices,
+     animation cycles, facings and fallbacks are all pure and testable with
+     no graphics library present. This IS the catalog the draw vocabulary
+     deferred in step 2: `frame_index` (tick -> cycle), `AnimPaths::frame`
+     (authored facing vs mirrored single strip) and
+     `SpriteCatalog::troop_frame` (animated else still).
+     The `ending` block is parsed too, since the victory-cartoon tiles come
+     from it rather than from `sprites`.
+     Verified on the shipped pack: 337 paths named, ZERO missing on disk,
+     including all 68 derived villain frames -- so the `_NN.png`
+     stem-stripping rule is right against real files. The 43 sprites that
+     name nothing are all accounted for: no hero idle, view icons 12-13 are
+     empty by C's own comment, `orb` is empty in the pack, and the HUD
+     animations declare 4 frames so 4..7 correctly name none.
+   - TODO: the macroquad backend itself. Window, texture load (feed it what
+     the catalog names), the font strip with its four twirl-glyph patches
+     (`font::TWIRL_GLYPHS`), input mapping, and a `DrawList` executor.
+     NOTE: `shell` is a BIN-only crate, so an integration test under
+     `shell/tests/` cannot link it. Either keep shell tests as unit tests or
+     split out a `lib.rs` when one is first needed.
 4. **Chrome + map viewport.** First thing actually on screen.
 5. **Banner/template layer.** `strings` parsing and `%VAR%` substitution.
 6. **Views.** Town, castle, dwelling, alcove, contract, army, spells, puzzle.

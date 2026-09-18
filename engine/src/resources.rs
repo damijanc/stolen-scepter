@@ -154,6 +154,46 @@ impl Default for ResSprites {
     }
 }
 
+/// The victory cartoon: its four tile images and the parameters that animate
+/// them. The tiles are sized to one map cell, so the cartoon lines up with
+/// the viewport.
+///
+/// The numeric defaults come from the original's `display_cartoon` and are
+/// installed even when the block is absent, so a pack that overrides only the
+/// tile paths still animates correctly.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResEnding {
+    pub grass_tile: FixedStr<RES_PATH_LEN>,
+    pub carpet_tile: FixedStr<RES_PATH_LEN>,
+    pub hero_tile: FixedStr<RES_PATH_LEN>,
+    pub throne_backdrop: FixedStr<RES_PATH_LEN>,
+    pub grid_width: i32,
+    pub grid_height: i32,
+    pub carpet_column: i32,
+    pub carpet_length: i32,
+    pub frame_count: i32,
+    pub ticks_per_step: i32,
+    pub troop_border: bool,
+}
+
+impl Default for ResEnding {
+    fn default() -> Self {
+        Self {
+            grass_tile: FixedStr::empty(),
+            carpet_tile: FixedStr::empty(),
+            hero_tile: FixedStr::empty(),
+            throne_backdrop: FixedStr::empty(),
+            grid_width: 6,
+            grid_height: 5,
+            carpet_column: 4,
+            carpet_length: 5,
+            frame_count: 10,
+            ticks_per_step: 2,
+            troop_border: true,
+        }
+    }
+}
+
 /// The battle art the C shell carried as a static array before a pack could
 /// name its own. Installed before parsing, so a pack that declares no
 /// `sprites.combat` still gets a full tileset.
@@ -718,6 +758,7 @@ pub struct Resources {
     /// plus the path tables. `Resources` is built inline, so an unboxed one
     /// overflows the stack.
     pub sprites: Box<ResSprites>,
+    pub ending: ResEnding,
     pub tuning: ResTuning,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
@@ -755,6 +796,7 @@ impl Default for Resources {
             economy: ResEconomy::default(),
             render: ResRender::default(),
             sprites: Box::new(ResSprites::default()),
+            ending: ResEnding::default(),
             tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
@@ -804,6 +846,7 @@ impl Resources {
         resources.parse_economy(&root)?;
         resources.parse_render(&root)?;
         resources.parse_sprites(&root);
+        resources.parse_ending(&root);
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
@@ -889,11 +932,21 @@ impl Resources {
     }
 
     pub fn resolve_map_path(&self, zone: &ResZone) -> Option<std::path::PathBuf> {
-        let raw = zone.map_path.as_str();
-        if raw.is_empty() {
+        self.resolve_path(zone.map_path.as_str())
+    }
+
+    /// Turn a pack-relative path into one that can be opened, porting
+    /// `resources_resolve_path`. An empty path is nothing to open.
+    ///
+    /// In C this is an identity copy, because a pack-relative path resolves
+    /// against the global pack stack. Here there is no such stack, so it joins
+    /// the directory the pack was loaded from -- which is why a pack loaded
+    /// from a string rather than a file resolves nothing.
+    pub fn resolve_path(&self, relative: &str) -> Option<std::path::PathBuf> {
+        if relative.is_empty() {
             return None;
         }
-        let path = std::path::Path::new(raw);
+        let path = std::path::Path::new(relative);
         if path.is_absolute() || self.resource_root.is_empty() {
             Some(path.to_path_buf())
         } else {
@@ -1135,6 +1188,38 @@ impl Resources {
     ///
     /// The viewport validation (odd axes, minimum sizes) moves with it, for
     /// the same reason.
+    /// Read the victory cartoon's art and parameters, porting `parse_ending`.
+    /// Infallible, like the sprite manifest: the defaults stand for anything
+    /// the pack leaves out or mis-types.
+    fn parse_ending(&mut self, root: &serde_json::Value) {
+        self.ending = ResEnding::default();
+        let Some(obj) = root.get("ending").filter(|v| v.is_object()) else {
+            return;
+        };
+        for (key, slot) in [
+            ("grass_tile", &mut self.ending.grass_tile),
+            ("carpet_tile", &mut self.ending.carpet_tile),
+            ("hero_tile", &mut self.ending.hero_tile),
+            ("throne_backdrop", &mut self.ending.throne_backdrop),
+        ] {
+            slot.copy_from_str(json_str_or(obj, key, ""));
+        }
+        let int = |key: &str, fallback: i32| {
+            obj.get(key)
+                .and_then(serde_json::Value::as_i64)
+                .map_or(fallback, |v| v as i32)
+        };
+        self.ending.grid_width = int("grid_width", self.ending.grid_width);
+        self.ending.grid_height = int("grid_height", self.ending.grid_height);
+        self.ending.carpet_column = int("carpet_column", self.ending.carpet_column);
+        self.ending.carpet_length = int("carpet_length", self.ending.carpet_length);
+        self.ending.frame_count = int("frame_count", self.ending.frame_count);
+        self.ending.ticks_per_step = int("ticks_per_step", self.ending.ticks_per_step);
+        if let Some(border) = obj.get("troop_border").and_then(serde_json::Value::as_bool) {
+            self.ending.troop_border = border;
+        }
+    }
+
     /// Read the role-fixed art manifest, porting `parse_sprites`.
     ///
     /// Infallible on purpose, as C's is: every entry is optional presentation
