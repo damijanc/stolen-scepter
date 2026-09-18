@@ -64,6 +64,23 @@ const DEFAULT_CHEST_NEW_SPELL: &str = "You have captured a\n\
        %COUNT% %SPELL% spell.";
 const DEFAULT_CHEST_EMPTY: &str = "The chest was empty!";
 
+/// The Archmage Aurange alcove offer and its results. The pack overrides them
+/// under `strings.banners` / `strings.dialog_titles`.
+const DEFAULT_DT_ALCOVE_OFFER: &str = "Archmage Aurange";
+const DEFAULT_DT_ALCOVE_RESULT: &str = "Aurange";
+const DEFAULT_ALCOVE_OFFER: &str = "The venerable Archmage,\n\
+    Aurange, will teach you the\n\
+    secrets of spell casting for\n\
+    %COST% gold.\n\n\
+    Accept?";
+const DEFAULT_ALCOVE_ALREADY: &str = "The archmage nods.\nYou already know magic.";
+const DEFAULT_ALCOVE_TAUGHT: &str = "Aurange teaches you the\n\
+    arcane arts. You now know\n\
+    the ways of magic.";
+const DEFAULT_ALCOVE_NO_GOLD: &str = "You have not enough gold!\n\
+    %COST% is required.\n\
+    Begone until you do!";
+
 /// The dialog (header, body) for a one-shot pick-up, or `None` when the
 /// interaction is not a plain message.
 pub fn pickup_message(
@@ -208,6 +225,74 @@ pub fn chest_message(resources: &Resources, roll: &ChestRoll) -> Option<(String,
         _ => return None,
     };
     Some((String::new(), body))
+}
+
+/// The alcove offer, named after its archmage and quoting the cost.
+pub fn alcove_offer(resources: &Resources) -> (String, String) {
+    let header = banner::text(
+        resources,
+        "dialog_titles",
+        "alcove_offer",
+        DEFAULT_DT_ALCOVE_OFFER,
+    )
+    .to_owned();
+    let cost = resources.economy.alcove_cost.to_string();
+    let body = banner::formatted(
+        resources,
+        "banners",
+        "alcove_offer",
+        DEFAULT_ALCOVE_OFFER,
+        &[("COST", &cost)],
+    );
+    (header, body)
+}
+
+/// The "you already know magic" brush-off, shown without a header.
+pub fn alcove_already(resources: &Resources) -> (String, String) {
+    (
+        String::new(),
+        banner::text(
+            resources,
+            "banners",
+            "alcove_already",
+            DEFAULT_ALCOVE_ALREADY,
+        )
+        .to_owned(),
+    )
+}
+
+/// The success message after magic is granted.
+pub fn alcove_taught(resources: &Resources) -> (String, String) {
+    let header = banner::text(
+        resources,
+        "dialog_titles",
+        "alcove_result",
+        DEFAULT_DT_ALCOVE_RESULT,
+    )
+    .to_owned();
+    let body =
+        banner::text(resources, "banners", "alcove_taught", DEFAULT_ALCOVE_TAUGHT).to_owned();
+    (header, body)
+}
+
+/// The refusal when the hero cannot afford the cost.
+pub fn alcove_no_gold(resources: &Resources) -> (String, String) {
+    let header = banner::text(
+        resources,
+        "dialog_titles",
+        "alcove_result",
+        DEFAULT_DT_ALCOVE_RESULT,
+    )
+    .to_owned();
+    let cost = resources.economy.alcove_cost.to_string();
+    let body = banner::formatted(
+        resources,
+        "banners",
+        "alcove_no_gold",
+        DEFAULT_ALCOVE_NO_GOLD,
+        &[("COST", &cost)],
+    );
+    (header, body)
 }
 
 #[cfg(test)]
@@ -428,5 +513,29 @@ mod tests {
         assert_eq!(chest_choice(&resources, &roll), None);
         let (_, body) = chest_message(&resources, &roll).expect("a message");
         assert_eq!(body, "The chest was empty!");
+    }
+
+    #[test]
+    fn the_alcove_offer_quotes_the_cost() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [], "economy": {"alcove_cost": 5000},
+                "zones": [{"id":"home"}]}"#,
+        )
+        .expect("fixture parses");
+        let (header, body) = alcove_offer(&resources);
+        assert_eq!(header, "Archmage Aurange");
+        assert!(body.contains("5000 gold."));
+        assert!(body.ends_with("Accept?"));
+
+        // The taught, no-gold and already messages carry the result title.
+        let (th_header, th_body) = alcove_taught(&resources);
+        assert_eq!(th_header, "Aurange");
+        assert!(th_body.contains("the ways of magic"));
+        let (ng_header, ng_body) = alcove_no_gold(&resources);
+        assert_eq!(ng_header, "Aurange");
+        assert!(ng_body.contains("5000 is required"));
+        let (al_header, al_body) = alcove_already(&resources);
+        assert!(al_header.is_empty());
+        assert!(al_body.contains("already know magic"));
     }
 }

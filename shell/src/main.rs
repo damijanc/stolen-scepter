@@ -59,6 +59,8 @@ enum PendingFlow {
         gold: i32,
         leadership: i32,
     },
+    /// The Archmage Aurange offer to teach magic for gold.
+    Alcove,
 }
 
 /// Text C compiles in for the prompts and dialogs the shell opens. Kept
@@ -150,6 +152,18 @@ fn dispatch_answer(
                 PromptResult::One => game.accept_chest_gold(gold),
                 PromptResult::Two => game.accept_chest_leadership(leadership),
                 _ => {}
+            }
+        }
+        PendingFlow::Alcove => {
+            *pending = PendingFlow::None;
+            if answer == PromptResult::Yes {
+                if game.accept_alcove(map, resources) {
+                    let (header, body) = interact::alcove_taught(resources);
+                    dialog.open(&header, &body);
+                } else {
+                    let (header, body) = interact::alcove_no_gold(resources);
+                    dialog.open(&header, &body);
+                }
             }
         }
         PendingFlow::None => {}
@@ -354,6 +368,16 @@ async fn main() {
                                 interact::chest_message(&resources, roll)
                             {
                                 dialog.open(&header, &body);
+                            }
+                        }
+                        StepInteraction::Alcove => {
+                            if game.stats.knows_magic {
+                                let (header, body) = interact::alcove_already(&resources);
+                                dialog.open(&header, &body);
+                            } else {
+                                let (header, body) = interact::alcove_offer(&resources);
+                                prompt.yes_no(&header, &body);
+                                pending = PendingFlow::Alcove;
                             }
                         }
                         StepInteraction::None => {}
