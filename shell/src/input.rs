@@ -124,6 +124,10 @@ pub trait KeySource {
     /// dialog advances on "any key", porting C's `ui_any_key_pressed`, which
     /// skips the shift/control/alt/super modifiers and the lock keys.
     fn any_pressed(&self) -> bool;
+    /// The printable characters typed this frame, draining them like C's
+    /// `input_get_char_pressed`. Text entry (the new-game name) is the only
+    /// consumer.
+    fn chars_pressed(&self) -> Vec<char>;
 }
 
 /// What a keypress asks for, porting `InputAction`.
@@ -254,6 +258,7 @@ pub fn poll(keys: &dyn KeySource) -> InputState {
 pub struct Keys {
     pressed: BTreeSet<Key>,
     down: BTreeSet<Key>,
+    chars: Vec<char>,
 }
 
 impl Keys {
@@ -261,11 +266,18 @@ impl Keys {
         Self {
             pressed: keys.iter().copied().collect(),
             down: BTreeSet::new(),
+            chars: Vec::new(),
         }
     }
 
     pub fn with_held(mut self, keys: &[Key]) -> Self {
         self.down = keys.iter().copied().collect();
+        self
+    }
+
+    /// The printable characters this frame typed, as text entry would see them.
+    pub fn with_chars(mut self, chars: &[char]) -> Self {
+        self.chars = chars.to_vec();
         self
     }
 }
@@ -285,6 +297,10 @@ impl KeySource for Keys {
         self.pressed
             .iter()
             .any(|k| !matches!(k, Key::LeftControl | Key::RightControl))
+    }
+
+    fn chars_pressed(&self) -> Vec<char> {
+        self.chars.clone()
     }
 }
 

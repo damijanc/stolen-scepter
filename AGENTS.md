@@ -20,9 +20,10 @@ will be selected only after headless engine parity is solid.
   `present.rs` the integer-scale blit, `sprites.rs` the pack art a `Sprite`
   resolves to, `map_render.rs` the overworld viewport, `anim.rs` the hero's
   animation clock, `chrome.rs` the frame and status bar, `banner.rs` pack text
-  and its `%VAR%` substitution, and `input.rs` the key bindings. `backend.rs`
-  is the ONLY module that knows macroquad exists; keep it that way. Run it
-  with `cargo run -p openbounty-shell -- <path to game.json>`.
+  and its `%VAR%` substitution, `startup.rs` the pre-game wizard, and
+  `input.rs` the key bindings. `backend.rs` is the ONLY module that knows
+  macroquad exists; keep it that way. Run it with
+  `cargo run -p openbounty-shell -- [--seed <n>] <path to game.json>`.
 - `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
   decision and what was rejected, the legacy geometry, and the work order.
   READ THIS before touching the shell.
@@ -182,8 +183,15 @@ Implemented and tested:
   around a castle gate, never stack, and report the collision that triggers
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
+- The pre-game wizard (`shell/src/startup.rs`): class select, name entry and
+  the difficulty picker, then the new-game intro. It replaces the old
+  hardcoded hero; `--seed <n>` picks the catalog seed, and with no flag the
+  seed is derived from time + name + class as C does. `Resources` flattens
+  `strings.difficulty` into the generic string map so the picker can read the
+  pack's labels. NOT yet ported: the two splash screens, the credits screen,
+  the save picker, and the LOAD path (`L` on class select is inert).
 
-Test coverage is 342 engine unit tests, 239 shell unit tests, 25 combat digest
+Test coverage is 343 engine unit tests, 246 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
