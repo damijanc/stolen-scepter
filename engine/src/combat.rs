@@ -30,36 +30,23 @@ pub enum CombatResult {
     Loss = 1,
 }
 
-/// One structured line a combat action appended to the log, porting the
-/// strings `combat_log_template` writes. The engine records the DATA (troop
-/// indices, counts), not the text: a render-free crate must not format a
-/// `strings.combat_log` banner itself. A shell maps each event to its banner.
+/// One structured line a combat action appended to the log. The engine
+/// records DATA (troop indices, counts), never text: a render-free crate must
+/// not format a `strings.combat_log` banner. A shell maps each event to text.
+///
+/// Hits and the IMMUNE no-effect are NOT here: `combat_hit_unit` already
+/// returns the kill count (`-1` for IMMUNE), so the shell formats those at its
+/// own call sites. Only [`CombatEvent::Retaliate`] is emitted here, because it
+/// happens inside the recursive retaliation deep in `combat_deal_damage`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CombatEvent {
-    /// `melee_hit` / `ranged_hit`: attacker and target troop indices + kills.
-    Hit {
-        attacker: i32,
-        target: i32,
-        kills: i32,
-        ranged: bool,
-    },
-    /// `no_effect_msg`: an IMMUNE target shrugged the whole attack off.
-    NoEffect,
+    /// `retaliate`: the defender struck back, killing `kills` of the attacker.
+    Retaliate { target: i32, kills: i32 },
     /// `cloned` / `resurrected`: count + troop index.
     CountTroop {
         count: i32,
         troop: i32,
         resurrected: bool,
-    },
-    /// `teleported` / `cast_fireball` / `cast_lightning` / `cast_turn_undead`.
-    CastFireball,
-    CastLightning,
-    CastTurnUndead,
-    Teleported,
-    /// `immune` / `frozen`: troop index, and whether it froze.
-    Freeze {
-        troop: i32,
-        frozen: bool,
     },
 }
 
@@ -514,8 +501,9 @@ pub fn combat_reset_match(c: &mut Combat, resources: &Resources) {
     c.stacks_destroyed = 0;
 }
 
-/// Resolve one attack. Ports `combat_hit_unit`, recording the hit or the
-/// IMMUNE no-effect as a structured log event rather than a banner.
+/// Resolve one attack, returning the kill count (`-1` for an IMMUNE target).
+/// Ports `combat_hit_unit`; the banner is the shell's, so the count is left
+/// for the caller to turn into text.
 pub fn combat_hit_unit(
     c: &mut Combat,
     resources: &Resources,
@@ -527,7 +515,7 @@ pub fn combat_hit_unit(
 ) -> i32 {
     c.units[a_side][a_id].turn_count = c.units[a_side][a_id].count;
     c.units[t_side][t_id].turn_count = c.units[t_side][t_id].count;
-    let kills = combat_deal_damage(
+    combat_deal_damage(
         c,
         resources,
         a_side as i32,
@@ -538,21 +526,7 @@ pub fn combat_hit_unit(
         false,
         0,
         false,
-    );
-    if kills > 0 {
-        combat_log_event(
-            c,
-            CombatEvent::Hit {
-                attacker: c.units[a_side][a_id].troop_idx,
-                target: c.units[t_side][t_id].troop_idx,
-                kills,
-                ranged: is_ranged,
-            },
-        );
-    } else if kills == -1 {
-        combat_log_event(c, CombatEvent::NoEffect);
-    }
-    kills
+    )
 }
 
 /// Step one cell. Returns 0 (blocked), 1 (moved) or 2 (attacked).
@@ -1160,7 +1134,8 @@ pub fn combat_deal_damage(
                     && c.units[t_side][t_id].count > 0
                 {
                     c.units[t_side][t_id].retaliated = true;
-                    combat_deal_damage(
+                    let retaliator_troop = c.units[t_side][t_id].troop_idx;
+                    let retal_kills = combat_deal_damage(
                         c,
                         resources,
                         t_side as i32,
@@ -1172,6 +1147,15 @@ pub fn combat_deal_damage(
                         0,
                         true,
                     );
+                    if retal_kills > 0 {
+                        combat_log_event(
+                            c,
+                            CombatEvent::Retaliate {
+                                target: retaliator_troop,
+                                kills: retal_kills,
+                            },
+                        );
+                    }
                 }
             }
         }
@@ -2432,32 +2416,16 @@ pub fn spell_teleport(c: &mut Combat, from_side: usize, from_slot: usize, to_x: 
     unit.x = to_x;
     unit.y = to_y;
     c.umap[to_y as usize][to_x as usize] = pack_uid(from_side, from_slot);
-    combat_log_event(c, CombatEvent::Teleported);
 }
 
 /// Freeze a stack so it cannot act. Ports `spell_freeze`, which returns -1
 /// for an IMMUNE target and 1 otherwise.
 pub fn spell_freeze(c: &mut Combat, resources: &Resources, t_side: usize, t_slot: usize) -> i32 {
-    let troop_idx = c.units[t_side][t_slot].troop_idx;
-    let troop = resources.troop_by_index(troop_idx);
+    let troop = resources.troop_by_index(c.units[t_side][t_slot].troop_idx);
     if troop.is_some_and(|troop| troop.abilities & TROOP_ABIL_IMMUNE != 0) {
-        combat_log_event(
-            c,
-            CombatEvent::Freeze {
-                troop: troop_idx,
-                frozen: false,
-            },
-        );
         return -1;
     }
     c.units[t_side][t_slot].frozen = true;
-    combat_log_event(
-        c,
-        CombatEvent::Freeze {
-            troop: troop_idx,
-            frozen: true,
-        },
-    );
     1
 }
 
@@ -2549,9 +2517,8 @@ pub fn combat_cast_spell(
             spell_teleport(c, t_side, t_slot, dest_x, dest_y);
             true
         }
-        COMBAT_SPELL_FIREBALL => {
+        COMBAT_SPELL_FIREBALL | COMBAT_SPELL_LIGHTNING | COMBAT_SPELL_TURN_UNDEAD => {
             if target_immune {
-                combat_log_event(c, CombatEvent::NoEffect);
                 false
             } else {
                 spell_damage(
@@ -2559,41 +2526,8 @@ pub fn combat_cast_spell(
                     resources,
                     t_side,
                     t_slot,
-                    spell_damage_value(combat_spell_damage_base(COMBAT_SPELL_FIREBALL), sp),
+                    spell_damage_value(combat_spell_damage_base(spell_idx), sp),
                 );
-                combat_log_event(c, CombatEvent::CastFireball);
-                true
-            }
-        }
-        COMBAT_SPELL_LIGHTNING => {
-            if target_immune {
-                combat_log_event(c, CombatEvent::NoEffect);
-                false
-            } else {
-                spell_damage(
-                    c,
-                    resources,
-                    t_side,
-                    t_slot,
-                    spell_damage_value(combat_spell_damage_base(COMBAT_SPELL_LIGHTNING), sp),
-                );
-                combat_log_event(c, CombatEvent::CastLightning);
-                true
-            }
-        }
-        COMBAT_SPELL_TURN_UNDEAD => {
-            if target_immune {
-                combat_log_event(c, CombatEvent::NoEffect);
-                false
-            } else {
-                spell_damage(
-                    c,
-                    resources,
-                    t_side,
-                    t_slot,
-                    spell_damage_value(combat_spell_damage_base(COMBAT_SPELL_TURN_UNDEAD), sp),
-                );
-                combat_log_event(c, CombatEvent::CastTurnUndead);
                 true
             }
         }
@@ -3049,29 +2983,32 @@ mod spell_tests {
     }
 
     #[test]
-    fn a_connecting_hit_appends_a_hit_event() {
+    fn cloning_appends_a_count_troop_event() {
         let resources = spell_fixture();
-        let (mut c, _) = duel(0, 5); // peasants vs peasants: a kill lands.
-        let kills = combat_hit_unit(&mut c, &resources, 0, 0, 1, 0, false);
-        assert!(kills > 0);
+        let (mut c, _) = duel(0, 5);
+        spell_clone(&mut c, &resources, 0, 0, 2);
         assert!(matches!(
             c.log.last(),
-            Some(CombatEvent::Hit { ranged: false, .. })
+            Some(&CombatEvent::CountTroop {
+                resurrected: false,
+                ..
+            })
         ));
     }
 
     #[test]
-    fn a_freeze_on_an_immune_target_logs_the_immune_event() {
+    fn a_retaliation_appends_a_retaliate_event() {
         let resources = spell_fixture();
-        let (mut c, _) = duel(2, 1); // dragons are IMMUNE.
-        let result = spell_freeze(&mut c, &resources, 1, 0);
-        assert_eq!(result, -1);
-        assert_eq!(
-            c.log.last(),
-            Some(&CombatEvent::Freeze {
-                troop: 2,
-                frozen: false
-            })
-        );
+        let (mut c, _) = duel(1, 10); // 5hp ogres survive a peasant swing.
+                                      // Ensure the defender survives to retaliate: use a weak melee roll by
+                                      // giving the attacker a single peasant.
+        c.units[0][0].count = 1;
+        c.units[0][0].turn_count = 1;
+        c.units[1][0].count = 10;
+        combat_hit_unit(&mut c, &resources, 0, 0, 1, 0, false);
+        assert!(c
+            .log
+            .iter()
+            .any(|event| matches!(event, CombatEvent::Retaliate { .. })));
     }
 }
