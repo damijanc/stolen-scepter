@@ -381,6 +381,9 @@ async fn main() {
     // A bridge cast has armed a direction prompt; the dialog owns the keys
     // until an arrow or ESC resolves it.
     let mut bridge_waiting = false;
+    // The audience fanfare dialog chains into the king's words when it is
+    // dismissed, so the second page is stashed here.
+    let mut pending_audience_message: Option<String> = None;
     // The modal layers: one prompt and one dialog at a time, mirroring C's
     // single-slot prompt and dialog globals.
     let mut prompt = Prompt::default();
@@ -425,6 +428,11 @@ async fn main() {
             } else if keys.any_pressed() {
                 if !dialog.advance() {
                     dialog.dismiss();
+                    if let Some(king) = pending_audience_message.take() {
+                        // The king's words render as the header (yellow), as C
+                        // passes them through player_io_message(body, "").
+                        dialog.open(&king, "");
+                    }
                 }
             }
         } else if prompt.is_active() {
@@ -531,13 +539,17 @@ async fn main() {
             }
         } else if views.active() == Some(ViewKind::HomeCastle) {
             // Throne room / barracks: ESC pops, A opens the recruit screen, B
-            // runs the (still deferred) audience flow.
+            // runs the audience-with-the-king flow.
             if keys.pressed(Key::Escape) {
                 views.dismiss();
             } else if keys.pressed(Key::A) {
                 views.recruit_soldiers_open(&resources, &game);
             } else if keys.pressed(Key::B) {
-                eprintln!("audience with the king not yet wired");
+                let (outcome, needed) = game.audience_with_king(&resources);
+                let (fanfare, king) =
+                    interact::audience_messages(&resources, &game, outcome, needed);
+                dialog.open("", &fanfare);
+                pending_audience_message = Some(king);
             }
         } else if views.active() == Some(ViewKind::RecruitSoldiers) {
             // The recruit screen owns its letters, digits and Enter/ESC.

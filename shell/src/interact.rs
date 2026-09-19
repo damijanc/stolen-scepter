@@ -11,8 +11,8 @@
 //! testable headlessly the way the engine's combat digests are.
 
 use openbounty_engine::game::{
-    BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game, GarrisonOutcome,
-    RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
+    AudienceOutcome, BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game,
+    GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
 };
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
@@ -688,6 +688,7 @@ const DEFAULT_CANNOT_GARRISON_LAST: &str = "You cannot garrison your\nlast army!
 const DEFAULT_NO_TROOP_SLOTS: &str = "No troop slots left!";
 const DEFAULT_RECRUIT_SOLDIERS_TITLE: &str = "Recruit Soldiers";
 const DEFAULT_RECRUIT_SOLDIERS_HOW_MANY: &str = "How Many";
+const DEFAULT_AUDIENCE_INTRO: &str = "Trumpets announce your\narrival with regal fanfare.\n\nKing Maximus rises from his\nthrone to greet you and\nproclaims:           (space)";
 
 /// The town header and gold label, used by the town menu panel.
 pub fn town_header_text(resources: &Resources, name: &str) -> String {
@@ -1146,6 +1147,47 @@ pub fn recruit_refusal(resources: &Resources, outcome: RecruitOutcome) -> Option
         ),
         _ => None,
     }
+}
+
+/// The audience flow's two messages, porting `run_audience_dialog`: the
+/// fanfare (page 1) and the king's words (page 2), with %NAME%/%RANK%/%NEEDED%
+/// /%S% substituted.
+pub fn audience_messages(
+    resources: &Resources,
+    game: &Game,
+    outcome: AudienceOutcome,
+    needed: i32,
+) -> (String, String) {
+    let castle = resources.home_castle();
+    let (intro, branch) = match castle {
+        Some(castle) => {
+            let intro = if castle.special.audience_intro.is_empty() {
+                DEFAULT_AUDIENCE_INTRO
+            } else {
+                castle.special.audience_intro.as_str()
+            };
+            let branch = match outcome {
+                AudienceOutcome::MoreNeeded => castle.special.audience_more_needed.as_str(),
+                AudienceOutcome::Promoted => castle.special.audience_rank_up.as_str(),
+                AudienceOutcome::FinalRank => castle.special.audience_final_rank.as_str(),
+            };
+            (intro, branch)
+        }
+        None => ("", ""),
+    };
+
+    let needed = needed.max(0);
+    let needed_str = needed.to_string();
+    let s = if needed == 1 { "" } else { "s" };
+    let vars: &[banner::Var<'_>] = &[
+        ("NAME", game.character.name.as_str()),
+        ("RANK", game.character.cls.rank_title.as_str()),
+        ("NEEDED", &needed_str),
+        ("S", s),
+    ];
+    let fanfare = banner::format(intro, vars);
+    let king = banner::format(branch, vars);
+    (fanfare, king)
 }
 
 #[cfg(test)]
@@ -1689,5 +1731,35 @@ mod tests {
             .unwrap()
             .contains("slots"));
         assert_eq!(recruit_refusal(&resources, RecruitOutcome::Ok), None);
+    }
+
+    #[test]
+    fn audience_messages_substitute_name_rank_and_needed() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "classes": [{"index":0,"id":"knight","name":"Knight","portrait":"k.png",
+                  "ranks":[{"id":"general","name":"General","villains_needed":2}]}],
+                "castles": [{"id":"home","zone":"home","x":0,"y":0,
+                  "special":{"flow":"audience",
+                    "audience":{"intro":"Fanfare %NAME%",
+                                "rank_up":"Promoted to %RANK%",
+                                "more_needed":"Need %NEEDED% more villain%S%",
+                                "final_rank":"Final %RANK%"}}}]}"#,
+        )
+        .expect("fixture parses");
+
+        let mut game = Game::default();
+        game.character.name.copy_from_str("Sir Rust");
+        game.character.cls.rank_title.copy_from_str("General");
+
+        let (fanfare, king) = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 3);
+        assert_eq!(fanfare, "Fanfare Sir Rust");
+        assert_eq!(king, "Need 3 more villains");
+
+        let (_, king) = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 1);
+        assert_eq!(king, "Need 1 more villain");
+
+        let (_, king) = audience_messages(&resources, &game, AudienceOutcome::Promoted, 0);
+        assert_eq!(king, "Promoted to General");
     }
 }
