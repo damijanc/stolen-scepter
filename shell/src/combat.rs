@@ -21,7 +21,7 @@ use openbounty_engine::combat::{
     combat_next_turn, combat_next_unit, combat_prepare_castle, combat_prepare_foe,
     combat_prepare_player, combat_reset_match, combat_reset_turn, combat_seed_rng,
     combat_spell_target_filter, combat_test_dead, combat_unit_surrounded, CastResult, Combat,
-    CombatMode, CombatTarget, PickFilter, COMBAT_H, COMBAT_SIDES, COMBAT_SIDE_AI,
+    CombatEvent, CombatMode, CombatTarget, PickFilter, COMBAT_H, COMBAT_SIDES, COMBAT_SIDE_AI,
     COMBAT_SIDE_PLAYER, COMBAT_SLOTS, COMBAT_SPELL_CLONE, COMBAT_SPELL_FIREBALL,
     COMBAT_SPELL_FREEZE, COMBAT_SPELL_LIGHTNING, COMBAT_SPELL_RESURRECT, COMBAT_SPELL_TELEPORT,
     COMBAT_SPELL_TURN_UNDEAD, COMBAT_W,
@@ -58,6 +58,17 @@ const DEFAULT_CL_SELECT_RESURRECT: &str = "Select army to Resurrect";
 const DEFAULT_CL_SELECT_DAMAGE: &str = "Select enemy army to %SPELL%";
 const DEFAULT_CL_SELECT_TELEPORT: &str = "Select army to Teleport";
 const DEFAULT_CL_SELECT_DEST: &str = "Select new location";
+const DEFAULT_CL_MELEE_HIT: &str = "%ATK% vs %TGT%, %COUNT% die";
+const DEFAULT_CL_RANGED_HIT: &str = "%ATK% shoot %TGT% killing %COUNT%";
+const DEFAULT_CL_NO_EFFECT: &str = "The spell seems to have no effect!";
+const DEFAULT_CL_CLONED: &str = "%COUNT% %TROOP% cloned";
+const DEFAULT_CL_TELEPORTED: &str = "Teleported";
+const DEFAULT_CL_IMMUNE: &str = "%TROOP% are immune";
+const DEFAULT_CL_FROZEN: &str = "%TROOP% are frozen";
+const DEFAULT_CL_RESURRECTED: &str = "%COUNT% %TROOP% resurrected";
+const DEFAULT_CL_CAST_FIREBALL: &str = "Fireball!";
+const DEFAULT_CL_CAST_LIGHTNING: &str = "Lightning!";
+const DEFAULT_CL_CAST_TURN_UNDEAD: &str = "Turn Undead!";
 
 /// Combat field origin, C's `CL_COMBAT_X` / `CL_COMBAT_Y`.
 pub const COMBAT_X: i32 = MAP_X;
@@ -85,6 +96,70 @@ fn troop_name(resources: &Resources, troop_index: i32, fallback: &str) -> String
             }
         })
         .unwrap_or_else(|| fallback.to_owned())
+}
+
+/// Turn one engine log event into its `strings.combat_log` banner, porting the
+/// substitution C's `combat_log_template` does with the same var names.
+fn format_event(resources: &Resources, event: CombatEvent) -> String {
+    let text = |key, default| banner::text(resources, "combat_log", key, default).to_owned();
+    match event {
+        CombatEvent::Hit {
+            attacker,
+            target,
+            kills,
+            ranged,
+        } => {
+            let atk = troop_name(resources, attacker, "Attackers");
+            let tgt = troop_name(resources, target, "Defenders");
+            let kills = kills.to_string();
+            let (key, default) = if ranged {
+                ("ranged_hit", DEFAULT_CL_RANGED_HIT)
+            } else {
+                ("melee_hit", DEFAULT_CL_MELEE_HIT)
+            };
+            banner::formatted(
+                resources,
+                "combat_log",
+                key,
+                default,
+                &[("ATK", &atk), ("TGT", &tgt), ("COUNT", &kills)],
+            )
+        }
+        CombatEvent::NoEffect => text("no_effect_msg", DEFAULT_CL_NO_EFFECT),
+        CombatEvent::CountTroop {
+            count,
+            troop,
+            resurrected,
+        } => {
+            let troop = troop_name(resources, troop, "creatures");
+            let count = count.to_string();
+            let (key, default) = if resurrected {
+                ("resurrected", DEFAULT_CL_RESURRECTED)
+            } else {
+                ("cloned", DEFAULT_CL_CLONED)
+            };
+            banner::formatted(
+                resources,
+                "combat_log",
+                key,
+                default,
+                &[("COUNT", &count), ("TROOP", &troop)],
+            )
+        }
+        CombatEvent::CastFireball => text("cast_fireball", DEFAULT_CL_CAST_FIREBALL),
+        CombatEvent::CastLightning => text("cast_lightning", DEFAULT_CL_CAST_LIGHTNING),
+        CombatEvent::CastTurnUndead => text("cast_turn_undead", DEFAULT_CL_CAST_TURN_UNDEAD),
+        CombatEvent::Teleported => text("teleported", DEFAULT_CL_TELEPORTED),
+        CombatEvent::Freeze { troop, frozen } => {
+            let troop = troop_name(resources, troop, "Foe");
+            let (key, default) = if frozen {
+                ("frozen", DEFAULT_CL_FROZEN)
+            } else {
+                ("immune", DEFAULT_CL_IMMUNE)
+            };
+            banner::formatted(resources, "combat_log", key, default, &[("TROOP", &troop)])
+        }
+    }
 }
 
 /// The status-bar title, porting `combat_format_title`. Before the first kill
@@ -257,6 +332,9 @@ pub struct CombatLoop {
     /// The action banner, C's `Combat.banner`: the title-bar line that
     /// overrides the standard "Options / <actor>" until the turn advances.
     banner: String,
+    /// A turn advanced on the previous step; the banner is cleared at the top
+    /// of the next step so the action that ended the turn is still shown once.
+    pending_banner_clear: bool,
 }
 
 impl CombatLoop {
@@ -298,6 +376,7 @@ impl CombatLoop {
             cast_dest_x: 0,
             cast_dest_y: 0,
             banner: String::new(),
+            pending_banner_clear: false,
         }
     }
 
@@ -340,6 +419,15 @@ impl CombatLoop {
             return self.status();
         }
 
+        // A turn advanced last step: revert the title to the standard
+        // "Options / <actor>" line now that the action it described has been
+        // shown.
+        if self.pending_banner_clear {
+            self.pending_banner_clear = false;
+            self.banner.clear();
+        }
+
+        let log_len_before = self.combat.log.len();
         let acted = if self.cast_phase != CastPhase::None {
             self.cast_step(keys, game, resources)
         } else if self.picker_active {
@@ -355,6 +443,13 @@ impl CombatLoop {
                 combat_ai_action(&mut self.combat, resources) != 0
             }
         };
+
+        // The engine recorded this action's line; show the latest one.
+        if self.combat.log.len() > log_len_before {
+            if let Some(event) = self.combat.log.last() {
+                self.banner = format_event(resources, *event);
+            }
+        }
 
         if !acted {
             return self.status();
@@ -386,10 +481,10 @@ impl CombatLoop {
             } else {
                 self.combat.unit_id = next;
             }
-            // The new unit's turn reverts the title to the standard
-            // "Options / <actor>" line, as C clears the banner in
-            // combat_next_unit.
-            self.banner.clear();
+            // The new unit's turn reverts the title to the standard line, as C
+            // clears the banner in combat_next_unit -- but on the NEXT step,
+            // so the action that ended this turn is still shown once.
+            self.pending_banner_clear = true;
         }
         self.status()
     }
@@ -905,6 +1000,7 @@ mod tests {
             cast_dest_x: 0,
             cast_dest_y: 0,
             banner: String::new(),
+            pending_banner_clear: false,
         };
         (loop_, resources, game)
     }
@@ -982,11 +1078,44 @@ mod tests {
     }
 
     #[test]
-    fn the_banner_clears_when_the_turn_advances() {
+    fn the_banner_clears_on_the_step_after_a_turn_advance() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        // Wait ends the lone player stack's turn, so the banner clears.
         loop_.banner = "stale".to_owned();
+        // Wait ends the lone player stack's turn; the banner is shown once,
+        // then cleared on the next step.
         loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources);
+        assert_eq!(loop_.banner, "stale");
+        loop_.step(&Keys::pressed(&[]), &mut game, &resources);
         assert!(loop_.banner.is_empty());
+    }
+
+    #[test]
+    fn a_melee_hit_event_maps_to_the_melee_banner() {
+        let (_, resources, _) = loop_fixture();
+        let banner = format_event(
+            &resources,
+            CombatEvent::Hit {
+                attacker: 0,
+                target: 1,
+                kills: 2,
+                ranged: false,
+            },
+        );
+        assert_eq!(banner, "Militia vs Archers, 2 die");
+    }
+
+    #[test]
+    fn an_attack_sets_the_engine_hit_banner() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        // Put the player militia adjacent to the AI archer, then walk into it
+        // so the move becomes an attack.
+        loop_.combat.units[COMBAT_SIDE_PLAYER][0].x = 3;
+        loop_.combat.units[COMBAT_SIDE_PLAYER][0].y = 4;
+        loop_.combat.umap[4][3] = 1;
+        loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources);
+        // The engine recorded a melee hit; the banner names both troops.
+        assert!(loop_.banner.contains("Militia"));
+        assert!(loop_.banner.contains("Archers"));
+        assert!(loop_.banner.contains("die"));
     }
 }
