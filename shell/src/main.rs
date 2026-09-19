@@ -22,6 +22,7 @@ pub mod map_render;
 pub mod palette;
 pub mod present;
 pub mod prompt;
+pub mod savepath;
 pub mod sprites;
 pub mod startup;
 pub mod views;
@@ -47,6 +48,7 @@ use openbounty_engine::game::{
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
+use openbounty_engine::savegame::save_read;
 use openbounty_engine::spells_adventure::{
     spell_index_by_adventure_effect, try_build_bridge, AdventureCast, AdventureEffect, SpellCast,
 };
@@ -56,6 +58,7 @@ use openbounty_engine::step::{
 };
 use present::Present;
 use prompt::{Prompt, PromptResult};
+use savepath::SavePaths;
 use sprites::SpriteCatalog;
 use startup::{Startup, StartupAction};
 use views::{controls_visible, worldmap_has_orb, SpellsInput, TownInput, TownRow, ViewKind, Views};
@@ -529,6 +532,7 @@ fn window_conf() -> Conf {
 async fn main() {
     let mut pack_path: Option<String> = None;
     let mut seed_index: i32 = -1;
+    let mut save_dir: Option<String> = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--seed" {
@@ -536,12 +540,14 @@ async fn main() {
                 .next()
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(-1);
+        } else if arg == "--save-dir" {
+            save_dir = args.next();
         } else if pack_path.is_none() {
             pack_path = Some(arg);
         }
     }
     let Some(pack_path) = pack_path else {
-        eprintln!("usage: openbounty-shell [--seed <n>] <path to game.json>");
+        eprintln!("usage: openbounty-shell [--seed <n>] [--save-dir <dir>] <path to game.json>");
         return;
     };
 
@@ -583,9 +589,13 @@ async fn main() {
 
     // Pre-game wizard: class select, then name/difficulty. It blocks on the
     // player, exactly as C's `startup_flow` does before the game exists.
+    let save_paths = match &save_dir {
+        Some(dir) => SavePaths::with_override(dir),
+        None => SavePaths::new(),
+    };
     let mut startup = Startup::new();
     let choice = loop {
-        if let Some(choice) = startup.update(&keys, &resources, get_time()) {
+        if let Some(choice) = startup.update(&keys, &resources, &save_paths, get_time()) {
             break choice;
         }
         list.clear();
@@ -603,28 +613,59 @@ async fn main() {
         return;
     }
 
-    let player_class = resources
-        .class_by_id(choice.class_id.as_str())
-        .map(|class| class.index)
-        .unwrap_or(0);
-    let mut game = Game::default();
-    game.init_seeded_with_resources(
-        &resources,
-        Some(choice.name.as_str()),
-        player_class,
-        choice.difficulty,
-        seed_index,
-    );
-    let zone = game.position.zone.as_str().to_owned();
-    let mut map = match Map::load_zone_with_placements(&resources, &zone, &game) {
-        Ok(map) => map,
-        Err(err) => {
-            eprintln!("could not load zone {zone}: {err}");
-            return;
+    let (mut game, mut map, mut fog) = if choice.action == StartupAction::Load {
+        // Hydrate from the chosen slot. C pre-initializes a default game so a
+        // failed load still leaves something playable.
+        let mut game = Game::default();
+        game.init_seeded_with_resources(&resources, Some("Hero"), 0, 1, -1);
+        let mut fog = Fog::new();
+        match save_paths.slot(resources.pack_id.as_str(), choice.slot) {
+            Some(path) => {
+                if let Err(err) = save_read(&path, &mut game, &resources, &Map::new(1, 1), &mut fog)
+                {
+                    eprintln!("load slot {} failed: {err:?}", choice.slot);
+                }
+            }
+            None => eprintln!("load slot {} has no path", choice.slot),
         }
+        let zone = game.position.zone.as_str().to_owned();
+        let mut map = match Map::load_zone_with_placements(&resources, &zone, &game) {
+            Ok(map) => map,
+            Err(err) => {
+                eprintln!("could not load zone {zone}: {err}");
+                return;
+            }
+        };
+        map.apply_consumed(&game, &zone);
+        (game, map, fog)
+    } else {
+        let player_class = resources
+            .class_by_id(choice.class_id.as_str())
+            .map(|class| class.index)
+            .unwrap_or(0);
+        let mut game = Game::default();
+        game.init_seeded_with_resources(
+            &resources,
+            Some(choice.name.as_str()),
+            player_class,
+            choice.difficulty,
+            seed_index,
+        );
+        let zone = game.position.zone.as_str().to_owned();
+        let map = match Map::load_zone_with_placements(&resources, &zone, &game) {
+            Ok(map) => map,
+            Err(err) => {
+                eprintln!("could not load zone {zone}: {err}");
+                return;
+            }
+        };
+        let mut fog = Fog::new();
+        fog.reveal(&map, game.position.x, game.position.y, 2);
+        (game, map, fog)
     };
-    let mut fog = Fog::new();
-    fog.reveal(&map, game.position.x, game.position.y, 2);
+    // C settles the hero on the loaded tile so the first frame is not a step.
+    game.position.last_x = game.position.x;
+    game.position.last_y = game.position.y;
 
     // Ctrl+Q arms a status-bar prompt rather than a dialog, which is why
     // chrome has a mode for it.
