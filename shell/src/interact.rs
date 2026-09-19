@@ -1336,6 +1336,25 @@ pub fn castle_display_name(resources: &Resources, castle_id: &str) -> String {
         .to_owned()
 }
 
+/// The siege target's display name, porting `run_castle_combat`: a named
+/// villain first, else the castle name, else the castle id. Display-only -- the
+/// RNG identity is still the castle id.
+pub fn siege_target_name(resources: &Resources, game: &Game, castle_id: &str) -> String {
+    let villain_name = game
+        .castles
+        .iter()
+        .find(|castle| castle.id.as_str() == castle_id)
+        .filter(|castle| !castle.villain_id.is_empty())
+        .and_then(|castle| resources.villain_by_id(castle.villain_id.as_str()))
+        .map(|villain| villain.name.as_str())
+        .filter(|name| !name.is_empty());
+    if let Some(name) = villain_name {
+        name.to_owned()
+    } else {
+        castle_display_name(resources, castle_id)
+    }
+}
+
 /// The monster-castle siege prompt, porting the `FLOW_SIEGE_MONSTER` branch.
 pub fn siege_monster_prompt(resources: &Resources, castle_id: &str) -> (String, String) {
     let name = castle_display_name(resources, castle_id);
@@ -2044,6 +2063,20 @@ mod tests {
             capture_message(VillainSiegeOutcome::NoCastle, "Murray", 0),
             None
         );
+    }
+
+    #[test]
+    fn siege_target_name_names_the_villain_first() {
+        let resources = town_resources();
+
+        let mut game = Game::default();
+        game.castles[0].id.copy_from_str("castle0");
+        assert_eq!(siege_target_name(&resources, &game, "castle0"), "Darkstone");
+
+        game.castles[0].villain_id.copy_from_str("murray");
+        assert_eq!(siege_target_name(&resources, &game, "castle0"), "Murray");
+
+        assert_eq!(siege_target_name(&resources, &game, "nope"), "nope");
     }
 
     #[test]

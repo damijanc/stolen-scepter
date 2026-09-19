@@ -153,7 +153,7 @@ fn start_combat(game: &Game, resources: &Resources, flow: CombatFlow) -> CombatS
                 .find(|castle| castle.id.as_str() == castle_id)
                 .map(|castle| castle.garrison)
                 .unwrap_or_default();
-            let name = interact::castle_display_name(resources, castle_id);
+            let name = interact::siege_target_name(resources, game, castle_id);
             let target = CombatTarget {
                 name: name.as_str(),
                 garrison: &garrison,
