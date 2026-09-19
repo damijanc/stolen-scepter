@@ -26,6 +26,8 @@ pub const RES_CHEST_TIERS: usize = 4;
 pub const RES_MAX_CONTROLS: usize = 8;
 pub const RES_CONTROL_LABEL_LEN: usize = 24;
 pub const RES_CONTROL_TYPE_LEN: usize = 16;
+pub const RES_NUMBER_NAME_MAX: usize = 8;
+pub const RES_NUMBER_NAME_LABEL_LEN: usize = 24;
 /// Length of an art path in the sprite manifest, C's `RES_PATH_LEN`.
 pub const RES_PATH_LEN: usize = 128;
 /// The combat tileset, in the fixed role order the renderer indexes by.
@@ -247,6 +249,32 @@ pub struct ResControls {
 impl ResControls {
     pub fn by_index(&self, index: usize) -> Option<&ResControl> {
         self.items.get(index).filter(|_| index < self.count)
+    }
+}
+
+/// The fuzzy-number labels (`combat.number_names`), C's `number_name_*` fields.
+/// Thresholds are listed high-to-low; the first whose threshold is at or below
+/// a count wins.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
+pub struct NumberNames {
+    pub count: usize,
+    pub thresholds: [i32; RES_NUMBER_NAME_MAX],
+    pub labels: [FixedStr<RES_NUMBER_NAME_LABEL_LEN>; RES_NUMBER_NAME_MAX],
+}
+
+impl NumberNames {
+    /// C's `GameNumberName`: the first label whose threshold is `<= count`, or
+    /// empty for a count below 1 or a pack that declares none.
+    pub fn label(&self, count: i32) -> &str {
+        if count < 1 || self.count == 0 {
+            return "";
+        }
+        for index in 0..self.count {
+            if count >= self.thresholds[index] {
+                return self.labels[index].as_str();
+            }
+        }
+        self.labels[self.count - 1].as_str()
     }
 }
 
@@ -801,6 +829,9 @@ impl Default for ResTown {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
 pub struct ResCastleSpecial {
     pub excluded_from_contract: bool,
+    pub excluded_from_intel: bool,
+    /// Parsed but never read, exactly as in C: no code consults it.
+    pub excluded_from_siege: bool,
     /// Pack marker for a quest castle: "" is a normal castle, "audience" is
     /// the home castle. OpenBounty keeps the flow id in resources and tests it
     /// only through `resources_castle_is_home`.
@@ -945,6 +976,7 @@ pub struct Resources {
     villain_descs: Box<[ResVillainDesc; CAT_VILLAINS_MAX]>,
     villain_desc_count: usize,
     morale_chart: [[u8; 5]; 5],
+    number_names: NumberNames,
 }
 
 impl Default for Resources {
@@ -984,6 +1016,7 @@ impl Default for Resources {
             villain_descs: Box::new([ResVillainDesc::default(); CAT_VILLAINS_MAX]),
             villain_desc_count: 0,
             morale_chart: default_morale_chart(),
+            number_names: NumberNames::default(),
         }
     }
 }
@@ -1074,6 +1107,11 @@ impl Resources {
 
     pub fn control_by_index(&self, index: usize) -> Option<&ResControl> {
         self.controls.by_index(index)
+    }
+
+    /// C's `GameNumberName`: the fuzzy label for a count, or empty.
+    pub fn number_name(&self, count: i32) -> &str {
+        self.number_names.label(count)
     }
 
     pub fn castle_count(&self) -> usize {
@@ -1773,30 +1811,51 @@ impl Resources {
         let Some(combat) = root.get("combat") else {
             return Ok(());
         };
-        let Some(chart) = combat.get("morale_chart") else {
-            return Ok(());
-        };
+        if let Some(chart) = combat.get("morale_chart") {
+            let rows = chart
+                .as_array()
+                .ok_or(ResourceError::InvalidField("combat.morale_chart"))?;
+            if rows.len() != 5 {
+                return Err(ResourceError::InvalidField("combat.morale_chart"));
+            }
 
-        let rows = chart
-            .as_array()
-            .ok_or(ResourceError::InvalidField("combat.morale_chart"))?;
-        if rows.len() != 5 {
-            return Err(ResourceError::InvalidField("combat.morale_chart"));
+            for (row_idx, row) in rows.iter().enumerate() {
+                let cols = row
+                    .as_array()
+                    .ok_or(ResourceError::InvalidField("combat.morale_chart row"))?;
+                if cols.len() != 5 {
+                    return Err(ResourceError::InvalidField("combat.morale_chart row"));
+                }
+                for (col_idx, value) in cols.iter().enumerate() {
+                    let s = value
+                        .as_str()
+                        .ok_or(ResourceError::InvalidField("combat.morale_chart value"))?;
+                    self.morale_chart[row_idx][col_idx] =
+                        s.as_bytes().first().copied().unwrap_or(b'N');
+                }
+            }
         }
 
-        for (row_idx, row) in rows.iter().enumerate() {
-            let cols = row
+        // number_names: array of {"min": N, "label": "..."}, high-to-low.
+        if let Some(names) = combat.get("number_names") {
+            let names = names
                 .as_array()
-                .ok_or(ResourceError::InvalidField("combat.morale_chart row"))?;
-            if cols.len() != 5 {
-                return Err(ResourceError::InvalidField("combat.morale_chart row"));
+                .ok_or(ResourceError::InvalidField("combat.number_names"))?;
+            let mut n = 0;
+            for value in names.iter() {
+                if n >= RES_NUMBER_NAME_MAX {
+                    break;
+                }
+                if !value.is_object() {
+                    continue;
+                }
+                self.number_names.thresholds[n] = optional_i32_field(value, "min", 1)?;
+                if let Some(label) = optional_string_field(value, "label")? {
+                    self.number_names.labels[n].copy_from_str(label);
+                }
+                n += 1;
             }
-            for (col_idx, value) in cols.iter().enumerate() {
-                let s = value
-                    .as_str()
-                    .ok_or(ResourceError::InvalidField("combat.morale_chart value"))?;
-                self.morale_chart[row_idx][col_idx] = s.as_bytes().first().copied().unwrap_or(b'N');
-            }
+            self.number_names.count = n;
         }
 
         Ok(())
@@ -2530,6 +2589,10 @@ fn parse_castle(value: &serde_json::Value) -> Result<ResCastle, ResourceError> {
     if let Some(special) = value.get("special") {
         castle.special.excluded_from_contract =
             optional_bool_field(special, "excluded_from_contract", false)?;
+        castle.special.excluded_from_intel =
+            optional_bool_field(special, "excluded_from_intel", false)?;
+        castle.special.excluded_from_siege =
+            optional_bool_field(special, "excluded_from_siege", false)?;
         if let Some(flow) = optional_string_field(special, "flow")? {
             castle.special.flow.copy_from_str(flow);
         }
@@ -3372,5 +3435,30 @@ mod tests {
         let resources = Resources::from_json_str(r#"{"troops": [], "controls": {"settings": []}}"#)
             .expect("fixture parses");
         assert_eq!(resources.controls_count(), 0);
+    }
+
+    #[test]
+    fn number_names_pick_the_first_threshold_at_or_below_the_count() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [],
+                "combat": {"number_names": [
+                  {"min":100,"label":"A horde of"},
+                  {"min":10,"label":"Some"},
+                  {"min":1,"label":"A few"}
+                ]}}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(resources.number_name(150), "A horde of");
+        assert_eq!(resources.number_name(100), "A horde of");
+        assert_eq!(resources.number_name(99), "Some");
+        assert_eq!(resources.number_name(10), "Some");
+        assert_eq!(resources.number_name(1), "A few");
+        // Below the lowest threshold or no names reads empty, as C does.
+        assert_eq!(resources.number_name(0), "");
+        assert_eq!(resources.number_name(-1), "");
+
+        let bare = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
+        assert_eq!(bare.number_name(5), "");
     }
 }
