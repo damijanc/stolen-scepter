@@ -38,7 +38,7 @@ use crate::layout::{MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
 use crate::prompt::{Prompt, PromptResult};
 use crate::sprites::SpriteCatalog;
-use crate::views::troop_sprite;
+use crate::views::{troop_sprite, ViewKind};
 
 /// The A-G keys the cast menu reads, in order.
 const COMBAT_SPELL_KEYS: [Key; 7] = [Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G];
@@ -294,6 +294,9 @@ pub enum CombatStatus {
     Running,
     Win,
     Loss,
+    /// A view was requested over the battlefield; the caller opens it and
+    /// pauses combat until it is dismissed.
+    OpenView(ViewKind),
 }
 
 /// The shell-side combat loop: the engine's [`Combat`] plus the cursor, picker
@@ -491,6 +494,17 @@ impl CombatLoop {
 
         // Advance the damage-burst and acting-unit animation on the SYN cadence.
         let rolled_over = self.tick_anim(time);
+
+        // View openers work even on the AI's turn, but not while a cast or a
+        // target picker is mid-flight.
+        if self.cast_phase == CastPhase::None && !self.picker_active {
+            if keys.pressed(Key::A) {
+                return CombatStatus::OpenView(ViewKind::Army);
+            }
+            if keys.pressed(Key::V) {
+                return CombatStatus::OpenView(ViewKind::Character);
+            }
+        }
 
         let log_len_before = self.combat.log.len();
         let acted = if self.cast_phase != CastPhase::None {
@@ -1386,5 +1400,29 @@ mod tests {
         );
         assert_eq!(status, CombatStatus::Loss);
         assert_eq!(loop_.combat.result, 2);
+    }
+
+    #[test]
+    fn a_view_key_opens_a_view_over_the_battlefield() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        let mut prompt = Prompt::default();
+
+        let status = loop_.step(
+            &Keys::pressed(&[Key::A]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(status, CombatStatus::OpenView(ViewKind::Army));
+
+        let status = loop_.step(
+            &Keys::pressed(&[Key::V]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(status, CombatStatus::OpenView(ViewKind::Character));
     }
 }

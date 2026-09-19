@@ -588,26 +588,39 @@ async fn main() {
         // fast-quit status
         // prompt, then the overworld.
         if let Some(session) = &mut combat {
-            let status = session
-                .combat
-                .step(&keys, &mut game, &resources, get_time(), &mut prompt);
-            if status != CombatStatus::Running {
-                let result = if status == CombatStatus::Win {
-                    CombatResult::Win
-                } else {
-                    CombatResult::Loss
-                };
-                let session = combat.take().expect("combat was Some");
-                if let Some((header, body)) = finish_combat(
-                    &mut game,
-                    &mut map,
-                    &mut fog,
-                    &resources,
-                    session,
-                    result,
-                    &mut dialog,
-                ) {
-                    pending_capture = Some((header, body));
+            if views.is_active() {
+                // A view is open over the battlefield; the read-only Army and
+                // Character views dismiss on any key, pausing the fight.
+                if keys.any_pressed() {
+                    views.dismiss();
+                }
+            } else {
+                let status =
+                    session
+                        .combat
+                        .step(&keys, &mut game, &resources, get_time(), &mut prompt);
+                match status {
+                    CombatStatus::Running => {}
+                    CombatStatus::OpenView(view) => views.set(view),
+                    CombatStatus::Win | CombatStatus::Loss => {
+                        let result = if status == CombatStatus::Win {
+                            CombatResult::Win
+                        } else {
+                            CombatResult::Loss
+                        };
+                        let session = combat.take().expect("combat was Some");
+                        if let Some((header, body)) = finish_combat(
+                            &mut game,
+                            &mut map,
+                            &mut fog,
+                            &resources,
+                            session,
+                            result,
+                            &mut dialog,
+                        ) {
+                            pending_capture = Some((header, body));
+                        }
+                    }
                 }
             }
         } else if dialog.is_active() {
