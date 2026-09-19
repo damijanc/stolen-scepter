@@ -183,12 +183,11 @@ Implemented and tested:
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
 
-Test coverage is 334 engine unit tests, 98 shell unit tests, 25 combat digest
+Test coverage is 342 engine unit tests, 239 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
-The most recent slice is the shell layout model. Run `git log --oneline -5`
-for the exact tip rather than trusting a hash written here; the working tree
-should be clean before you start.
+Run `git log --oneline -5` for the exact tip rather than trusting a hash written
+here; the working tree should be clean before you start.
 
 ## Parity Rules
 
@@ -305,15 +304,12 @@ is already a directly callable engine method here, so a shell can call the
 one it means instead of routing through a mirrored global. What a shell
 cannot get from the engine is the text, and that is the point.
 
-Two standing omissions:
+One standing omission:
 
-- A villain siege's "Capture" dialog is built inline in C and pushed through
-  `player_io_message`. The engine returns `VillainSiegeOutcome` instead so a
-  shell can write the text; the message queue itself is unported.
 - `CombatTurnRecord`, write-only replay data for a shell's animation. This
   really is shell-shaped and can wait.
 
-The combat spells USED to sit in that second bullet, deferred on the grounds
+The combat spells USED to sit in that bullet, deferred on the grounds
 that only a player policy reaches them. That reason was wrong: it explained
 why they are unreachable, not why they are unportable. They are damage
 formulas, IMMUNE handling and a once-per-round latch -- engine rules that
