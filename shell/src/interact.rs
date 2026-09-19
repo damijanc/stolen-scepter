@@ -12,7 +12,7 @@
 
 use openbounty_engine::game::{
     AudienceOutcome, BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game,
-    GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
+    GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, VillainSiegeOutcome,
 };
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
@@ -1317,6 +1317,38 @@ pub fn siege_villain_prompt(
     )
 }
 
+/// The villain-siege "Capture" dialog, porting the inline message in
+/// `flow_apply_siege_villain`. `None` for a repelled siege or a missing castle.
+pub fn capture_message(
+    outcome: VillainSiegeOutcome,
+    villain_name: &str,
+    reward: i32,
+) -> Option<(String, String)> {
+    match outcome {
+        VillainSiegeOutcome::Captured => Some((
+            "Capture".to_owned(),
+            format!(
+                "...and the capture of {villain_name}.\n\n\
+                 For fulfilling your contract\n\
+                 you receive an additional\n\
+                 {reward} gold as bounty...\n\
+                 and a piece of the map to\n\
+                 the stolen scepter."
+            ),
+        )),
+        VillainSiegeOutcome::SetFree => Some((
+            "Capture".to_owned(),
+            format!(
+                "...and the capture of {villain_name}.\n\n\
+                 Since you did not have the\n\
+                 proper contract, the Lord\n\
+                 has been set free."
+            ),
+        )),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1936,5 +1968,30 @@ mod tests {
         let (header, body) = siege_villain_prompt(&resources, &game, "castle0");
         assert_eq!(header, "Castle Darkstone");
         assert!(body.contains("Murray"));
+    }
+
+    #[test]
+    fn the_capture_dialog_names_the_villain() {
+        let (header, body) =
+            capture_message(VillainSiegeOutcome::Captured, "Murray", 1000).expect("captured");
+        assert_eq!(header, "Capture");
+        assert!(body.contains("Murray"));
+        assert!(body.contains("1000"));
+        assert!(body.contains("bounty"));
+
+        let (header, body) =
+            capture_message(VillainSiegeOutcome::SetFree, "Murray", 0).expect("set free");
+        assert_eq!(header, "Capture");
+        assert!(body.contains("Murray"));
+        assert!(body.contains("set free"));
+
+        assert_eq!(
+            capture_message(VillainSiegeOutcome::Repelled, "Murray", 0),
+            None
+        );
+        assert_eq!(
+            capture_message(VillainSiegeOutcome::NoCastle, "Murray", 0),
+            None
+        );
     }
 }

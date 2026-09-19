@@ -187,7 +187,7 @@ fn finish_combat(
     session: CombatSession,
     result: CombatResult,
     dialog: &mut Dialog,
-) {
+) -> Option<(String, String)> {
     if result == CombatResult::Win {
         let spoils = session.combat.combat.spoils[COMBAT_SIDE_AI];
         game.stats.gold = game.stats.gold.wrapping_add(spoils);
@@ -203,11 +203,32 @@ fn finish_combat(
         game.compact_army();
     }
 
+    let mut capture = None;
     let temp_death = match &session.flow {
         CombatFlow::MonsterSiege { castle_id } => game.resolve_monster_siege(castle_id, result),
         CombatFlow::VillainSiege { castle_id } => {
-            game.resolve_villain_siege(resources, castle_id, result)
-                == VillainSiegeOutcome::Repelled
+            // Snapshot the lord's name and bounty before the resolution clears
+            // the castle record.
+            let villain_id = game
+                .castles
+                .iter()
+                .find(|castle| castle.id.as_str() == castle_id)
+                .map(|castle| castle.villain_id.as_str())
+                .unwrap_or("");
+            let (name, reward) = resources
+                .villain_by_id(villain_id)
+                .map(|villain| {
+                    let name = if villain.name.is_empty() {
+                        villain_id.to_owned()
+                    } else {
+                        villain.name.as_str().to_owned()
+                    };
+                    (name, villain.reward)
+                })
+                .unwrap_or_else(|| (villain_id.to_owned(), 0));
+            let outcome = game.resolve_villain_siege(resources, castle_id, result);
+            capture = interact::capture_message(outcome, &name, reward);
+            outcome == VillainSiegeOutcome::Repelled
         }
         CombatFlow::HostileFoe {
             foe_id,
@@ -231,6 +252,8 @@ fn finish_combat(
         );
         dialog.open("Victory!", &body);
     }
+
+    capture
 }
 
 /// Route a prompt answer into the engine, porting the shell half of
@@ -545,6 +568,8 @@ async fn main() {
     // The audience fanfare dialog chains into the king's words when it is
     // dismissed, so the second page is stashed here.
     let mut pending_audience_message: Option<String> = None;
+    // A villain-siege win queues the "Capture" dialog after the victory banner.
+    let mut pending_capture: Option<(String, String)> = None;
     // The modal layers: one prompt and one dialog at a time, mirroring C's
     // single-slot prompt and dialog globals.
     let mut prompt = Prompt::default();
@@ -573,7 +598,7 @@ async fn main() {
                     CombatResult::Loss
                 };
                 let session = combat.take().expect("combat was Some");
-                finish_combat(
+                if let Some((header, body)) = finish_combat(
                     &mut game,
                     &mut map,
                     &mut fog,
@@ -581,7 +606,9 @@ async fn main() {
                     session,
                     result,
                     &mut dialog,
-                );
+                ) {
+                    pending_capture = Some((header, body));
+                }
             }
         } else if dialog.is_active() {
             let ctrl = keys.down(Key::LeftControl) || keys.down(Key::RightControl);
@@ -618,6 +645,8 @@ async fn main() {
                         // The king's words render as the header (yellow), as C
                         // passes them through player_io_message(body, "").
                         dialog.open(&king, "");
+                    } else if let Some((header, body)) = pending_capture.take() {
+                        dialog.open(&header, &body);
                     }
                 }
             }
