@@ -1,13 +1,19 @@
-//! The combat field renderer, porting `src/combat_render.c`.
+//! The combat field renderer and interactive loop, porting
+//! `src/combat_render.c` and `src/combat_loop.c`.
 //!
 //! Combat owns the full inner area of the screen -- no sidebar -- on a fixed
 //! 6x5 grid of 48x34 cells, whatever the overworld tile size. The engine's
-//! [`Combat`] is the only state: this module reads it and emits
+//! [`Combat`] is the only rules state; this module reads it and emits
 //! [`crate::draw::DrawList`] commands, so the field is testable headlessly the
 //! way the views are.
 //!
-//! The interactive loop (cursor, target picker, spell cast, the AI turn) is
-//! not here yet; this slice draws a ready-made field and its title bar.
+//! The action banner (the title-bar line that tells the player what the picker
+//! wants or why an action was refused) is shell state, not engine state: C
+//! stores `banner[80]` on its `Combat`, but that struct there doubles as the
+//! shell's whole UI state. Here it lives on [`CombatLoop`], and only the
+//! shell-observable events (picker instructions, refusals, a player's fly) set
+//! it. What happens INSIDE the engine -- retaliation, an IMMUNE target, the
+//! `melee_hit` tally -- is not observable from here and stays a later slice.
 
 use openbounty_engine::combat::{
     combat_ai_action, combat_cast_spell, combat_cell_passes_filter, combat_compact,
@@ -16,12 +22,15 @@ use openbounty_engine::combat::{
     combat_prepare_player, combat_reset_match, combat_reset_turn, combat_seed_rng,
     combat_spell_target_filter, combat_test_dead, combat_unit_surrounded, CastResult, Combat,
     CombatMode, CombatTarget, PickFilter, COMBAT_H, COMBAT_SIDES, COMBAT_SIDE_AI,
-    COMBAT_SIDE_PLAYER, COMBAT_SLOTS, COMBAT_SPELL_TELEPORT, COMBAT_W,
+    COMBAT_SIDE_PLAYER, COMBAT_SLOTS, COMBAT_SPELL_CLONE, COMBAT_SPELL_FIREBALL,
+    COMBAT_SPELL_FREEZE, COMBAT_SPELL_LIGHTNING, COMBAT_SPELL_RESURRECT, COMBAT_SPELL_TELEPORT,
+    COMBAT_SPELL_TURN_UNDEAD, COMBAT_W,
 };
 use openbounty_engine::game::Game;
 use openbounty_engine::resources::Resources;
 use openbounty_engine::tables::TROOP_ABIL_FLY;
 
+use crate::banner;
 use crate::draw::{DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::input::{Key, KeySource};
@@ -32,6 +41,23 @@ use crate::views::troop_sprite;
 
 /// The A-G keys the cast menu reads, in order.
 const COMBAT_SPELL_KEYS: [Key; 7] = [Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G];
+
+/// Combat-log banner defaults, porting `load_combat_log_defaults`. Only the
+/// lines the shell itself emits are carried here; the pack overrides them
+/// under `strings.combat_log`.
+const DEFAULT_CL_NO_AMMO: &str = "No ammo";
+const DEFAULT_CL_CANT_SHOOT: &str = "Can't Shoot";
+const DEFAULT_CL_CANT_FLY: &str = "Can't Fly";
+const DEFAULT_CL_ONLY_ONE_SPELL: &str = "Only 1 spell per round!";
+const DEFAULT_CL_NO_SPELL_TYPE: &str = "No spells of that type";
+const DEFAULT_CL_CANNOT_CAST: &str = "You cannot cast magic";
+const DEFAULT_CL_FLY: &str = "%TROOP% fly";
+const DEFAULT_CL_SELECT_CLONE: &str = "Select your army to Clone";
+const DEFAULT_CL_SELECT_FREEZE: &str = "Select enemy army to Freeze";
+const DEFAULT_CL_SELECT_RESURRECT: &str = "Select army to Resurrect";
+const DEFAULT_CL_SELECT_DAMAGE: &str = "Select enemy army to %SPELL%";
+const DEFAULT_CL_SELECT_TELEPORT: &str = "Select army to Teleport";
+const DEFAULT_CL_SELECT_DEST: &str = "Select new location";
 
 /// Combat field origin, C's `CL_COMBAT_X` / `CL_COMBAT_Y`.
 pub const COMBAT_X: i32 = MAP_X;
@@ -228,6 +254,9 @@ pub struct CombatLoop {
     pick_t1_slot: usize,
     cast_dest_x: i32,
     cast_dest_y: i32,
+    /// The action banner, C's `Combat.banner`: the title-bar line that
+    /// overrides the standard "Options / <actor>" until the turn advances.
+    banner: String,
 }
 
 impl CombatLoop {
@@ -268,7 +297,34 @@ impl CombatLoop {
             pick_t1_slot: 0,
             cast_dest_x: 0,
             cast_dest_y: 0,
+            banner: String::new(),
         }
+    }
+
+    /// The status-bar line, porting the three-branch `combat_format_title`:
+    /// the action banner when one is set, else the acting-unit line before the
+    /// first kill, else the running kill tally.
+    pub fn title(&self, resources: &Resources) -> String {
+        if !self.banner.is_empty() {
+            return self.banner.clone();
+        }
+        combat_title(&self.combat, resources)
+    }
+
+    /// Replace the action banner from a `strings.combat_log` line.
+    fn log(&mut self, resources: &Resources, key: &str, default: &str) {
+        self.banner = banner::text(resources, "combat_log", key, default).to_owned();
+    }
+
+    /// Replace the action banner from a formatted `strings.combat_log` line.
+    fn log_formatted(
+        &mut self,
+        resources: &Resources,
+        key: &str,
+        default: &str,
+        vars: &[banner::Var<'_>],
+    ) {
+        self.banner = banner::formatted(resources, "combat_log", key, default, vars);
     }
 
     /// Drive one frame of combat input. The player's actions dispatch through
@@ -330,6 +386,10 @@ impl CombatLoop {
             } else {
                 self.combat.unit_id = next;
             }
+            // The new unit's turn reverts the title to the standard
+            // "Options / <actor>" line, as C clears the banner in
+            // combat_next_unit.
+            self.banner.clear();
         }
         self.status()
     }
@@ -370,9 +430,11 @@ impl CombatLoop {
             let (side, id) = (self.combat.side, self.combat.unit_id as usize);
             let unit = &self.combat.units[side][id];
             if unit.shots <= 0 {
+                self.log(resources, "no_ammo", DEFAULT_CL_NO_AMMO);
                 return false;
             }
             if combat_unit_surrounded(&self.combat, side, id) {
+                self.log(resources, "cant_shoot", DEFAULT_CL_CANT_SHOOT);
                 return false;
             }
             self.cursor_x = unit.x;
@@ -392,6 +454,7 @@ impl CombatLoop {
                 .troop_by_index(unit.troop_idx)
                 .is_some_and(|troop| troop.abilities & TROOP_ABIL_FLY != 0);
             if !flies || unit.flights <= 0 {
+                self.log(resources, "cant_fly", DEFAULT_CL_CANT_FLY);
                 return false;
             }
             self.cursor_x = unit.x;
@@ -403,9 +466,11 @@ impl CombatLoop {
         }
         if keys.pressed(Key::U) {
             if self.combat.spells_this_round >= 1 {
+                self.log(resources, "only_one_spell", DEFAULT_CL_ONLY_ONE_SPELL);
                 return false;
             }
             if !game.stats.knows_magic {
+                self.log(resources, "cannot_cast", DEFAULT_CL_CANNOT_CAST);
                 return false;
             }
             self.cast_phase = CastPhase::PickSpell;
@@ -452,7 +517,15 @@ impl CombatLoop {
                 true
             }
             PickReason::Fly => {
-                combat_fly_unit(&mut self.combat, side, id, tx as i32, ty as i32) != 0
+                let flew = combat_fly_unit(&mut self.combat, side, id, tx as i32, ty as i32) != 0;
+                if flew {
+                    let troop = resources
+                        .troop_by_index(self.combat.units[side][id].troop_idx)
+                        .map(|t| t.name.as_str())
+                        .unwrap_or("Troop");
+                    self.log_formatted(resources, "fly", DEFAULT_CL_FLY, &[("TROOP", troop)]);
+                }
+                flew
             }
             _ => false,
         };
@@ -551,6 +624,7 @@ impl CombatLoop {
                     return false;
                 }
                 if game.spells.counts[picked as usize] <= 0 {
+                    self.log(resources, "no_spell_type", DEFAULT_CL_NO_SPELL_TYPE);
                     self.cast_phase = CastPhase::None;
                     return false;
                 }
@@ -563,6 +637,7 @@ impl CombatLoop {
                     self.cursor_x = unit.x;
                     self.cursor_y = unit.y;
                 }
+                self.arm_select_banner(resources, picked);
                 self.cast_phase = CastPhase::PickTarget;
                 false
             }
@@ -592,6 +667,7 @@ impl CombatLoop {
                         self.cursor_x = unit.x;
                         self.cursor_y = unit.y;
                     }
+                    self.log(resources, "select_dest", DEFAULT_CL_SELECT_DEST);
                     return false;
                 }
                 if self.pick_reason == PickReason::TeleportDest {
@@ -627,6 +703,35 @@ impl CombatLoop {
         );
         self.cast_phase = CastPhase::None;
         result == CastResult::Ok
+    }
+
+    /// Set the picker instruction banner for the chosen combat spell, so the
+    /// player sees what the cursor is asking for. The three direct-damage
+    /// spells share `select_damage` and fill in their own name.
+    fn arm_select_banner(&mut self, resources: &Resources, spell_idx: i32) {
+        match spell_idx {
+            COMBAT_SPELL_CLONE => self.log(resources, "select_clone", DEFAULT_CL_SELECT_CLONE),
+            COMBAT_SPELL_FREEZE => self.log(resources, "select_freeze", DEFAULT_CL_SELECT_FREEZE),
+            COMBAT_SPELL_RESURRECT => {
+                self.log(resources, "select_resurrect", DEFAULT_CL_SELECT_RESURRECT)
+            }
+            COMBAT_SPELL_TELEPORT => {
+                self.log(resources, "select_teleport", DEFAULT_CL_SELECT_TELEPORT)
+            }
+            COMBAT_SPELL_FIREBALL | COMBAT_SPELL_LIGHTNING | COMBAT_SPELL_TURN_UNDEAD => {
+                let name = resources
+                    .spell_by_index(spell_idx)
+                    .map(|spell| spell.name.as_str())
+                    .unwrap_or("Spell");
+                self.log_formatted(
+                    resources,
+                    "select_damage",
+                    DEFAULT_CL_SELECT_DAMAGE,
+                    &[("SPELL", name)],
+                );
+            }
+            _ => {}
+        }
     }
 }
 
@@ -799,6 +904,7 @@ mod tests {
             pick_t1_slot: 0,
             cast_dest_x: 0,
             cast_dest_y: 0,
+            banner: String::new(),
         };
         (loop_, resources, game)
     }
@@ -838,5 +944,49 @@ mod tests {
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
         loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources);
         assert!(!loop_.picker_active);
+    }
+
+    #[test]
+    fn the_title_prefers_the_action_banner() {
+        let (mut loop_, resources, _) = loop_fixture();
+        loop_.banner = "A banner".to_owned();
+        assert_eq!(loop_.title(&resources), "A banner");
+    }
+
+    #[test]
+    fn a_refused_shoot_logs_no_ammo() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        loop_.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
+        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources);
+        assert_eq!(loop_.banner, "No ammo");
+    }
+
+    #[test]
+    fn a_second_spell_in_one_round_is_refused() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        loop_.combat.spells_this_round = 1;
+        game.stats.knows_magic = true;
+        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources);
+        assert_eq!(loop_.banner, "Only 1 spell per round!");
+    }
+
+    #[test]
+    fn picking_a_spell_arms_the_select_banner() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        game.stats.knows_magic = true;
+        game.spells.counts[COMBAT_SPELL_CLONE as usize] = 1;
+        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::A]), &mut game, &resources);
+        assert_eq!(loop_.banner, "Select your army to Clone");
+        assert!(loop_.picker_active);
+    }
+
+    #[test]
+    fn the_banner_clears_when_the_turn_advances() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        // Wait ends the lone player stack's turn, so the banner clears.
+        loop_.banner = "stale".to_owned();
+        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources);
+        assert!(loop_.banner.is_empty());
     }
 }

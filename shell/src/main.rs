@@ -30,7 +30,7 @@ use macroquad::prelude::{get_time, next_frame, Conf};
 use anim::HeroAnimator;
 use backend::{Backend, MacroquadKeys};
 use chrome::{Chrome, StatusMode};
-use combat::{combat_render, combat_title, CombatLoop, CombatStatus};
+use combat::{combat_render, CombatLoop, CombatStatus};
 use dialog::Dialog;
 use draw::DrawList;
 use input::{Action, Key, KeySource, DIGITS};
@@ -1056,7 +1056,7 @@ async fn main() {
         list.clear();
         if let Some(session) = &combat {
             // Combat owns the full inner area; the chrome shows its title.
-            let title = combat_title(&session.combat.combat, &resources);
+            let title = session.combat.title(&resources);
             Chrome {
                 layout: &layout,
                 palette: backend.palette(),
