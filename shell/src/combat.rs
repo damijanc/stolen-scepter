@@ -36,6 +36,7 @@ use crate::font;
 use crate::input::{Key, KeySource};
 use crate::layout::{MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
+use crate::prompt::{Prompt, PromptResult};
 use crate::sprites::SpriteCatalog;
 use crate::views::troop_sprite;
 
@@ -70,6 +71,12 @@ const DEFAULT_CL_RESURRECTED: &str = "%COUNT% %TROOP% resurrected";
 const DEFAULT_CL_CAST_FIREBALL: &str = "Fireball!";
 const DEFAULT_CL_CAST_LIGHTNING: &str = "Lightning!";
 const DEFAULT_CL_CAST_TURN_UNDEAD: &str = "Turn Undead!";
+
+/// The give-up confirm, ported from the `combat_give_up_*` banners (which the
+/// shipped pack leaves at their defaults).
+const DEFAULT_GIVE_UP_HEADER: &str = "Press ESC to exit";
+const DEFAULT_GIVE_UP_BODY: &str =
+    "Giving up will forfeit your\narmies and send you back to\nthe King. Give up";
 
 /// Combat field origin, C's `CL_COMBAT_X` / `CL_COMBAT_Y`.
 pub const COMBAT_X: i32 = MAP_X;
@@ -459,8 +466,18 @@ impl CombatLoop {
         game: &mut Game,
         resources: &Resources,
         time: f64,
+        prompt: &mut Prompt,
     ) -> CombatStatus {
         if self.combat.result != 0 {
+            return self.status();
+        }
+
+        // The give-up confirm is modal over the battlefield: it owns the keys
+        // until answered. A yes forfeits the fight.
+        if prompt.is_active() {
+            if prompt.update(keys) == PromptResult::Yes {
+                self.combat.result = 2;
+            }
             return self.status();
         }
 
@@ -486,7 +503,7 @@ impl CombatLoop {
                 && !self.combat.units[self.combat.side][self.combat.unit_id as usize]
                     .out_of_control;
             if player_turn {
-                self.player_action(keys, game, resources)
+                self.player_action(keys, game, resources, prompt)
             } else if rolled_over {
                 combat_ai_action(&mut self.combat, resources) != 0
             } else {
@@ -588,6 +605,7 @@ impl CombatLoop {
         keys: &dyn KeySource,
         game: &mut Game,
         resources: &Resources,
+        prompt: &mut Prompt,
     ) -> bool {
         if let Some((dx, dy)) = combat_read_dir(keys) {
             if self.combat.unit_id < 0 {
@@ -653,6 +671,22 @@ impl CombatLoop {
                 return false;
             }
             self.cast_phase = CastPhase::PickSpell;
+            return false;
+        }
+        if keys.pressed(Key::G) {
+            let header = banner::text(
+                resources,
+                "banners",
+                "combat_give_up_header",
+                DEFAULT_GIVE_UP_HEADER,
+            );
+            let body = banner::text(
+                resources,
+                "banners",
+                "combat_give_up_body",
+                DEFAULT_GIVE_UP_BODY,
+            );
+            prompt.yes_no(header, body);
             return false;
         }
         false
@@ -1128,7 +1162,13 @@ mod tests {
     #[test]
     fn a_player_move_steps_the_unit() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        let status = loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources, 100.0);
+        let status = loop_.step(
+            &Keys::pressed(&[Key::Right]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert_eq!(status, CombatStatus::Running);
         assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].x, 1);
         assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].y, 0);
@@ -1138,7 +1178,13 @@ mod tests {
     #[test]
     fn waiting_ends_the_players_turn() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::Space]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         // The player's lone stack is done, so the turn rolls over to the AI.
         assert_eq!(loop_.combat.side, COMBAT_SIDE_AI);
         assert_eq!(loop_.combat.unit_id, 0);
@@ -1147,7 +1193,13 @@ mod tests {
     #[test]
     fn shooting_arms_the_picker() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::S]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert!(loop_.picker_active);
         assert_eq!(loop_.pick_reason, PickReason::Shoot);
         assert_eq!(loop_.cursor_x, 0);
@@ -1158,7 +1210,13 @@ mod tests {
     fn a_unit_with_no_shots_cannot_shoot() {
         let (mut loop_, resources, mut game) = loop_fixture();
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
-        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::S]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert!(!loop_.picker_active);
     }
 
@@ -1173,7 +1231,13 @@ mod tests {
     fn a_refused_shoot_logs_no_ammo() {
         let (mut loop_, resources, mut game) = loop_fixture();
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
-        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::S]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert_eq!(loop_.banner, "No ammo");
     }
 
@@ -1182,7 +1246,13 @@ mod tests {
         let (mut loop_, resources, mut game) = loop_fixture();
         loop_.combat.spells_this_round = 1;
         game.stats.knows_magic = true;
-        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::U]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert_eq!(loop_.banner, "Only 1 spell per round!");
     }
 
@@ -1191,8 +1261,20 @@ mod tests {
         let (mut loop_, resources, mut game) = loop_fixture();
         game.stats.knows_magic = true;
         game.spells.counts[COMBAT_SPELL_CLONE as usize] = 1;
-        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources, 100.0);
-        loop_.step(&Keys::pressed(&[Key::A]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::U]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
+        loop_.step(
+            &Keys::pressed(&[Key::A]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert_eq!(loop_.banner, "Select your army to Clone");
         assert!(loop_.picker_active);
     }
@@ -1203,9 +1285,21 @@ mod tests {
         loop_.banner = "stale".to_owned();
         // Wait ends the lone player stack's turn; the banner is shown once,
         // then cleared on the next step.
-        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::Space]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert_eq!(loop_.banner, "stale");
-        loop_.step(&Keys::pressed(&[]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         assert!(loop_.banner.is_empty());
     }
 
@@ -1237,7 +1331,13 @@ mod tests {
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].x = 3;
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].y = 4;
         loop_.combat.umap[4][3] = 1;
-        loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources, 100.0);
+        loop_.step(
+            &Keys::pressed(&[Key::Right]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
         // The archers survive the swing and strike back; the retaliation is
         // the last line the engine surfaced.
         assert!(loop_.banner.contains("retaliate"));
@@ -1259,5 +1359,32 @@ mod tests {
         assert!(!loop_.tick_anim(0.31));
         assert!(loop_.tick_anim(0.46));
         assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].frame, 0);
+    }
+
+    #[test]
+    fn giving_up_forfeits_the_fight() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        let mut prompt = Prompt::default();
+
+        // G opens the modal confirm without ending the turn.
+        loop_.step(
+            &Keys::pressed(&[Key::G]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert!(prompt.is_active());
+
+        // Answering yes forfeits the fight.
+        let status = loop_.step(
+            &Keys::pressed(&[Key::Y]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(status, CombatStatus::Loss);
+        assert_eq!(loop_.combat.result, 2);
     }
 }

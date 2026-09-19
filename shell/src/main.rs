@@ -565,7 +565,7 @@ async fn main() {
         if let Some(session) = &mut combat {
             let status = session
                 .combat
-                .step(&keys, &mut game, &resources, get_time());
+                .step(&keys, &mut game, &resources, get_time(), &mut prompt);
             if status != CombatStatus::Running {
                 let result = if status == CombatStatus::Win {
                     CombatResult::Win
