@@ -388,6 +388,9 @@ const DEFAULT_SPELL_TIME_STOP: &str = "Time has stopped for %STEPS% steps.";
 const DEFAULT_SPELL_FIND_VILLAIN_NO_CONTRACT: &str = "You have no contract.";
 const DEFAULT_SPELL_FIND_VILLAIN_SUCCESS: &str = "You have found %CASTLE%!";
 const DEFAULT_SPELL_FIND_VILLAIN_NONE: &str = "Your search reveals nothing.";
+const DEFAULT_SPELL_BRIDGE_PROMPT: &str = "Build bridge in which\ndirection? Use arrows.";
+const DEFAULT_SPELL_BRIDGE_BUILT: &str = "Bridge constructed with\n%COUNT% tiles.";
+const DEFAULT_SPELL_BRIDGE_INVALID: &str = "Not a suitable location\nfor a bridge.";
 const DEFAULT_SPELL_CASTLE_GATE_NONE: &str = "You have not visited\nany castles yet.";
 const DEFAULT_SPELL_TOWN_GATE_NONE: &str = "You have not visited\nany towns yet.";
 const DEFAULT_SPELL_INSTANT_ARMY_FIZZLE: &str = "Spell fizzles.";
@@ -593,6 +596,51 @@ pub fn adventure_cast_message(
             ))
         }
     }
+}
+
+/// The bridge-cast prompt, shown while the shell waits for a direction. The
+/// charge is NOT spent here; the caller spends it once a bridge is built.
+pub fn bridge_prompt(resources: &Resources) -> (String, String) {
+    (
+        spell_header(resources, "bridge", "Bridge"),
+        banner::text(
+            resources,
+            "banners",
+            "spell_bridge_prompt",
+            DEFAULT_SPELL_BRIDGE_PROMPT,
+        )
+        .to_owned(),
+    )
+}
+
+/// The bridge-built message, porting the `spell_bridge_built` banner with its
+/// `%COUNT%` substitution.
+pub fn bridge_built(resources: &Resources, count: i32) -> (String, String) {
+    let count = count.to_string();
+    (
+        spell_header(resources, "bridge", "Bridge"),
+        banner::formatted(
+            resources,
+            "banners",
+            "spell_bridge_built",
+            DEFAULT_SPELL_BRIDGE_BUILT,
+            &[("COUNT", &count)],
+        ),
+    )
+}
+
+/// The bridge-invalid message, shown when the chosen direction has no water.
+pub fn bridge_invalid(resources: &Resources) -> (String, String) {
+    (
+        spell_header(resources, "bridge", "Bridge"),
+        banner::text(
+            resources,
+            "banners",
+            "spell_bridge_invalid",
+            DEFAULT_SPELL_BRIDGE_INVALID,
+        )
+        .to_owned(),
+    )
 }
 
 #[cfg(test)]
@@ -971,5 +1019,22 @@ mod tests {
         .expect("a dialog");
         assert_eq!(header, "Town Gate");
         assert!(body.contains("towns"));
+    }
+
+    #[test]
+    fn the_bridge_messages_use_the_bridge_header() {
+        let resources = spell_resources();
+
+        let (header, body) = bridge_prompt(&resources);
+        assert_eq!(header, "Bridge");
+        assert!(body.contains("direction"));
+
+        let (header, body) = bridge_built(&resources, 2);
+        assert_eq!(header, "Bridge");
+        assert!(body.contains("2"));
+
+        let (header, body) = bridge_invalid(&resources);
+        assert_eq!(header, "Bridge");
+        assert!(body.contains("suitable"));
     }
 }

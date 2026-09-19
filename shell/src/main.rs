@@ -38,7 +38,9 @@ use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{Game, TravelMode, GAME_ARMY_SLOTS};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
-use openbounty_engine::spells_adventure::{AdventureCast, SpellCast};
+use openbounty_engine::spells_adventure::{
+    spell_index_by_adventure_effect, try_build_bridge, AdventureCast, AdventureEffect, SpellCast,
+};
 use openbounty_engine::step::{
     consume_step, game_step_basic, search_here, spend_week, SearchOutcome, StepInteraction,
     StepResult,
@@ -200,9 +202,9 @@ fn dispatch_answer(
 }
 
 /// Route a chosen spellbook slot into the engine and present the result,
-/// porting the shell half of `dispatch_adventure_spell`. The bridge-direction
-/// and gate-picker continuations are their own slices; until then a cast that
-/// arms them is reported and left alone.
+/// porting the shell half of `dispatch_adventure_spell`. The bridge cast arms
+/// a direction prompt, signalled through `bridge_waiting`; the gate picker is
+/// still its own slice.
 fn dispatch_spell(
     game: &mut Game,
     resources: &Resources,
@@ -210,6 +212,7 @@ fn dispatch_spell(
     prompt: &mut Prompt,
     dialog: &mut Dialog,
     pending: &mut PendingFlow,
+    bridge_waiting: &mut bool,
 ) {
     match game.dispatch_adventure_spell(resources, spell_idx) {
         SpellCast::NotKnown => {
@@ -236,8 +239,9 @@ fn dispatch_spell(
         }
         SpellCast::Applied(cast) => match &cast {
             AdventureCast::BridgeArmed => {
-                // Bridge direction prompt is the next slice.
-                eprintln!("bridge spell armed (not yet wired)");
+                let (header, body) = interact::bridge_prompt(resources);
+                dialog.open(&header, &body);
+                *bridge_waiting = true;
             }
             AdventureCast::GateArmed { .. } => {
                 // Gate destination picker is the next slice.
@@ -328,6 +332,9 @@ async fn main() {
     // Ctrl+Q arms a status-bar prompt rather than a dialog, which is why
     // chrome has a mode for it.
     let mut fast_quit = false;
+    // A bridge cast has armed a direction prompt; the dialog owns the keys
+    // until an arrow or ESC resolves it.
+    let mut bridge_waiting = false;
     // The modal layers: one prompt and one dialog at a time, mirroring C's
     // single-slot prompt and dialog globals.
     let mut prompt = Prompt::default();
@@ -346,7 +353,30 @@ async fn main() {
             if ctrl && keys.pressed(Key::Q) {
                 return;
             }
-            if keys.any_pressed() {
+            if bridge_waiting {
+                // The bridge prompt owns the dialog: an arrow builds toward
+                // that direction, ESC cancels. Nothing else dismisses.
+                let dir = input::poll(&keys);
+                if dir.dx != 0 || dir.dy != 0 {
+                    bridge_waiting = false;
+                    let built = try_build_bridge(&game, &mut map, dir.dx, dir.dy);
+                    if built > 0 {
+                        let bridge =
+                            spell_index_by_adventure_effect(&resources, AdventureEffect::Bridge);
+                        if bridge >= 0 {
+                            game.spells.counts[bridge as usize] -= 1;
+                        }
+                        let (header, body) = interact::bridge_built(&resources, built);
+                        dialog.open(&header, &body);
+                    } else {
+                        let (header, body) = interact::bridge_invalid(&resources);
+                        dialog.open(&header, &body);
+                    }
+                } else if keys.pressed(Key::Escape) {
+                    bridge_waiting = false;
+                    dialog.dismiss();
+                }
+            } else if keys.any_pressed() {
                 if !dialog.advance() {
                     dialog.dismiss();
                 }
@@ -421,6 +451,7 @@ async fn main() {
                         &mut prompt,
                         &mut dialog,
                         &mut pending,
+                        &mut bridge_waiting,
                     );
                 }
                 SpellsInput::Handled => {}
