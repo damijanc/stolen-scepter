@@ -30,6 +30,42 @@ pub enum CombatResult {
     Loss = 1,
 }
 
+/// One structured line a combat action appended to the log, porting the
+/// strings `combat_log_template` writes. The engine records the DATA (troop
+/// indices, counts), not the text: a render-free crate must not format a
+/// `strings.combat_log` banner itself. A shell maps each event to its banner.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CombatEvent {
+    /// `melee_hit` / `ranged_hit`: attacker and target troop indices + kills.
+    Hit {
+        attacker: i32,
+        target: i32,
+        kills: i32,
+        ranged: bool,
+    },
+    /// `no_effect_msg`: an IMMUNE target shrugged the whole attack off.
+    NoEffect,
+    /// `cloned` / `resurrected`: count + troop index.
+    CountTroop {
+        count: i32,
+        troop: i32,
+        resurrected: bool,
+    },
+    /// `teleported` / `cast_fireball` / `cast_lightning` / `cast_turn_undead`.
+    CastFireball,
+    CastLightning,
+    CastTurnUndead,
+    Teleported,
+    /// `immune` / `frozen`: troop index, and whether it froze.
+    Freeze {
+        troop: i32,
+        frozen: bool,
+    },
+}
+
+/// How many lines the combat log retains, C's `COMBAT_LOG_LINES`.
+pub const COMBAT_LOG_LINES: usize = 8;
+
 pub const COMBAT_POWER_INCREASED_DAMAGE: u8 = 1 << 0;
 pub const COMBAT_POWER_QUARTER_PROTECTION: u8 = 1 << 1;
 
@@ -108,6 +144,9 @@ pub struct Combat {
     pub stacks_destroyed: i32,
     /// 0 = running, 1 = player win, 2 = AI win.
     pub result: i32,
+    /// The scrolling action log, oldest first. Output data only: it never
+    /// feeds the rules, so it is excluded from the digest fingerprint.
+    pub log: Vec<CombatEvent>,
 }
 
 impl Default for Combat {
@@ -130,8 +169,18 @@ impl Default for Combat {
             first_kill_seen: false,
             stacks_destroyed: 0,
             result: 0,
+            log: Vec::new(),
         }
     }
+}
+
+/// Append a structured line to the combat log, scrolling the oldest out past
+/// [`COMBAT_LOG_LINES`]. Ports `combat_log`'s ring behaviour (minus the text).
+pub fn combat_log_event(c: &mut Combat, event: CombatEvent) {
+    if c.log.len() >= COMBAT_LOG_LINES {
+        c.log.remove(0);
+    }
+    c.log.push(event);
 }
 
 /// The defender in an encounter. `seed_key` is a stable per-encounter
@@ -465,8 +514,8 @@ pub fn combat_reset_match(c: &mut Combat, resources: &Resources) {
     c.stacks_destroyed = 0;
 }
 
-/// Resolve one attack. Ports `combat_hit_unit` minus its log lines, which
-/// belong to the shell.
+/// Resolve one attack. Ports `combat_hit_unit`, recording the hit or the
+/// IMMUNE no-effect as a structured log event rather than a banner.
 pub fn combat_hit_unit(
     c: &mut Combat,
     resources: &Resources,
@@ -478,7 +527,7 @@ pub fn combat_hit_unit(
 ) -> i32 {
     c.units[a_side][a_id].turn_count = c.units[a_side][a_id].count;
     c.units[t_side][t_id].turn_count = c.units[t_side][t_id].count;
-    combat_deal_damage(
+    let kills = combat_deal_damage(
         c,
         resources,
         a_side as i32,
@@ -489,7 +538,21 @@ pub fn combat_hit_unit(
         false,
         0,
         false,
-    )
+    );
+    if kills > 0 {
+        combat_log_event(
+            c,
+            CombatEvent::Hit {
+                attacker: c.units[a_side][a_id].troop_idx,
+                target: c.units[t_side][t_id].troop_idx,
+                kills,
+                ranged: is_ranged,
+            },
+        );
+    } else if kills == -1 {
+        combat_log_event(c, CombatEvent::NoEffect);
+    }
+    kills
 }
 
 /// Step one cell. Returns 0 (blocked), 1 (moved) or 2 (attacked).
@@ -2339,10 +2402,19 @@ pub fn spell_clone(c: &mut Combat, resources: &Resources, t_side: usize, t_slot:
     let damage = sp.wrapping_mul(10).wrapping_add(unit.injury);
     let clones = damage / troop.hit_points;
     let residual = damage % troop.hit_points;
+    let troop_idx = c.units[t_side][t_slot].troop_idx;
     let unit = &mut c.units[t_side][t_slot];
     unit.count = unit.count.wrapping_add(clones);
     unit.max_count = unit.max_count.wrapping_add(clones);
     unit.injury = residual;
+    combat_log_event(
+        c,
+        CombatEvent::CountTroop {
+            count: clones,
+            troop: troop_idx,
+            resurrected: false,
+        },
+    );
 }
 
 /// Move a stack to `(to_x, to_y)`. Ports `spell_teleport`.
@@ -2360,16 +2432,32 @@ pub fn spell_teleport(c: &mut Combat, from_side: usize, from_slot: usize, to_x: 
     unit.x = to_x;
     unit.y = to_y;
     c.umap[to_y as usize][to_x as usize] = pack_uid(from_side, from_slot);
+    combat_log_event(c, CombatEvent::Teleported);
 }
 
 /// Freeze a stack so it cannot act. Ports `spell_freeze`, which returns -1
 /// for an IMMUNE target and 1 otherwise.
 pub fn spell_freeze(c: &mut Combat, resources: &Resources, t_side: usize, t_slot: usize) -> i32 {
-    let troop = resources.troop_by_index(c.units[t_side][t_slot].troop_idx);
+    let troop_idx = c.units[t_side][t_slot].troop_idx;
+    let troop = resources.troop_by_index(troop_idx);
     if troop.is_some_and(|troop| troop.abilities & TROOP_ABIL_IMMUNE != 0) {
+        combat_log_event(
+            c,
+            CombatEvent::Freeze {
+                troop: troop_idx,
+                frozen: false,
+            },
+        );
         return -1;
     }
     c.units[t_side][t_slot].frozen = true;
+    combat_log_event(
+        c,
+        CombatEvent::Freeze {
+            troop: troop_idx,
+            frozen: true,
+        },
+    );
     1
 }
 
@@ -2392,9 +2480,18 @@ pub fn spell_resurrect(c: &mut Combat, t_side: usize, t_slot: usize, sp: i32) ->
     if revived <= 0 {
         return 0;
     }
+    let troop_idx = c.units[t_side][t_slot].troop_idx;
     let unit = &mut c.units[t_side][t_slot];
     unit.count = unit.count.wrapping_add(revived);
     unit.injury = 0;
+    combat_log_event(
+        c,
+        CombatEvent::CountTroop {
+            count: revived,
+            troop: troop_idx,
+            resurrected: true,
+        },
+    );
     1
 }
 
@@ -2452,12 +2549,51 @@ pub fn combat_cast_spell(
             spell_teleport(c, t_side, t_slot, dest_x, dest_y);
             true
         }
-        COMBAT_SPELL_FIREBALL | COMBAT_SPELL_LIGHTNING | COMBAT_SPELL_TURN_UNDEAD => {
+        COMBAT_SPELL_FIREBALL => {
             if target_immune {
+                combat_log_event(c, CombatEvent::NoEffect);
                 false
             } else {
-                let damage = spell_damage_value(combat_spell_damage_base(spell_idx), sp);
-                spell_damage(c, resources, t_side, t_slot, damage);
+                spell_damage(
+                    c,
+                    resources,
+                    t_side,
+                    t_slot,
+                    spell_damage_value(combat_spell_damage_base(COMBAT_SPELL_FIREBALL), sp),
+                );
+                combat_log_event(c, CombatEvent::CastFireball);
+                true
+            }
+        }
+        COMBAT_SPELL_LIGHTNING => {
+            if target_immune {
+                combat_log_event(c, CombatEvent::NoEffect);
+                false
+            } else {
+                spell_damage(
+                    c,
+                    resources,
+                    t_side,
+                    t_slot,
+                    spell_damage_value(combat_spell_damage_base(COMBAT_SPELL_LIGHTNING), sp),
+                );
+                combat_log_event(c, CombatEvent::CastLightning);
+                true
+            }
+        }
+        COMBAT_SPELL_TURN_UNDEAD => {
+            if target_immune {
+                combat_log_event(c, CombatEvent::NoEffect);
+                false
+            } else {
+                spell_damage(
+                    c,
+                    resources,
+                    t_side,
+                    t_slot,
+                    spell_damage_value(combat_spell_damage_base(COMBAT_SPELL_TURN_UNDEAD), sp),
+                );
+                combat_log_event(c, CombatEvent::CastTurnUndead);
                 true
             }
         }
@@ -2910,5 +3046,32 @@ mod spell_tests {
             0,
             PickFilter::Undead
         ));
+    }
+
+    #[test]
+    fn a_connecting_hit_appends_a_hit_event() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(0, 5); // peasants vs peasants: a kill lands.
+        let kills = combat_hit_unit(&mut c, &resources, 0, 0, 1, 0, false);
+        assert!(kills > 0);
+        assert!(matches!(
+            c.log.last(),
+            Some(CombatEvent::Hit { ranged: false, .. })
+        ));
+    }
+
+    #[test]
+    fn a_freeze_on_an_immune_target_logs_the_immune_event() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(2, 1); // dragons are IMMUNE.
+        let result = spell_freeze(&mut c, &resources, 1, 0);
+        assert_eq!(result, -1);
+        assert_eq!(
+            c.log.last(),
+            Some(&CombatEvent::Freeze {
+                troop: 2,
+                frozen: false
+            })
+        );
     }
 }
