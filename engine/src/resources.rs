@@ -1057,6 +1057,7 @@ impl Resources {
         resources.parse_colors(&root);
         resources.parse_controls(&root)?;
         resources.parse_strings(&root);
+        resources.parse_difficulty_labels(&root);
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
@@ -1523,6 +1524,34 @@ impl Resources {
             if !table.is_empty() {
                 self.strings.insert(group.clone(), table);
             }
+        }
+    }
+
+    /// Flatten `strings.difficulty.<name>.{label,score_mult}` into the generic
+    /// string map as `"<name>.label"` / `"<name>.score_mult"`. It is the one
+    /// nested UI group a startup screen reads (C's `ResUI.difficulty`), so it
+    /// is flattened here rather than given a struct of its own.
+    fn parse_difficulty_labels(&mut self, root: &serde_json::Value) {
+        let Some(difficulty) = root
+            .get("strings")
+            .and_then(|strings| strings.get("difficulty"))
+            .and_then(serde_json::Value::as_object)
+        else {
+            return;
+        };
+        let mut table = std::collections::BTreeMap::new();
+        for (name, entry) in difficulty {
+            let Some(entry) = entry.as_object() else {
+                continue;
+            };
+            for (field, value) in entry {
+                if let Some(text) = value.as_str() {
+                    table.insert(format!("{name}.{field}"), text.to_owned());
+                }
+            }
+        }
+        if !table.is_empty() {
+            self.strings.insert("difficulty".to_owned(), table);
         }
     }
 
@@ -3391,6 +3420,33 @@ mod tests {
         let odd = sprite_pack(r#""nope""#);
         assert_eq!(odd.sprites.combat_count, RES_COMBAT_TILES);
         assert_eq!(odd.sprites.font.as_str(), FONT_DEFAULT);
+    }
+
+    #[test]
+    fn difficulty_labels_are_flattened_into_the_string_map() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [],
+                "strings": {"difficulty": {
+                  "easy": {"label": "Trivial", "score_mult": "x.1"},
+                  "normal": {"label": "Normal", "score_mult": " x1"}
+                }}}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(
+            resources.string("difficulty", "easy.label"),
+            Some("Trivial")
+        );
+        assert_eq!(
+            resources.string("difficulty", "easy.score_mult"),
+            Some("x.1")
+        );
+        assert_eq!(
+            resources.string("difficulty", "normal.label"),
+            Some("Normal")
+        );
+        // A difficulty the pack omits stays absent, so the shell falls back.
+        assert_eq!(resources.string("difficulty", "impossible.label"), None);
     }
 
     #[test]
