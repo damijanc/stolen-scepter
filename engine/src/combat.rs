@@ -515,7 +515,7 @@ pub fn combat_hit_unit(
 ) -> i32 {
     c.units[a_side][a_id].turn_count = c.units[a_side][a_id].count;
     c.units[t_side][t_id].turn_count = c.units[t_side][t_id].count;
-    combat_deal_damage(
+    let kills = combat_deal_damage(
         c,
         resources,
         a_side as i32,
@@ -526,7 +526,13 @@ pub fn combat_hit_unit(
         false,
         0,
         false,
-    )
+    );
+    // A connecting attack stamps the damage burst (decayed by the shell's
+    // animation tick). `-1` is the IMMUNE cancel, which leaves no splat.
+    if kills >= 0 {
+        c.units[t_side][t_id].hit_flash = 3;
+    }
+    kills
 }
 
 /// Step one cell. Returns 0 (blocked), 1 (moved) or 2 (attacked).
@@ -3010,5 +3016,14 @@ mod spell_tests {
             .log
             .iter()
             .any(|event| matches!(event, CombatEvent::Retaliate { .. })));
+    }
+
+    #[test]
+    fn a_connecting_hit_stamps_the_damage_burst() {
+        let resources = spell_fixture();
+        let (mut c, _) = duel(0, 5);
+        let kills = combat_hit_unit(&mut c, &resources, 0, 0, 1, 0, false);
+        assert!(kills >= 0);
+        assert_eq!(c.units[1][0].hit_flash, 3);
     }
 }
