@@ -77,6 +77,10 @@ enum PendingFlow {
     DiscardSpell {
         spell_idx: i32,
     },
+    /// A dwelling offered a troop; the "how many" entry is pending.
+    Dwelling {
+        troop_id: String,
+    },
 }
 
 /// Text C compiles in for the prompts and dialogs the shell opens. Kept
@@ -198,6 +202,15 @@ fn dispatch_answer(
         PendingFlow::DiscardSpell { spell_idx } => {
             if answer == PromptResult::Yes {
                 game.discard_spell(spell_idx);
+            }
+        }
+        PendingFlow::Dwelling { troop_id } => {
+            if answer == PromptResult::Yes {
+                let requested = prompt.text_input_value();
+                let zone = game.position.zone.as_str().to_owned();
+                let x = game.position.dwelling_x;
+                let y = game.position.dwelling_y;
+                game.recruit_from_dwelling(resources, &zone, x, y, &troop_id, requested);
             }
         }
         PendingFlow::None => {}
@@ -754,6 +767,55 @@ async fn main() {
                             } else {
                                 // Hostile castle: the siege flow is the combat slice.
                                 eprintln!("hostile castle siege not yet wired");
+                            }
+                        }
+                        StepInteraction::Dwelling {
+                            kind,
+                            troop_id,
+                            count,
+                            ..
+                        } => {
+                            if troop_id.is_empty() {
+                                dialog.open("", &interact::dwelling_empty(&resources));
+                            } else if *count <= 0 {
+                                dialog.open("", &interact::dwelling_none_this_week(&resources));
+                            } else {
+                                let troop_name = resources
+                                    .troop_by_id(troop_id.as_str())
+                                    .map(|t| t.name.as_str())
+                                    .unwrap_or(troop_id.as_str())
+                                    .to_owned();
+                                let cost = resources
+                                    .troop_by_id(troop_id.as_str())
+                                    .map(|t| t.recruit_cost)
+                                    .unwrap_or(0);
+                                let troop_index = resources
+                                    .troop_by_id(troop_id.as_str())
+                                    .map(|t| t.index)
+                                    .unwrap_or(-1);
+                                let gold = game.stats.gold;
+                                let cap = game.dwelling_recruit_cap(&resources, troop_id);
+                                views.dwelling_open(
+                                    *kind,
+                                    troop_index,
+                                    &troop_name,
+                                    *count,
+                                    cost,
+                                    gold,
+                                    cap,
+                                );
+                                let body = interact::dwelling_prompt_body(
+                                    &resources,
+                                    &troop_name,
+                                    *count,
+                                    cost,
+                                    gold,
+                                    cap,
+                                );
+                                prompt.text_input(&troop_name, &body, 4, cap);
+                                pending = PendingFlow::Dwelling {
+                                    troop_id: troop_id.clone(),
+                                };
                             }
                         }
                         StepInteraction::None => {}

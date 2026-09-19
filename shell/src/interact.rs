@@ -17,6 +17,7 @@ use openbounty_engine::game::{
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
 use openbounty_engine::step::StepInteraction;
+use openbounty_engine::tile::Interact;
 
 use crate::banner;
 
@@ -689,6 +690,15 @@ const DEFAULT_NO_TROOP_SLOTS: &str = "No troop slots left!";
 const DEFAULT_RECRUIT_SOLDIERS_TITLE: &str = "Recruit Soldiers";
 const DEFAULT_RECRUIT_SOLDIERS_HOW_MANY: &str = "How Many";
 const DEFAULT_AUDIENCE_INTRO: &str = "Trumpets announce your\narrival with regal fanfare.\n\nKing Maximus rises from his\nthrone to greet you and\nproclaims:           (space)";
+const DEFAULT_DWELLING_RECRUIT_PROMPT: &str =
+    "%COUNT% %TROOP% are available\nCost=%COST% each.  GP=%GOLD%\nYou may recruit up to %CAP%.";
+const DEFAULT_DWELLING_NONE_THIS_WEEK: &str = "No troops are available here\nthis week.";
+const DEFAULT_DWELLING_EMPTY: &str = "This dwelling is empty.";
+const DEFAULT_DWELLING_KIND_PLAINS: &str = "Plains";
+const DEFAULT_DWELLING_KIND_FOREST: &str = "Forest";
+const DEFAULT_DWELLING_KIND_HILL: &str = "Hill";
+const DEFAULT_DWELLING_KIND_DUNGEON: &str = "Dungeon";
+const DEFAULT_DWELLING_HOW_MANY: &str = "Recruit how many";
 
 /// The town header and gold label, used by the town menu panel.
 pub fn town_header_text(resources: &Resources, name: &str) -> String {
@@ -1188,6 +1198,78 @@ pub fn audience_messages(
     let fanfare = banner::format(intro, vars);
     let king = banner::format(branch, vars);
     (fanfare, king)
+}
+
+/// A dwelling kind's display name, porting `dwelling_kind_name`.
+pub fn dwelling_kind_name(resources: &Resources, kind: Interact) -> String {
+    let (key, default) = match kind {
+        Interact::DwellingForest => ("dwelling_kind_forest", DEFAULT_DWELLING_KIND_FOREST),
+        Interact::DwellingHills => ("dwelling_kind_hill", DEFAULT_DWELLING_KIND_HILL),
+        Interact::DwellingDungeon => ("dwelling_kind_dungeon", DEFAULT_DWELLING_KIND_DUNGEON),
+        _ => ("dwelling_kind_plains", DEFAULT_DWELLING_KIND_PLAINS),
+    };
+    banner::text(resources, "ui", key, default).to_owned()
+}
+
+/// The dwelling recruit prompt body, porting `dwelling_recruit_prompt`.
+pub fn dwelling_prompt_body(
+    resources: &Resources,
+    troop_name: &str,
+    count: i32,
+    cost: i32,
+    gold: i32,
+    cap: i32,
+) -> String {
+    let count = count.to_string();
+    let cost = cost.to_string();
+    let gold = gold.to_string();
+    let cap = cap.to_string();
+    banner::formatted(
+        resources,
+        "banners",
+        "dwelling_recruit_prompt",
+        DEFAULT_DWELLING_RECRUIT_PROMPT,
+        &[
+            ("COUNT", &count),
+            ("TROOP", troop_name),
+            ("COST", &cost),
+            ("GOLD", &gold),
+            ("CAP", &cap),
+        ],
+    )
+}
+
+/// The "no troops this week" refusal, porting `dwelling_none_this_week`.
+pub fn dwelling_none_this_week(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "banners",
+        "dwelling_none_this_week",
+        DEFAULT_DWELLING_NONE_THIS_WEEK,
+    )
+    .to_owned()
+}
+
+/// The empty-dwelling message, porting `dwelling_empty`.
+pub fn dwelling_empty(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "banners",
+        "dwelling_empty",
+        DEFAULT_DWELLING_EMPTY,
+    )
+    .to_owned()
+}
+
+/// The "Recruit how many" label from the `ui` block.
+pub fn dwelling_how_many(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "ui",
+        "dwelling_recruit_how_many",
+        DEFAULT_DWELLING_HOW_MANY,
+    )
+    .to_owned()
 }
 
 #[cfg(test)]
@@ -1761,5 +1843,37 @@ mod tests {
 
         let (_, king) = audience_messages(&resources, &game, AudienceOutcome::Promoted, 0);
         assert_eq!(king, "Promoted to General");
+    }
+
+    #[test]
+    fn dwelling_text_and_prompt_body() {
+        let resources = town_resources();
+
+        assert_eq!(
+            dwelling_kind_name(&resources, Interact::DwellingPlains),
+            "Plains"
+        );
+        assert_eq!(
+            dwelling_kind_name(&resources, Interact::DwellingForest),
+            "Forest"
+        );
+        assert_eq!(
+            dwelling_kind_name(&resources, Interact::DwellingHills),
+            "Hill"
+        );
+        assert_eq!(
+            dwelling_kind_name(&resources, Interact::DwellingDungeon),
+            "Dungeon"
+        );
+
+        let body = dwelling_prompt_body(&resources, "Peasants", 5, 10, 5000, 5);
+        assert!(body.contains("5 Peasants are available"));
+        assert!(body.contains("Cost=10 each"));
+        assert!(body.contains("GP=5000"));
+        assert!(body.contains("up to 5"));
+
+        assert!(dwelling_none_this_week(&resources).contains("this week"));
+        assert!(dwelling_empty(&resources).contains("empty"));
+        assert_eq!(dwelling_how_many(&resources), "Recruit how many");
     }
 }

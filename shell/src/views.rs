@@ -18,7 +18,7 @@ use openbounty_engine::game::{
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::{ResColors, Resources, RES_MAX_CONTROLS};
 use openbounty_engine::tables::puzzle_grid_entity;
-use openbounty_engine::tile::Terrain;
+use openbounty_engine::tile::{Interact, Terrain};
 
 use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
@@ -126,6 +126,7 @@ pub enum ViewKind {
     HomeCastle,
     OwnCastle,
     RecruitSoldiers,
+    Dwelling,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -237,6 +238,14 @@ pub struct Views {
     recruit_input: String,
     recruit_error: String,
     recruit_error_just_set: bool,
+    /// The dwelling screen's context, porting the `s_*` statics.
+    dwelling_kind: Interact,
+    dwelling_troop_index: i32,
+    dwelling_troop_name: String,
+    dwelling_pop: i32,
+    dwelling_cost: i32,
+    dwelling_gold: i32,
+    dwelling_cap: i32,
 }
 
 impl Views {
@@ -279,7 +288,8 @@ impl Views {
                 | ViewKind::Town
                 | ViewKind::HomeCastle
                 | ViewKind::OwnCastle
-                | ViewKind::RecruitSoldiers,
+                | ViewKind::RecruitSoldiers
+                | ViewKind::Dwelling,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
@@ -754,6 +764,27 @@ impl Views {
         false
     }
 
+    /// Open the dwelling screen, porting `screen_dwelling_open`.
+    pub fn dwelling_open(
+        &mut self,
+        kind: Interact,
+        troop_index: i32,
+        troop_name: &str,
+        pop: i32,
+        cost: i32,
+        gold: i32,
+        cap: i32,
+    ) {
+        self.dwelling_kind = kind;
+        self.dwelling_troop_index = troop_index;
+        self.dwelling_troop_name = troop_name.to_owned();
+        self.dwelling_pop = pop;
+        self.dwelling_cost = cost;
+        self.dwelling_gold = gold;
+        self.dwelling_cap = cap;
+        self.set(ViewKind::Dwelling);
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -806,6 +837,9 @@ impl Views {
             }
             Some(ViewKind::RecruitSoldiers) => {
                 self.draw_recruit_soldiers(list, layout, palette, resources, catalog, game, time)
+            }
+            Some(ViewKind::Dwelling) => {
+                self.draw_dwelling(list, layout, palette, resources, catalog)
             }
             None => {}
         }
@@ -1654,6 +1688,88 @@ impl Views {
             );
         }
     }
+
+    /// Ports `screen_dwelling_draw`: the kind-specific backdrop and the info
+    /// panel. The "how many" entry itself is the modal prompt's.
+    fn draw_dwelling(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+    ) {
+        // Dwellings never animate their troop (C hardcodes frame 0).
+        draw_location_backdrop(
+            list,
+            palette,
+            catalog,
+            dwelling_backdrop(self.dwelling_kind),
+            self.dwelling_troop_index,
+            0.0,
+            layout.map_h,
+        );
+
+        let x = layout.panel_x();
+        let y = layout.panel_y();
+        let w = layout.panel_w();
+        let h = PANEL_H;
+        list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
+        list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
+
+        let row_h = font::GLYPH_H + 1;
+        let tx = x + PANEL_PAD_X;
+        let mut ty = y + PANEL_PAD_X;
+
+        let title = crate::interact::dwelling_kind_name(resources, self.dwelling_kind);
+        list.text_centered(&title, x + w / 2, ty, palette.clr(Pal::White));
+        ty += row_h;
+        let ruler = "-".repeat(title.len().min(28));
+        list.text_centered(&ruler, x + w / 2, ty, palette.clr(Pal::White));
+        ty += row_h;
+
+        let name = if self.dwelling_troop_name.is_empty() {
+            "Troops"
+        } else {
+            &self.dwelling_troop_name
+        };
+        list.text(
+            &format!("{} {} are available", self.dwelling_pop, name),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+        ty += row_h;
+
+        list.text(
+            &format!("Cost={} each.", self.dwelling_cost),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+        list.text(
+            &format!("GP={}K", self.dwelling_gold / 1000),
+            tx + 20 * font::GLYPH_W,
+            ty,
+            palette.clr(Pal::White),
+        );
+        ty += row_h;
+
+        list.text(
+            &format!("You may recruit up to {}", self.dwelling_cap),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+        ty += row_h;
+
+        list.text(
+            &crate::interact::dwelling_how_many(resources),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+    }
 }
 
 /// Whether the hero owns the crystal orb for the current continent. Ports
@@ -2046,6 +2162,16 @@ fn own_castle_troop(game: &Game, resources: &Resources, castle_id: &str) -> i32 
         h = h.wrapping_mul(131).wrapping_add(byte as u64);
     }
     pool[(h % npool as u64) as usize]
+}
+
+/// The backdrop a dwelling kind draws, porting `loc_kind_for`.
+fn dwelling_backdrop(kind: Interact) -> crate::draw::Backdrop {
+    match kind {
+        Interact::DwellingForest => crate::draw::Backdrop::Forest,
+        Interact::DwellingHills => crate::draw::Backdrop::HillCave,
+        Interact::DwellingDungeon => crate::draw::Backdrop::Dungeon,
+        _ => crate::draw::Backdrop::Plains,
+    }
 }
 
 /// Morale of one army slot: any 'L' against another stack reads Low, all 'H'
@@ -3549,5 +3675,22 @@ mod tests {
         assert!(list.has_text_containing("Archers"));
         assert!(list.has_text_containing("50"));
         assert!(list.has_text_containing("250"));
+    }
+
+    #[test]
+    fn the_dwelling_view_draws_title_and_info() {
+        let (resources, layout, _) = castle_fixtures();
+        let mut views = Views::new();
+        views.dwelling_open(Interact::DwellingPlains, 0, "Peasants", 5, 10, 5000, 5);
+        let list = draw_castle_view(&mut views, &resources, &layout, &Game::default());
+
+        assert!(list.has_text_containing("Plains"));
+        assert!(list.has_text_containing("5 Peasants are available"));
+        assert!(list.has_text_containing("Cost=10 each."));
+        assert!(list.has_text_containing("You may recruit up to 5"));
+        assert!(list.has_text_containing("Recruit how many"));
+        assert!(!list
+            .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Plains))
+            .is_empty());
     }
 }
