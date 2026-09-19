@@ -11,8 +11,8 @@
 //! testable headlessly the way the engine's combat digests are.
 
 use openbounty_engine::game::{
-    AudienceOutcome, BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game,
-    GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, VillainSiegeOutcome,
+    AudienceOutcome, BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, FriendlyOffer,
+    Game, GarrisonOutcome, RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome, VillainSiegeOutcome,
 };
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
@@ -699,6 +699,13 @@ const DEFAULT_DWELLING_KIND_FOREST: &str = "Forest";
 const DEFAULT_DWELLING_KIND_HILL: &str = "Hill";
 const DEFAULT_DWELLING_KIND_DUNGEON: &str = "Dungeon";
 const DEFAULT_DWELLING_HOW_MANY: &str = "Recruit how many";
+const DEFAULT_ENCOUNTER_JOIN_NAMED: &str = "You encounter:\n  %LABEL% %TROOP%\n\n\
+    They offer to join your\narmy for %COST% gold.\n\n\
+    Press Enter to accept, Esc\nto refuse.";
+const DEFAULT_ENCOUNTER_JOIN_NUMERIC: &str = "You encounter:\n  %COUNT% %TROOP%\n\n\
+    They offer to join your\narmy for %COST% gold.\n\n\
+    Press Enter to accept, Esc\nto refuse.";
+const DEFAULT_ENCOUNTER_WANDERERS: &str = "A band of wanderers passes\nby, looking grim.";
 
 /// The town header and gold label, used by the town menu panel.
 pub fn town_header_text(resources: &Resources, name: &str) -> String {
@@ -1272,6 +1279,49 @@ pub fn dwelling_how_many(resources: &Resources) -> String {
     .to_owned()
 }
 
+/// The friendly-foe join-offer body, porting `start_foe_friendly_flow`. C names
+/// the count with a fuzzy label when one exists and a number otherwise; the
+/// offer is always free, so neither template's `%COST%` is ever filled.
+pub fn friendly_offer_prompt(resources: &Resources, offer: &FriendlyOffer) -> String {
+    let troop_name = resources
+        .troop_by_id(offer.troop_id.as_str())
+        .map(|troop| troop.name.as_str())
+        .unwrap_or(offer.troop_id.as_str())
+        .to_owned();
+    let label = resources.number_name(offer.count);
+    if label.is_empty() {
+        let count = offer.count.to_string();
+        banner::formatted(
+            resources,
+            "banners",
+            "encounter_join_numeric",
+            DEFAULT_ENCOUNTER_JOIN_NUMERIC,
+            &[("COUNT", &count), ("TROOP", &troop_name)],
+        )
+    } else {
+        banner::formatted(
+            resources,
+            "banners",
+            "encounter_join_named",
+            DEFAULT_ENCOUNTER_JOIN_NAMED,
+            &[("LABEL", label), ("TROOP", &troop_name)],
+        )
+    }
+}
+
+/// The "wanderers pass by" banner shown when a friendly foe flees (no army
+/// slot for the offered troop), porting the `!has_slot` branch of
+/// `start_foe_friendly_flow`.
+pub fn friendly_flees(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "banners",
+        "encounter_wanderers",
+        DEFAULT_ENCOUNTER_WANDERERS,
+    )
+    .to_owned()
+}
+
 pub fn castle_display_name(resources: &Resources, castle_id: &str) -> String {
     resources
         .castle_by_id(castle_id)
@@ -1354,6 +1404,7 @@ mod tests {
     use super::*;
     use openbounty_engine::game::{ChestOutcome, ChestRoll, Game, GarrisonOutcome};
     use openbounty_engine::step::StepInteraction;
+    use openbounty_engine::tables::FixedStr;
 
     fn resources(zones: &str) -> Resources {
         Resources::from_json_str(&format!(
@@ -1993,5 +2044,25 @@ mod tests {
             capture_message(VillainSiegeOutcome::NoCastle, "Murray", 0),
             None
         );
+    }
+
+    #[test]
+    fn friendly_offer_prompt_and_flees() {
+        let resources = town_resources();
+
+        let offer = FriendlyOffer {
+            troop_id: FixedStr::from_str("peasants"),
+            count: 5,
+            foe_id: FixedStr::from_str("foe0"),
+            zone: FixedStr::from_str("home"),
+            x: 0,
+            y: 0,
+        };
+        let body = friendly_offer_prompt(&resources, &offer);
+        assert!(body.contains("A few Peasants"));
+        // A free offer never fills %COST%, which the verbatim default leaves in.
+        assert!(body.contains("%COST%"));
+
+        assert!(friendly_flees(&resources).contains("wanderers"));
     }
 }

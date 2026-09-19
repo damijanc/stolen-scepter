@@ -41,8 +41,8 @@ use openbounty_engine::combat::{
 };
 use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{
-    ArmyStack, CastleOwnerKind, Game, GarrisonOutcome, GateDestKind, GateDestination, TravelMode,
-    VillainSiegeOutcome, GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
+    ArmyStack, CastleOwnerKind, FriendlyOffer, Game, GarrisonOutcome, GateDestKind,
+    GateDestination, TravelMode, VillainSiegeOutcome, GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
@@ -92,6 +92,10 @@ enum PendingFlow {
     },
     SiegeVillain {
         castle_id: String,
+    },
+    /// A friendly foe offered to join; the deterministic troop stack is pending.
+    FriendlyOffer {
+        offer: FriendlyOffer,
     },
 }
 
@@ -335,6 +339,10 @@ fn dispatch_answer(
                 let body = banner::text(resources, "banners", "temp_death", DEFAULT_TEMP_DEATH);
                 dialog.open("", body);
             }
+        }
+        PendingFlow::FriendlyOffer { offer } => {
+            // Yes accepts the free troop stack; either answer consumes the foe.
+            game.resolve_friendly_offer(map, offer, answer == PromptResult::Yes);
         }
         PendingFlow::ChestChoice { gold, leadership } => {
             match answer {
@@ -1028,12 +1036,12 @@ async fn main() {
                             // C bounces them back, but this engine never bounces.
                         }
                         StepInteraction::Foe { id, friendly } => {
+                            let (foe_x, foe_y) = game.foes[..game.foe_count]
+                                .iter()
+                                .find(|foe| foe.placement_id.as_str() == id)
+                                .map(|foe| (foe.x, foe.y))
+                                .unwrap_or((0, 0));
                             if !friendly {
-                                let (foe_x, foe_y) = game.foes[..game.foe_count]
-                                    .iter()
-                                    .find(|foe| foe.placement_id.as_str() == id)
-                                    .map(|foe| (foe.x, foe.y))
-                                    .unwrap_or((0, 0));
                                 combat = Some(start_combat(
                                     &game,
                                     &resources,
@@ -1043,8 +1051,19 @@ async fn main() {
                                         foe_y,
                                     },
                                 ));
+                            } else if let Some(offer) = game.begin_friendly_encounter(
+                                &mut map,
+                                &resources,
+                                id.as_str(),
+                                foe_x,
+                                foe_y,
+                            ) {
+                                let body = interact::friendly_offer_prompt(&resources, &offer);
+                                prompt.yes_no("", &body);
+                                pending = PendingFlow::FriendlyOffer { offer };
+                            } else {
+                                dialog.open("", &interact::friendly_flees(&resources));
                             }
-                            // A friendly foe's join offer is the encounter slice.
                         }
                         StepInteraction::Dwelling {
                             kind,
