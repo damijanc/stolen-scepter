@@ -28,6 +28,7 @@ pub const RES_CONTROL_LABEL_LEN: usize = 24;
 pub const RES_CONTROL_TYPE_LEN: usize = 16;
 pub const RES_NUMBER_NAME_MAX: usize = 8;
 pub const RES_NUMBER_NAME_LABEL_LEN: usize = 24;
+pub const RES_CASTLE_AUDIENCE_LEN: usize = 320;
 /// Length of an art path in the sprite manifest, C's `RES_PATH_LEN`.
 pub const RES_PATH_LEN: usize = 128;
 /// The combat tileset, in the fixed role order the renderer indexes by.
@@ -836,6 +837,12 @@ pub struct ResCastleSpecial {
     /// the home castle. OpenBounty keeps the flow id in resources and tests it
     /// only through `resources_castle_is_home`.
     pub flow: FixedStr<RES_ID_LEN>,
+    /// Audience-flow text templates, with %NAME%/%RANK%/%NEEDED%/%S%
+    /// substitutions. Populated only for the audience castle.
+    pub audience_intro: FixedStr<RES_CASTLE_AUDIENCE_LEN>,
+    pub audience_rank_up: FixedStr<RES_CASTLE_AUDIENCE_LEN>,
+    pub audience_more_needed: FixedStr<RES_CASTLE_AUDIENCE_LEN>,
+    pub audience_final_rank: FixedStr<RES_CASTLE_AUDIENCE_LEN>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2596,6 +2603,23 @@ fn parse_castle(value: &serde_json::Value) -> Result<ResCastle, ResourceError> {
         if let Some(flow) = optional_string_field(special, "flow")? {
             castle.special.flow.copy_from_str(flow);
         }
+        if let Some(audience) = special.get("audience") {
+            if let Some(intro) = optional_string_field(audience, "intro")? {
+                castle.special.audience_intro.copy_from_str(intro);
+            }
+            if let Some(rank_up) = optional_string_field(audience, "rank_up")? {
+                castle.special.audience_rank_up.copy_from_str(rank_up);
+            }
+            if let Some(more_needed) = optional_string_field(audience, "more_needed")? {
+                castle
+                    .special
+                    .audience_more_needed
+                    .copy_from_str(more_needed);
+            }
+            if let Some(final_rank) = optional_string_field(audience, "final_rank")? {
+                castle.special.audience_final_rank.copy_from_str(final_rank);
+            }
+        }
     }
 
     Ok(castle)
@@ -3460,5 +3484,28 @@ mod tests {
 
         let bare = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
         assert_eq!(bare.number_name(5), "");
+    }
+
+    #[test]
+    fn castle_special_flags_and_audience_text_parse() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [],
+                "castles": [{"id":"home","zone":"home","x":0,"y":0,
+                  "special":{"flow":"audience","excluded_from_intel":true,"excluded_from_siege":true,
+                    "audience":{"intro":"Hi %NAME%","rank_up":"Up %RANK%",
+                                "more_needed":"Need %NEEDED%","final_rank":"Done"}}}]}"#,
+        )
+        .expect("fixture parses");
+
+        let castle = resources.castle_by_id("home").expect("present");
+        assert!(castle.special.excluded_from_intel);
+        assert!(castle.special.excluded_from_siege);
+        assert_eq!(castle.special.audience_intro.as_str(), "Hi %NAME%");
+        assert_eq!(castle.special.audience_rank_up.as_str(), "Up %RANK%");
+        assert_eq!(
+            castle.special.audience_more_needed.as_str(),
+            "Need %NEEDED%"
+        );
+        assert_eq!(castle.special.audience_final_rank.as_str(), "Done");
     }
 }
