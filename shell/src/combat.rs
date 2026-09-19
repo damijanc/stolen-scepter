@@ -60,6 +60,7 @@ const DEFAULT_CL_SELECT_TELEPORT: &str = "Select army to Teleport";
 const DEFAULT_CL_SELECT_DEST: &str = "Select new location";
 const DEFAULT_CL_MELEE_HIT: &str = "%ATK% vs %TGT%, %COUNT% die";
 const DEFAULT_CL_RANGED_HIT: &str = "%ATK% shoot %TGT% killing %COUNT%";
+const DEFAULT_CL_RETALIATE: &str = "%TGT% retaliate, killing %COUNT%";
 const DEFAULT_CL_NO_EFFECT: &str = "The spell seems to have no effect!";
 const DEFAULT_CL_CLONED: &str = "%COUNT% %TROOP% cloned";
 const DEFAULT_CL_TELEPORTED: &str = "Teleported";
@@ -98,34 +99,23 @@ fn troop_name(resources: &Resources, troop_index: i32, fallback: &str) -> String
         .unwrap_or_else(|| fallback.to_owned())
 }
 
-/// Turn one engine log event into its `strings.combat_log` banner, porting the
-/// substitution C's `combat_log_template` does with the same var names.
+/// Turn one engine log event into its `strings.combat_log` banner. Only the
+/// events the engine cannot express as a return value reach here: retaliation
+/// and the clone/resurrect counts. Hits, IMMUNE no-effects and the spell
+/// announcements are formatted at their call sites instead.
 fn format_event(resources: &Resources, event: CombatEvent) -> String {
-    let text = |key, default| banner::text(resources, "combat_log", key, default).to_owned();
     match event {
-        CombatEvent::Hit {
-            attacker,
-            target,
-            kills,
-            ranged,
-        } => {
-            let atk = troop_name(resources, attacker, "Attackers");
+        CombatEvent::Retaliate { target, kills } => {
             let tgt = troop_name(resources, target, "Defenders");
             let kills = kills.to_string();
-            let (key, default) = if ranged {
-                ("ranged_hit", DEFAULT_CL_RANGED_HIT)
-            } else {
-                ("melee_hit", DEFAULT_CL_MELEE_HIT)
-            };
             banner::formatted(
                 resources,
                 "combat_log",
-                key,
-                default,
-                &[("ATK", &atk), ("TGT", &tgt), ("COUNT", &kills)],
+                "retaliate",
+                DEFAULT_CL_RETALIATE,
+                &[("TGT", &tgt), ("COUNT", &kills)],
             )
         }
-        CombatEvent::NoEffect => text("no_effect_msg", DEFAULT_CL_NO_EFFECT),
         CombatEvent::CountTroop {
             count,
             troop,
@@ -145,19 +135,6 @@ fn format_event(resources: &Resources, event: CombatEvent) -> String {
                 default,
                 &[("COUNT", &count), ("TROOP", &troop)],
             )
-        }
-        CombatEvent::CastFireball => text("cast_fireball", DEFAULT_CL_CAST_FIREBALL),
-        CombatEvent::CastLightning => text("cast_lightning", DEFAULT_CL_CAST_LIGHTNING),
-        CombatEvent::CastTurnUndead => text("cast_turn_undead", DEFAULT_CL_CAST_TURN_UNDEAD),
-        CombatEvent::Teleported => text("teleported", DEFAULT_CL_TELEPORTED),
-        CombatEvent::Freeze { troop, frozen } => {
-            let troop = troop_name(resources, troop, "Foe");
-            let (key, default) = if frozen {
-                ("frozen", DEFAULT_CL_FROZEN)
-            } else {
-                ("immune", DEFAULT_CL_IMMUNE)
-            };
-            banner::formatted(resources, "combat_log", key, default, &[("TROOP", &troop)])
         }
     }
 }
@@ -406,6 +383,69 @@ impl CombatLoop {
         self.banner = banner::formatted(resources, "combat_log", key, default, vars);
     }
 
+    /// Format a resolved hit from `combat_hit_unit`'s kill count: `kills > 0`
+    /// is the melee/ranged line, `-1` is the IMMUNE no-effect, `0` is silent.
+    fn emit_hit(
+        &mut self,
+        resources: &Resources,
+        attacker: i32,
+        target: i32,
+        kills: i32,
+        ranged: bool,
+    ) {
+        if kills > 0 {
+            let atk = troop_name(resources, attacker, "Attackers");
+            let tgt = troop_name(resources, target, "Defenders");
+            let kills = kills.to_string();
+            let (key, default) = if ranged {
+                ("ranged_hit", DEFAULT_CL_RANGED_HIT)
+            } else {
+                ("melee_hit", DEFAULT_CL_MELEE_HIT)
+            };
+            self.log_formatted(
+                resources,
+                key,
+                default,
+                &[("ATK", &atk), ("TGT", &tgt), ("COUNT", &kills)],
+            );
+        } else if kills == -1 {
+            self.log(resources, "no_effect_msg", DEFAULT_CL_NO_EFFECT);
+        }
+    }
+
+    /// Format the announcement for the spell just applied. The clone/resurrect
+    /// counts come from the engine's `CountTroop` event (drained by `step`),
+    /// so only the count-less spell lines are set here.
+    fn emit_spell_banner(&mut self, resources: &Resources, result: CastResult) {
+        let ok = result == CastResult::Ok;
+        match self.cast_spell_idx {
+            COMBAT_SPELL_FIREBALL if ok => {
+                self.log(resources, "cast_fireball", DEFAULT_CL_CAST_FIREBALL)
+            }
+            COMBAT_SPELL_LIGHTNING if ok => {
+                self.log(resources, "cast_lightning", DEFAULT_CL_CAST_LIGHTNING)
+            }
+            COMBAT_SPELL_TURN_UNDEAD if ok => {
+                self.log(resources, "cast_turn_undead", DEFAULT_CL_CAST_TURN_UNDEAD)
+            }
+            COMBAT_SPELL_FIREBALL | COMBAT_SPELL_LIGHTNING | COMBAT_SPELL_TURN_UNDEAD => {
+                self.log(resources, "no_effect_msg", DEFAULT_CL_NO_EFFECT)
+            }
+            COMBAT_SPELL_TELEPORT if ok => self.log(resources, "teleported", DEFAULT_CL_TELEPORTED),
+            COMBAT_SPELL_FREEZE => {
+                let troop = self.combat.units[self.pick_t1_side][self.pick_t1_slot].troop_idx;
+                let troop = troop_name(resources, troop, "Foe");
+                let (key, default) = if ok {
+                    ("frozen", DEFAULT_CL_FROZEN)
+                } else {
+                    ("immune", DEFAULT_CL_IMMUNE)
+                };
+                self.log_formatted(resources, key, default, &[("TROOP", &troop)]);
+            }
+            _ => {}
+        }
+    }
+
     /// Drive one frame of combat input. The player's actions dispatch through
     /// the engine's move/hit/fly/cast cores; on the AI's turn one AI action is
     /// taken per call.
@@ -507,9 +547,7 @@ impl CombatLoop {
             if self.combat.unit_id < 0 {
                 return false;
             }
-            let side = self.combat.side;
-            let id = self.combat.unit_id as usize;
-            return combat_move_unit(&mut self.combat, resources, side, id, dx, dy) != 0;
+            return self.player_move(resources, dx, dy);
         }
         if keys.pressed(Key::Space) || keys.pressed(Key::W) {
             if self.combat.unit_id >= 0 {
@@ -574,6 +612,37 @@ impl CombatLoop {
         false
     }
 
+    /// One step in a direction: attack the occupant, or move into an empty
+    /// cell. The attack is resolved here (not via `combat_move_unit`) so the
+    /// kill count is in hand for the melee banner.
+    fn player_move(&mut self, resources: &Resources, dx: i32, dy: i32) -> bool {
+        let (side, id) = (self.combat.side, self.combat.unit_id as usize);
+        let unit = &self.combat.units[side][id];
+        let (nx, ny) = (unit.x + dx, unit.y + dy);
+        if !combat_in_bounds(nx, ny) || self.combat.omap[ny as usize][nx as usize] != 0 {
+            return false;
+        }
+        let uid = self.combat.umap[ny as usize][nx as usize];
+        if uid != 0 {
+            let o_side = (uid - 1) as usize / COMBAT_SLOTS;
+            let o_slot = (uid - 1) as usize % COMBAT_SLOTS;
+            // A same-side, in-control stack blocks the move, exactly as
+            // combat_move_unit refuses it. The acting unit is always in
+            // control here (the player turn gates on it).
+            if o_side == side && !self.combat.units[o_side][o_slot].out_of_control {
+                return false;
+            }
+            let attacker = unit.troop_idx;
+            let target = self.combat.units[o_side][o_slot].troop_idx;
+            let kills =
+                combat_hit_unit(&mut self.combat, resources, side, id, o_side, o_slot, false);
+            self.emit_hit(resources, attacker, target, kills, false);
+            self.combat.units[side][id].acted = true;
+            return true;
+        }
+        combat_move_unit(&mut self.combat, resources, side, id, dx, dy) != 0
+    }
+
     /// The shoot/fly picker: one `combat_pick_step` per frame, then dispatch.
     fn pick_dispatch(
         &mut self,
@@ -599,7 +668,9 @@ impl CombatLoop {
                 let uid = self.combat.umap[ty][tx];
                 let target_side = (uid - 1) as usize / COMBAT_SLOTS;
                 let target_slot = (uid - 1) as usize % COMBAT_SLOTS;
-                combat_hit_unit(
+                let attacker = self.combat.units[side][id].troop_idx;
+                let target = self.combat.units[target_side][target_slot].troop_idx;
+                let kills = combat_hit_unit(
                     &mut self.combat,
                     resources,
                     side,
@@ -608,6 +679,7 @@ impl CombatLoop {
                     target_slot,
                     true,
                 );
+                self.emit_hit(resources, attacker, target, kills, true);
                 self.combat.units[side][id].acted = true;
                 true
             }
@@ -797,6 +869,7 @@ impl CombatLoop {
             self.cast_dest_y,
         );
         self.cast_phase = CastPhase::None;
+        self.emit_spell_banner(resources, result);
         result == CastResult::Ok
     }
 
@@ -1090,22 +1163,27 @@ mod tests {
     }
 
     #[test]
-    fn a_melee_hit_event_maps_to_the_melee_banner() {
+    fn a_retaliate_event_maps_to_the_retaliate_banner() {
         let (_, resources, _) = loop_fixture();
         let banner = format_event(
             &resources,
-            CombatEvent::Hit {
-                attacker: 0,
+            CombatEvent::Retaliate {
                 target: 1,
                 kills: 2,
-                ranged: false,
             },
         );
-        assert_eq!(banner, "Militia vs Archers, 2 die");
+        assert_eq!(banner, "Archers retaliate, killing 2");
     }
 
     #[test]
-    fn an_attack_sets_the_engine_hit_banner() {
+    fn a_hit_banner_names_both_troops() {
+        let (mut loop_, resources, _) = loop_fixture();
+        loop_.emit_hit(&resources, 0, 1, 2, false);
+        assert_eq!(loop_.banner, "Militia vs Archers, 2 die");
+    }
+
+    #[test]
+    fn a_melee_attack_shows_the_retaliation() {
         let (mut loop_, resources, mut game) = loop_fixture();
         // Put the player militia adjacent to the AI archer, then walk into it
         // so the move becomes an attack.
@@ -1113,9 +1191,8 @@ mod tests {
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].y = 4;
         loop_.combat.umap[4][3] = 1;
         loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources);
-        // The engine recorded a melee hit; the banner names both troops.
-        assert!(loop_.banner.contains("Militia"));
-        assert!(loop_.banner.contains("Archers"));
-        assert!(loop_.banner.contains("die"));
+        // The archers survive the swing and strike back; the retaliation is
+        // the last line the engine surfaced.
+        assert!(loop_.banner.contains("retaliate"));
     }
 }
