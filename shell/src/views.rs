@@ -122,6 +122,7 @@ pub enum ViewKind {
     Controls,
     Spells,
     Gate,
+    Town,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -134,6 +135,47 @@ pub enum SpellsInput {
     /// Nothing was handled; the caller may dismiss on any other key.
     None,
 }
+
+/// The town menu's action rows, porting `TownRow`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TownRow {
+    Contract,
+    Boat,
+    Info,
+    Spell,
+    Siege,
+}
+
+impl TownRow {
+    fn from_index(index: usize) -> TownRow {
+        match index {
+            0 => TownRow::Contract,
+            1 => TownRow::Boat,
+            2 => TownRow::Info,
+            3 => TownRow::Spell,
+            _ => TownRow::Siege,
+        }
+    }
+}
+
+/// What one frame of town-view input did, porting `views_town_update`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TownInput {
+    /// No key was handled.
+    None,
+    /// A navigation or info-dismiss key was handled; the view stays open.
+    Handled,
+    /// ESC closed the view.
+    Dismissed,
+    /// The player executed a row; the caller runs the transaction.
+    RunRow(TownRow),
+}
+
+/// The town menu's five rows.
+const TOWN_ROW_COUNT: i32 = 5;
+
+/// The A-E keys that jump straight to a town row.
+const TOWN_KEYS: [Key; 5] = [Key::A, Key::B, Key::C, Key::D, Key::E];
 
 /// The view stack. `Views::default()` is the empty (overworld) stack.
 #[derive(Clone, Debug, Default)]
@@ -164,6 +206,14 @@ pub struct Views {
     gate_is_town: bool,
     gate_cursor: usize,
     gate_chosen: i32,
+    /// The town menu's context, porting the `town` static.
+    town_display_name: String,
+    town_record_key: String,
+    town_boat_x: i32,
+    town_boat_y: i32,
+    town_cursor: i32,
+    town_info_body: String,
+    town_info_active: bool,
 }
 
 impl Views {
@@ -202,7 +252,8 @@ impl Views {
                 | ViewKind::Puzzle
                 | ViewKind::Controls
                 | ViewKind::Spells
-                | ViewKind::Gate,
+                | ViewKind::Gate
+                | ViewKind::Town,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
@@ -403,6 +454,87 @@ impl Views {
         false
     }
 
+    /// Open the town menu with the visiting town's context, porting
+    /// `views_open_town`. The cursor starts on the contract row.
+    pub fn town_open(&mut self, display_name: &str, record_key: &str, boat_x: i32, boat_y: i32) {
+        self.town_display_name = display_name.to_owned();
+        self.town_record_key = record_key.to_owned();
+        self.town_boat_x = boat_x;
+        self.town_boat_y = boat_y;
+        self.town_cursor = 0;
+        self.town_info_body.clear();
+        self.town_info_active = false;
+        self.set(ViewKind::Town);
+    }
+
+    /// The visiting town's display name, porting `views_town_display_name`.
+    pub fn town_display_name(&self) -> &str {
+        &self.town_display_name
+    }
+
+    /// The visiting town's record key, porting `views_town_record_key`.
+    pub fn town_record_key(&self) -> &str {
+        &self.town_record_key
+    }
+
+    /// The town's boat dock, used by the rent-boat transaction.
+    pub fn town_boat(&self) -> (i32, i32) {
+        (self.town_boat_x, self.town_boat_y)
+    }
+
+    /// Show the info overlay, porting `town_show_info`.
+    pub fn town_show_info(&mut self, body: &str) {
+        self.town_info_body = body.to_owned();
+        self.town_info_active = true;
+    }
+
+    /// Read one frame of town-menu input, porting `views_town_update`. When a
+    /// row is executed the caller runs the transaction and shows the result
+    /// with [`Views::town_show_info`].
+    pub fn town_update(&mut self, keys: &dyn KeySource) -> TownInput {
+        if self.town_info_active {
+            // The info overlay owns the keys until ESC/Enter/Space or A-E.
+            if keys.pressed(Key::Escape)
+                || keys.pressed(Key::Enter)
+                || keys.pressed(Key::KpEnter)
+                || keys.pressed(Key::Space)
+            {
+                self.town_info_active = false;
+                return TownInput::Handled;
+            }
+            for key in TOWN_KEYS {
+                if keys.pressed(key) {
+                    self.town_info_active = false;
+                    return TownInput::Handled;
+                }
+            }
+            return TownInput::Handled;
+        }
+
+        if keys.pressed(Key::Escape) {
+            self.dismiss();
+            return TownInput::Dismissed;
+        }
+        if keys.pressed(Key::Up) || keys.pressed(Key::W) || keys.pressed(Key::Kp8) {
+            self.town_cursor = (self.town_cursor - 1 + TOWN_ROW_COUNT) % TOWN_ROW_COUNT;
+            return TownInput::Handled;
+        }
+        if keys.pressed(Key::Down) || keys.pressed(Key::S) || keys.pressed(Key::Kp2) {
+            self.town_cursor = (self.town_cursor + 1) % TOWN_ROW_COUNT;
+            return TownInput::Handled;
+        }
+        if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) || keys.pressed(Key::Space) {
+            return TownInput::RunRow(TownRow::from_index(self.town_cursor as usize));
+        }
+        for (index, key) in TOWN_KEYS.iter().enumerate() {
+            if keys.pressed(*key) {
+                self.town_cursor = index as i32;
+                return TownInput::RunRow(TownRow::from_index(index));
+            }
+        }
+        TownInput::None
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -444,6 +576,9 @@ impl Views {
             }
             Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
             Some(ViewKind::Gate) => self.draw_gate(list, layout, palette),
+            Some(ViewKind::Town) => {
+                self.draw_town(list, layout, palette, resources, catalog, game, time)
+            }
             None => {}
         }
     }
@@ -976,6 +1111,106 @@ impl Views {
             palette.clr(Pal::Grey),
         );
     }
+
+    /// Ports `draw_town`: the town backdrop with an animated troop, then the
+    /// bottom action menu (header + rows), and the info overlay when one is
+    /// showing.
+    fn draw_town(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+        game: &Game,
+        time: f64,
+    ) {
+        let name = &self.town_display_name;
+
+        // Backdrop: 240x102 at the map origin, then an animated castle troop
+        // pinned to its bottom-left.
+        list.rect(Rect::new(MAP_X, MAP_Y, 240, 102), palette.clr(Pal::Black));
+        list.blit(
+            Sprite::Backdrop(crate::draw::Backdrop::Town),
+            Dst::rect(MAP_X, MAP_Y, 240, 102),
+        );
+
+        let troop_index = town_backdrop_troop(game, resources, name);
+        let tick = (time * 6.66) as i32;
+        if let Some(sprite) = troop_sprite(catalog, troop_index, tick) {
+            // Inset one sprite-width and lifted off the panel below.
+            let tw = 48;
+            let th = 34;
+            list.blit(sprite, Dst::rect(MAP_X + tw, MAP_Y + 102 - th - 4, tw, th));
+        }
+
+        // Black fill below the backdrop before the panel draws over it.
+        let below_y = MAP_Y + 102;
+        if below_y < MAP_Y + layout.map_h {
+            list.rect(
+                Rect::new(MAP_X, below_y, 240, MAP_Y + layout.map_h - below_y),
+                palette.clr(Pal::Black),
+            );
+        }
+
+        // Menu panel at the bottom of the map area.
+        let row_h = font::GLYPH_H + 1;
+        let pad = 4;
+        let lines = 2 + TOWN_ROW_COUNT;
+        let h = lines * row_h + 2 * pad + 4;
+        let w = layout.map_w + layout.sidebar_w;
+        let x = MAP_X;
+        let y = MAP_Y + layout.map_h - h;
+
+        list.rounded_panel(
+            Rect::new(x, y, w, h),
+            palette.clr(Pal::DBlue),
+            palette.clr(Pal::Yellow),
+        );
+
+        let tx = x + pad;
+        let mut ty = y + pad - row_h / 4 - row_h / 8;
+        if ty < y + 1 {
+            ty = y + 1;
+        }
+
+        let header = crate::interact::town_header_text(resources, name);
+        list.text(&header, tx, ty, palette.clr(Pal::Yellow));
+        ty += row_h;
+
+        let gold = crate::interact::town_gold_text(resources, game.stats.gold);
+        let gold_w = font::measure_width(&gold);
+        list.text(&gold, x + w - gold_w - pad, ty, palette.clr(Pal::Yellow));
+        ty += row_h + 2;
+
+        for row in 0..TOWN_ROW_COUNT {
+            let label = crate::interact::town_row_text(resources, game, &self.town_record_key, row);
+            let selected = row == self.town_cursor;
+            let fg = if selected {
+                palette.clr(Pal::Yellow)
+            } else {
+                palette.clr(Pal::White)
+            };
+            list.text(&label, tx, ty, fg);
+            ty += row_h;
+        }
+
+        if self.town_info_active {
+            // The info overlay covers the menu with the same panel shape. The
+            // body is already line-broken by the banner templates, so it is
+            // split on newlines and capped at the menu's line budget.
+            list.rounded_panel(
+                Rect::new(x, y, w, h),
+                palette.clr(Pal::DBlue),
+                palette.clr(Pal::Yellow),
+            );
+            let mut ty = y + pad;
+            for line in self.town_info_body.split('\n').take(lines as usize) {
+                list.text(line, tx, ty, palette.clr(Pal::White));
+                ty += row_h;
+            }
+        }
+    }
 }
 
 /// Whether the hero owns the crystal orb for the current continent. Ports
@@ -1257,6 +1492,39 @@ fn troop_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite
     catalog
         .troop_frame(index, tick)
         .map(|_| Sprite::TroopStill(index))
+}
+
+/// Deterministically pick which castle-dwelling troop idles on a town backdrop,
+/// porting `town_backdrop_troop`: the pool is limited to troops dwelling at
+/// castles, hashed by `(seed, town key)`.
+fn town_backdrop_troop(game: &Game, resources: &Resources, key: &str) -> i32 {
+    let troop_count = resources.troops_count();
+    let mut pool = [0i32; 32];
+    let mut npool = 0;
+    for index in 0..troop_count.min(32) {
+        if let Some(troop) = resources.troop_by_index(index as i32) {
+            if troop.dwelling.as_str() == "castle" {
+                pool[npool] = index as i32;
+                npool += 1;
+            }
+        }
+    }
+
+    let hash = |key: &str| -> u64 {
+        let mut h = game.seed ^ 0xA1B2C3;
+        for byte in key.bytes() {
+            h = h.wrapping_mul(131).wrapping_add(byte as u64);
+        }
+        h
+    };
+
+    if npool < 1 {
+        if troop_count < 1 {
+            return 0;
+        }
+        return (hash(key) % troop_count as u64) as i32;
+    }
+    pool[(hash(key) % npool as u64) as usize]
 }
 
 /// Morale of one army slot: any 'L' against another stack reads Low, all 'H'
@@ -2516,5 +2784,85 @@ mod tests {
         assert!(list.has_text_containing("Bari"));
         assert!(list.has_text_containing("Cortona"));
         assert!(list.has_text_containing("Enter go"));
+    }
+
+    #[test]
+    fn town_open_sets_context_and_cursor() {
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+        assert_eq!(views.active(), Some(ViewKind::Town));
+        assert_eq!(views.town_display_name(), "Riverton");
+        assert_eq!(views.town_record_key(), "town0");
+        assert_eq!(views.town_boat(), (3, 4));
+    }
+
+    #[test]
+    fn town_arrows_navigate_and_letters_execute_rows() {
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+
+        assert_eq!(
+            views.town_update(&Keys::pressed(&[Key::Down])),
+            TownInput::Handled
+        );
+        assert_eq!(
+            views.town_update(&Keys::pressed(&[Key::B])),
+            TownInput::RunRow(TownRow::Boat)
+        );
+        assert_eq!(
+            views.town_update(&Keys::pressed(&[Key::Escape])),
+            TownInput::Dismissed
+        );
+        assert!(!views.is_active());
+    }
+
+    #[test]
+    fn the_town_info_overlay_is_sticky_until_acknowledged() {
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+        views.town_show_info("Hello");
+
+        // An unrelated key is consumed but keeps the overlay open.
+        assert_eq!(
+            views.town_update(&Keys::pressed(&[Key::X])),
+            TownInput::Handled
+        );
+        // ESC dismisses only the overlay, not the view.
+        assert_eq!(
+            views.town_update(&Keys::pressed(&[Key::Escape])),
+            TownInput::Handled
+        );
+        assert!(views.is_active());
+    }
+
+    #[test]
+    fn the_town_view_draws_header_and_rows() {
+        let (resources, layout, _) = spells_fixtures();
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+        let palette = Palette::fallback();
+        let mut list = DrawList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        let catalog = SpriteCatalog::from_resources(&resources);
+        views.draw(
+            &mut list,
+            &layout,
+            &palette,
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &Game::default(),
+            &present,
+            0.0,
+        );
+
+        assert!(list.has_text_containing("Town of Riverton"));
+        assert!(list.has_text_containing("Get New Contract"));
+        assert!(list.has_text_containing("Gather information"));
+        assert!(!list
+            .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Town))
+            .is_empty());
     }
 }

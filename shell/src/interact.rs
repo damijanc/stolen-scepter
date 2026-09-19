@@ -10,7 +10,10 @@
 //! Nothing here touches a graphics library, so the outcome-to-text mapping is
 //! testable headlessly the way the engine's combat digests are.
 
-use openbounty_engine::game::{ChestOutcome, ChestRoll, Game};
+use openbounty_engine::game::{
+    BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game, SiegeBuyOutcome,
+    SpellBuyOutcome,
+};
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
 use openbounty_engine::step::StepInteraction;
@@ -643,6 +646,370 @@ pub fn bridge_invalid(resources: &Resources) -> (String, String) {
     )
 }
 
+/// Town banner defaults, porting `load_banner_defaults`. The pack overrides
+/// them under `strings.banners`.
+const DEFAULT_TOWN_HEADER: &str = "Town of %NAME%";
+const DEFAULT_TOWN_GOLD_LABEL: &str = "GP=%GOLD%K";
+const DEFAULT_TOWN_ROW_CONTRACT: &str = "A) Get New Contract";
+const DEFAULT_TOWN_ROW_BOAT_RENT: &str = "B) Rent boat (%COST% week)";
+const DEFAULT_TOWN_ROW_BOAT_CANCEL: &str = "B) Cancel boat rental";
+const DEFAULT_TOWN_ROW_INFO: &str = "C) Gather information";
+const DEFAULT_TOWN_ROW_SPELL: &str = "D) %SPELL% spell (%SPELL_COST%)";
+const DEFAULT_TOWN_ROW_SPELL_NONE: &str = "D) (no spell available)";
+const DEFAULT_TOWN_ROW_SIEGE_BUY: &str = "E) Buy seige weapons (%SIEGE_COST%)";
+const DEFAULT_TOWN_ROW_SIEGE_OWNED: &str = "E) Siege weapons (owned)";
+const DEFAULT_TOWN_CONTRACT_NEW: &str =
+    "New contract: %VILLAIN%.\nReward: %REWARD% gold.\nLast seen on %ZONE%.";
+const DEFAULT_TOWN_CONTRACT_NONE: &str = "No contracts are available right now.";
+const DEFAULT_TOWN_BOAT_VACATE_FIRST: &str = "\n\nPlease vacate the boat first";
+const DEFAULT_TOWN_NO_GOLD: &str = "\n\n\nYou don't have enough gold!";
+const DEFAULT_TOWN_INTEL_UNAVAILABLE: &str = "No intelligence is available here.";
+const DEFAULT_TOWN_INTEL_CASTLE_UNDER: &str = "Castle %NAME% is under\n";
+const DEFAULT_TOWN_INTEL_OWNER_RULE: &str = "%OWNER%'s rule.\n\n";
+const DEFAULT_TOWN_INTEL_OWNER_NONE: &str = "no one";
+const DEFAULT_TOWN_INTEL_OWNER_PLAYER: &str = "your";
+const DEFAULT_TOWN_INTEL_OWNER_KING: &str = "the King";
+const DEFAULT_TOWN_INTEL_COUNT_NAMED: &str = "  %LABEL% %TROOP%\n";
+const DEFAULT_TOWN_INTEL_COUNT_NUMERIC: &str = "  %COUNT% %TROOP%\n";
+const DEFAULT_TOWN_INTEL_MONSTERS_GENERIC: &str =
+    "  Various groups of monsters\n  occupy the castle.";
+const DEFAULT_TOWN_INTEL_NO_GARRISON: &str = "  (no garrison)";
+const DEFAULT_TOWN_SPELL_UNAVAILABLE: &str = "No spell is available here.";
+const DEFAULT_TOWN_SPELL_AT_CAP: &str = "You have learned your maximum number of spells.";
+const DEFAULT_TOWN_SPELL_CAN_LEARN: &str = "You can learn %LEFT% more spell%S%.";
+const DEFAULT_TOWN_SIEGE_ALREADY: &str = "You have siege weapons!";
+const DEFAULT_TOWN_SIEGE_PURCHASED: &str = "Siege weapons purchased.";
+
+/// The town header and gold label, used by the town menu panel.
+pub fn town_header_text(resources: &Resources, name: &str) -> String {
+    banner::formatted(
+        resources,
+        "banners",
+        "town_header",
+        DEFAULT_TOWN_HEADER,
+        &[("NAME", name)],
+    )
+}
+
+/// The right-aligned "GP=%GOLD%K" label, porting `town_gold_label`.
+pub fn town_gold_text(resources: &Resources, gold: i32) -> String {
+    let gold_k = (gold / 1000).to_string();
+    banner::formatted(
+        resources,
+        "banners",
+        "town_gold_label",
+        DEFAULT_TOWN_GOLD_LABEL,
+        &[("GOLD", &gold_k)],
+    )
+}
+
+/// One town action row's label, porting `town_format_row`. `row` is 0..4:
+/// contract, boat, info, spell, siege.
+pub fn town_row_text(resources: &Resources, game: &Game, record_key: &str, row: i32) -> String {
+    let text = |key, default| banner::text(resources, "banners", key, default);
+    match row {
+        0 => text("town_row_contract", DEFAULT_TOWN_ROW_CONTRACT).to_owned(),
+        1 => {
+            if game.boat.has_boat {
+                text("town_row_boat_cancel", DEFAULT_TOWN_ROW_BOAT_CANCEL).to_owned()
+            } else {
+                let cost = game.boat_cost(resources).to_string();
+                banner::formatted(
+                    resources,
+                    "banners",
+                    "town_row_boat_rent",
+                    DEFAULT_TOWN_ROW_BOAT_RENT,
+                    &[("COST", &cost)],
+                )
+            }
+        }
+        2 => text("town_row_info", DEFAULT_TOWN_ROW_INFO).to_owned(),
+        3 => {
+            let spell_for_sale = game
+                .towns
+                .iter()
+                .find(|town| town.id.as_str() == record_key)
+                .map(|town| town.spell_for_sale.as_str())
+                .unwrap_or("");
+            match resources.spell_by_id(spell_for_sale) {
+                Some(spell) if !spell_for_sale.is_empty() => {
+                    let cost = spell.cost.to_string();
+                    banner::formatted(
+                        resources,
+                        "banners",
+                        "town_row_spell",
+                        DEFAULT_TOWN_ROW_SPELL,
+                        &[("SPELL", spell.name.as_str()), ("SPELL_COST", &cost)],
+                    )
+                }
+                _ => text("town_row_spell_none", DEFAULT_TOWN_ROW_SPELL_NONE).to_owned(),
+            }
+        }
+        4 => {
+            if game.stats.siege_weapons != 0 {
+                text("town_row_siege_owned", DEFAULT_TOWN_ROW_SIEGE_OWNED).to_owned()
+            } else {
+                let cost = resources.economy.siege_cost.to_string();
+                banner::formatted(
+                    resources,
+                    "banners",
+                    "town_row_siege_buy",
+                    DEFAULT_TOWN_ROW_SIEGE_BUY,
+                    &[("SIEGE_COST", &cost)],
+                )
+            }
+        }
+        _ => String::new(),
+    }
+}
+
+/// The contract toast, porting `town_do_contract`. `villain_id` is the id
+/// `Game::take_next_contract` returned (already applied to the active
+/// contract); `None` means no contract was available.
+pub fn town_contract_toast(resources: &Resources, villain_id: Option<&str>) -> String {
+    match villain_id.and_then(|id| resources.villain_by_id(id)) {
+        Some(villain) => {
+            let reward = villain.reward.to_string();
+            let zone_label = resources
+                .zone_by_id(villain.zone.as_str())
+                .map(|zone| {
+                    if zone.name.is_empty() {
+                        zone.id.as_str()
+                    } else {
+                        zone.name.as_str()
+                    }
+                })
+                .unwrap_or(villain.zone.as_str());
+            banner::formatted(
+                resources,
+                "banners",
+                "town_contract_new",
+                DEFAULT_TOWN_CONTRACT_NEW,
+                &[
+                    ("VILLAIN", villain.name.as_str()),
+                    ("REWARD", &reward),
+                    ("ZONE", zone_label),
+                ],
+            )
+        }
+        None => banner::text(
+            resources,
+            "banners",
+            "town_contract_none",
+            DEFAULT_TOWN_CONTRACT_NONE,
+        )
+        .to_owned(),
+    }
+}
+
+/// The boat toast, porting `town_do_boat`. `None` is the silent success path
+/// (the row label itself confirms the change).
+pub fn town_boat_toast(resources: &Resources, outcome: BoatActionOutcome) -> Option<String> {
+    match outcome {
+        BoatActionOutcome::RentOk | BoatActionOutcome::CancelOk => None,
+        BoatActionOutcome::CancelAtSea => Some(
+            banner::text(
+                resources,
+                "banners",
+                "town_boat_vacate_first",
+                DEFAULT_TOWN_BOAT_VACATE_FIRST,
+            )
+            .to_owned(),
+        ),
+        BoatActionOutcome::RentNoGold => Some(
+            banner::text(resources, "banners", "town_no_gold", DEFAULT_TOWN_NO_GOLD).to_owned(),
+        ),
+    }
+}
+
+/// The spell-buy toast, porting `town_do_spell`. The engine applies the buy;
+/// this writes the result message.
+pub fn town_spell_toast(resources: &Resources, game: &Game, outcome: SpellBuyOutcome) -> String {
+    match outcome {
+        SpellBuyOutcome::NoSpell => banner::text(
+            resources,
+            "banners",
+            "town_spell_unavailable",
+            DEFAULT_TOWN_SPELL_UNAVAILABLE,
+        )
+        .to_owned(),
+        SpellBuyOutcome::AtCap => banner::text(
+            resources,
+            "banners",
+            "town_spell_at_cap",
+            DEFAULT_TOWN_SPELL_AT_CAP,
+        )
+        .to_owned(),
+        SpellBuyOutcome::NoGold => {
+            banner::text(resources, "banners", "town_no_gold", DEFAULT_TOWN_NO_GOLD).to_owned()
+        }
+        SpellBuyOutcome::Ok => {
+            let left = game.stats.max_spells - game.known_spells();
+            let left = left.to_string();
+            let s = if game.stats.max_spells - game.known_spells() == 1 {
+                ""
+            } else {
+                "s"
+            };
+            banner::formatted(
+                resources,
+                "banners",
+                "town_spell_can_learn",
+                DEFAULT_TOWN_SPELL_CAN_LEARN,
+                &[("LEFT", &left), ("S", s)],
+            )
+        }
+    }
+}
+
+/// The siege-buy toast, porting `town_do_siege`.
+pub fn town_siege_toast(resources: &Resources, outcome: SiegeBuyOutcome) -> String {
+    let (key, default) = match outcome {
+        SiegeBuyOutcome::Already => ("town_siege_already", DEFAULT_TOWN_SIEGE_ALREADY),
+        SiegeBuyOutcome::NoGold => ("town_no_gold", DEFAULT_TOWN_NO_GOLD),
+        SiegeBuyOutcome::Ok => ("town_siege_purchased", DEFAULT_TOWN_SIEGE_PURCHASED),
+    };
+    banner::text(resources, "banners", key, default).to_owned()
+}
+
+/// The gather-information toast, porting `town_do_info`: castle owner, rule,
+/// and garrison stacks (fuzzy-count labelled when the pack ships `number_names`).
+pub fn town_intel_toast(resources: &Resources, game: &Game, record_key: &str) -> String {
+    let unavailable = || {
+        banner::text(
+            resources,
+            "banners",
+            "town_intel_unavailable",
+            DEFAULT_TOWN_INTEL_UNAVAILABLE,
+        )
+        .to_owned()
+    };
+
+    let Some(town) = resources.town_by_id(record_key) else {
+        return unavailable();
+    };
+    if town.intel_castle.is_empty() {
+        return unavailable();
+    }
+    let Some(castle) = resources.castle_by_id(town.intel_castle.as_str()) else {
+        return unavailable();
+    };
+    if castle.special.excluded_from_intel {
+        return unavailable();
+    }
+    let Some(record) = game
+        .castles
+        .iter()
+        .find(|record| record.id.as_str() == town.intel_castle.as_str())
+    else {
+        return unavailable();
+    };
+
+    let display_name = if castle.name.is_empty() {
+        castle.id.as_str()
+    } else {
+        castle.name.as_str()
+    };
+    let mut body = banner::formatted(
+        resources,
+        "banners",
+        "town_intel_castle_under",
+        DEFAULT_TOWN_INTEL_CASTLE_UNDER,
+        &[("NAME", display_name)],
+    );
+
+    let owner = match record.owner_kind {
+        CastleOwnerKind::Player => banner::text(
+            resources,
+            "banners",
+            "town_intel_owner_player",
+            DEFAULT_TOWN_INTEL_OWNER_PLAYER,
+        ),
+        CastleOwnerKind::Villain => {
+            let label = resources
+                .villain_by_id(record.villain_id.as_str())
+                .map(|v| {
+                    if v.name.is_empty() {
+                        v.id.as_str()
+                    } else {
+                        v.name.as_str()
+                    }
+                })
+                .unwrap_or(record.villain_id.as_str());
+            label
+        }
+        CastleOwnerKind::Special => banner::text(
+            resources,
+            "banners",
+            "town_intel_owner_king",
+            DEFAULT_TOWN_INTEL_OWNER_KING,
+        ),
+        _ => banner::text(
+            resources,
+            "banners",
+            "town_intel_owner_none",
+            DEFAULT_TOWN_INTEL_OWNER_NONE,
+        ),
+    };
+    body.push_str(&banner::formatted(
+        resources,
+        "banners",
+        "town_intel_owner_rule",
+        DEFAULT_TOWN_INTEL_OWNER_RULE,
+        &[("OWNER", owner)],
+    ));
+
+    let mut stacks_shown = 0;
+    for unit in record.garrison.iter() {
+        if unit.id.is_empty() || unit.count == 0 {
+            continue;
+        }
+        let troop_name = resources
+            .troop_by_id(unit.id.as_str())
+            .map(|t| t.name.as_str())
+            .unwrap_or(unit.id.as_str());
+        let count_label = resources.number_name(unit.count);
+        if !count_label.is_empty() {
+            body.push_str(&banner::formatted(
+                resources,
+                "banners",
+                "town_intel_count_named",
+                DEFAULT_TOWN_INTEL_COUNT_NAMED,
+                &[("LABEL", count_label), ("TROOP", troop_name)],
+            ));
+        } else {
+            let count = unit.count.to_string();
+            body.push_str(&banner::formatted(
+                resources,
+                "banners",
+                "town_intel_count_numeric",
+                DEFAULT_TOWN_INTEL_COUNT_NUMERIC,
+                &[("COUNT", &count), ("TROOP", troop_name)],
+            ));
+        }
+        stacks_shown += 1;
+    }
+    if stacks_shown == 0 {
+        let line = if record.owner_kind == CastleOwnerKind::Monsters {
+            banner::text(
+                resources,
+                "banners",
+                "town_intel_monsters_generic",
+                DEFAULT_TOWN_INTEL_MONSTERS_GENERIC,
+            )
+        } else {
+            banner::text(
+                resources,
+                "banners",
+                "town_intel_no_garrison",
+                DEFAULT_TOWN_INTEL_NO_GARRISON,
+            )
+        };
+        body.push_str(line);
+    }
+    body
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1036,5 +1403,104 @@ mod tests {
         let (header, body) = bridge_invalid(&resources);
         assert_eq!(header, "Bridge");
         assert!(body.contains("suitable"));
+    }
+
+    fn town_resources() -> Resources {
+        Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [
+                 {"index":0,"id":"peasants","name":"Peasants","skill_level":1,"hit_points":1,
+                  "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,
+                  "spoils_factor":1,"abilities":"","morale_group":"A"}
+               ],
+               "zones": [{"id":"home","name":"Continentia"}],
+               "towns": [{"id":"town0","name":"Riverton","zone":"home","x":1,"y":1,"intel_castle":"castle0"}],
+               "castles": [{"id":"castle0","name":"Darkstone","zone":"home","x":2,"y":2}],
+               "spells": [{"id":"fireball","name":"Fireball","kind":"combat","cost":50}],
+               "villains": [{"index":0,"id":"murray","name":"Murray","zone":"home","reward":1000}],
+               "combat": {"number_names": [{"min":10,"label":"Some"},{"min":1,"label":"A few"}]}}"#,
+        )
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn town_rows_reflect_game_state() {
+        let resources = town_resources();
+        let mut game = Game::default();
+        game.towns[0].id.copy_from_str("town0");
+        game.towns[0].spell_for_sale.copy_from_str("fireball");
+
+        assert!(town_row_text(&resources, &game, "town0", 0).contains("Get New Contract"));
+        assert!(town_row_text(&resources, &game, "town0", 1).contains("Rent boat"));
+        assert!(town_row_text(&resources, &game, "town0", 3).contains("Fireball"));
+        assert!(town_row_text(&resources, &game, "town0", 3).contains("50"));
+        assert!(town_row_text(&resources, &game, "town0", 4).contains("Buy seige"));
+
+        game.boat.has_boat = true;
+        assert!(town_row_text(&resources, &game, "town0", 1).contains("Cancel boat"));
+
+        game.stats.siege_weapons = 1;
+        assert!(town_row_text(&resources, &game, "town0", 4).contains("owned"));
+    }
+
+    #[test]
+    fn town_contract_toast_names_the_villain() {
+        let resources = town_resources();
+        let toast = town_contract_toast(&resources, Some("murray"));
+        assert!(toast.contains("Murray"));
+        assert!(toast.contains("1000"));
+        assert!(toast.contains("Continentia"));
+
+        let none = town_contract_toast(&resources, None);
+        assert!(none.contains("No contracts"));
+    }
+
+    #[test]
+    fn town_intel_toast_reports_castle_owner_and_garrison() {
+        let resources = town_resources();
+        let mut game = Game::default();
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].owner_kind = openbounty_engine::game::CastleOwnerKind::Villain;
+        game.castles[0].villain_id.copy_from_str("murray");
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 5;
+
+        let toast = town_intel_toast(&resources, &game, "town0");
+        assert!(toast.contains("Darkstone"));
+        assert!(toast.contains("Murray"));
+        assert!(toast.contains("A few"));
+        assert!(toast.contains("Peasants"));
+    }
+
+    #[test]
+    fn town_boat_toast_only_responds_to_failures() {
+        let resources = town_resources();
+        assert_eq!(town_boat_toast(&resources, BoatActionOutcome::RentOk), None);
+        assert_eq!(
+            town_boat_toast(&resources, BoatActionOutcome::CancelOk),
+            None
+        );
+        assert!(town_boat_toast(&resources, BoatActionOutcome::RentNoGold)
+            .unwrap()
+            .contains("gold"));
+        assert!(town_boat_toast(&resources, BoatActionOutcome::CancelAtSea)
+            .unwrap()
+            .contains("vacate"));
+    }
+
+    #[test]
+    fn town_spell_and_siege_toasts_report_each_outcome() {
+        let resources = town_resources();
+        let mut game = Game::default();
+        game.stats.max_spells = 5;
+        game.spells.counts[0] = 2;
+
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::NoSpell).contains("No spell"));
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::AtCap).contains("maximum"));
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::NoGold).contains("gold"));
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::Ok).contains("3 more spells"));
+
+        assert!(town_siege_toast(&resources, SiegeBuyOutcome::Already).contains("siege weapons"));
+        assert!(town_siege_toast(&resources, SiegeBuyOutcome::NoGold).contains("gold"));
+        assert!(town_siege_toast(&resources, SiegeBuyOutcome::Ok).contains("purchased"));
     }
 }

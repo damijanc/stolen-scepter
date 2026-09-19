@@ -50,7 +50,7 @@ use openbounty_engine::step::{
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use sprites::SpriteCatalog;
-use views::{controls_visible, worldmap_has_orb, SpellsInput, ViewKind, Views};
+use views::{controls_visible, worldmap_has_orb, SpellsInput, TownInput, TownRow, ViewKind, Views};
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -267,6 +267,41 @@ fn dispatch_spell(
             }
         },
     }
+}
+
+/// Run one town action row: the engine applies the transaction and the result
+/// is shown through the town info overlay. Ports `town_do_row`.
+fn run_town_row(game: &mut Game, resources: &Resources, views: &mut Views, row: TownRow) {
+    let record_key = views.town_record_key().to_owned();
+    let toast = match row {
+        TownRow::Contract => {
+            let villain_id = game.take_next_contract(resources).map(|id| id.to_owned());
+            interact::town_contract_toast(resources, villain_id.as_deref())
+        }
+        TownRow::Boat => {
+            let (boat_x, boat_y) = views.town_boat();
+            let zone = game.position.zone.as_str().to_owned();
+            let outcome = if game.boat.has_boat {
+                game.cancel_boat()
+            } else {
+                game.rent_boat(resources, boat_x, boat_y, &zone)
+            };
+            match interact::town_boat_toast(resources, outcome) {
+                Some(body) => body,
+                None => return,
+            }
+        }
+        TownRow::Info => interact::town_intel_toast(resources, game, &record_key),
+        TownRow::Spell => {
+            let outcome = game.buy_spell(resources, &record_key);
+            interact::town_spell_toast(resources, game, outcome)
+        }
+        TownRow::Siege => {
+            let outcome = game.buy_siege(resources);
+            interact::town_siege_toast(resources, outcome)
+        }
+    };
+    views.town_show_info(&toast);
 }
 
 fn window_conf() -> Conf {
@@ -486,6 +521,13 @@ async fn main() {
                     }
                 }
             }
+        } else if views.active() == Some(ViewKind::Town) {
+            // The town menu owns its arrows/letter/Enter input; executing a row
+            // runs the engine transaction and shows its info toast.
+            match views.town_update(&keys) {
+                TownInput::RunRow(row) => run_town_row(&mut game, &resources, &mut views, row),
+                TownInput::Dismissed | TownInput::Handled | TownInput::None => {}
+            }
         } else if views.is_active() {
             // The worldmap alone treats SPACE specially: with the crystal orb
             // it toggles fog-only vs whole-map; without it SPACE dismisses
@@ -633,6 +675,19 @@ async fn main() {
                                 prompt.yes_no(&header, &body);
                                 pending = PendingFlow::Alcove;
                             }
+                        }
+                        StepInteraction::Town { id, boat_x, boat_y } => {
+                            let display_name = resources
+                                .town_by_id(id.as_str())
+                                .map(|town| {
+                                    if town.name.is_empty() {
+                                        town.id.as_str()
+                                    } else {
+                                        town.name.as_str()
+                                    }
+                                })
+                                .unwrap_or(id.as_str());
+                            views.town_open(display_name, id.as_str(), *boat_x, *boat_y);
                         }
                         StepInteraction::None => {}
                         other => {
