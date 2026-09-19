@@ -24,7 +24,7 @@ pub const DEFAULT_WORLDMAP_YOUR_MAP: &str = "'ESC' to exit / 'SPC' your map";
 pub const DEFAULT_WORLDMAP_WHOLE_MAP: &str = "'ESC' to exit / 'SPC' whole map";
 
 /// What the status bar says. Three modes, in priority order.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StatusMode {
     /// Ctrl+Q: a modal prompt that overrides everything until it is answered.
     FastQuit,
@@ -35,6 +35,9 @@ pub enum StatusMode {
     Worldmap { whole_map: bool },
     /// Adventure mode: days left, or the time-stop countdown instead.
     Adventure,
+    /// Combat supplies its own status line (the acting unit, or the running
+    /// kill tally), already formatted.
+    Combat { title: String },
     /// Combat and the like supply their own line, already formatted.
     Custom(&'static str),
 }
@@ -101,6 +104,7 @@ impl Chrome<'_> {
     pub fn status_text(&self) -> String {
         match self.mode {
             StatusMode::Custom(text) => text.to_owned(),
+            StatusMode::Combat { ref title } => title.clone(),
             StatusMode::FastQuit => banner::text(
                 self.resources,
                 "ui",
@@ -373,6 +377,21 @@ mod tests {
             list.texts()[0],
             (STATUS_X + 1, STATUS_Y + 1, "Sir Rust vs Ogres")
         );
+    }
+
+    #[test]
+    fn a_combat_line_is_taken_as_given() {
+        let (layout, palette, resources, game) = parts("");
+        let chrome = chrome_of(
+            &layout,
+            &palette,
+            &resources,
+            &game,
+            StatusMode::Combat {
+                title: " Options / Militia M5,S2".to_owned(),
+            },
+        );
+        assert_eq!(chrome.status_text(), " Options / Militia M5,S2");
     }
 
     #[test]

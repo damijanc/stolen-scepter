@@ -1272,6 +1272,51 @@ pub fn dwelling_how_many(resources: &Resources) -> String {
     .to_owned()
 }
 
+pub fn castle_display_name(resources: &Resources, castle_id: &str) -> String {
+    resources
+        .castle_by_id(castle_id)
+        .map(|castle| {
+            if castle.name.is_empty() {
+                castle.id.as_str()
+            } else {
+                castle.name.as_str()
+            }
+        })
+        .unwrap_or(castle_id)
+        .to_owned()
+}
+
+/// The monster-castle siege prompt, porting the `FLOW_SIEGE_MONSTER` branch.
+pub fn siege_monster_prompt(resources: &Resources, castle_id: &str) -> (String, String) {
+    let name = castle_display_name(resources, castle_id);
+    (
+        format!("Castle {name}"),
+        "Various groups of monsters\noccupy this castle.\n\n\n                Lay Siege".to_owned(),
+    )
+}
+
+/// The villain-castle siege prompt, porting the `FLOW_SIEGE_VILLAIN` branch.
+pub fn siege_villain_prompt(
+    resources: &Resources,
+    game: &Game,
+    castle_id: &str,
+) -> (String, String) {
+    let name = castle_display_name(resources, castle_id);
+    let villain_name = game
+        .castles
+        .iter()
+        .find(|castle| castle.id.as_str() == castle_id)
+        .map(|castle| castle.villain_id.as_str())
+        .and_then(|id| resources.villain_by_id(id))
+        .map(|villain| villain.name.as_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Foe");
+    (
+        format!("Castle {name}"),
+        format!("{villain_name} and\narmy occupy this castle.\n\n\n                Lay Siege"),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1875,5 +1920,21 @@ mod tests {
         assert!(dwelling_none_this_week(&resources).contains("this week"));
         assert!(dwelling_empty(&resources).contains("empty"));
         assert_eq!(dwelling_how_many(&resources), "Recruit how many");
+    }
+
+    #[test]
+    fn siege_prompts_name_the_occupant() {
+        let resources = town_resources();
+        let (header, body) = siege_monster_prompt(&resources, "castle0");
+        assert_eq!(header, "Castle Darkstone");
+        assert!(body.contains("monsters"));
+        assert!(body.contains("Lay Siege"));
+
+        let mut game = Game::default();
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].villain_id.copy_from_str("murray");
+        let (header, body) = siege_villain_prompt(&resources, &game, "castle0");
+        assert_eq!(header, "Castle Darkstone");
+        assert!(body.contains("Murray"));
     }
 }

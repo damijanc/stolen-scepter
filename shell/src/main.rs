@@ -30,15 +30,19 @@ use macroquad::prelude::{get_time, next_frame, Conf};
 use anim::HeroAnimator;
 use backend::{Backend, MacroquadKeys};
 use chrome::{Chrome, StatusMode};
+use combat::{combat_render, combat_title, CombatLoop, CombatStatus};
 use dialog::Dialog;
 use draw::DrawList;
 use input::{Action, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
+use openbounty_engine::combat::{
+    CombatMode, CombatResult, CombatTarget, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER, COMBAT_SLOTS,
+};
 use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{
-    CastleOwnerKind, Game, GarrisonOutcome, GateDestKind, GateDestination, TravelMode,
-    GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
+    ArmyStack, CastleOwnerKind, Game, GarrisonOutcome, GateDestKind, GateDestination, TravelMode,
+    VillainSiegeOutcome, GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
@@ -82,6 +86,13 @@ enum PendingFlow {
     Dwelling {
         troop_id: String,
     },
+    /// A hostile castle asked whether to lay siege.
+    SiegeMonster {
+        castle_id: String,
+    },
+    SiegeVillain {
+        castle_id: String,
+    },
 }
 
 /// Text C compiles in for the prompts and dialogs the shell opens. Kept
@@ -97,6 +108,131 @@ const DEFAULT_BODY_DISMISS_LAST: &str = "If you dismiss your last\n\
     to the King in disgrace.\n\
     Dismiss last army?";
 
+/// Which battle a combat session is resolving.
+enum CombatFlow {
+    MonsterSiege {
+        castle_id: String,
+    },
+    VillainSiege {
+        castle_id: String,
+    },
+    HostileFoe {
+        foe_id: String,
+        foe_x: i32,
+        foe_y: i32,
+    },
+}
+
+/// A running interactive battle plus the flow that armed it.
+struct CombatSession {
+    flow: CombatFlow,
+    combat: CombatLoop,
+    target_name: String,
+}
+
+/// Build the interactive combat for a flow, porting the shell half of
+/// `RunCombat`'s setup: the target garrison is copied out of game state so the
+/// borrow does not fight the `&mut Game` the loop needs.
+fn start_combat(game: &Game, resources: &Resources, flow: CombatFlow) -> CombatSession {
+    match &flow {
+        CombatFlow::MonsterSiege { castle_id } | CombatFlow::VillainSiege { castle_id } => {
+            let garrison = game
+                .castles
+                .iter()
+                .find(|castle| castle.id.as_str() == castle_id)
+                .map(|castle| castle.garrison)
+                .unwrap_or_default();
+            let name = interact::castle_display_name(resources, castle_id);
+            let target = CombatTarget {
+                name: name.as_str(),
+                garrison: &garrison,
+                seed_key: castle_id.as_str(),
+            };
+            let combat = CombatLoop::new(game, resources, CombatMode::Castle, &target);
+            CombatSession {
+                flow,
+                combat,
+                target_name: name,
+            }
+        }
+        CombatFlow::HostileFoe { foe_id, .. } => {
+            let garrison = game.foes[..game.foe_count]
+                .iter()
+                .find(|foe| foe.placement_id.as_str() == foe_id)
+                .map(|foe| foe.garrison)
+                .unwrap_or_default();
+            let target = CombatTarget {
+                name: "Hostile band",
+                garrison: &garrison,
+                seed_key: foe_id.as_str(),
+            };
+            let combat = CombatLoop::new(game, resources, CombatMode::Foe, &target);
+            CombatSession {
+                flow,
+                combat,
+                target_name: "Hostile band".to_owned(),
+            }
+        }
+    }
+}
+
+/// Apply a finished battle: credit spoils and write the surviving army back on
+/// a win, then resolve the flow (castle ownership, foe removal, or the loss
+/// handling) and show the victory banner.
+fn finish_combat(
+    game: &mut Game,
+    map: &mut Map,
+    fog: &mut Fog,
+    resources: &Resources,
+    session: CombatSession,
+    result: CombatResult,
+    dialog: &mut Dialog,
+) {
+    if result == CombatResult::Win {
+        let spoils = session.combat.combat.spoils[COMBAT_SIDE_AI];
+        game.stats.gold = game.stats.gold.wrapping_add(spoils);
+        for slot in 0..COMBAT_SLOTS {
+            let unit = &session.combat.combat.units[COMBAT_SIDE_PLAYER][slot];
+            if unit.troop_idx < 0 || unit.count == 0 {
+                game.army[slot] = ArmyStack::default();
+            } else if let Some(troop) = resources.troop_by_index(unit.troop_idx) {
+                game.army[slot].id.copy_from_str(troop.id.as_str());
+                game.army[slot].count = unit.count;
+            }
+        }
+        game.compact_army();
+    }
+
+    let temp_death = match &session.flow {
+        CombatFlow::MonsterSiege { castle_id } => game.resolve_monster_siege(castle_id, result),
+        CombatFlow::VillainSiege { castle_id } => {
+            game.resolve_villain_siege(resources, castle_id, result)
+                == VillainSiegeOutcome::Repelled
+        }
+        CombatFlow::HostileFoe {
+            foe_id,
+            foe_x,
+            foe_y,
+        } => game.resolve_hostile_foe(map, foe_id, *foe_x, *foe_y, result),
+    };
+    if temp_death {
+        game.temp_death(resources, map, fog);
+    }
+
+    if result == CombatResult::Win {
+        let hero = if game.character.name.is_empty() {
+            "warrior"
+        } else {
+            game.character.name.as_str()
+        };
+        let body = format!(
+            "Well done {hero}, you have\nsuccessfully vanquished\n{}.\n\nSpoils of War: {} gold",
+            session.target_name, session.combat.combat.spoils[COMBAT_SIDE_AI]
+        );
+        dialog.open("Victory!", &body);
+    }
+}
+
 /// Route a prompt answer into the engine, porting the shell half of
 /// `shell_promptdispatch.c`. The engine cores are called directly rather than
 /// through a mirrored queue; each answer either mutates game state, opens a
@@ -110,7 +246,7 @@ fn dispatch_answer(
     pending: &mut PendingFlow,
     prompt: &mut Prompt,
     dialog: &mut Dialog,
-) {
+) -> Option<CombatFlow> {
     let flow = std::mem::take(pending);
     match flow {
         PendingFlow::Search => {
@@ -214,8 +350,19 @@ fn dispatch_answer(
                 game.recruit_from_dwelling(resources, &zone, x, y, &troop_id, requested);
             }
         }
+        PendingFlow::SiegeMonster { castle_id } => {
+            if answer == PromptResult::Yes {
+                return Some(CombatFlow::MonsterSiege { castle_id });
+            }
+        }
+        PendingFlow::SiegeVillain { castle_id } => {
+            if answer == PromptResult::Yes {
+                return Some(CombatFlow::VillainSiege { castle_id });
+            }
+        }
         PendingFlow::None => {}
     }
+    None
 }
 
 /// Route a chosen spellbook slot into the engine and present the result,
@@ -404,14 +551,37 @@ async fn main() {
     let mut dialog = Dialog::default();
     let mut pending = PendingFlow::None;
     let mut views = Views::new();
+    // A running interactive battle; while Some, combat owns the screen and
+    // the keys.
+    let mut combat: Option<CombatSession> = None;
 
     loop {
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
 
-        // Input priority: the message dialog owns the keys while it is open
-        // (C's issue #19 gate), then the prompt, then the fast-quit status
+        // Input priority: combat first, then the message dialog owns the keys
+        // while it is open (C's issue #19 gate), then the prompt, then the
+        // fast-quit status
         // prompt, then the overworld.
-        if dialog.is_active() {
+        if let Some(session) = &mut combat {
+            let status = session.combat.step(&keys, &mut game, &resources);
+            if status != CombatStatus::Running {
+                let result = if status == CombatStatus::Win {
+                    CombatResult::Win
+                } else {
+                    CombatResult::Loss
+                };
+                let session = combat.take().expect("combat was Some");
+                finish_combat(
+                    &mut game,
+                    &mut map,
+                    &mut fog,
+                    &resources,
+                    session,
+                    result,
+                    &mut dialog,
+                );
+            }
+        } else if dialog.is_active() {
             let ctrl = keys.down(Key::LeftControl) || keys.down(Key::RightControl);
             if ctrl && keys.pressed(Key::Q) {
                 return;
@@ -452,7 +622,7 @@ async fn main() {
         } else if prompt.is_active() {
             let answer = prompt.update(&keys);
             if answer != PromptResult::None {
-                dispatch_answer(
+                let combat_flow = dispatch_answer(
                     &mut game,
                     &mut map,
                     &mut fog,
@@ -462,6 +632,9 @@ async fn main() {
                     &mut prompt,
                     &mut dialog,
                 );
+                if let Some(flow) = combat_flow {
+                    combat = Some(start_combat(&game, &resources, flow));
+                }
             }
         } else if views.active() == Some(ViewKind::Controls) {
             // Navigate rows with Up/Down; Enter/Space (or a digit) advances
@@ -765,10 +938,56 @@ async fn main() {
                                 c.id.as_str() == id && c.owner_kind == CastleOwnerKind::Player
                             }) {
                                 views.own_castle_open(id.as_str());
-                            } else {
-                                // Hostile castle: the siege flow is the combat slice.
-                                eprintln!("hostile castle siege not yet wired");
+                            } else if game.stats.siege_weapons != 0 {
+                                let owner_kind = game
+                                    .castles
+                                    .iter()
+                                    .find(|c| c.id.as_str() == id)
+                                    .map(|c| c.owner_kind)
+                                    .unwrap_or(CastleOwnerKind::Monsters);
+                                match owner_kind {
+                                    CastleOwnerKind::Villain => {
+                                        let (header, body) = interact::siege_villain_prompt(
+                                            &resources,
+                                            &game,
+                                            id.as_str(),
+                                        );
+                                        prompt.yes_no(&header, &body);
+                                        pending = PendingFlow::SiegeVillain {
+                                            castle_id: id.clone(),
+                                        };
+                                    }
+                                    _ => {
+                                        let (header, body) =
+                                            interact::siege_monster_prompt(&resources, id);
+                                        prompt.yes_no(&header, &body);
+                                        pending = PendingFlow::SiegeMonster {
+                                            castle_id: id.clone(),
+                                        };
+                                    }
+                                }
                             }
+                            // Without siege weapons the hero stays on the gate;
+                            // C bounces them back, but this engine never bounces.
+                        }
+                        StepInteraction::Foe { id, friendly } => {
+                            if !friendly {
+                                let (foe_x, foe_y) = game.foes[..game.foe_count]
+                                    .iter()
+                                    .find(|foe| foe.placement_id.as_str() == id)
+                                    .map(|foe| (foe.x, foe.y))
+                                    .unwrap_or((0, 0));
+                                combat = Some(start_combat(
+                                    &game,
+                                    &resources,
+                                    CombatFlow::HostileFoe {
+                                        foe_id: id.clone(),
+                                        foe_x,
+                                        foe_y,
+                                    },
+                                ));
+                            }
+                            // A friendly foe's join offer is the encounter slice.
                         }
                         StepInteraction::Dwelling {
                             kind,
@@ -835,52 +1054,71 @@ async fn main() {
         }
 
         list.clear();
-        Chrome {
-            layout: &layout,
-            palette: backend.palette(),
-            resources: &resources,
-            game: &game,
-            mode: if fast_quit {
-                StatusMode::FastQuit
-            } else if views.active() == Some(ViewKind::Worldmap) {
-                StatusMode::Worldmap {
-                    whole_map: views.whole_map(),
-                }
-            } else if views.wants_exit_hint(&game) {
-                StatusMode::ExitHint
-            } else {
-                StatusMode::Adventure
-            },
-        }
-        .draw(&mut list);
-        MapScene {
-            layout: &layout,
-            catalog: &catalog,
-            palette: backend.palette(),
-            resources: &resources,
-            game: &game,
-            map: &map,
-            fog: &fog,
-            tick: hero_anim.tick(),
-            moving: hero_anim.moving(),
-        }
-        .draw(&mut list);
+        if let Some(session) = &combat {
+            // Combat owns the full inner area; the chrome shows its title.
+            let title = combat_title(&session.combat.combat, &resources);
+            Chrome {
+                layout: &layout,
+                palette: backend.palette(),
+                resources: &resources,
+                game: &game,
+                mode: StatusMode::Combat { title },
+            }
+            .draw(&mut list);
+            combat_render(
+                &mut list,
+                &session.combat.combat,
+                backend.palette(),
+                &catalog,
+            );
+        } else {
+            Chrome {
+                layout: &layout,
+                palette: backend.palette(),
+                resources: &resources,
+                game: &game,
+                mode: if fast_quit {
+                    StatusMode::FastQuit
+                } else if views.active() == Some(ViewKind::Worldmap) {
+                    StatusMode::Worldmap {
+                        whole_map: views.whole_map(),
+                    }
+                } else if views.wants_exit_hint(&game) {
+                    StatusMode::ExitHint
+                } else {
+                    StatusMode::Adventure
+                },
+            }
+            .draw(&mut list);
+            MapScene {
+                layout: &layout,
+                catalog: &catalog,
+                palette: backend.palette(),
+                resources: &resources,
+                game: &game,
+                map: &map,
+                fog: &fog,
+                tick: hero_anim.tick(),
+                moving: hero_anim.moving(),
+            }
+            .draw(&mut list);
 
-        // A view covers the map area while the overworld keeps running below.
-        // Each view derives its own animation clock from the wall time, as C
-        // does with GetTime().
-        views.draw(
-            &mut list,
-            &layout,
-            backend.palette(),
-            &resources,
-            &catalog,
-            &map,
-            &fog,
-            &game,
-            &present,
-            get_time(),
-        );
+            // A view covers the map area while the overworld keeps running
+            // below. Each view derives its own animation clock from the wall
+            // time, as C does with GetTime().
+            views.draw(
+                &mut list,
+                &layout,
+                backend.palette(),
+                &resources,
+                &catalog,
+                &map,
+                &fog,
+                &game,
+                &present,
+                get_time(),
+            );
+        }
 
         // The prompt replaces the bottom frame; the dialog draws LAST so it
         // covers a prompt that is up at the same time, exactly as C's overlay
