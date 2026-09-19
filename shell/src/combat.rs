@@ -312,6 +312,9 @@ pub struct CombatLoop {
     /// A turn advanced on the previous step; the banner is cleared at the top
     /// of the next step so the action that ended the turn is still shown once.
     pending_banner_clear: bool,
+    /// When the next SYN tick fires, pacing the damage burst and the AI to
+    /// C's 150ms cadence.
+    next_tick: f64,
 }
 
 impl CombatLoop {
@@ -354,6 +357,7 @@ impl CombatLoop {
             cast_dest_y: 0,
             banner: String::new(),
             pending_banner_clear: false,
+            next_tick: 0.0,
         }
     }
 
@@ -447,13 +451,14 @@ impl CombatLoop {
     }
 
     /// Drive one frame of combat input. The player's actions dispatch through
-    /// the engine's move/hit/fly/cast cores; on the AI's turn one AI action is
-    /// taken per call.
+    /// the engine's move/hit/fly/cast cores; the AI is paced to the SYN-tick
+    /// rollover so units visibly walk between tiles.
     pub fn step(
         &mut self,
         keys: &dyn KeySource,
         game: &mut Game,
         resources: &Resources,
+        time: f64,
     ) -> CombatStatus {
         if self.combat.result != 0 {
             return self.status();
@@ -467,6 +472,9 @@ impl CombatLoop {
             self.banner.clear();
         }
 
+        // Advance the damage-burst and acting-unit animation on the SYN cadence.
+        let rolled_over = self.tick_anim(time);
+
         let log_len_before = self.combat.log.len();
         let acted = if self.cast_phase != CastPhase::None {
             self.cast_step(keys, game, resources)
@@ -479,8 +487,10 @@ impl CombatLoop {
                     .out_of_control;
             if player_turn {
                 self.player_action(keys, game, resources)
-            } else {
+            } else if rolled_over {
                 combat_ai_action(&mut self.combat, resources) != 0
+            } else {
+                false
             }
         };
 
@@ -535,6 +545,42 @@ impl CombatLoop {
             2 => CombatStatus::Loss,
             _ => CombatStatus::Running,
         }
+    }
+
+    /// The SYN-tick animation pass, porting `combat_tick_anim`: every 150ms it
+    /// decays the damage burst on every stack and advances the acting unit's
+    /// frame, reporting true when the frame wrapped (which paces the AI).
+    fn tick_anim(&mut self, time: f64) -> bool {
+        if time < self.next_tick {
+            return false;
+        }
+        self.next_tick = time + 0.15;
+
+        for side in 0..COMBAT_SIDES {
+            for slot in 0..COMBAT_SLOTS {
+                let unit = &mut self.combat.units[side][slot];
+                if unit.troop_idx < 0 {
+                    continue;
+                }
+                if unit.hit_flash > 0 {
+                    unit.hit_flash -= 1;
+                }
+            }
+        }
+
+        if self.combat.unit_id >= 0 {
+            let side = self.combat.side;
+            let slot = self.combat.unit_id as usize;
+            let unit = &mut self.combat.units[side][slot];
+            if unit.troop_idx >= 0 && unit.count > 0 {
+                unit.frame += 1;
+                if unit.frame > 3 {
+                    unit.frame = 0;
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn player_action(
@@ -1074,6 +1120,7 @@ mod tests {
             cast_dest_y: 0,
             banner: String::new(),
             pending_banner_clear: false,
+            next_tick: 0.0,
         };
         (loop_, resources, game)
     }
@@ -1081,7 +1128,7 @@ mod tests {
     #[test]
     fn a_player_move_steps_the_unit() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        let status = loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources);
+        let status = loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources, 100.0);
         assert_eq!(status, CombatStatus::Running);
         assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].x, 1);
         assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].y, 0);
@@ -1091,7 +1138,7 @@ mod tests {
     #[test]
     fn waiting_ends_the_players_turn() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources, 100.0);
         // The player's lone stack is done, so the turn rolls over to the AI.
         assert_eq!(loop_.combat.side, COMBAT_SIDE_AI);
         assert_eq!(loop_.combat.unit_id, 0);
@@ -1100,7 +1147,7 @@ mod tests {
     #[test]
     fn shooting_arms_the_picker() {
         let (mut loop_, resources, mut game) = loop_fixture();
-        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources, 100.0);
         assert!(loop_.picker_active);
         assert_eq!(loop_.pick_reason, PickReason::Shoot);
         assert_eq!(loop_.cursor_x, 0);
@@ -1111,7 +1158,7 @@ mod tests {
     fn a_unit_with_no_shots_cannot_shoot() {
         let (mut loop_, resources, mut game) = loop_fixture();
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
-        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources, 100.0);
         assert!(!loop_.picker_active);
     }
 
@@ -1126,7 +1173,7 @@ mod tests {
     fn a_refused_shoot_logs_no_ammo() {
         let (mut loop_, resources, mut game) = loop_fixture();
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
-        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::S]), &mut game, &resources, 100.0);
         assert_eq!(loop_.banner, "No ammo");
     }
 
@@ -1135,7 +1182,7 @@ mod tests {
         let (mut loop_, resources, mut game) = loop_fixture();
         loop_.combat.spells_this_round = 1;
         game.stats.knows_magic = true;
-        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources, 100.0);
         assert_eq!(loop_.banner, "Only 1 spell per round!");
     }
 
@@ -1144,8 +1191,8 @@ mod tests {
         let (mut loop_, resources, mut game) = loop_fixture();
         game.stats.knows_magic = true;
         game.spells.counts[COMBAT_SPELL_CLONE as usize] = 1;
-        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources);
-        loop_.step(&Keys::pressed(&[Key::A]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::U]), &mut game, &resources, 100.0);
+        loop_.step(&Keys::pressed(&[Key::A]), &mut game, &resources, 100.0);
         assert_eq!(loop_.banner, "Select your army to Clone");
         assert!(loop_.picker_active);
     }
@@ -1156,9 +1203,9 @@ mod tests {
         loop_.banner = "stale".to_owned();
         // Wait ends the lone player stack's turn; the banner is shown once,
         // then cleared on the next step.
-        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::Space]), &mut game, &resources, 100.0);
         assert_eq!(loop_.banner, "stale");
-        loop_.step(&Keys::pressed(&[]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[]), &mut game, &resources, 100.0);
         assert!(loop_.banner.is_empty());
     }
 
@@ -1190,9 +1237,27 @@ mod tests {
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].x = 3;
         loop_.combat.units[COMBAT_SIDE_PLAYER][0].y = 4;
         loop_.combat.umap[4][3] = 1;
-        loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources);
+        loop_.step(&Keys::pressed(&[Key::Right]), &mut game, &resources, 100.0);
         // The archers survive the swing and strike back; the retaliation is
         // the last line the engine surfaced.
         assert!(loop_.banner.contains("retaliate"));
+    }
+
+    #[test]
+    fn the_animation_tick_decays_the_damage_burst() {
+        let (mut loop_, _, _) = loop_fixture();
+        loop_.combat.units[COMBAT_SIDE_PLAYER][0].hit_flash = 3;
+        loop_.tick_anim(0.0);
+        assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].hit_flash, 2);
+    }
+
+    #[test]
+    fn the_animation_tick_wraps_the_frame_every_four_ticks() {
+        let (mut loop_, _, _) = loop_fixture();
+        assert!(!loop_.tick_anim(0.0));
+        assert!(!loop_.tick_anim(0.16));
+        assert!(!loop_.tick_anim(0.31));
+        assert!(loop_.tick_anim(0.46));
+        assert_eq!(loop_.combat.units[COMBAT_SIDE_PLAYER][0].frame, 0);
     }
 }

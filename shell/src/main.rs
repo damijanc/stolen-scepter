@@ -563,7 +563,9 @@ async fn main() {
         // fast-quit status
         // prompt, then the overworld.
         if let Some(session) = &mut combat {
-            let status = session.combat.step(&keys, &mut game, &resources);
+            let status = session
+                .combat
+                .step(&keys, &mut game, &resources, get_time());
             if status != CombatStatus::Running {
                 let result = if status == CombatStatus::Win {
                     CombatResult::Win
