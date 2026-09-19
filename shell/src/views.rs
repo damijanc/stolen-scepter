@@ -125,6 +125,7 @@ pub enum ViewKind {
     Town,
     HomeCastle,
     OwnCastle,
+    RecruitSoldiers,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -179,6 +180,13 @@ const TOWN_ROW_COUNT: i32 = 5;
 /// The A-E keys that jump straight to a town row.
 const TOWN_KEYS: [Key; 5] = [Key::A, Key::B, Key::C, Key::D, Key::E];
 
+/// The recruit-soldiers list holds at most five castle-dwelling troops.
+const RECRUIT_SLOTS: usize = 5;
+
+/// Gold held back from a max-out recruit, C's `RECRUIT_GOLD_RESERVE`, so the
+/// hero keeps several weeks of boat upkeep.
+const RECRUIT_GOLD_RESERVE: i32 = 1000;
+
 /// The view stack. `Views::default()` is the empty (overworld) stack.
 #[derive(Clone, Debug, Default)]
 pub struct Views {
@@ -220,6 +228,15 @@ pub struct Views {
     /// `s_garrison_mode`.
     own_castle_id: String,
     own_castle_garrison_mode: bool,
+    /// The recruit-soldiers screen's context, porting the `s_*` statics.
+    recruit_pool: [i32; RECRUIT_SLOTS],
+    recruit_pool_count: usize,
+    recruit_anim_troop: i32,
+    recruit_whom: i32,
+    recruit_max: i32,
+    recruit_input: String,
+    recruit_error: String,
+    recruit_error_just_set: bool,
 }
 
 impl Views {
@@ -261,7 +278,8 @@ impl Views {
                 | ViewKind::Gate
                 | ViewKind::Town
                 | ViewKind::HomeCastle
-                | ViewKind::OwnCastle,
+                | ViewKind::OwnCastle
+                | ViewKind::RecruitSoldiers,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
@@ -574,6 +592,168 @@ impl Views {
         &self.own_castle_id
     }
 
+    /// Open the recruit-soldiers screen, porting `screen_recruit_soldiers_open`:
+    /// build the castle-dwelling pool in recruit-cost order and pick a
+    /// deterministic animated troop.
+    pub fn recruit_soldiers_open(&mut self, resources: &Resources, game: &Game) {
+        let mut pool = [0i32; RECRUIT_SLOTS];
+        let mut count = 0;
+        for index in 0..resources.troops_count() {
+            if count >= RECRUIT_SLOTS {
+                break;
+            }
+            if let Some(troop) = resources.troop_by_index(index as i32) {
+                if troop.dwelling.as_str() == "castle" {
+                    pool[count] = index as i32;
+                    count += 1;
+                }
+            }
+        }
+        // Insertion sort by recruit cost ascending (n <= 5).
+        for i in 1..count {
+            let key = pool[i];
+            let key_cost = resources
+                .troop_by_index(key)
+                .map(|t| t.recruit_cost)
+                .unwrap_or(0);
+            let mut j = i;
+            while j > 0 {
+                let prev_cost = resources
+                    .troop_by_index(pool[j - 1])
+                    .map(|t| t.recruit_cost)
+                    .unwrap_or(0);
+                if prev_cost <= key_cost {
+                    break;
+                }
+                pool[j] = pool[j - 1];
+                j -= 1;
+            }
+            pool[j] = key;
+        }
+
+        self.recruit_pool = pool;
+        self.recruit_pool_count = count;
+        self.recruit_anim_troop = if count > 0 {
+            let mut h = game.seed ^ 0xC451_E11A;
+            h ^= game.stats.days_left as u64;
+            h = h.wrapping_mul(2_654_435_761).wrapping_add(0x9E37_79B9);
+            pool[(h % count as u64) as usize]
+        } else {
+            -1
+        };
+        self.recruit_whom = 0;
+        self.recruit_max = 9999;
+        self.recruit_input.clear();
+        self.recruit_error.clear();
+        self.recruit_error_just_set = false;
+        self.set(ViewKind::RecruitSoldiers);
+    }
+
+    /// The gold+leadership cap for a selected troop, porting `recompute_max`.
+    fn recruit_recompute_max(&self, resources: &Resources, game: &Game, slot: usize) -> i32 {
+        let Some(troop) = self
+            .recruit_pool
+            .get(slot)
+            .and_then(|index| resources.troop_by_index(*index))
+        else {
+            return 0;
+        };
+        let mut max = game.max_recruitable(resources, troop.id.as_str()).max(0);
+        if troop.recruit_cost > 0 {
+            let budget = (game.stats.gold - RECRUIT_GOLD_RESERVE).max(0);
+            let affordable = budget / troop.recruit_cost;
+            max = max.min(affordable);
+        }
+        max
+    }
+
+    /// Read one frame of recruit-soldiers input, porting
+    /// `screen_recruit_soldiers_update`. Returns true when the screen should be
+    /// dismissed (ESC while idle).
+    pub fn recruit_soldiers_update(
+        &mut self,
+        game: &mut Game,
+        resources: &Resources,
+        keys: &dyn KeySource,
+    ) -> bool {
+        // An error popup swallows input until the next key clears it.
+        if !self.recruit_error.is_empty() {
+            if self.recruit_error_just_set {
+                self.recruit_error_just_set = false;
+            } else if keys.any_pressed() {
+                self.recruit_error.clear();
+            }
+            return false;
+        }
+
+        if self.recruit_whom == 0 {
+            if keys.pressed(Key::Escape) {
+                return true;
+            }
+            for i in 0..RECRUIT_SLOTS {
+                let key = TOWN_KEYS[i]; // A..E
+                if keys.pressed(key) {
+                    if i < self.recruit_pool_count {
+                        let troop = resources.troop_by_index(self.recruit_pool[i]);
+                        let unreachable = troop.map_or(true, |t| {
+                            t.hit_points <= 0 || game.stats.leadership_current < t.hit_points * 6
+                        });
+                        if !unreachable {
+                            self.recruit_whom = (i + 1) as i32;
+                            self.recruit_max = self.recruit_recompute_max(resources, game, i);
+                            self.recruit_input.clear();
+                        }
+                    }
+                    break;
+                }
+            }
+        } else {
+            if keys.pressed(Key::Escape) {
+                self.recruit_whom = 0;
+                self.recruit_input.clear();
+            } else if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) {
+                let number: i32 = self.recruit_input.parse().unwrap_or(0);
+                let pool_slot = (self.recruit_whom - 1) as usize;
+                let troop_id = self
+                    .recruit_pool
+                    .get(pool_slot)
+                    .and_then(|index| resources.troop_by_index(*index))
+                    .map(|t| t.id.as_str().to_owned());
+                if let Some(troop_id) = troop_id {
+                    let mut count = number;
+                    let max = self.recruit_recompute_max(resources, game, pool_slot);
+                    if count > max {
+                        count = max;
+                    }
+                    if count > 0 {
+                        let outcome = game.buy_troop(resources, &troop_id, count);
+                        if let Some(message) = crate::interact::recruit_refusal(resources, outcome)
+                        {
+                            self.recruit_error = message;
+                            self.recruit_error_just_set = true;
+                        }
+                    }
+                    self.recruit_max = self.recruit_recompute_max(resources, game, pool_slot);
+                }
+                self.recruit_whom = 0;
+                self.recruit_input.clear();
+            } else if keys.pressed(Key::Backspace) {
+                self.recruit_input.pop();
+            } else {
+                for digit in 0..10u8 {
+                    if keys.pressed(crate::input::DIGITS[digit as usize])
+                        || keys.pressed(crate::input::NUMPAD_DIGITS[digit as usize])
+                    {
+                        if self.recruit_input.len() < 6 {
+                            self.recruit_input.push(char::from(b'0' + digit));
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -623,6 +803,9 @@ impl Views {
             }
             Some(ViewKind::OwnCastle) => {
                 self.draw_own_castle(list, layout, palette, resources, catalog, game, time)
+            }
+            Some(ViewKind::RecruitSoldiers) => {
+                self.draw_recruit_soldiers(list, layout, palette, resources, catalog, game, time)
             }
             None => {}
         }
@@ -1350,6 +1533,125 @@ impl Views {
             );
             list.text(&line, tx, ty, palette.clr(Pal::White));
             ty += row_h;
+        }
+    }
+
+    /// Ports `screen_recruit_soldiers_draw`: the castle backdrop and the troop
+    /// list with the inline count entry on the right.
+    fn draw_recruit_soldiers(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+        game: &Game,
+        time: f64,
+    ) {
+        draw_location_backdrop(
+            list,
+            palette,
+            catalog,
+            crate::draw::Backdrop::Castle,
+            self.recruit_anim_troop,
+            time,
+            layout.map_h,
+        );
+
+        let x = layout.panel_x();
+        let y = layout.panel_y();
+        let w = layout.panel_w();
+        let h = PANEL_H;
+        list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
+        list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
+
+        let row_h = font::GLYPH_H + 1;
+        let tx = x + PANEL_PAD_X;
+        let ty = y + PANEL_PAD_X;
+
+        // An error popup replaces the panel content (3 leading blank rows for
+        // the gold banner's own padding).
+        if !self.recruit_error.is_empty() {
+            list.text_centered(
+                &self.recruit_error,
+                x + w / 2,
+                ty + 3 * row_h,
+                palette.clr(Pal::White),
+            );
+            return;
+        }
+
+        let title = crate::interact::recruit_soldiers_title(resources);
+        list.text(&title, tx, ty, palette.clr(Pal::White));
+
+        let troop_ty = ty + row_h + 1;
+        let total_lead = game.stats.leadership_current;
+        for i in 0..self.recruit_pool_count {
+            let Some(troop) = resources.troop_by_index(self.recruit_pool[i]) else {
+                continue;
+            };
+            let unreachable = troop.hit_points <= 0 || total_lead < troop.hit_points * 6;
+            let label = if unreachable {
+                format!(
+                    "{}) {:<11}n/a",
+                    char::from(b'A' + i as u8),
+                    troop.name.as_str()
+                )
+            } else {
+                format!(
+                    "{}) {:<11}{}",
+                    char::from(b'A' + i as u8),
+                    troop.name.as_str(),
+                    troop.recruit_cost
+                )
+            };
+            list.text(
+                &label,
+                tx,
+                troop_ty + i as i32 * row_h,
+                palette.clr(Pal::White),
+            );
+        }
+
+        // Right column.
+        let rx = tx + 20 * font::GLYPH_W;
+        let gp = format!("GP={}K", game.stats.gold / 1000);
+        list.text(&gp, rx, ty, palette.clr(Pal::White));
+
+        let rby = ty + row_h + 1 + row_h;
+        list.text("(A-C) ", rx, rby, palette.clr(Pal::White));
+        let after_hint_x = rx + 6 * font::GLYPH_W;
+
+        if self.recruit_whom == 0 {
+            // The spinner twirl (the `|` glyph as a stable stand-in; the real
+            // four-frame twirl is a cosmetic tick the tests ignore).
+            list.text("|", after_hint_x, rby, palette.clr(Pal::White));
+        } else {
+            let letter = char::from(b'A' + (self.recruit_whom - 1) as u8);
+            list.text(
+                &letter.to_string(),
+                after_hint_x,
+                rby,
+                palette.clr(Pal::White),
+            );
+            list.text(
+                &format!("Max={}", self.recruit_max),
+                rx,
+                rby + row_h,
+                palette.clr(Pal::White),
+            );
+            list.text(
+                &crate::interact::recruit_soldiers_how_many(resources),
+                rx,
+                rby + 2 * row_h,
+                palette.clr(Pal::White),
+            );
+            list.text(
+                &format!("{}_", self.recruit_input),
+                rx,
+                rby + 3 * row_h,
+                palette.clr(Pal::White),
+            );
         }
     }
 }
@@ -3156,5 +3458,96 @@ mod tests {
         assert!(list.has_text_containing("Castle Darkstone"));
         assert!(list.has_text_containing("Remove troops"));
         assert!(list.has_text_containing("Peasants"));
+    }
+
+    fn recruit_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [
+                 {"index":0,"id":"archers","name":"Archers","skill_level":1,"hit_points":3,
+                  "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":250,
+                  "spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"},
+                 {"index":1,"id":"militia","name":"Militia","skill_level":1,"hit_points":2,
+                  "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":50,
+                  "spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}
+               ]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    #[test]
+    fn recruit_soldiers_opens_a_cost_sorted_pool() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 100;
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+
+        assert_eq!(views.active(), Some(ViewKind::RecruitSoldiers));
+        assert_eq!(views.recruit_pool_count, 2);
+        // Militia (cost 50) sorts before Archers (cost 250) despite catalog order.
+        assert_eq!(views.recruit_pool[0], 1);
+        assert_eq!(views.recruit_pool[1], 0);
+    }
+
+    #[test]
+    fn recruit_soldiers_types_a_count_and_commits() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+        game.stats.gold = 5000;
+        game.position.home_castle.copy_from_str("castle0");
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+
+        // A selects militia (pool slot 0).
+        assert!(!views.recruit_soldiers_update(&mut game, &resources, &Keys::pressed(&[Key::A])));
+        assert_eq!(views.recruit_whom, 1);
+
+        views.recruit_soldiers_update(&mut game, &resources, &Keys::pressed(&[Key::Digit3]));
+        assert_eq!(views.recruit_input, "3");
+
+        assert!(!views.recruit_soldiers_update(
+            &mut game,
+            &resources,
+            &Keys::pressed(&[Key::Enter])
+        ));
+        assert_eq!(views.recruit_whom, 0);
+        assert!(views.recruit_input.is_empty());
+        assert_eq!(game.army[0].id.as_str(), "militia");
+        assert_eq!(game.army[0].count, 3);
+    }
+
+    #[test]
+    fn recruit_soldiers_esc_at_idle_requests_dismiss() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 100;
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+
+        assert!(views.recruit_soldiers_update(
+            &mut game,
+            &resources,
+            &Keys::pressed(&[Key::Escape])
+        ));
+    }
+
+    #[test]
+    fn the_recruit_soldiers_view_draws_rows_and_cost() {
+        let (resources, layout, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 100;
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+        let list = draw_castle_view(&mut views, &resources, &layout, &game);
+
+        assert!(list.has_text_containing("Recruit Soldiers"));
+        assert!(list.has_text_containing("Militia"));
+        assert!(list.has_text_containing("Archers"));
+        assert!(list.has_text_containing("50"));
+        assert!(list.has_text_containing("250"));
     }
 }

@@ -12,7 +12,7 @@
 
 use openbounty_engine::game::{
     BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game, GarrisonOutcome,
-    SiegeBuyOutcome, SpellBuyOutcome,
+    RecruitOutcome, SiegeBuyOutcome, SpellBuyOutcome,
 };
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
@@ -686,6 +686,8 @@ const DEFAULT_OWN_CASTLE_MODE_GARRISON: &str = "Garrison troops (Space=Remove)";
 const DEFAULT_OWN_CASTLE_MODE_REMOVE: &str = "Remove troops (Space=Garrison)";
 const DEFAULT_CANNOT_GARRISON_LAST: &str = "You cannot garrison your\nlast army!";
 const DEFAULT_NO_TROOP_SLOTS: &str = "No troop slots left!";
+const DEFAULT_RECRUIT_SOLDIERS_TITLE: &str = "Recruit Soldiers";
+const DEFAULT_RECRUIT_SOLDIERS_HOW_MANY: &str = "How Many";
 
 /// The town header and gold label, used by the town menu panel.
 pub fn town_header_text(resources: &Resources, name: &str) -> String {
@@ -1102,6 +1104,47 @@ pub fn garrison_refusal(resources: &Resources, outcome: GarrisonOutcome) -> &str
             "no_troop_slots",
             DEFAULT_NO_TROOP_SLOTS,
         ),
+    }
+}
+
+/// The recruit-soldiers screen title and "how many" prompt, from the `ui` block.
+pub fn recruit_soldiers_title(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "ui",
+        "recruit_soldiers_title",
+        DEFAULT_RECRUIT_SOLDIERS_TITLE,
+    )
+    .to_owned()
+}
+
+pub fn recruit_soldiers_how_many(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "ui",
+        "recruit_soldiers_how_many",
+        DEFAULT_RECRUIT_SOLDIERS_HOW_MANY,
+    )
+    .to_owned()
+}
+
+/// The recruit-commit refusal popup, porting `recruit_commit`'s error mapping:
+/// no gold reads the town banner, no slots the troop-slots banner.
+pub fn recruit_refusal(resources: &Resources, outcome: RecruitOutcome) -> Option<String> {
+    match outcome {
+        RecruitOutcome::NoGold => Some(
+            banner::text(resources, "banners", "town_no_gold", DEFAULT_TOWN_NO_GOLD).to_owned(),
+        ),
+        RecruitOutcome::NoSlotOrInvalid => Some(
+            banner::text(
+                resources,
+                "banners",
+                "no_troop_slots",
+                DEFAULT_NO_TROOP_SLOTS,
+            )
+            .to_owned(),
+        ),
+        _ => None,
     }
 }
 
@@ -1632,5 +1675,19 @@ mod tests {
         let resources = town_resources();
         assert!(garrison_refusal(&resources, GarrisonOutcome::Refused).contains("slots"));
         assert!(garrison_refusal(&resources, GarrisonOutcome::WouldLeaveNoArmy).contains("last"));
+    }
+
+    #[test]
+    fn recruit_soldiers_text_and_refusals() {
+        let resources = town_resources();
+        assert_eq!(recruit_soldiers_title(&resources), "Recruit Soldiers");
+        assert_eq!(recruit_soldiers_how_many(&resources), "How Many");
+        assert!(recruit_refusal(&resources, RecruitOutcome::NoGold)
+            .unwrap()
+            .contains("gold"));
+        assert!(recruit_refusal(&resources, RecruitOutcome::NoSlotOrInvalid)
+            .unwrap()
+            .contains("slots"));
+        assert_eq!(recruit_refusal(&resources, RecruitOutcome::Ok), None);
     }
 }

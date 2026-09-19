@@ -530,14 +530,19 @@ async fn main() {
                 TownInput::Dismissed | TownInput::Handled | TownInput::None => {}
             }
         } else if views.active() == Some(ViewKind::HomeCastle) {
-            // Throne room / barracks: ESC pops, A and B run the (still
-            // deferred) recruit and audience sub-flows.
+            // Throne room / barracks: ESC pops, A opens the recruit screen, B
+            // runs the (still deferred) audience flow.
             if keys.pressed(Key::Escape) {
                 views.dismiss();
             } else if keys.pressed(Key::A) {
-                eprintln!("recruit soldiers not yet wired");
+                views.recruit_soldiers_open(&resources, &game);
             } else if keys.pressed(Key::B) {
                 eprintln!("audience with the king not yet wired");
+            }
+        } else if views.active() == Some(ViewKind::RecruitSoldiers) {
+            // The recruit screen owns its letters, digits and Enter/ESC.
+            if views.recruit_soldiers_update(&mut game, &resources, &keys) {
+                views.dismiss();
             }
         } else if views.active() == Some(ViewKind::OwnCastle) {
             // SPACE toggles garrison/remove; A..E transfer the chosen stack.
