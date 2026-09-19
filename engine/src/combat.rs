@@ -34,14 +34,13 @@ pub enum CombatResult {
 /// records DATA (troop indices, counts), never text: a render-free crate must
 /// not format a `strings.combat_log` banner. A shell maps each event to text.
 ///
-/// Hits and the IMMUNE no-effect are NOT here: `combat_hit_unit` already
-/// returns the kill count (`-1` for IMMUNE), so the shell formats those at its
-/// own call sites. Only [`CombatEvent::Retaliate`] is emitted here, because it
-/// happens inside the recursive retaliation deep in `combat_deal_damage`.
+/// Hits, the IMMUNE no-effect, and retaliation are NOT here: `combat_hit_unit`
+/// returns the kill count (`-1` for IMMUNE), and retaliation calls
+/// `combat_deal_damage` directly, so the shell formats those at its own call
+/// sites. Only [`CombatEvent::CountTroop`] is emitted here, because it happens
+/// deep in the clone/resurrect effects.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CombatEvent {
-    /// `retaliate`: the defender struck back, killing `kills` of the attacker.
-    Retaliate { target: i32, kills: i32 },
     /// `cloned` / `resurrected`: count + troop index.
     CountTroop {
         count: i32,
@@ -1140,8 +1139,7 @@ pub fn combat_deal_damage(
                     && c.units[t_side][t_id].count > 0
                 {
                     c.units[t_side][t_id].retaliated = true;
-                    let retaliator_troop = c.units[t_side][t_id].troop_idx;
-                    let retal_kills = combat_deal_damage(
+                    combat_deal_damage(
                         c,
                         resources,
                         t_side as i32,
@@ -1153,15 +1151,6 @@ pub fn combat_deal_damage(
                         0,
                         true,
                     );
-                    if retal_kills > 0 {
-                        combat_log_event(
-                            c,
-                            CombatEvent::Retaliate {
-                                target: retaliator_troop,
-                                kills: retal_kills,
-                            },
-                        );
-                    }
                 }
             }
         }
@@ -3000,22 +2989,6 @@ mod spell_tests {
                 ..
             })
         ));
-    }
-
-    #[test]
-    fn a_retaliation_appends_a_retaliate_event() {
-        let resources = spell_fixture();
-        let (mut c, _) = duel(1, 10); // 5hp ogres survive a peasant swing.
-                                      // Ensure the defender survives to retaliate: use a weak melee roll by
-                                      // giving the attacker a single peasant.
-        c.units[0][0].count = 1;
-        c.units[0][0].turn_count = 1;
-        c.units[1][0].count = 10;
-        combat_hit_unit(&mut c, &resources, 0, 0, 1, 0, false);
-        assert!(c
-            .log
-            .iter()
-            .any(|event| matches!(event, CombatEvent::Retaliate { .. })));
     }
 
     #[test]

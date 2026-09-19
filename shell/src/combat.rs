@@ -10,10 +10,9 @@
 //! The action banner (the title-bar line that tells the player what the picker
 //! wants or why an action was refused) is shell state, not engine state: C
 //! stores `banner[80]` on its `Combat`, but that struct there doubles as the
-//! shell's whole UI state. Here it lives on [`CombatLoop`], and only the
-//! shell-observable events (picker instructions, refusals, a player's fly) set
-//! it. What happens INSIDE the engine -- retaliation, an IMMUNE target, the
-//! `melee_hit` tally -- is not observable from here and stays a later slice.
+//! shell's whole UI state. Here it lives on [`CombatLoop`] and mirrors the
+//! combat log: hits, IMMUNE no-effects and spell announcements are formatted at
+//! their call sites, and the clone/resurrect counts arrive as [`CombatEvent`]s.
 
 use openbounty_engine::combat::{
     combat_ai_action, combat_cast_spell, combat_cell_passes_filter, combat_compact,
@@ -22,9 +21,8 @@ use openbounty_engine::combat::{
     combat_prepare_player, combat_reset_match, combat_reset_turn, combat_seed_rng,
     combat_spell_target_filter, combat_test_dead, combat_unit_surrounded, CastResult, Combat,
     CombatEvent, CombatMode, CombatTarget, PickFilter, COMBAT_H, COMBAT_SIDES, COMBAT_SIDE_AI,
-    COMBAT_SIDE_PLAYER, COMBAT_SLOTS, COMBAT_SPELL_CLONE, COMBAT_SPELL_FIREBALL,
-    COMBAT_SPELL_FREEZE, COMBAT_SPELL_LIGHTNING, COMBAT_SPELL_RESURRECT, COMBAT_SPELL_TELEPORT,
-    COMBAT_SPELL_TURN_UNDEAD, COMBAT_W,
+    COMBAT_SIDE_PLAYER, COMBAT_SLOTS, COMBAT_SPELL_FIREBALL, COMBAT_SPELL_FREEZE,
+    COMBAT_SPELL_LIGHTNING, COMBAT_SPELL_TELEPORT, COMBAT_SPELL_TURN_UNDEAD, COMBAT_W,
 };
 use openbounty_engine::game::Game;
 use openbounty_engine::resources::Resources;
@@ -53,15 +51,8 @@ const DEFAULT_CL_ONLY_ONE_SPELL: &str = "Only 1 spell per round!";
 const DEFAULT_CL_NO_SPELL_TYPE: &str = "No spells of that type";
 const DEFAULT_CL_CANNOT_CAST: &str = "You cannot cast magic";
 const DEFAULT_CL_FLY: &str = "%TROOP% fly";
-const DEFAULT_CL_SELECT_CLONE: &str = "Select your army to Clone";
-const DEFAULT_CL_SELECT_FREEZE: &str = "Select enemy army to Freeze";
-const DEFAULT_CL_SELECT_RESURRECT: &str = "Select army to Resurrect";
-const DEFAULT_CL_SELECT_DAMAGE: &str = "Select enemy army to %SPELL%";
-const DEFAULT_CL_SELECT_TELEPORT: &str = "Select army to Teleport";
-const DEFAULT_CL_SELECT_DEST: &str = "Select new location";
 const DEFAULT_CL_MELEE_HIT: &str = "%ATK% vs %TGT%, %COUNT% die";
 const DEFAULT_CL_RANGED_HIT: &str = "%ATK% shoot %TGT% killing %COUNT%";
-const DEFAULT_CL_RETALIATE: &str = "%TGT% retaliate, killing %COUNT%";
 const DEFAULT_CL_NO_EFFECT: &str = "The spell seems to have no effect!";
 const DEFAULT_CL_CLONED: &str = "%COUNT% %TROOP% cloned";
 const DEFAULT_CL_TELEPORTED: &str = "Teleported";
@@ -107,22 +98,11 @@ fn troop_name(resources: &Resources, troop_index: i32, fallback: &str) -> String
 }
 
 /// Turn one engine log event into its `strings.combat_log` banner. Only the
-/// events the engine cannot express as a return value reach here: retaliation
-/// and the clone/resurrect counts. Hits, IMMUNE no-effects and the spell
-/// announcements are formatted at their call sites instead.
+/// events the engine cannot express as a return value reach here: the clone and
+/// resurrect counts. Hits, IMMUNE no-effects and the spell announcements are
+/// formatted at their call sites instead.
 fn format_event(resources: &Resources, event: CombatEvent) -> String {
     match event {
-        CombatEvent::Retaliate { target, kills } => {
-            let tgt = troop_name(resources, target, "Defenders");
-            let kills = kills.to_string();
-            banner::formatted(
-                resources,
-                "combat_log",
-                "retaliate",
-                DEFAULT_CL_RETALIATE,
-                &[("TGT", &tgt), ("COUNT", &kills)],
-            )
-        }
         CombatEvent::CountTroop {
             count,
             troop,
@@ -898,7 +878,6 @@ impl CombatLoop {
                     self.cursor_x = unit.x;
                     self.cursor_y = unit.y;
                 }
-                self.arm_select_banner(resources, picked);
                 self.cast_phase = CastPhase::PickTarget;
                 false
             }
@@ -928,7 +907,6 @@ impl CombatLoop {
                         self.cursor_x = unit.x;
                         self.cursor_y = unit.y;
                     }
-                    self.log(resources, "select_dest", DEFAULT_CL_SELECT_DEST);
                     return false;
                 }
                 if self.pick_reason == PickReason::TeleportDest {
@@ -966,35 +944,6 @@ impl CombatLoop {
         self.emit_spell_banner(resources, result);
         result == CastResult::Ok
     }
-
-    /// Set the picker instruction banner for the chosen combat spell, so the
-    /// player sees what the cursor is asking for. The three direct-damage
-    /// spells share `select_damage` and fill in their own name.
-    fn arm_select_banner(&mut self, resources: &Resources, spell_idx: i32) {
-        match spell_idx {
-            COMBAT_SPELL_CLONE => self.log(resources, "select_clone", DEFAULT_CL_SELECT_CLONE),
-            COMBAT_SPELL_FREEZE => self.log(resources, "select_freeze", DEFAULT_CL_SELECT_FREEZE),
-            COMBAT_SPELL_RESURRECT => {
-                self.log(resources, "select_resurrect", DEFAULT_CL_SELECT_RESURRECT)
-            }
-            COMBAT_SPELL_TELEPORT => {
-                self.log(resources, "select_teleport", DEFAULT_CL_SELECT_TELEPORT)
-            }
-            COMBAT_SPELL_FIREBALL | COMBAT_SPELL_LIGHTNING | COMBAT_SPELL_TURN_UNDEAD => {
-                let name = resources
-                    .spell_by_index(spell_idx)
-                    .map(|spell| spell.name.as_str())
-                    .unwrap_or("Spell");
-                self.log_formatted(
-                    resources,
-                    "select_damage",
-                    DEFAULT_CL_SELECT_DAMAGE,
-                    &[("SPELL", name)],
-                );
-            }
-            _ => {}
-        }
-    }
 }
 
 /// Read one directional step, porting `combat_read_dir`.
@@ -1029,7 +978,9 @@ fn combat_read_dir(keys: &dyn KeySource) -> Option<(i32, i32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openbounty_engine::combat::{CombatUnit, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER};
+    use openbounty_engine::combat::{
+        CombatUnit, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER, COMBAT_SPELL_CLONE,
+    };
 
     fn fixtures() -> (Resources, SpriteCatalog, Palette, Combat) {
         let resources = Resources::from_json_str(
@@ -1271,7 +1222,7 @@ mod tests {
     }
 
     #[test]
-    fn picking_a_spell_arms_the_select_banner() {
+    fn picking_a_spell_arms_the_picker_without_an_instruction() {
         let (mut loop_, resources, mut game) = loop_fixture();
         game.stats.knows_magic = true;
         game.spells.counts[COMBAT_SPELL_CLONE as usize] = 1;
@@ -1289,8 +1240,10 @@ mod tests {
             100.0,
             &mut Prompt::default(),
         );
-        assert_eq!(loop_.banner, "Select your army to Clone");
+        // C arms the picker with no instruction banner; `select_*` strings
+        // are declared but never read.
         assert!(loop_.picker_active);
+        assert!(!loop_.banner.contains("Select"));
     }
 
     #[test]
@@ -1318,19 +1271,6 @@ mod tests {
     }
 
     #[test]
-    fn a_retaliate_event_maps_to_the_retaliate_banner() {
-        let (_, resources, _) = loop_fixture();
-        let banner = format_event(
-            &resources,
-            CombatEvent::Retaliate {
-                target: 1,
-                kills: 2,
-            },
-        );
-        assert_eq!(banner, "Archers retaliate, killing 2");
-    }
-
-    #[test]
     fn a_hit_banner_names_both_troops() {
         let (mut loop_, resources, _) = loop_fixture();
         loop_.emit_hit(&resources, 0, 1, 2, false);
@@ -1338,7 +1278,7 @@ mod tests {
     }
 
     #[test]
-    fn a_melee_attack_shows_the_retaliation() {
+    fn a_retaliation_produces_no_banner_line() {
         let (mut loop_, resources, mut game) = loop_fixture();
         // Put the player militia adjacent to the AI archer, then walk into it
         // so the move becomes an attack.
@@ -1352,9 +1292,10 @@ mod tests {
             100.0,
             &mut Prompt::default(),
         );
-        // The archers survive the swing and strike back; the retaliation is
-        // the last line the engine surfaced.
-        assert!(loop_.banner.contains("retaliate"));
+        // C's retaliation calls combat_deal_damage directly and emits nothing;
+        // the banner shows only the melee hit, never a "retaliate" line.
+        assert!(loop_.banner.contains("vs Archers"));
+        assert!(!loop_.banner.contains("retaliate"));
     }
 
     #[test]
