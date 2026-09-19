@@ -35,7 +35,9 @@ use input::{Action, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
 use openbounty_engine::fog::Fog;
-use openbounty_engine::game::{Game, TravelMode, GAME_ARMY_SLOTS};
+use openbounty_engine::game::{
+    Game, GateDestKind, GateDestination, TravelMode, GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
+};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::{
@@ -213,6 +215,7 @@ fn dispatch_spell(
     dialog: &mut Dialog,
     pending: &mut PendingFlow,
     bridge_waiting: &mut bool,
+    views: &mut Views,
 ) {
     match game.dispatch_adventure_spell(resources, spell_idx) {
         SpellCast::NotKnown => {
@@ -243,9 +246,16 @@ fn dispatch_spell(
                 dialog.open(&header, &body);
                 *bridge_waiting = true;
             }
-            AdventureCast::GateArmed { .. } => {
-                // Gate destination picker is the next slice.
-                eprintln!("gate spell armed (not yet wired)");
+            AdventureCast::GateArmed { mode, .. } => {
+                // The destination list is built fresh from game state, as C's
+                // gate_menu_tick does, then handed to the picker view.
+                let kind = match mode {
+                    openbounty_engine::spells_adventure::GateMode::Castle => GateDestKind::Castle,
+                    openbounty_engine::spells_adventure::GateMode::Town => GateDestKind::Town,
+                };
+                let mut destinations = [GateDestination::default(); GAME_GATE_DESTS_MAX];
+                let count = game.gate_destinations(resources, kind, &mut destinations);
+                views.gate_open(&destinations[..count], kind == GateDestKind::Town);
             }
             AdventureCast::NoCharge => {}
             _ => {
@@ -452,12 +462,27 @@ async fn main() {
                         &mut dialog,
                         &mut pending,
                         &mut bridge_waiting,
+                        &mut views,
                     );
                 }
                 SpellsInput::Handled => {}
                 SpellsInput::None => {
                     if keys.any_pressed() {
                         views.dismiss();
+                    }
+                }
+            }
+        } else if views.active() == Some(ViewKind::Gate) {
+            // The gate picker owns its arrows/letter/Enter input; a confirmed
+            // choice teleports through the engine, which also spends the charge.
+            if views.gate_update(&keys) {
+                let chosen = views.gate_take_chosen();
+                if let Some(index) = chosen {
+                    let destination = views.gate_dest(index).copied();
+                    let is_town = views.gate_is_town();
+                    if let Some(destination) = destination {
+                        let spell_id = if is_town { "town_gate" } else { "castle_gate" };
+                        game.gate_teleport(&resources, &mut map, &mut fog, &destination, spell_id);
                     }
                 }
             }

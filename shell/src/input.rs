@@ -59,22 +59,29 @@ pub enum Key {
     E,
     F,
     G,
+    H,
     I,
+    J,
+    K,
     L,
     M,
     N,
     O,
     P,
     Q,
+    R,
     S,
+    T,
     U,
     V,
     W,
+    X,
     /// Answers the fast-quit prompt. Not an overworld binding, so [`poll`]
     /// ignores it; the prompt is modal and reads it directly. `N` answers the
     /// same prompt and doubles as the New Continent binding, which is safe
     /// because the prompt is checked first.
     Y,
+    Z,
     LeftControl,
     RightControl,
 }

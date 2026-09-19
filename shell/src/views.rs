@@ -12,7 +12,8 @@
 
 use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{
-    CastleOwnerKind, Game, GAME_ARMY_SLOTS, GAME_CASTLES, GAME_CONTINENTS,
+    CastleOwnerKind, Game, GateDestination, GAME_ARMY_SLOTS, GAME_CASTLES, GAME_CONTINENTS,
+    GAME_GATE_DESTS_MAX,
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::{ResColors, Resources, RES_MAX_CONTROLS};
@@ -62,6 +63,41 @@ const DEFAULT_SV_ADVENTURE: &str = "Adventuring";
 /// the seven keys are spelled out.
 const SPELL_KEYS: [Key; 7] = [Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G];
 
+/// The full A-Z key row, for the gate picker's letter shortcuts. Ports C's
+/// `KEY_A + letter` indexing.
+const LETTER_KEYS: [Key; 26] = [
+    Key::A,
+    Key::B,
+    Key::C,
+    Key::D,
+    Key::E,
+    Key::F,
+    Key::G,
+    Key::H,
+    Key::I,
+    Key::J,
+    Key::K,
+    Key::L,
+    Key::M,
+    Key::N,
+    Key::O,
+    Key::P,
+    Key::Q,
+    Key::R,
+    Key::S,
+    Key::T,
+    Key::U,
+    Key::V,
+    Key::W,
+    Key::X,
+    Key::Y,
+    Key::Z,
+];
+
+/// How many characters of a gate destination name the picker shows, C's
+/// `GATE_NAME_COL`.
+const GATE_NAME_COL: usize = 14;
+
 /// Contract-view labels C compiles in; the pack overrides them under
 /// `strings.contract_view`.
 const DEFAULT_CV_TITLE_NO_CONTRACT: &str = "You have no Contract!";
@@ -85,6 +121,7 @@ pub enum ViewKind {
     Worldmap,
     Controls,
     Spells,
+    Gate,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -121,6 +158,12 @@ pub struct Views {
     /// Which spells column the A-G keys address: 0 combat, 1 adventure.
     /// Ports `spell_state.column`.
     spells_column: i32,
+    /// The gate picker's snapshot, porting the `gate_view` static.
+    gate_list: [GateDestination; GAME_GATE_DESTS_MAX],
+    gate_count: usize,
+    gate_is_town: bool,
+    gate_cursor: usize,
+    gate_chosen: i32,
 }
 
 impl Views {
@@ -158,7 +201,8 @@ impl Views {
                 | ViewKind::Army
                 | ViewKind::Puzzle
                 | ViewKind::Controls
-                | ViewKind::Spells,
+                | ViewKind::Spells
+                | ViewKind::Gate,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
@@ -252,6 +296,113 @@ impl Views {
         }
     }
 
+    /// Open the gate destination picker with a snapshot of the eligible list,
+    /// porting `views_gate_open`.
+    pub fn gate_open(&mut self, destinations: &[GateDestination], is_town: bool) {
+        let count = destinations.len().min(GAME_GATE_DESTS_MAX);
+        self.gate_list[..count].copy_from_slice(&destinations[..count]);
+        self.gate_count = count;
+        self.gate_is_town = is_town;
+        self.gate_cursor = 0;
+        self.gate_chosen = -1;
+        self.set(ViewKind::Gate);
+    }
+
+    /// The snapshot size, porting `views_gate_count`.
+    pub fn gate_count(&self) -> usize {
+        self.gate_count
+    }
+
+    /// Whether this picker lists towns (true) or castles (false), porting
+    /// `views_gate_is_town`.
+    pub fn gate_is_town(&self) -> bool {
+        self.gate_is_town
+    }
+
+    /// The highlighted row, porting `views_gate_cursor`.
+    pub fn gate_cursor(&self) -> usize {
+        self.gate_cursor
+    }
+
+    /// A destination by snapshot index, porting `views_gate_dest`.
+    pub fn gate_dest(&self, index: usize) -> Option<&GateDestination> {
+        if index >= self.gate_count {
+            return None;
+        }
+        Some(&self.gate_list[index])
+    }
+
+    /// Consume the confirmed destination index, porting `views_gate_chosen`.
+    pub fn gate_take_chosen(&mut self) -> Option<usize> {
+        if self.gate_chosen < 0 {
+            return None;
+        }
+        let chosen = self.gate_chosen as usize;
+        self.gate_chosen = -1;
+        Some(chosen)
+    }
+
+    /// Read one frame of gate-picker input, porting `views_gate_update`.
+    /// Returns true when a destination was confirmed (letter, Enter or Space);
+    /// the caller reads it with [`Views::gate_take_chosen`].
+    pub fn gate_update(&mut self, keys: &dyn KeySource) -> bool {
+        let n = self.gate_count;
+        if n == 0 {
+            return false;
+        }
+        let left = (n + 1) / 2;
+
+        if keys.pressed(Key::Escape) {
+            self.dismiss();
+            return false;
+        }
+        // Letter shortcut: each destination is keyed by the first letter of
+        // its name, not its row. Ports C's `toupper(name[0]) - 'A'`.
+        for index in 0..n {
+            let Some(destination) = self.gate_dest(index) else {
+                continue;
+            };
+            let Some(first) = destination.name.as_str().chars().next() else {
+                continue;
+            };
+            let letter = first.to_ascii_uppercase() as i32 - 'A' as i32;
+            if !(0..26).contains(&letter) {
+                continue;
+            }
+            if keys.pressed(LETTER_KEYS[letter as usize]) {
+                self.gate_chosen = index as i32;
+                self.dismiss();
+                return true;
+            }
+        }
+        if keys.pressed(Key::Down) {
+            self.gate_cursor = (self.gate_cursor + 1) % n;
+        }
+        if keys.pressed(Key::Up) {
+            self.gate_cursor = if self.gate_cursor == 0 {
+                n - 1
+            } else {
+                self.gate_cursor - 1
+            };
+        }
+        // Left/Right jump columns, preserving the row offset.
+        if keys.pressed(Key::Right) && self.gate_cursor < left {
+            let target = self.gate_cursor + left;
+            if target < n {
+                self.gate_cursor = target;
+            }
+        }
+        if keys.pressed(Key::Left) && self.gate_cursor >= left {
+            self.gate_cursor -= left;
+        }
+        if keys.pressed(Key::Enter) || keys.pressed(Key::Space) {
+            self.gate_chosen = self.gate_cursor as i32;
+            self.dismiss();
+            return true;
+        }
+        false
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -292,6 +443,7 @@ impl Views {
                 self.draw_controls(list, layout, palette, resources, game, present)
             }
             Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
+            Some(ViewKind::Gate) => self.draw_gate(list, layout, palette),
             None => {}
         }
     }
@@ -754,6 +906,75 @@ impl Views {
                 list.text(&label, col_r, row_y + i * row_h, rc);
             }
         }
+    }
+
+    /// Ports `draw_gate`: a cursored, two-column list of gate destinations.
+    /// The panel covers the map and the sidebar so long names fit.
+    fn draw_gate(&self, list: &mut DrawList, layout: &Layout, palette: &Palette) {
+        let vx = MAP_X;
+        let vw = layout.map_w + layout.sidebar_w;
+        let vy = MAP_Y;
+        let vh = layout.map_h;
+        list.rect(Rect::new(vx, vy, vw, vh), palette.clr(Pal::DGrey));
+        list.rect_lines(Rect::new(vx, vy, vw, vh), palette.clr(Pal::DRed));
+
+        let title = if self.gate_is_town {
+            "Town Gate"
+        } else {
+            "Castle Gate"
+        };
+        list.text_centered(title, vx + vw / 2, vy + VIEW_PAD, palette.clr(Pal::Yellow));
+
+        let n = self.gate_count;
+        let cursor = self.gate_cursor;
+        let left = (n + 1) / 2;
+
+        let row_y = vy + VIEW_PAD + font::GLYPH_H + 6;
+        let row_h = font::GLYPH_H + 2;
+        let col_l = vx + VIEW_PAD + 2;
+        let col_r = vx + vw / 2 + 2;
+
+        for r in 0..left {
+            for side in 0..2 {
+                let index = if side == 0 { r } else { r + left };
+                if index >= n {
+                    continue;
+                }
+                let Some(destination) = self.gate_dest(index) else {
+                    continue;
+                };
+                let x = if side == 0 { col_l } else { col_r };
+                let y = row_y + r as i32 * row_h;
+                let selected = index == cursor;
+                let fg = if selected {
+                    palette.clr(Pal::Yellow)
+                } else {
+                    palette.clr(Pal::White)
+                };
+                let key = destination
+                    .name
+                    .as_str()
+                    .chars()
+                    .next()
+                    .unwrap_or(' ')
+                    .to_ascii_uppercase();
+                let short: String = destination
+                    .name
+                    .as_str()
+                    .chars()
+                    .take(GATE_NAME_COL)
+                    .collect();
+                let label = format!("{}{}) {}", if selected { ">" } else { " " }, key, short);
+                list.text(&label, x, y, fg);
+            }
+        }
+
+        list.text(
+            "Arrows/letter select  Enter go  ESC cancel",
+            vx + VIEW_PAD + 2,
+            vy + vh - font::GLYPH_H - 3,
+            palette.clr(Pal::Grey),
+        );
     }
 }
 
@@ -2195,5 +2416,105 @@ mod tests {
         );
         assert!(!views.is_active());
         assert_eq!(views.active(), None);
+    }
+
+    fn gate_dest(name: &str) -> GateDestination {
+        let mut destination = GateDestination::default();
+        destination.name.copy_from_str(name);
+        destination
+    }
+
+    #[test]
+    fn the_gate_picker_snapshots_the_destination_list() {
+        let mut views = Views::new();
+        views.gate_open(
+            &[gate_dest("Avalon"), gate_dest("Bari"), gate_dest("Cortona")],
+            true,
+        );
+        assert_eq!(views.active(), Some(ViewKind::Gate));
+        assert_eq!(views.gate_count(), 3);
+        assert!(views.gate_is_town());
+        assert_eq!(views.gate_cursor(), 0);
+        assert_eq!(views.gate_dest(1).map(|d| d.name.as_str()), Some("Bari"));
+        assert!(views.gate_dest(3).is_none());
+    }
+
+    #[test]
+    fn a_letter_shortcut_selects_by_first_name_letter() {
+        let mut views = Views::new();
+        views.gate_open(
+            &[
+                gate_dest("Avalon"),
+                gate_dest("Elan's Landing"),
+                gate_dest("Zion"),
+            ],
+            false,
+        );
+        // 'E' matches Elan's Landing (index 1), not its row.
+        assert!(views.gate_update(&Keys::pressed(&[Key::E])));
+        assert_eq!(views.gate_take_chosen(), Some(1));
+        assert!(!views.is_active());
+    }
+
+    #[test]
+    fn arrows_wrap_and_enter_confirms_the_cursor() {
+        let mut views = Views::new();
+        views.gate_open(
+            &[gate_dest("Avalon"), gate_dest("Bari"), gate_dest("Cortona")],
+            false,
+        );
+
+        views.gate_update(&Keys::pressed(&[Key::Down]));
+        views.gate_update(&Keys::pressed(&[Key::Down]));
+        assert_eq!(views.gate_cursor(), 2);
+        views.gate_update(&Keys::pressed(&[Key::Down]));
+        assert_eq!(views.gate_cursor(), 0);
+
+        views.gate_update(&Keys::pressed(&[Key::Up]));
+        assert_eq!(views.gate_cursor(), 2);
+
+        assert!(views.gate_update(&Keys::pressed(&[Key::Enter])));
+        assert_eq!(views.gate_take_chosen(), Some(2));
+    }
+
+    #[test]
+    fn escape_cancels_the_gate_picker() {
+        let mut views = Views::new();
+        views.gate_open(&[gate_dest("Avalon")], false);
+        assert!(!views.gate_update(&Keys::pressed(&[Key::Escape])));
+        assert!(!views.is_active());
+    }
+
+    #[test]
+    fn the_gate_picker_draws_two_columns_and_the_footer() {
+        let (resources, layout, _) = spells_fixtures();
+        let mut views = Views::new();
+        views.gate_open(
+            &[gate_dest("Avalon"), gate_dest("Bari"), gate_dest("Cortona")],
+            false,
+        );
+        let palette = Palette::fallback();
+        let mut list = DrawList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        let catalog = SpriteCatalog::from_resources(&resources);
+        views.draw(
+            &mut list,
+            &layout,
+            &palette,
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &Game::default(),
+            &present,
+            0.0,
+        );
+
+        assert!(list.has_text_containing("Castle Gate"));
+        assert!(list.has_text_containing("Avalon"));
+        assert!(list.has_text_containing("Bari"));
+        assert!(list.has_text_containing("Cortona"));
+        assert!(list.has_text_containing("Enter go"));
     }
 }
