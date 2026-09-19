@@ -11,6 +11,7 @@ pub mod anim;
 pub mod backend;
 pub mod banner;
 pub mod chrome;
+pub mod combat;
 pub mod dialog;
 pub mod draw;
 pub mod font;

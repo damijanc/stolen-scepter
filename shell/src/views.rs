@@ -2039,7 +2039,7 @@ fn draw_character(
 
 /// A troop's animated frame, falling back to its still sprite. Mirrors the
 /// helper `map_render` uses, since the army view animates the same way.
-fn troop_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite> {
+pub(crate) fn troop_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite> {
     let index = usize::try_from(index).ok()?;
     let frames = catalog.troop_anim_len(index);
     if frames > 0 {
