@@ -107,6 +107,13 @@ const DEFAULT_BODY_DISMISS_LAST: &str = "If you dismiss your last\n\
     army, you will be sent back\n\
     to the King in disgrace.\n\
     Dismiss last army?";
+const DEFAULT_TEMP_DEATH: &str = "After being disgraced on the\n\
+    field of battle, King\n\
+    Maximus summons you to his\n\
+    castle. After a lesson in\n\
+    tactics, he reluctantly re-\n\
+    issues your commission and\n\
+    sends you on your way.";
 
 /// Which battle a combat session is resolving.
 enum CombatFlow {
@@ -238,6 +245,10 @@ fn finish_combat(
     };
     if temp_death {
         game.temp_death(resources, map, fog);
+        // `perform_temp_death`: the engine owns the transition; the shell adds
+        // only the untitled temp_death banner, following the battle.
+        let body = banner::text(resources, "banners", "temp_death", DEFAULT_TEMP_DEATH);
+        dialog.open("", body);
     }
 
     if result == CombatResult::Win {
@@ -321,6 +332,8 @@ fn dispatch_answer(
         PendingFlow::DismissLast => {
             if answer == PromptResult::Yes {
                 game.temp_death(resources, map, fog);
+                let body = banner::text(resources, "banners", "temp_death", DEFAULT_TEMP_DEATH);
+                dialog.open("", body);
             }
         }
         PendingFlow::ChestChoice { gold, leadership } => {
