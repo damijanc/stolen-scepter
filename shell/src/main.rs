@@ -36,7 +36,8 @@ use layout::Layout;
 use map_render::MapScene;
 use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{
-    Game, GateDestKind, GateDestination, TravelMode, GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
+    CastleOwnerKind, Game, GarrisonOutcome, GateDestKind, GateDestination, TravelMode,
+    GAME_ARMY_SLOTS, GAME_GATE_DESTS_MAX,
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
@@ -528,6 +529,40 @@ async fn main() {
                 TownInput::RunRow(row) => run_town_row(&mut game, &resources, &mut views, row),
                 TownInput::Dismissed | TownInput::Handled | TownInput::None => {}
             }
+        } else if views.active() == Some(ViewKind::HomeCastle) {
+            // Throne room / barracks: ESC pops, A and B run the (still
+            // deferred) recruit and audience sub-flows.
+            if keys.pressed(Key::Escape) {
+                views.dismiss();
+            } else if keys.pressed(Key::A) {
+                eprintln!("recruit soldiers not yet wired");
+            } else if keys.pressed(Key::B) {
+                eprintln!("audience with the king not yet wired");
+            }
+        } else if views.active() == Some(ViewKind::OwnCastle) {
+            // SPACE toggles garrison/remove; A..E transfer the chosen stack.
+            if keys.pressed(Key::Escape) {
+                views.dismiss();
+            } else if keys.pressed(Key::Space) {
+                views.own_castle_toggle_mode();
+            } else {
+                let castle_id = views.own_castle_castle_id().to_owned();
+                let garrison_mode = views.own_castle_garrison_mode();
+                let keys_abcd = [Key::A, Key::B, Key::C, Key::D, Key::E];
+                for (slot, key) in keys_abcd.iter().enumerate().take(GAME_ARMY_SLOTS) {
+                    if keys.pressed(*key) {
+                        let outcome = if garrison_mode {
+                            game.garrison_troop(&castle_id, slot)
+                        } else {
+                            game.ungarrison_troop(&castle_id, slot)
+                        };
+                        if outcome != GarrisonOutcome::Ok {
+                            dialog.open("", interact::garrison_refusal(&resources, outcome));
+                        }
+                        break;
+                    }
+                }
+            }
         } else if views.is_active() {
             // The worldmap alone treats SPACE specially: with the crystal orb
             // it toggles fog-only vs whole-map; without it SPACE dismisses
@@ -688,6 +723,21 @@ async fn main() {
                                 })
                                 .unwrap_or(id.as_str());
                             views.town_open(display_name, id.as_str(), *boat_x, *boat_y);
+                        }
+                        StepInteraction::CastleGate { id } => {
+                            if resources
+                                .castle_by_id(id.as_str())
+                                .is_some_and(|c| c.is_home())
+                            {
+                                views.home_castle_open();
+                            } else if game.castles.iter().any(|c| {
+                                c.id.as_str() == id && c.owner_kind == CastleOwnerKind::Player
+                            }) {
+                                views.own_castle_open(id.as_str());
+                            } else {
+                                // Hostile castle: the siege flow is the combat slice.
+                                eprintln!("hostile castle siege not yet wired");
+                            }
                         }
                         StepInteraction::None => {}
                         other => {

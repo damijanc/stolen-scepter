@@ -24,7 +24,7 @@ use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::input::{Key, KeySource};
-use crate::layout::{Layout, MAP_X, MAP_Y};
+use crate::layout::{Layout, MAP_X, MAP_Y, PANEL_H, PANEL_PAD_X};
 use crate::palette::{Pal, Palette};
 use crate::present::Present;
 use crate::sprites::SpriteCatalog;
@@ -123,6 +123,8 @@ pub enum ViewKind {
     Spells,
     Gate,
     Town,
+    HomeCastle,
+    OwnCastle,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -214,6 +216,10 @@ pub struct Views {
     town_cursor: i32,
     town_info_body: String,
     town_info_active: bool,
+    /// The own-castle screen's context, porting `s_castle_id` and
+    /// `s_garrison_mode`.
+    own_castle_id: String,
+    own_castle_garrison_mode: bool,
 }
 
 impl Views {
@@ -253,7 +259,9 @@ impl Views {
                 | ViewKind::Controls
                 | ViewKind::Spells
                 | ViewKind::Gate
-                | ViewKind::Town,
+                | ViewKind::Town
+                | ViewKind::HomeCastle
+                | ViewKind::OwnCastle,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
@@ -535,6 +543,37 @@ impl Views {
         TownInput::None
     }
 
+    /// Open the home castle (throne room / barracks), porting
+    /// `screen_home_castle_open`.
+    pub fn home_castle_open(&mut self) {
+        self.set(ViewKind::HomeCastle);
+    }
+
+    /// Open the own-castle screen, porting `screen_own_castle_open`. The mode
+    /// starts on REMOVE, as C does.
+    pub fn own_castle_open(&mut self, castle_id: &str) {
+        self.own_castle_id = castle_id.to_owned();
+        self.own_castle_garrison_mode = false;
+        self.set(ViewKind::OwnCastle);
+    }
+
+    /// Whether the own-castle screen is in garrison (true) or remove (false)
+    /// mode, porting `screen_own_castle_is_garrison_mode`.
+    pub fn own_castle_garrison_mode(&self) -> bool {
+        self.own_castle_garrison_mode
+    }
+
+    /// Flip the own-castle mode, porting `screen_own_castle_toggle_mode`.
+    pub fn own_castle_toggle_mode(&mut self) {
+        self.own_castle_garrison_mode = !self.own_castle_garrison_mode;
+    }
+
+    /// The castle the own-castle screen is bound to, porting
+    /// `screen_own_castle_castle_id`.
+    pub fn own_castle_castle_id(&self) -> &str {
+        &self.own_castle_id
+    }
+
     /// Draw the active view over the map area.
     pub fn draw(
         &mut self,
@@ -578,6 +617,12 @@ impl Views {
             Some(ViewKind::Gate) => self.draw_gate(list, layout, palette),
             Some(ViewKind::Town) => {
                 self.draw_town(list, layout, palette, resources, catalog, game, time)
+            }
+            Some(ViewKind::HomeCastle) => {
+                self.draw_home_castle(list, layout, palette, resources, catalog, game, time)
+            }
+            Some(ViewKind::OwnCastle) => {
+                self.draw_own_castle(list, layout, palette, resources, catalog, game, time)
             }
             None => {}
         }
@@ -1127,31 +1172,16 @@ impl Views {
     ) {
         let name = &self.town_display_name;
 
-        // Backdrop: 240x102 at the map origin, then an animated castle troop
-        // pinned to its bottom-left.
-        list.rect(Rect::new(MAP_X, MAP_Y, 240, 102), palette.clr(Pal::Black));
-        list.blit(
-            Sprite::Backdrop(crate::draw::Backdrop::Town),
-            Dst::rect(MAP_X, MAP_Y, 240, 102),
-        );
-
         let troop_index = town_backdrop_troop(game, resources, name);
-        let tick = (time * 6.66) as i32;
-        if let Some(sprite) = troop_sprite(catalog, troop_index, tick) {
-            // Inset one sprite-width and lifted off the panel below.
-            let tw = 48;
-            let th = 34;
-            list.blit(sprite, Dst::rect(MAP_X + tw, MAP_Y + 102 - th - 4, tw, th));
-        }
-
-        // Black fill below the backdrop before the panel draws over it.
-        let below_y = MAP_Y + 102;
-        if below_y < MAP_Y + layout.map_h {
-            list.rect(
-                Rect::new(MAP_X, below_y, 240, MAP_Y + layout.map_h - below_y),
-                palette.clr(Pal::Black),
-            );
-        }
+        draw_location_backdrop(
+            list,
+            palette,
+            catalog,
+            crate::draw::Backdrop::Town,
+            troop_index,
+            time,
+            layout.map_h,
+        );
 
         // Menu panel at the bottom of the map area.
         let row_h = font::GLYPH_H + 1;
@@ -1209,6 +1239,117 @@ impl Views {
                 list.text(line, tx, ty, palette.clr(Pal::White));
                 ty += row_h;
             }
+        }
+    }
+
+    /// Ports `screen_home_castle_draw`: the castle backdrop and the two-choice
+    /// menu (Recruit Soldiers / Audience with the King).
+    fn draw_home_castle(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+        game: &Game,
+        time: f64,
+    ) {
+        let troop_index = home_castle_troop(game, resources);
+        draw_location_backdrop(
+            list,
+            palette,
+            catalog,
+            crate::draw::Backdrop::Castle,
+            troop_index,
+            time,
+            layout.map_h,
+        );
+
+        let x = layout.panel_x();
+        let y = layout.panel_y();
+        let w = layout.panel_w();
+        let h = PANEL_H;
+        list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
+        list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
+
+        let body = crate::interact::home_castle_body(resources);
+        let row_h = font::GLYPH_H + 1;
+        let mut ty = y + PANEL_PAD_X;
+        for line in body.split('\n') {
+            if ty + row_h > y + h - PANEL_PAD_X {
+                break;
+            }
+            list.text(line, x + PANEL_PAD_X, ty, palette.clr(Pal::White));
+            ty += row_h;
+        }
+    }
+
+    /// Ports `screen_own_castle_draw`: the castle backdrop and the garrison /
+    /// remove list with the mode subtitle.
+    fn draw_own_castle(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+        game: &Game,
+        time: f64,
+    ) {
+        let troop_index = own_castle_troop(game, resources, &self.own_castle_id);
+        draw_location_backdrop(
+            list,
+            palette,
+            catalog,
+            crate::draw::Backdrop::Castle,
+            troop_index,
+            time,
+            layout.map_h,
+        );
+
+        let x = layout.panel_x();
+        let y = layout.panel_y();
+        let w = layout.panel_w();
+        let h = PANEL_H;
+        list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
+        list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
+
+        let row_h = font::GLYPH_H + 1;
+        let tx = x + PANEL_PAD_X;
+        let mut ty = y + PANEL_PAD_X;
+
+        let castle_name = resources
+            .castle_by_id(self.own_castle_id.as_str())
+            .map(|castle| {
+                if castle.name.is_empty() {
+                    castle.id.as_str()
+                } else {
+                    castle.name.as_str()
+                }
+            })
+            .unwrap_or(self.own_castle_id.as_str());
+        list.text(
+            &format!("Castle {castle_name}"),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+        ty += row_h;
+
+        let mode = crate::interact::own_castle_mode_label(resources, self.own_castle_garrison_mode);
+        list.text(&mode, tx, ty, palette.clr(Pal::White));
+        ty += row_h + 1;
+
+        for slot in 0..GAME_ARMY_SLOTS {
+            let line = crate::interact::own_castle_row(
+                resources,
+                game,
+                &self.own_castle_id,
+                self.own_castle_garrison_mode,
+                slot,
+            );
+            list.text(&line, tx, ty, palette.clr(Pal::White));
+            ty += row_h;
         }
     }
 }
@@ -1525,6 +1666,84 @@ fn town_backdrop_troop(game: &Game, resources: &Resources, key: &str) -> i32 {
         return (hash(key) % troop_count as u64) as i32;
     }
     pool[(hash(key) % npool as u64) as usize]
+}
+
+/// Draw a 240x102 location backdrop with an animated troop and the black fill
+/// below it, porting `draw_location_backdrop`.
+fn draw_location_backdrop(
+    list: &mut DrawList,
+    palette: &Palette,
+    catalog: &SpriteCatalog,
+    backdrop: crate::draw::Backdrop,
+    troop_index: i32,
+    time: f64,
+    map_h: i32,
+) {
+    list.rect(Rect::new(MAP_X, MAP_Y, 240, 102), palette.clr(Pal::Black));
+    list.blit(
+        Sprite::Backdrop(backdrop),
+        Dst::rect(MAP_X, MAP_Y, 240, 102),
+    );
+
+    let tick = (time * 6.66) as i32;
+    if let Some(sprite) = troop_sprite(catalog, troop_index, tick) {
+        list.blit(sprite, Dst::rect(MAP_X + 48, MAP_Y + 102 - 34 - 4, 48, 34));
+    }
+
+    let below_y = MAP_Y + 102;
+    if below_y < MAP_Y + map_h {
+        list.rect(
+            Rect::new(MAP_X, below_y, 240, MAP_Y + map_h - below_y),
+            palette.clr(Pal::Black),
+        );
+    }
+}
+
+/// The castle-class troop that idles on the home-castle backdrop, porting
+/// `pick_castle_troop` in `home_castle.c`.
+fn home_castle_troop(game: &Game, resources: &Resources) -> i32 {
+    let troop_count = resources.troops_count();
+    let mut pool = [0i32; 8];
+    let mut npool = 0;
+    for index in 0..troop_count.min(8) {
+        if let Some(troop) = resources.troop_by_index(index as i32) {
+            if troop.dwelling.as_str() == "castle" {
+                pool[npool] = index as i32;
+                npool += 1;
+            }
+        }
+    }
+    if npool < 1 {
+        return -1;
+    }
+    let mut h = game.seed ^ 0xC451_E11A;
+    h ^= game.stats.days_left as u64;
+    h = h.wrapping_mul(2_654_435_761).wrapping_add(0x9E37_79B9);
+    pool[(h % npool as u64) as usize]
+}
+
+/// The castle-class troop that idles on an own-castle backdrop, porting
+/// `pick_castle_troop` in `own_castle.c`.
+fn own_castle_troop(game: &Game, resources: &Resources, castle_id: &str) -> i32 {
+    let troop_count = resources.troops_count();
+    let mut pool = [0i32; 8];
+    let mut npool = 0;
+    for index in 0..troop_count.min(8) {
+        if let Some(troop) = resources.troop_by_index(index as i32) {
+            if troop.dwelling.as_str() == "castle" {
+                pool[npool] = index as i32;
+                npool += 1;
+            }
+        }
+    }
+    if npool < 1 {
+        return -1;
+    }
+    let mut h = game.seed ^ 0x0CA5_71E5;
+    for byte in castle_id.bytes() {
+        h = h.wrapping_mul(131).wrapping_add(byte as u64);
+    }
+    pool[(h % npool as u64) as usize]
 }
 
 /// Morale of one army slot: any 'L' against another stack reads Low, all 'H'
@@ -2864,5 +3083,78 @@ mod tests {
         assert!(!list
             .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Town))
             .is_empty());
+    }
+
+    fn castle_fixtures() -> (Resources, Layout, SpriteCatalog) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [
+                 {"index":0,"id":"peasants","name":"Peasants","skill_level":1,"hit_points":1,
+                  "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,
+                  "spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}
+               ],
+               "castles": [{"id":"castle0","name":"Darkstone","zone":"home","x":2,"y":2}]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    fn draw_castle_view(
+        views: &mut Views,
+        resources: &Resources,
+        layout: &Layout,
+        game: &Game,
+    ) -> DrawList {
+        let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        let catalog = SpriteCatalog::from_resources(resources);
+        let mut list = DrawList::new();
+        views.draw(
+            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, &present, 0.0,
+        );
+        list
+    }
+
+    #[test]
+    fn own_castle_opens_in_remove_mode_and_toggles() {
+        let mut views = Views::new();
+        views.own_castle_open("castle0");
+        assert_eq!(views.active(), Some(ViewKind::OwnCastle));
+        assert_eq!(views.own_castle_castle_id(), "castle0");
+        assert!(!views.own_castle_garrison_mode());
+        views.own_castle_toggle_mode();
+        assert!(views.own_castle_garrison_mode());
+    }
+
+    #[test]
+    fn the_home_castle_view_draws_the_menu() {
+        let (resources, layout, _) = castle_fixtures();
+        let mut views = Views::new();
+        views.home_castle_open();
+        let list = draw_castle_view(&mut views, &resources, &layout, &Game::default());
+
+        assert!(list.has_text_containing("Recruit Soldiers"));
+        assert!(list.has_text_containing("Audience with the King"));
+        assert!(!list
+            .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Castle))
+            .is_empty());
+    }
+
+    #[test]
+    fn the_own_castle_view_draws_title_and_rows() {
+        let (resources, layout, _) = castle_fixtures();
+        let mut game = Game::default();
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 5;
+        let mut views = Views::new();
+        views.own_castle_open("castle0");
+        let list = draw_castle_view(&mut views, &resources, &layout, &game);
+
+        assert!(list.has_text_containing("Castle Darkstone"));
+        assert!(list.has_text_containing("Remove troops"));
+        assert!(list.has_text_containing("Peasants"));
     }
 }

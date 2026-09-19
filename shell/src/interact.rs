@@ -11,8 +11,8 @@
 //! testable headlessly the way the engine's combat digests are.
 
 use openbounty_engine::game::{
-    BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game, SiegeBuyOutcome,
-    SpellBuyOutcome,
+    BoatActionOutcome, CastleOwnerKind, ChestOutcome, ChestRoll, Game, GarrisonOutcome,
+    SiegeBuyOutcome, SpellBuyOutcome,
 };
 use openbounty_engine::resources::Resources;
 use openbounty_engine::spells_adventure::AdventureCast;
@@ -680,6 +680,13 @@ const DEFAULT_TOWN_SPELL_CAN_LEARN: &str = "You can learn %LEFT% more spell%S%."
 const DEFAULT_TOWN_SIEGE_ALREADY: &str = "You have siege weapons!";
 const DEFAULT_TOWN_SIEGE_PURCHASED: &str = "Siege weapons purchased.";
 
+/// Castle screen defaults, porting `load_banner_defaults` and the `ui` block.
+const DEFAULT_BODY_HOME_CASTLE: &str = "1. Recruit Soldiers\n2. Audience with the King";
+const DEFAULT_OWN_CASTLE_MODE_GARRISON: &str = "Garrison troops (Space=Remove)";
+const DEFAULT_OWN_CASTLE_MODE_REMOVE: &str = "Remove troops (Space=Garrison)";
+const DEFAULT_CANNOT_GARRISON_LAST: &str = "You cannot garrison your\nlast army!";
+const DEFAULT_NO_TROOP_SLOTS: &str = "No troop slots left!";
+
 /// The town header and gold label, used by the town menu panel.
 pub fn town_header_text(resources: &Resources, name: &str) -> String {
     banner::formatted(
@@ -1010,10 +1017,98 @@ pub fn town_intel_toast(resources: &Resources, game: &Game, record_key: &str) ->
     body
 }
 
+/// The home-castle menu body, porting the `body_home_castle` banner.
+pub fn home_castle_body(resources: &Resources) -> String {
+    banner::text(
+        resources,
+        "banners",
+        "body_home_castle",
+        DEFAULT_BODY_HOME_CASTLE,
+    )
+    .to_owned()
+}
+
+/// The own-castle mode subtitle, porting the `own_castle_mode_*` UI strings.
+pub fn own_castle_mode_label(resources: &Resources, garrison_mode: bool) -> String {
+    if garrison_mode {
+        banner::text(
+            resources,
+            "ui",
+            "own_castle_mode_garrison",
+            DEFAULT_OWN_CASTLE_MODE_GARRISON,
+        )
+        .to_owned()
+    } else {
+        banner::text(
+            resources,
+            "ui",
+            "own_castle_mode_remove",
+            DEFAULT_OWN_CASTLE_MODE_REMOVE,
+        )
+        .to_owned()
+    }
+}
+
+/// One own-castle row. In garrison mode it lists the player army (move into the
+/// castle); in remove mode the castle garrison (move into the army). Ports
+/// `screen_own_castle_draw`'s row formatting.
+pub fn own_castle_row(
+    resources: &Resources,
+    game: &Game,
+    castle_id: &str,
+    garrison_mode: bool,
+    slot: usize,
+) -> String {
+    let letter = char::from(b'A' + slot as u8);
+    let (id, count) = if garrison_mode {
+        game.army
+            .get(slot)
+            .filter(|stack| !stack.id.is_empty() && stack.count > 0)
+            .map(|stack| (stack.id.as_str(), stack.count))
+            .unwrap_or(("", 0))
+    } else {
+        game.castles
+            .iter()
+            .find(|castle| castle.id.as_str() == castle_id)
+            .and_then(|castle| castle.garrison.get(slot))
+            .filter(|unit| !unit.id.is_empty() && unit.count > 0)
+            .map(|unit| (unit.id.as_str(), unit.count))
+            .unwrap_or(("", 0))
+    };
+
+    if id.is_empty() {
+        return format!("{letter}) {:<11}-", "(empty)");
+    }
+    let name = resources
+        .troop_by_id(id)
+        .map(|troop| troop.name.as_str())
+        .unwrap_or(id);
+    format!("{letter}) {:<11}{count}", name)
+}
+
+/// The refusal message for a garrison/remove transfer, porting the shell half
+/// of the own-castle input: `WouldLeaveNoArmy` is garrison-only.
+pub fn garrison_refusal(resources: &Resources, outcome: GarrisonOutcome) -> &str {
+    match outcome {
+        GarrisonOutcome::WouldLeaveNoArmy => banner::text(
+            resources,
+            "banners",
+            "cannot_garrison_last",
+            DEFAULT_CANNOT_GARRISON_LAST,
+        ),
+        _ => banner::text(
+            resources,
+            "banners",
+            "no_troop_slots",
+            DEFAULT_NO_TROOP_SLOTS,
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openbounty_engine::game::{ChestOutcome, ChestRoll, Game};
+    use openbounty_engine::game::{ChestOutcome, ChestRoll, Game, GarrisonOutcome};
     use openbounty_engine::step::StepInteraction;
 
     fn resources(zones: &str) -> Resources {
@@ -1502,5 +1597,40 @@ mod tests {
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::Already).contains("siege weapons"));
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::NoGold).contains("gold"));
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::Ok).contains("purchased"));
+    }
+
+    #[test]
+    fn the_home_castle_body_and_mode_labels_are_pack_text() {
+        let resources = town_resources();
+        assert!(home_castle_body(&resources).contains("Recruit"));
+        assert!(own_castle_mode_label(&resources, true).contains("Garrison"));
+        assert!(own_castle_mode_label(&resources, false).contains("Remove"));
+    }
+
+    #[test]
+    fn the_own_castle_rows_list_the_right_source() {
+        let resources = town_resources();
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 12;
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 5;
+
+        // Garrison mode lists the player army.
+        let row = own_castle_row(&resources, &game, "castle0", true, 0);
+        assert_eq!(row, "A) Peasants   12");
+        // Remove mode lists the castle garrison.
+        let row = own_castle_row(&resources, &game, "castle0", false, 0);
+        assert_eq!(row, "A) Peasants   5");
+        // An empty slot reads "(empty) -".
+        assert!(own_castle_row(&resources, &game, "castle0", true, 1).contains("(empty)"));
+    }
+
+    #[test]
+    fn garrison_refusals_name_the_banner() {
+        let resources = town_resources();
+        assert!(garrison_refusal(&resources, GarrisonOutcome::Refused).contains("slots"));
+        assert!(garrison_refusal(&resources, GarrisonOutcome::WouldLeaveNoArmy).contains("last"));
     }
 }
