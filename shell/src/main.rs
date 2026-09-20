@@ -594,7 +594,7 @@ async fn main() {
         Some(dir) => SavePaths::with_override(dir),
         None => SavePaths::new(),
     };
-    let mut startup = Startup::new();
+    let mut startup = Startup::new(&resources);
     let choice = loop {
         if let Some(choice) = startup.update(&keys, &resources, &save_paths, get_time()) {
             break choice;

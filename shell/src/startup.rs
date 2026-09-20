@@ -46,6 +46,22 @@ const CLASS_PICKER_H: i32 = 184;
 
 /// Longest accepted hero name, C's `char name_buf[11]`.
 const NAME_MAX: usize = 10;
+/// How long a splash holds before auto-advancing, C's `timeout`.
+const SPLASH_TIMEOUT: f64 = 2.5;
+/// How long the credits hold before auto-advancing, C's `timeout`.
+const CREDITS_TIMEOUT: f64 = 2.5;
+/// Shipped splash-art sizes, which C reads from the textures; the shell cannot.
+const SPLASH_LOGO_W: i32 = 320;
+const SPLASH_LOGO_H: i32 = 84;
+const SPLASH_TITLE_W: i32 = 320;
+const SPLASH_TITLE_H: i32 = 200;
+/// Credits layout constants, C's locals.
+const CREDIT_LINE_H: i32 = GLYPH_H + 1;
+const CREDIT_PAD: i32 = 6;
+const CREDIT_IMAGE_GAP: i32 = 8;
+/// The class-select highlight sprite, C's `class_select_highlight`.
+const CREDIT_INSET_W: i32 = 42;
+const CREDIT_INSET_H: i32 = 44;
 /// How long the new-game intro holds before auto-advancing, C's `timeout`.
 const INTRO_TIMEOUT: f64 = 4.0;
 /// Corner padding of the intro panel, C's `pad`.
@@ -80,6 +96,9 @@ pub struct StartupChoice {
 /// Which wizard screen is up.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Screen {
+    SplashLogo,
+    SplashTitle,
+    Credits,
     ClassSelect,
     SavePicker,
     CreateGame,
@@ -90,6 +109,9 @@ enum Screen {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Startup {
     screen: Screen,
+    /// When the current timed screen (a splash, the credits, or the intro)
+    /// was entered, so its hold can be measured against the wall clock.
+    screen_started: f64,
     class_id: String,
     name: String,
     /// False while typing the name; true once Enter confirms and the
@@ -109,6 +131,7 @@ impl Default for Startup {
     fn default() -> Self {
         Self {
             screen: Screen::ClassSelect,
+            screen_started: 0.0,
             class_id: String::new(),
             name: String::new(),
             has_name: false,
@@ -123,8 +146,22 @@ impl Default for Startup {
 }
 
 impl Startup {
-    pub fn new() -> Self {
-        Self::default()
+    /// Start the flow. When the pack declares a splash or credits, the flow
+    /// opens there, exactly as C's `startup_flow` does; otherwise it opens on
+    /// class select.
+    pub fn new(resources: &Resources) -> Self {
+        let has_splash_or_credits = !resources.sprites.splash_logo.is_empty()
+            || !resources.sprites.splash_title.is_empty()
+            || resources.credits.group_count > 0
+            || resources.credits.copyright_count > 0;
+        Self {
+            screen: if has_splash_or_credits {
+                Screen::SplashLogo
+            } else {
+                Screen::ClassSelect
+            },
+            ..Self::default()
+        }
     }
 
     /// Consume one frame. Returns a choice only when the player commits or
@@ -137,11 +174,56 @@ impl Startup {
         time: f64,
     ) -> Option<StartupChoice> {
         match self.screen {
+            Screen::SplashLogo => self.step_splash(
+                keys,
+                resources.sprites.splash_logo.is_empty(),
+                Screen::SplashTitle,
+                time,
+            ),
+            Screen::SplashTitle => self.step_splash(
+                keys,
+                resources.sprites.splash_title.is_empty(),
+                Screen::Credits,
+                time,
+            ),
+            Screen::Credits => self.step_credits(keys, resources, time),
             Screen::ClassSelect => self.update_class_select(keys, resources, paths),
             Screen::SavePicker => self.update_save_picker(keys),
             Screen::CreateGame => self.update_create_game(keys, resources, time),
             Screen::Intro => self.update_intro(keys, time),
         }
+    }
+
+    /// A timed, full-screen splash: advance on any key, or after the hold. An
+    /// absent texture skips straight through, as C does.
+    fn step_splash(
+        &mut self,
+        keys: &dyn KeySource,
+        absent: bool,
+        next: Screen,
+        time: f64,
+    ) -> Option<StartupChoice> {
+        if absent || keys.any_pressed() || (time - self.screen_started) >= SPLASH_TIMEOUT {
+            self.screen = next;
+            self.screen_started = time;
+        }
+        None
+    }
+
+    /// The credits screen: advance on any key, or after the hold. An empty
+    /// credits block is skipped.
+    fn step_credits(
+        &mut self,
+        keys: &dyn KeySource,
+        resources: &Resources,
+        time: f64,
+    ) -> Option<StartupChoice> {
+        let absent = resources.credits.group_count == 0 && resources.credits.copyright_count == 0;
+        if absent || keys.any_pressed() || (time - self.screen_started) >= CREDITS_TIMEOUT {
+            self.screen = Screen::ClassSelect;
+            self.screen_started = time;
+        }
+        None
     }
 
     fn update_class_select(
@@ -318,17 +400,169 @@ impl Startup {
         resources: &Resources,
         time: f64,
     ) {
+        match self.screen {
+            // The splashes and credits own the whole screen.
+            Screen::SplashLogo => self.draw_splash(
+                list,
+                layout,
+                palette,
+                Sprite::SplashLogo,
+                SPLASH_LOGO_W,
+                SPLASH_LOGO_H,
+            ),
+            Screen::SplashTitle => self.draw_splash(
+                list,
+                layout,
+                palette,
+                Sprite::SplashTitle,
+                SPLASH_TITLE_W,
+                SPLASH_TITLE_H,
+            ),
+            Screen::Credits => self.draw_credits(list, layout, palette, resources),
+            // Every wizard screen sits over the class-picker cartoon.
+            Screen::ClassSelect | Screen::SavePicker | Screen::CreateGame | Screen::Intro => {
+                list.rect(
+                    Rect::new(0, 0, layout.screen_w, layout.screen_h),
+                    palette.clr(Pal::Black),
+                );
+                self.draw_class_picker(list, layout);
+                self.draw_status_hint(list, layout, palette, resources);
+                match self.screen {
+                    Screen::SavePicker => self.draw_save_picker(list, layout, palette, resources),
+                    Screen::CreateGame => {
+                        self.draw_create_game(list, layout, palette, resources, time)
+                    }
+                    Screen::Intro => self.draw_intro(list, layout, palette, resources),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn draw_splash(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        sprite: Sprite,
+        w: i32,
+        h: i32,
+    ) {
+        list.rect(
+            Rect::new(0, 0, layout.screen_w, layout.screen_h),
+            palette.clr(Pal::Black),
+        );
+        let x = (layout.screen_w - w) / 2;
+        let y = (layout.screen_h - h) / 2;
+        list.blit(sprite, Dst::rect(x, y, w, h));
+    }
+
+    fn draw_credits(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+    ) {
+        // The credits drape over the character-pick cartoon, as C's do.
         list.rect(
             Rect::new(0, 0, layout.screen_w, layout.screen_h),
             palette.clr(Pal::Black),
         );
         self.draw_class_picker(list, layout);
         self.draw_status_hint(list, layout, palette, resources);
-        match self.screen {
-            Screen::ClassSelect => {}
-            Screen::SavePicker => self.draw_save_picker(list, layout, palette, resources),
-            Screen::CreateGame => self.draw_create_game(list, layout, palette, resources, time),
-            Screen::Intro => self.draw_intro(list, layout, palette, resources),
+
+        let credits = &resources.credits;
+        let line_h = CREDIT_LINE_H;
+        let pad = CREDIT_PAD;
+
+        let mut max_text_chars = 0;
+        for group in &credits.groups[..credits.group_count] {
+            max_text_chars = max_text_chars.max(group.label.as_str().chars().count());
+            for name in &group.names[..group.name_count] {
+                max_text_chars = max_text_chars.max(name.as_str().chars().count() + 2);
+            }
+        }
+        for line in &credits.copyright[..credits.copyright_count] {
+            max_text_chars = max_text_chars.max(line.as_str().chars().count());
+        }
+
+        let has_image = !credits.image.is_empty();
+        let (image_w, image_h) = if has_image {
+            (CREDIT_INSET_W, CREDIT_INSET_H)
+        } else {
+            (0, 0)
+        };
+        let text_w = max_text_chars as i32 * GLYPH_W;
+        let gap = if has_image { CREDIT_IMAGE_GAP } else { 0 };
+        let mut panel_w = pad + text_w + gap + image_w + pad;
+        if panel_w > layout.screen_w - 8 {
+            panel_w = layout.screen_w - 8;
+        }
+
+        let mut rows = 0;
+        for (index, group) in credits.groups[..credits.group_count].iter().enumerate() {
+            rows += 1 + group.name_count as i32;
+            if index + 1 < credits.group_count {
+                rows += 1;
+            }
+        }
+        let copyright_rows = credits.copyright_count as i32;
+        let spacer = if credits.group_count > 0 && credits.copyright_count > 0 {
+            1
+        } else {
+            0
+        };
+        let total_rows = rows + spacer + copyright_rows;
+        let mut panel_h = pad * 2 + total_rows * line_h;
+        let min_panel_h = pad * 2 + image_h;
+        if panel_h < min_panel_h {
+            panel_h = min_panel_h;
+        }
+
+        let px = (layout.screen_w - panel_w) / 2;
+        let py = (layout.screen_h - panel_h) / 2;
+        list.rect(Rect::new(px, py, panel_w, panel_h), palette.clr(Pal::DBlue));
+        list.rect_lines(
+            Rect::new(px, py, panel_w, panel_h),
+            palette.clr(Pal::Yellow),
+        );
+
+        let tx = px + pad;
+        let mut ty = py + pad;
+        for (index, group) in credits.groups[..credits.group_count].iter().enumerate() {
+            list.text(group.label.as_str(), tx, ty, palette.clr(Pal::White));
+            ty += line_h;
+            for name in &group.names[..group.name_count] {
+                list.text(name.as_str(), tx + 2 * GLYPH_W, ty, palette.clr(Pal::White));
+                ty += line_h;
+            }
+            if index + 1 < credits.group_count {
+                ty += line_h;
+            }
+        }
+        if spacer > 0 {
+            ty += line_h;
+        }
+        for line in &credits.copyright[..credits.copyright_count] {
+            let line = expand_version(line.as_str(), resources.version);
+            let tw = line.as_str().chars().count() as i32 * GLYPH_W;
+            let cx = px + (panel_w - tw) / 2;
+            list.text(&line, cx, ty, palette.clr(Pal::White));
+            ty += line_h;
+        }
+
+        if has_image {
+            let ix = px + panel_w - pad - image_w;
+            let mut iy = py + pad + line_h;
+            if iy + image_h > py + panel_h - pad {
+                iy = py + panel_h - pad - image_h;
+            }
+            list.blit(Sprite::ClassHighlight, Dst::rect(ix, iy, image_w, image_h));
+            list.rect_lines(
+                Rect::new(ix - 1, iy - 1, image_w + 2, image_h + 2),
+                palette.clr(Pal::DGreen),
+            );
         }
     }
 
@@ -568,6 +802,11 @@ impl Startup {
     }
 }
 
+/// Substitute `%VERSION%` in a credits line, porting `expand_version`.
+fn expand_version(src: &str, version: i32) -> String {
+    src.replace("%VERSION%", &version.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -661,7 +900,7 @@ mod tests {
     fn the_wizard_yields_the_picked_class_and_typed_name() {
         let resources = resources();
         let paths = paths("wizard");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         let choice = run_wizard(&mut startup, &resources, &paths);
         assert_eq!(choice.action, StartupAction::New);
         assert_eq!(choice.slot, 0);
@@ -674,7 +913,7 @@ mod tests {
     fn escape_at_class_select_quits() {
         let resources = resources();
         let paths = paths("quit");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         let choice = startup
             .update(&Keys::pressed(&[Key::Escape]), &resources, &paths, 0.0)
             .expect("quits");
@@ -685,7 +924,7 @@ mod tests {
     fn an_empty_name_falls_back_to_the_world_default() {
         let resources = resources();
         let paths = paths("default-name");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::A]), &resources, &paths, 0.0);
         startup.update(&Keys::pressed(&[Key::Enter]), &resources, &paths, 0.0);
         // The second Enter confirms the (defaulted) name and opens difficulty.
@@ -704,7 +943,7 @@ mod tests {
     fn the_name_caps_at_ten_characters() {
         let resources = resources();
         let paths = paths("name-cap");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::A]), &resources, &paths, 0.0);
         startup.update(
             &Keys::pressed(&[])
@@ -725,7 +964,7 @@ mod tests {
     fn the_intro_auto_advances_on_the_timeout() {
         let resources = resources();
         let paths = paths("intro-timeout");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::A]), &resources, &paths, 0.0);
         startup.update(&Keys::pressed(&[Key::Enter]), &resources, &paths, 0.0);
         startup.update(&Keys::pressed(&[Key::Enter]), &resources, &paths, 10.0);
@@ -737,7 +976,7 @@ mod tests {
     #[test]
     fn class_select_draws_the_hint_bar_and_picker() {
         let resources = resources();
-        let startup = Startup::new();
+        let startup = Startup::new(&resources);
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
@@ -754,7 +993,7 @@ mod tests {
     fn the_create_game_screen_shows_the_difficulty_table() {
         let resources = resources();
         let paths = paths("difficulty-draw");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::A]), &resources, &paths, 0.0);
         let layout = layout();
         let palette = Palette::fallback();
@@ -775,7 +1014,7 @@ mod tests {
         let resources = resources();
         let paths = paths("picker-load");
         write_save(&paths.slot("openbounty", 4).expect("slot"), "Murray", 123);
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
 
         // L opens the picker with the cursor on the first existing slot.
         assert_eq!(
@@ -794,7 +1033,7 @@ mod tests {
         let resources = resources();
         let paths = paths("picker-new");
         write_save(&paths.slot("openbounty", 0).expect("slot"), "Murray", 1);
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::L]), &resources, &paths, 0.0);
         // The cursor starts on slot 0; walk to the "New game" row.
         for _ in 0..SAVE_SLOT_COUNT {
@@ -814,7 +1053,7 @@ mod tests {
     fn escape_from_the_picker_returns_to_class_select() {
         let resources = resources();
         let paths = paths("picker-esc");
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::L]), &resources, &paths, 0.0);
         startup.update(&Keys::pressed(&[Key::Escape]), &resources, &paths, 0.0);
         // Back at the root: ESC now quits rather than stepping back.
@@ -829,7 +1068,7 @@ mod tests {
         let resources = resources();
         let paths = paths("picker-draw");
         write_save(&paths.slot("openbounty", 2).expect("slot"), "Murray", 123);
-        let mut startup = Startup::new();
+        let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::L]), &resources, &paths, 0.0);
         let layout = layout();
         let palette = Palette::fallback();
@@ -844,5 +1083,88 @@ mod tests {
             .iter()
             .any(|(_, _, text)| text.contains("Murray") && text.contains("123d")));
         assert!(texts.iter().any(|(_, _, text)| text.contains("New game")));
+    }
+
+    fn splash_resources() -> Resources {
+        Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [], "pack_id": "openbounty", "version": 7,
+                "world": {"default_name": "Hero"},
+                "classes": [{"index":0,"id":"knight","name":"Knight","portrait":"k.png","starting_gold":1000}],
+                "sprites": {"ui": {"splash_logo": "logo.png", "splash_title": "title.png"}},
+                "credits": {
+                  "image": "highlight.png",
+                  "groups": [{"label": "By:", "names": ["A"]}],
+                  "copyright": ["v%VERSION%"]
+                }}"#,
+        )
+        .expect("fixture parses")
+    }
+
+    #[test]
+    fn version_tokens_are_substituted() {
+        assert_eq!(expand_version("v%VERSION%", 7), "v7");
+        assert_eq!(expand_version("no token", 3), "no token");
+    }
+
+    #[test]
+    fn the_splash_and_credits_precede_class_select() {
+        let resources = splash_resources();
+        let paths = paths("splash");
+        let mut startup = Startup::new(&resources);
+        // Logo splash -> title splash -> credits -> class select, one key each.
+        for _ in 0..3 {
+            assert_eq!(
+                startup.update(&Keys::pressed(&[Key::Space]), &resources, &paths, 0.0),
+                None
+            );
+        }
+        // Now at class select: ESC quits rather than stepping back.
+        let choice = startup
+            .update(&Keys::pressed(&[Key::Escape]), &resources, &paths, 0.0)
+            .expect("quits");
+        assert_eq!(choice.action, StartupAction::Quit);
+    }
+
+    #[test]
+    fn a_pack_without_splash_or_credits_opens_on_class_select() {
+        let resources = resources();
+        let paths = paths("no-splash");
+        let mut startup = Startup::new(&resources);
+        let choice = startup
+            .update(&Keys::pressed(&[Key::Escape]), &resources, &paths, 0.0)
+            .expect("quits");
+        assert_eq!(choice.action, StartupAction::Quit);
+    }
+
+    #[test]
+    fn the_splash_draws_the_logo_sprite() {
+        let resources = splash_resources();
+        let startup = Startup::new(&resources);
+        let layout = layout();
+        let palette = Palette::fallback();
+        let mut list = DrawList::new();
+        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+        assert_eq!(list.blits_of(Sprite::SplashLogo).len(), 1);
+    }
+
+    #[test]
+    fn the_credits_draw_the_groups_and_versioned_copyright() {
+        let resources = splash_resources();
+        let paths = paths("credits-draw");
+        let mut startup = Startup::new(&resources);
+        // Advance past the two splashes to the credits screen.
+        startup.update(&Keys::pressed(&[Key::Space]), &resources, &paths, 0.0);
+        startup.update(&Keys::pressed(&[Key::Space]), &resources, &paths, 0.0);
+
+        let layout = layout();
+        let palette = Palette::fallback();
+        let mut list = DrawList::new();
+        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+
+        let texts = list.texts();
+        assert!(texts.iter().any(|(_, _, text)| *text == "By:"));
+        assert!(texts.iter().any(|(_, _, text)| *text == "A"));
+        assert!(texts.iter().any(|(_, _, text)| *text == "v7"));
+        assert_eq!(list.blits_of(Sprite::ClassHighlight).len(), 1);
     }
 }

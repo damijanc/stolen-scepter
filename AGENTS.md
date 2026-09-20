@@ -184,20 +184,21 @@ Implemented and tested:
   around a castle gate, never stack, and report the collision that triggers
   the attack flow. `game_step_basic` drives the pass on every step and
   surfaces a `FoeCollision` for the shell to prompt on; timestop freezes it.
-- The pre-game wizard (`shell/src/startup.rs`): class select, name entry and
-  the difficulty picker, then the new-game intro. `L` on class select opens
-  the save picker (`shell/src/savepath.rs` ports `SavePathGetSlot`; a
-  `--save-dir` override makes the layout flat for tests), and a LOAD choice
-  hydrates through `save_read`. It replaces the old hardcoded hero;
-  `--seed <n>` picks the catalog seed, and with no flag the seed is derived
-  from time + name + class as C does. `Resources` flattens
-  `strings.difficulty` into the generic string map so the picker can read the
-  pack's labels. A NEW or LOAD choice then queues C's post-init message, and
-  `Q` (`Action::SaveQuit`) writes slot 0 and shows the save-confirm banner.
-  NOT yet ported: the two splash screens, the credits screen, and the Options
-  screen behind `Action::OptionsMenu`.
+- The pre-game wizard (`shell/src/startup.rs`): the two splash screens, the
+  credits screen, class select, name entry and the difficulty picker, then
+  the new-game intro. `L` on class select opens the save picker
+  (`shell/src/savepath.rs` ports `SavePathGetSlot`; a `--save-dir` override
+  makes the layout flat for tests), and a LOAD choice hydrates through
+  `save_read`. It replaces the old hardcoded hero; `--seed <n>` picks the
+  catalog seed, and with no flag the seed is derived from time + name + class
+  as C does. `Resources` flattens `strings.difficulty` into the generic
+  string map so the picker can read the pack's labels, parses the `credits`
+  block, and carries `version` for `%VERSION%`. A NEW or LOAD choice then
+  queues C's post-init message, and `Q` (`Action::SaveQuit`) writes slot 0
+  and shows the save-confirm banner. The only startup-adjacent screen still
+  unported is the Options screen behind `Action::OptionsMenu`.
 
-Test coverage is 343 engine unit tests, 253 shell unit tests, 25 combat digest
+Test coverage is 344 engine unit tests, 258 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
