@@ -49,3 +49,31 @@
   spell salting.
 - Use DOS `KB.EXE` only through extraction tooling or offline inspection. Do not
   make the engine crate depend on local binaries.
+
+## Local Tooling (`tools/`, see `tools/README.md`)
+
+Readers for the local materials live in `tools/`. The scripts are tracked; the
+materials they read are not, so on a fresh clone the tools will be present but
+`game-assets/` will be empty. Their OCR cache is derived manual text and is
+written to `game-assets/.manual_ocr/`, which the existing ignore rule covers.
+
+- `manual_word.py` answers the DOS manual-lookup copy protection ("page P,
+  line L, word W") against the scanned manual. Each PDF sheet holds two printed
+  pages, so `PDF sheet = printed // 2 + 2`, even printed page on the left half.
+- `cc_extract.py` reads the original `256.CC` / `416.CC` archives: `u16` entry
+  count, 8-byte directory rows (`u16` name hash, `u24` offset, `u24` size), each
+  blob a `u32` uncompressed size followed by 9..12-bit LSB-first LZW. Same
+  format OpenBounty's `reference/tools/extract_lzw.c` implements.
+
+Two findings that bound how much the local binaries can ever tell us:
+
+- Both `.CC` archives are PURE GRAPHICS. Neither holds any English text.
+- `KB.EXE` is packed. No game text is plaintext -- not even "Select Char",
+  which is visibly on screen. Single-byte XOR, bit-7-terminator encoding and
+  every standard packer signature were ruled out. Extracting anything textual
+  from it requires unpacking the loader stub first.
+
+The scanned manual (`kings-bounty_dos_manual_en.pdf`) carries an OCR text
+layer, but it is a poor read of the calligraphic face -- "the" as `tfie`,
+"his" as `fiis`, `b` as `6`, `g` as `9`. Treat its word POSITIONS as usable
+and its spellings as not; re-OCR with tesseract 5.x for anything quotable.
