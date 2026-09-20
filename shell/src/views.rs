@@ -26,6 +26,7 @@ use crate::font;
 use crate::input::{Key, KeySource};
 use crate::layout::{Layout, FRAME_BOTTOM_H, FRAME_RIGHT_W, MAP_X, MAP_Y, PANEL_H, PANEL_PAD_X};
 use crate::palette::{Pal, Palette};
+use crate::pointer::{HitList, HitTarget};
 use crate::present::Present;
 use crate::sprites::SpriteCatalog;
 
@@ -780,6 +781,23 @@ impl Views {
         TownInput::None
     }
 
+    /// Resolve a pointer hit to the same outcome `town_update` returns for the
+    /// equivalent keypress. The pointer must never reach a transaction the
+    /// keyboard cannot, so this maps onto the existing vocabulary only.
+    pub fn town_click(&mut self, target: HitTarget) -> TownInput {
+        match target {
+            HitTarget::DialogDismiss if self.town_info_active => {
+                self.town_info_active = false;
+                TownInput::Handled
+            }
+            HitTarget::TownRow(row) if !self.town_info_active => {
+                self.town_cursor = row as i32;
+                TownInput::RunRow(row)
+            }
+            _ => TownInput::None,
+        }
+    }
+
     /// Open the home castle (throne room / barracks), porting
     /// `screen_home_castle_open`.
     pub fn home_castle_open(&mut self) {
@@ -998,6 +1016,7 @@ impl Views {
     pub fn draw(
         &mut self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1044,7 +1063,7 @@ impl Views {
             Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
             Some(ViewKind::Gate) => self.draw_gate(list, layout, palette),
             Some(ViewKind::Town) => {
-                self.draw_town(list, layout, palette, resources, catalog, game, time)
+                self.draw_town(list, hits, layout, palette, resources, catalog, game, time)
             }
             Some(ViewKind::HomeCastle) => {
                 self.draw_home_castle(list, layout, palette, resources, catalog, game, time)
@@ -1602,6 +1621,7 @@ impl Views {
     fn draw_town(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1661,6 +1681,15 @@ impl Views {
                 palette.clr(Pal::White)
             };
             list.text(&label, tx, ty, fg);
+            // Same rect, one line apart: the row's clickable band spans the
+            // panel's inner width, not just the glyphs. Suppressed while the
+            // info overlay covers the rows.
+            if !self.town_info_active {
+                hits.push(
+                    Rect::new(tx, ty, w - 2 * pad, row_h),
+                    HitTarget::TownRow(TownRow::from_index(row as usize)),
+                );
+            }
             ty += row_h;
         }
 
@@ -1673,6 +1702,9 @@ impl Views {
                 palette.clr(Pal::DBlue),
                 palette.clr(Pal::Yellow),
             );
+            // The overlay covers the rows, so a click dismisses it instead of
+            // running whatever row is underneath.
+            hits.push(Rect::new(x, y, w, h), HitTarget::DialogDismiss);
             let mut ty = y + pad;
             for line in self.town_info_body.split('\n').take(lines as usize) {
                 list.text(line, tx, ty, palette.clr(Pal::White));
@@ -2974,8 +3006,10 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
 
         let labels: Vec<&str> = list.texts().iter().map(|(_, _, t)| *t).collect();
@@ -3002,8 +3036,10 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
 
         assert!(!list.blits_of(Sprite::ViewIcon(0)).is_empty());
@@ -3029,8 +3065,10 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
         assert!(list.has_text_containing("GP"));
         assert!(!list.has_text_containing("Gold"));
@@ -3046,8 +3084,10 @@ mod tests {
         let mut views = Views::new();
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
         assert!(list.is_empty());
     }
@@ -3063,8 +3103,10 @@ mod tests {
         views.set(ViewKind::Character);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
 
         // "Followers killed" is 0, so its number must not appear.
@@ -3132,8 +3174,10 @@ mod tests {
         views.set(ViewKind::Army);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
 
         assert!(list.has_text_containing("Peasants"));
@@ -3187,8 +3231,10 @@ mod tests {
         views.set(ViewKind::Contract);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
         assert!(list.has_text_containing("You have no Contract!"));
     }
@@ -3205,8 +3251,10 @@ mod tests {
         views.set(ViewKind::Contract);
 
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
 
         assert!(list.has_text_containing("Name: Murray"));
@@ -3250,12 +3298,16 @@ mod tests {
         let present = Present::new();
         let catalog = SpriteCatalog::from_resources(resources);
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, &present, 0.0,
+            &mut list, &mut hits, layout, &palette, resources, &catalog, &map, &fog, game,
+            &present, 0.0,
         );
         list.clear();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, &present, 100.0,
+            &mut list, &mut hits, layout, &palette, resources, &catalog, &map, &fog, game,
+            &present, 100.0,
         );
         list
     }
@@ -3352,8 +3404,10 @@ mod tests {
     ) -> DrawList {
         let mut list = DrawList::new();
         let present = Present::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, layout, palette, resources, catalog, map, fog, game, &present, time,
+            &mut list, &mut hits, layout, palette, resources, catalog, map, fog, game, &present,
+            time,
         );
         list
     }
@@ -3461,8 +3515,10 @@ mod tests {
         let (map, fog) = map_and_fog();
         let catalog = SpriteCatalog::from_resources(resources);
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, present, 0.0,
+            &mut list, &mut hits, layout, &palette, resources, &catalog, &map, &fog, game, present,
+            0.0,
         );
         list
     }
@@ -3582,8 +3638,10 @@ mod tests {
 
         // Frame 10: the carpet is at full length and the hero stands on it.
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 1.6,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 1.6,
         );
         assert_eq!(list.blits_of(Sprite::EndGrass).len(), 30);
         assert_eq!(list.blits_of(Sprite::EndCarpet).len(), 5);
@@ -3696,8 +3754,10 @@ mod tests {
         let (map, fog) = map_and_fog();
         let present = Present::new();
         let catalog = SpriteCatalog::from_resources(&resources);
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 0.0,
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 0.0,
         );
 
         assert!(list.has_text_containing("Combat"));
@@ -3843,8 +3903,10 @@ mod tests {
         let (map, fog) = map_and_fog();
         let present = Present::new();
         let catalog = SpriteCatalog::from_resources(&resources);
+        let mut hits = HitList::new();
         views.draw(
             &mut list,
+            &mut hits,
             &layout,
             &palette,
             &resources,
@@ -3922,8 +3984,10 @@ mod tests {
         let (map, fog) = map_and_fog();
         let present = Present::new();
         let catalog = SpriteCatalog::from_resources(&resources);
+        let mut hits = HitList::new();
         views.draw(
             &mut list,
+            &mut hits,
             &layout,
             &palette,
             &resources,
@@ -3941,6 +4005,91 @@ mod tests {
         assert!(!list
             .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Town))
             .is_empty());
+    }
+
+    /// The anti-drift test. Copy this shape for every new surface: the published
+    /// region must contain the centre of the rect that was actually drawn.
+    #[test]
+    fn the_town_hit_regions_line_up_with_the_drawn_rows() {
+        let (resources, layout, catalog) = spells_fixtures();
+        let game = Game::default();
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        views.draw_town(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::default(),
+            &resources,
+            &catalog,
+            &game,
+            0.0,
+        );
+
+        // Every row is reachable, and each maps to its own row.
+        for row in [
+            TownRow::Contract,
+            TownRow::Boat,
+            TownRow::Info,
+            TownRow::Spell,
+            TownRow::Siege,
+        ] {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::TownRow(row))
+                .unwrap_or_else(|| panic!("row {row:?} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::TownRow(row)));
+        }
+    }
+
+    #[test]
+    fn the_town_info_overlay_publishes_dismiss_instead_of_rows() {
+        let (resources, layout, catalog) = spells_fixtures();
+        let game = Game::default();
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+        views.town_show_info("Some info");
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        views.draw_town(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::default(),
+            &resources,
+            &catalog,
+            &game,
+            0.0,
+        );
+
+        assert!(
+            hits.regions()
+                .iter()
+                .all(|r| r.target == HitTarget::DialogDismiss),
+            "the overlay covers the rows, so no row may be clickable"
+        );
+    }
+
+    /// The keystone test: the pointer and the keyboard must agree, permanently.
+    #[test]
+    fn clicking_a_town_row_matches_pressing_its_letter() {
+        let mut by_key = Views::new();
+        by_key.town_open("Riverton", "town0", 3, 4);
+        let keyed = by_key.town_update(&Keys::pressed(&[Key::B]));
+
+        let mut by_click = Views::new();
+        by_click.town_open("Riverton", "town0", 3, 4);
+        let clicked = by_click.town_click(HitTarget::TownRow(TownRow::Boat));
+
+        assert_eq!(keyed, TownInput::RunRow(TownRow::Boat));
+        assert_eq!(clicked, keyed);
     }
 
     fn castle_fixtures() -> (Resources, Layout, SpriteCatalog) {
@@ -3969,8 +4118,10 @@ mod tests {
         let present = Present::new();
         let catalog = SpriteCatalog::from_resources(resources);
         let mut list = DrawList::new();
+        let mut hits = HitList::new();
         views.draw(
-            &mut list, layout, &palette, resources, &catalog, &map, &fog, game, &present, 0.0,
+            &mut list, &mut hits, layout, &palette, resources, &catalog, &map, &fog, game,
+            &present, 0.0,
         );
         list
     }

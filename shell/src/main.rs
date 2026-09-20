@@ -57,6 +57,7 @@ use openbounty_engine::step::{
     consume_step, game_step_basic, search_here, spend_week, SearchOutcome, StepInteraction,
     StepResult,
 };
+use pointer::HitList;
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use savepath::SavePaths;
@@ -668,6 +669,9 @@ async fn main() {
     let mut last_step = None;
     let mut hero_anim = HeroAnimator::new();
     let mut list = DrawList::new();
+    // Rebuilt every frame during draw and hit-tested on the NEXT frame's
+    // input; see specs/mouse-support-design.md.
+    let mut hits = HitList::new();
     let keys = MacroquadKeys;
 
     // Pre-game wizard: class select, then name/difficulty. It blocks on the
@@ -1391,6 +1395,7 @@ async fn main() {
         }
 
         list.clear();
+        hits.clear();
         if let Some(session) = &combat {
             // Combat owns the full inner area; the chrome shows its title.
             let title = session.combat.title(&resources);
@@ -1445,6 +1450,7 @@ async fn main() {
             // time, as C does with GetTime().
             views.draw(
                 &mut list,
+                &mut hits,
                 &layout,
                 backend.palette(),
                 &resources,
