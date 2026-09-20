@@ -20,6 +20,7 @@ pub mod interact;
 pub mod layout;
 pub mod map_render;
 pub mod palette;
+pub mod pointer;
 pub mod present;
 pub mod prompt;
 pub mod savepath;
