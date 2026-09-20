@@ -117,7 +117,7 @@ pdftoppm -r 300 -f 10 -l 10 -png \
 Note `ocrmypdf` refuses this file with `PriorOcrFoundError` because of that
 existing layer. Use `--redo-ocr` (strips and redoes) or `--force-ocr`.
 
-## `cc_extract.py` -- read the original `.CC` archives
+## `cc_extract.py` -- read the original `.CC` archives and extract the art
 
 Run it against the unpacked archives (see "First-time setup" above):
 
@@ -131,12 +131,9 @@ uncompressed size, so a clean run is a full integrity check of the archive:
 
 ```
 256.CC: 66 entries, 281551 bytes
-  entry   0 tag=0x12fa size=   6578         ok  alpha-runs=213
+  entry   0 peas.256     tag=0x12fa size=   6578         ok
   ...
 ```
-
-`alpha-runs` counts 4+ letter sequences in the decoded bytes. It is a noise
-metric, not text -- see the findings below.
 
 Format (independently derived here, and matching OpenBounty's
 `reference/tools/extract_lzw.c`):
@@ -150,7 +147,51 @@ LZW:                  9..12 bit codes, LSB-first, 0x100 reset, 0x101 end
 
 Entries are contiguous and the last ends exactly at EOF, so the directory is
 self-validating. 256.CC has 66 entries, 416.CC has 133; all decode to exactly
-their declared sizes.
+their declared sizes. The original names are not stored -- only a 16-bit hash
+-- so the tool rebuilds a candidate table (`peas`/`spri`/... x `.4`/`.16`/
+`.256`, plus the driver/font/map specials) and matches hashes, porting the
+recovery in `extract_lzw.c`.
+
+### Extracting the art as PNGs
+
+The `.256` entries are multi-image VGA atlases. `--png-dir` decodes them
+(plus the bitmap font, a palette swatch and an index gallery):
+
+```sh
+# from unpacked archives
+./cc_extract.py --png-dir game-assets/extracted \
+    /tmp/kb/kings-bounty/256.CC /tmp/kb/kings-bounty/416.CC
+
+# or straight from the shipped zip (unpacked to scratch for you)
+./cc_extract.py --png-dir game-assets/extracted \
+    --from-zip game-assets/Kings-Bounty_DOS_EN.zip
+```
+
+Output tree (all under `game-assets/extracted/`, which is gitignored because
+it is original game content -- never commit it):
+
+```
+art/               308 engine-role PNGs + art/font/kb-font.png
+raw/<cc>/<entry>/  every VGA frame of every entry (326 total)
+palette.png        256-swatch VGA palette with indices
+manifest.json      source archive / entry / frame / dimensions per PNG
+index.html         contact-sheet gallery; open it in a browser
+```
+
+`art/` mirrors the pack layout (`art/troops/archers_00.png`, ...) using the
+curated mapping ported to `tools/cc_output_map.py`. Two files in the pack are
+**not** emitted because they have no DOS source: `art/ui/chrome_overworld.png`
+(cleanroom) and `art/ui/puzzle_cover.png` (synthesized).
+
+The VGA decoder is a port of `reference/tools/extract_vga.c`: frame directory,
+color-key detection with a border-dominance heuristic, and bit-replicated
+6->8-bit palette expansion. Tilesets render opaque; everything else is
+color-keyed. 416.CC is mostly CGA/EGA (`.4`/`.16`) siblings and only its
+`endpic.256` is decoded.
+
+The PNG writer is a small `zlib`-based encoder, so the script stays
+dependency-free (no Pillow). Output is pixel-identical to the C extractor's
+golden art tree for every shared file.
 
 ## Troubleshooting
 
