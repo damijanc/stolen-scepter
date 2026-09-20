@@ -396,23 +396,29 @@ including `resources_format_template` and its `%VAR%` substitution.
      prompt, which is why chrome has a `FastQuit` mode). Every other action
      prints "not wired up yet" rather than swallowing the key, and step
      interactions print to stdout, until the dialog and view layers land.
-8. **Combat loop and rendering**, then `CombatTurnRecord` once its consumer
-   exists and its shape is known.
+8. **Combat loop and rendering**, then `CombatTurnRecord`. DONE: the field
+   renders, the interactive loop and AI pacing run, and `CombatTurnRecord` is
+   ported as `combat_run_headless_rec` (write-only observation).
 9. **Mouse support** for menus, views, dialogs and prompts. See
-   `specs/mouse-support-design.md`. A deliberate divergence -- the DOS release
-   is keyboard-only -- confined to the shell, in service of the modern mode
-   this document already anticipates. Two rules carry the whole design: a view
-   emits its hit regions from the SAME rect it draws (so the two cannot drift),
-   and a click resolves to the outcome value the keyboard path already returns
-   (so the pointer can never reach a transaction the keyboard cannot). When
-   adding a view from here on, push its hit regions in the draw function and
-   copy the anti-drift test; a forgotten region renders perfectly and only
+   `specs/mouse-support-design.md`. DONE. A deliberate divergence -- the DOS
+   release is keyboard-only -- confined to the shell, in service of the modern
+   mode this document already anticipates. Two rules carry the whole design: a
+   view emits its hit regions from the SAME rect it draws (so the two cannot
+   drift), and a click resolves to the outcome value the keyboard path already
+   returns (so the pointer can never reach a transaction the keyboard cannot).
+   When adding a view from here on, push its hit regions in the draw function
+   and copy the anti-drift test; a forgotten region renders perfectly and only
    misbehaves under the pointer.
+
+   Covered: town rows, gate destinations, spell cells, recruit rows, home- and
+   own-castle menus, controls rows, dialogs, yes/no prompts, and the read-only
+   views plus the dwelling (a click dismisses, as any key does). NOT covered,
+   deliberately: the overworld and combat (design non-goals), and the
+   recruit/dwelling count entry, which is a digits-only modal with no clickable
+   affordance.
 
 ## Still deliberately unported in the engine
 
-- `CombatTurnRecord`: write-only replay data for animation. Its shape depends
-  on what the renderer wants to replay, so it waits for step 8.
 - `player_io.c`: the FIFO carries header/body TEXT, which is presentation,
   and its `player_io_answer` routing exists to pick a `flow_apply_*` core
   from a mirrored global `pending_flow`. All twelve of those cores are

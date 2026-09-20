@@ -149,14 +149,17 @@ Interactions, all **OK** unless marked:
 | Town | Town menu (see §5) |
 | Castle gate | Home, owned, or hostile castle (see §6) |
 | Hostile foe | Attack prompt, then combat (see §9) |
-| **Friendly foe** | **GAP** -- the join offer is unported; nothing happens |
+| Friendly foe | Join offer: accept the free troop, or decline [C] |
 
 **Verify in play:**
 
-1. Walk onto a friendly (non-hostile) foe. Expect nothing to happen today. This
-   is the most visible remaining hole.
+1. Walk onto a friendly (non-hostile) foe. Expect a join prompt; accepting adds
+   the offered stack without charging gold, and either answer consumes the foe.
 2. Pick up the Anchor of Admiralty and confirm boat rental drops 500 -> 100 (§5).
 3. Confirm a telecave's destination is stable across repeated uses.
+4. **Mouse:** click a read-only view (army, character, contract, puzzle,
+   worldmap, options) to dismiss it, as any key does. The overworld itself is
+   keyboard-only -- click-to-move is a design non-goal.
 
 ---
 
@@ -181,6 +184,7 @@ information, and buy the town's spell.
    (5000) -- check whether they behave consistently with the boat.
 3. Rent a boat, then cancel it, and confirm the refund behavior matches what the
    manual describes.
+4. **Mouse:** click each menu row; it does exactly what its letter key does.
 
 ---
 
@@ -221,6 +225,8 @@ If the manual's advancement chart disagrees, these are pack-data bugs.
    more are needed, with correct singular/plural ("1 more villain" vs "2 more
    villains").
 3. Promote a Sorceress and watch the commission figure. Expect it to fall.
+4. **Mouse:** click a line of the home-castle menu, and a slot of the owned
+   castle; each does what its key does. A click on a dialog dismisses it.
 
 ---
 
@@ -243,6 +249,9 @@ If the manual's advancement chart disagrees, these are pack-data bugs.
    repopulates.
 3. **This is a high-value [C] check.** If the real game repopulates all
    dwellings weekly, C's selective growth is wrong.
+4. **Mouse:** click a recruit row; it selects the troop exactly as its letter
+   does. The count entry itself is keyboard-only (there is no clickable
+   keypad).
 
 ---
 
@@ -274,6 +283,9 @@ Other quirks:
 1. **Cast bridge and count the tiles.** Expect 2, never more.
 2. Cast a gate spell and confirm no charge is consumed.
 3. Try to fly with a mixed army containing sprites. Expect to be grounded.
+4. **Mouse:** open the spellbook in cast mode (`U`) and click a spell cell; it
+   casts that spell. Clicking elsewhere closes the book. A click on the gate
+   picker selects a destination.
 
 ---
 
@@ -383,16 +395,11 @@ Do not file these as findings; they are already tracked.
 
 | Area | Status | Effect in play |
 |---|---|---|
-| Startup / class select / difficulty | GAP | Always a Knight on seed 42 |
-| Save / load | GAP | No persistence at all |
-| Options menu | GAP | Key does nothing |
-| Friendly-foe join offer | GAP | Stepping on a friendly foe does nothing |
-| Defeat message | GAP | Army lost and hero teleported with no explanation |
-| Victory banner naming | ISSUE | Names the castle, not the villain |
 | Sidebar HUD, overlay | GAP | Not drawn |
 | Audio | GAP | Silent |
-| End cartoon | GAP | No victory sequence |
 | Pack picker | GAP | Pack path passed on the command line |
+| Mouse: overworld & combat | BY DESIGN | Click-to-move and click-in-combat are design non-goals |
+| Mouse: count entry | BY DESIGN | Recruit/dwelling "how many" is keyboard-only |
 
 ---
 
