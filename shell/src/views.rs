@@ -238,6 +238,9 @@ pub struct Views {
     town_boat_x: i32,
     town_boat_y: i32,
     town_cursor: i32,
+    /// What the pointer is over. PURELY VISUAL -- it never moves a cursor,
+    /// because moving the mouse must not change what Enter does.
+    hover: Option<HitTarget>,
     town_info_body: String,
     town_info_active: bool,
     /// The own-castle screen's context, porting `s_castle_id` and
@@ -726,6 +729,20 @@ impl Views {
     /// The town's boat dock, used by the rent-boat transaction.
     pub fn town_boat(&self) -> (i32, i32) {
         (self.town_boat_x, self.town_boat_y)
+    }
+
+    /// The town menu's highlighted row.
+    pub fn town_cursor(&self) -> i32 {
+        self.town_cursor
+    }
+
+    /// Set what the pointer is over. Purely visual; it never moves a cursor.
+    pub fn set_hover(&mut self, target: Option<HitTarget>) {
+        self.hover = target;
+    }
+
+    pub fn hover(&self) -> Option<HitTarget> {
+        self.hover
     }
 
     /// Show the info overlay, porting `town_show_info`.
@@ -1675,7 +1692,8 @@ impl Views {
         for row in 0..TOWN_ROW_COUNT {
             let label = crate::interact::town_row_text(resources, game, &self.town_record_key, row);
             let selected = row == self.town_cursor;
-            let fg = if selected {
+            let hovered = self.hover == Some(HitTarget::TownRow(TownRow::from_index(row as usize)));
+            let fg = if selected || hovered {
                 palette.clr(Pal::Yellow)
             } else {
                 palette.clr(Pal::White)
@@ -4090,6 +4108,28 @@ mod tests {
 
         assert_eq!(keyed, TownInput::RunRow(TownRow::Boat));
         assert_eq!(clicked, keyed);
+    }
+
+    #[test]
+    fn hover_highlights_a_row_without_moving_the_keyboard_cursor() {
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+        let before = views.town_cursor();
+        views.set_hover(Some(HitTarget::TownRow(TownRow::Spell)));
+        assert_eq!(
+            views.town_cursor(),
+            before,
+            "hover must not change what Enter does"
+        );
+    }
+
+    #[test]
+    fn leaving_the_window_clears_the_hover() {
+        let mut views = Views::new();
+        views.town_open("Riverton", "town0", 3, 4);
+        views.set_hover(Some(HitTarget::TownRow(TownRow::Spell)));
+        views.set_hover(None);
+        assert_eq!(views.hover(), None);
     }
 
     fn castle_fixtures() -> (Resources, Layout, SpriteCatalog) {

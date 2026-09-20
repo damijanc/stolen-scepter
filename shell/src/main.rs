@@ -829,6 +829,7 @@ async fn main() {
         } else {
             None
         };
+        views.set_hover(hovered);
 
         // Input priority: combat first, then the message dialog owns the keys
         // while it is open (C's issue #19 gate), then the prompt, then the
