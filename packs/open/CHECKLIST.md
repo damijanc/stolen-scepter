@@ -62,31 +62,31 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 
 ## troops (100)
 
-- [ ] `art/troops/archers_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/archmages_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/barbarians_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/cavalry_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/demons_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/dragons_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/druids_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/dwarves_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/elves_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/ghosts_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/giants_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/gnomes_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/knights_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/militia_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/nomads_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/ogres_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/orcs_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/peasants_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/pikemen_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/skeletons_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/sprites_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/trolls_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/vampires_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/wolves_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
-- [ ] `art/troops/zombies_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/archers_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/archmages_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/barbarians_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/cavalry_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/demons_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/dragons_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/druids_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/dwarves_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/elves_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/ghosts_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/giants_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/gnomes_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/knights_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/militia_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/nomads_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/ogres_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/orcs_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/peasants_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/pikemen_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/skeletons_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/sprites_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/trolls_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/vampires_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/wolves_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
+- [x] `art/troops/zombies_00.._03.png` - 4 frame(s), 48x34, color_key, troop_still_or_anim
 
 ## ui (43)
 

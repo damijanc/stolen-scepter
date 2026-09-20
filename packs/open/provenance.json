@@ -694,6 +694,706 @@
       "source": "original",
       "license": "CC0-1.0",
       "date": "2026-09-20"
+    },
+    "art/troops/archers_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archers_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archers_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archers_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archmages_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archmages_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archmages_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/archmages_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/barbarians_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/barbarians_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/barbarians_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/barbarians_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/cavalry_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/cavalry_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/cavalry_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/cavalry_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/demons_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/demons_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/demons_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/demons_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dragons_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dragons_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dragons_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dragons_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/druids_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/druids_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/druids_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/druids_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dwarves_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dwarves_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dwarves_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/dwarves_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/elves_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/elves_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/elves_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/elves_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ghosts_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ghosts_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ghosts_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ghosts_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/giants_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/giants_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/giants_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/giants_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/gnomes_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/gnomes_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/gnomes_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/gnomes_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/knights_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/knights_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/knights_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/knights_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/militia_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/militia_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/militia_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/militia_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/nomads_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/nomads_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/nomads_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/nomads_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ogres_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ogres_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ogres_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/ogres_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/orcs_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/orcs_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/orcs_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/orcs_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/peasants_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/peasants_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/peasants_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/peasants_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/pikemen_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/pikemen_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/pikemen_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/pikemen_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/skeletons_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/skeletons_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/skeletons_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/skeletons_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/sprites_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/sprites_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/sprites_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/sprites_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/trolls_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/trolls_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/trolls_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/trolls_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/vampires_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/vampires_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/vampires_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/vampires_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/wolves_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/wolves_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/wolves_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/wolves_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/zombies_00.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/zombies_01.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/zombies_02.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/troops/zombies_03.png": {
+      "author": "procedural (tools/gen_troops.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
     }
   }
 }
