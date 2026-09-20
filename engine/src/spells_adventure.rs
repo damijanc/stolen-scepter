@@ -162,6 +162,9 @@ pub fn spell_index_by_adventure_effect(resources: &Resources, effect: AdventureE
 /// The caller spends the charge when this returns a positive count; a cast
 /// that finds no water spends nothing.
 pub fn try_build_bridge(game: &Game, map: &mut Map, dx: i32, dy: i32) -> i32 {
+    // A north/south run lays a vertical span, an east/west run a horizontal
+    // one; the sprite follows the direction, as in C.
+    let bridge_art = if dy != 0 { "bridge_v" } else { "bridge_h" };
     let mut built = 0_i32;
     // C's loop bound of 5 is unreachable past the second step: every
     // iteration that does not break increments `built`, and `built >= 2`
@@ -178,13 +181,15 @@ pub fn try_build_bridge(game: &Game, map: &mut Map, dx: i32, dy: i32) -> i32 {
             break;
         }
 
-        // C also stamps the "bridge_v"/"bridge_h" sprite name into `art`.
-        // The Rust tile carries no `art`: map.c documents it as the
-        // renderer's sprite key, and `is_bridge` is what the engine reads.
+        // C stamps the bridge sprite name into `art`, which is the renderer's
+        // sprite key (`map_render` draws `tile.art`); `is_bridge` is what the
+        // engine reads. Both have to be written, or a built bridge keeps the
+        // stale water art it replaced.
         tile.terrain = Terrain::Grass;
         tile.interactive = Interact::None;
         tile.blocks_foot = false;
         tile.is_bridge = true;
+        tile.art.copy_from_str(bridge_art);
 
         built = built.wrapping_add(1);
         if built >= 2 {
@@ -836,6 +841,9 @@ mod tests {
             assert_eq!(tile.terrain, Terrain::Grass);
             assert!(tile.is_bridge);
             assert!(!tile.blocks_foot);
+            // An east/west run stamps the horizontal bridge sprite, which is
+            // what the map renderer draws.
+            assert_eq!(tile.art.as_str(), "bridge_h");
         }
         assert_eq!(
             map.tile_i32(3, 0).expect("tile exists").terrain,
@@ -856,6 +864,22 @@ mod tests {
         assert_eq!(try_build_bridge(&game, &mut map, 1, 0), 1);
         // Facing off the map builds nothing at all.
         assert_eq!(try_build_bridge(&game, &mut map, -1, 0), 0);
+    }
+
+    #[test]
+    fn a_north_south_bridge_uses_the_vertical_sprite() {
+        let mut game = knight();
+        game.position.x = 0;
+        game.position.y = 0;
+        let mut map =
+            Map::from_tiles(1, 4, vec![Tile::plain_grass(); 4]).expect("dimensions match");
+        map.tile_mut_i32(0, 1).expect("tile exists").terrain = Terrain::Water;
+
+        assert_eq!(try_build_bridge(&game, &mut map, 0, 1), 1);
+        let tile = map.tile_i32(0, 1).expect("tile exists");
+        assert!(tile.is_bridge);
+        // A north/south run stamps the vertical sprite, not the horizontal.
+        assert_eq!(tile.art.as_str(), "bridge_v");
     }
 
     #[test]
