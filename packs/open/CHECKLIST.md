@@ -33,29 +33,29 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 
 - [ ] `art/tiles/artifact_chest.png` - 1 frame(s), 48x34, opaque, map_tile
 - [ ] `art/tiles/artifact_ring.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/bridge_h.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/bridge_v.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/castle_br.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/castle_gate.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/castle_ml.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/castle_mr.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/castle_tl.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/castle_tr.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/chest.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/bridge_h.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/bridge_v.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/castle_br.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/castle_gate.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/castle_ml.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/castle_mr.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/castle_tl.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/castle_tr.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/chest.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/desert.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/desert_edge_01.._12.png` - 12 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/dwelling_dungeon.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/dwelling_forest.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/dwelling_hills.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/dwelling_plains.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/dwelling_dungeon.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/dwelling_forest.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/dwelling_hills.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/dwelling_plains.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/forest.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/forest_edge_01.._12.png` - 12 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/grass.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/grass_variant.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/mountain.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/mountain_edge_01.._12.png` - 12 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/sign.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/town.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/sign.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/town.png` - 1 frame(s), 48x34, opaque, map_tile
 - [ ] `art/tiles/wandering_army.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/water.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/water_edge_00.._11.png` - 12 frame(s), 48x34, opaque, map_tile

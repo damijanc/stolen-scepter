@@ -379,6 +379,111 @@
       "source": "original",
       "license": "CC0-1.0",
       "date": "2026-09-20"
+    },
+    "art/tiles/town.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/chest.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/dwelling_plains.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/dwelling_forest.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/dwelling_hills.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/dwelling_dungeon.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/sign.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/bridge_h.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/bridge_v.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/castle_tl.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/castle_br.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/castle_tr.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/castle_ml.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/castle_gate.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/castle_mr.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
     }
   }
 }
