@@ -1047,9 +1047,7 @@ async fn main() {
                     }
                 }
                 Action::None => {}
-                Action::OptionsMenu => {
-                    println!("OptionsMenu is not wired up yet: the Options screen is unported");
-                }
+                Action::OptionsMenu => views.set(ViewKind::Options),
                 Action::SaveQuit => {
                     // C saves slot 0 unconditionally, then shows the confirm
                     // banner; Ctrl-Q during that dialog exits.

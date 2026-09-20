@@ -12,7 +12,7 @@
 
 use openbounty_engine::fog::Fog;
 use openbounty_engine::game::{
-    CastleOwnerKind, Game, GateDestination, GAME_ARMY_SLOTS, GAME_CASTLES, GAME_CONTINENTS,
+    CastleOwnerKind, Game, GateDestination, Mount, GAME_ARMY_SLOTS, GAME_CASTLES, GAME_CONTINENTS,
     GAME_GATE_DESTS_MAX,
 };
 use openbounty_engine::map::Map;
@@ -120,6 +120,7 @@ pub enum ViewKind {
     Puzzle,
     Worldmap,
     Controls,
+    Options,
     Spells,
     Gate,
     Town,
@@ -283,6 +284,7 @@ impl Views {
                 | ViewKind::Army
                 | ViewKind::Puzzle
                 | ViewKind::Controls
+                | ViewKind::Options
                 | ViewKind::Spells
                 | ViewKind::Gate
                 | ViewKind::Town
@@ -824,6 +826,7 @@ impl Views {
             Some(ViewKind::Controls) => {
                 self.draw_controls(list, layout, palette, resources, game, present)
             }
+            Some(ViewKind::Options) => draw_options(list, layout, palette, resources, game),
             Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
             Some(ViewKind::Gate) => self.draw_gate(list, layout, palette),
             Some(ViewKind::Town) => {
@@ -1816,6 +1819,78 @@ pub fn controls_visible(resources: &Resources) -> Vec<usize> {
         visible.push(index);
     }
     visible
+}
+
+/// The `O` options screen: a fixed movement reference followed by the pack's
+/// keybind list, porting `draw_options`. Read-only -- any key dismisses it via
+/// the caller. The list is capped to the rows that fit, and the three
+/// mount-conditional entries are hidden when they do not apply.
+fn draw_options(
+    list: &mut DrawList,
+    _layout: &Layout,
+    palette: &Palette,
+    resources: &Resources,
+    game: &Game,
+) {
+    const MOVEMENT: [(&str, &str); 8] = [
+        ("\x18 or 2", "Move Down"),
+        ("\x1B or 4", "Move Left"),
+        ("\x1A or 6", "Move Right"),
+        ("\x19 or 8", "Move Up"),
+        ("END or 1", "Down Left"),
+        ("PGDN or 3", "Down Right"),
+        ("HOME or 7", "Up Left"),
+        ("PGUP or 9", "Up Right"),
+    ];
+
+    let pad = 3;
+    let cols = 28;
+    let rows = 19;
+    let w = cols * font::GLYPH_W + 2 * pad;
+    let h = rows * font::GLYPH_H + 2 * pad;
+    let x = MAP_X;
+    let y = MAP_Y;
+    list.rounded_panel(
+        Rect::new(x, y, w, h),
+        palette.clr(Pal::DBlue),
+        palette.clr(Pal::Yellow),
+    );
+
+    let tx = x + pad;
+    let mut ty = y + pad;
+
+    for (keys, label) in MOVEMENT {
+        list.text(
+            &format!("{keys:<10} {label}"),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+        ty += font::GLYPH_H;
+    }
+
+    let max_row = ((y + h - pad - ty) / font::GLYPH_H).max(0) as usize;
+    let count = resources.keybind_count.min(max_row);
+    for index in 0..count {
+        let keybind = &resources.keybinds[index];
+        let key = keybind.key.as_str();
+        if key == "F" && game.character.mount == Mount::Fly {
+            continue;
+        }
+        if key == "L" && game.character.mount != Mount::Fly {
+            continue;
+        }
+        if key == "N" && game.character.mount != Mount::Sail {
+            continue;
+        }
+        list.text(
+            &format!("{key:<4} {}", keybind.label.as_str()),
+            tx,
+            ty,
+            palette.clr(Pal::White),
+        );
+        ty += font::GLYPH_H;
+    }
 }
 
 /// The shell ships no audio, so the three audio-dependent rows are always
@@ -3160,6 +3235,37 @@ mod tests {
         assert!(controls_row_disabled(&resources, 1));
         assert!(!controls_row_disabled(&resources, 0));
         assert!(!controls_row_disabled(&resources, 2));
+    }
+
+    #[test]
+    fn options_view_lists_movement_and_hides_inapplicable_keybinds() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "strings": {"keybinds": [
+                  {"key":"F","label":"Take Flight"},
+                  {"key":"L","label":"Make Landing"},
+                  {"key":"N","label":"Sail Away"},
+                  {"key":"A","label":"View Army"}
+                ]}}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let mut game = Game::default();
+        game.character.mount = Mount::Ride;
+        let mut views = Views::new();
+        views.set(ViewKind::Options);
+        let present = Present::for_layout(&layout);
+        let list = draw_controls_view(&mut views, &resources, &layout, &game, &present);
+
+        let texts = list.texts();
+        // The movement reference is always drawn.
+        assert!(texts.iter().any(|(_, _, t)| t.contains("Move Down")));
+        // Riding hides Land (needs flight) and Sail Away (needs sailing), but
+        // keeps Take Flight and the unconditional rows.
+        assert!(texts.iter().any(|(_, _, t)| t.contains("Take Flight")));
+        assert!(!texts.iter().any(|(_, _, t)| t.contains("Make Landing")));
+        assert!(!texts.iter().any(|(_, _, t)| t.contains("Sail Away")));
+        assert!(texts.iter().any(|(_, _, t)| t.contains("View Army")));
     }
 
     #[test]

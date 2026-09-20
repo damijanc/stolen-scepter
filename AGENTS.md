@@ -195,10 +195,11 @@ Implemented and tested:
   string map so the picker can read the pack's labels, parses the `credits`
   block, and carries `version` for `%VERSION%`. A NEW or LOAD choice then
   queues C's post-init message, and `Q` (`Action::SaveQuit`) writes slot 0
-  and shows the save-confirm banner. The only startup-adjacent screen still
-  unported is the Options screen behind `Action::OptionsMenu`.
+  and shows the save-confirm banner. `O` (`Action::OptionsMenu`) opens the
+  read-only options reference, which draws the fixed movement list plus the
+  pack's `strings.keybinds` (mount-conditional rows hidden).
 
-Test coverage is 344 engine unit tests, 258 shell unit tests, 25 combat digest
+Test coverage is 345 engine unit tests, 259 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
