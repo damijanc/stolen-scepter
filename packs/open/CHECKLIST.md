@@ -130,22 +130,22 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 
 ## villains (68)
 
-- [ ] `art/villains/aimola_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/arech_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/auric_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/bargash_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/baron_makahl_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/barrowpine_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/caneghor_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/czar_nickolai_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/dread_rob_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/hack_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/magus_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/mahk_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/moradon_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/murray_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/ragface_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/rinaldus_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
-- [ ] `art/villains/urthrax_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/aimola_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/arech_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/auric_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/bargash_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/baron_makahl_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/barrowpine_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/caneghor_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/czar_nickolai_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/dread_rob_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/hack_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/magus_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/mahk_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/moradon_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/murray_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/ragface_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/rinaldus_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
+- [x] `art/villains/urthrax_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
 
 Total: 311 slots.

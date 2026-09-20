@@ -1394,6 +1394,482 @@
       "source": "original",
       "license": "CC0-1.0",
       "date": "2026-09-20"
+    },
+    "art/villains/aimola_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/aimola_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/aimola_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/aimola_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/arech_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/arech_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/arech_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/arech_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/auric_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/auric_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/auric_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/auric_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/bargash_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/bargash_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/bargash_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/bargash_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/baron_makahl_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/baron_makahl_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/baron_makahl_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/baron_makahl_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/barrowpine_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/barrowpine_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/barrowpine_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/barrowpine_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/caneghor_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/caneghor_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/caneghor_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/caneghor_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/czar_nickolai_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/czar_nickolai_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/czar_nickolai_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/czar_nickolai_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/dread_rob_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/dread_rob_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/dread_rob_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/dread_rob_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/hack_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/hack_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/hack_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/hack_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/magus_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/magus_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/magus_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/magus_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/mahk_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/mahk_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/mahk_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/mahk_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/moradon_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/moradon_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/moradon_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/moradon_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/murray_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/murray_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/murray_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/murray_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/ragface_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/ragface_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/ragface_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/ragface_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/rinaldus_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/rinaldus_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/rinaldus_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/rinaldus_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/urthrax_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/urthrax_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/urthrax_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/villains/urthrax_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
     }
   }
 }
