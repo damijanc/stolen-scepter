@@ -324,4 +324,40 @@ OUTPUT_MAP = [
     ('zomb.256', 1, 'art/troops/zombies_01.png'),
     ('zomb.256', 2, 'art/troops/zombies_02.png'),
     ('zomb.256', 3, 'art/troops/zombies_03.png'),
+
+    # --- Source frames upstream's extract_output_map.inc leaves unmapped. ---
+    # These 21 VGA frames are real original art the pack never references, so
+    # they have no engine role; they are emitted so an HD upscale covers every
+    # original variant. Kept after the ported rows because they do not exist
+    # in the C map, so no ported row's last-writer-wins order changes.
+    #
+    # cursor 4-7 is a second 4-frame character strip sitting immediately
+    # before hero-walk 8-11; it is the natural hero_idle candidate the pack
+    # never declares.
+    ('cursor.256', 4, 'art/sprites/hero_idle_00.png'),
+    ('cursor.256', 5, 'art/sprites/hero_idle_01.png'),
+    ('cursor.256', 6, 'art/sprites/hero_idle_02.png'),
+    ('cursor.256', 7, 'art/sprites/hero_idle_03.png'),
+    # cursor 25-27 are three 16x5 bar/segment strips.
+    ('cursor.256', 25, 'art/ui/hud_bar_segment_00.png'),
+    ('cursor.256', 26, 'art/ui/hud_bar_segment_01.png'),
+    ('cursor.256', 27, 'art/ui/hud_bar_segment_02.png'),
+    # view 12-13 are the "empty" / "empty-map" inventory placeholders.
+    ('view.256', 12, 'art/ui/view_empty.png'),
+    ('view.256', 13, 'art/ui/view_empty_map.png'),
+    # endpic 2-4 are 48x34 ending-cartoon tiles beside the two 144x170 screens.
+    ('416:endpic.256', 2, 'art/ui/end_tile_00.png'),
+    ('416:endpic.256', 3, 'art/ui/end_tile_01.png'),
+    ('416:endpic.256', 4, 'art/ui/end_tile_02.png'),
+    # tilesalt is a complete 9-frame alternate tileset present in the DOS and
+    # Amiga releases; nothing maps it, so it is emitted under its own name.
+    ('tilesalt.256', 0, 'art/tiles/tilesalt_00.png'),
+    ('tilesalt.256', 1, 'art/tiles/tilesalt_01.png'),
+    ('tilesalt.256', 2, 'art/tiles/tilesalt_02.png'),
+    ('tilesalt.256', 3, 'art/tiles/tilesalt_03.png'),
+    ('tilesalt.256', 4, 'art/tiles/tilesalt_04.png'),
+    ('tilesalt.256', 5, 'art/tiles/tilesalt_05.png'),
+    ('tilesalt.256', 6, 'art/tiles/tilesalt_06.png'),
+    ('tilesalt.256', 7, 'art/tiles/tilesalt_07.png'),
+    ('tilesalt.256', 8, 'art/tiles/tilesalt_08.png'),
 ]

@@ -171,7 +171,7 @@ Output tree (all under `game-assets/extracted/`, which is gitignored because
 it is original game content -- never commit it):
 
 ```
-art/               308 engine-role PNGs + art/font/kb-font.png
+art/               330 PNGs (309 pack-role + 21 unmapped originals) + art/font/kb-font.png
 raw/<cc>/<entry>/  every VGA frame of every entry (326 total)
 palette.png        256-swatch VGA palette with indices
 manifest.json      source archive / entry / frame / dimensions per PNG
@@ -183,6 +183,15 @@ curated mapping ported to `tools/cc_output_map.py`. Two files in the pack are
 **not** emitted because they have no DOS source: `art/ui/chrome_overworld.png`
 (cleanroom) and `art/ui/puzzle_cover.png` (synthesized).
 
+Beyond the ported map, `tools/cc_output_map.py` also emits 21 original VGA
+frames that upstream's `extract_output_map.inc` leaves unmapped and no pack row
+references: the 9-frame `tilesalt` alternate tileset, the `cursor` 4-7 idle
+candidate, three `cursor` 16x5 bar segments, the `view` 12-13 empty
+placeholders, and three `endpic` 2-4 ending tiles. They are emitted under their
+own names and marked `engine_used: false` in the HD manifest, so an upscale can
+cover every original variant; this is the one place the output deliberately
+exceeds the C extractor's tree.
+
 The VGA decoder is a port of `reference/tools/extract_vga.c`: frame directory,
 color-key detection with a border-dominance heuristic, and bit-replicated
 6->8-bit palette expansion. Tilesets render opaque; everything else is
@@ -192,6 +201,25 @@ color-keyed. 416.CC is mostly CGA/EGA (`.4`/`.16`) siblings and only its
 The PNG writer is a small `zlib`-based encoder, so the script stays
 dependency-free (no Pillow). Output is pixel-identical to the C extractor's
 golden art tree for every shared file.
+
+### Building the HD upscale manifest
+
+`hd_manifest.py` reads the extraction dump plus the shipped pack and writes a
+tracked `tools/hd_assets.json` describing every art path an HD pipeline must
+cover: native size, alpha convention (`opaque` for tiles, `color_key`
+elsewhere), source archive/entry/frame, whether the engine draws it, and the
+overworld/combat/cartoon draw order.
+
+```sh
+python3 tools/hd_manifest.py
+# -> tools/hd_assets.json: 332 assets (311 engine-used, 21 unused originals)
+```
+
+Paths mirror the pack layout, so an upscaler writes
+`game-assets/generated/<path>` beside the source. The two synthetic pack-only
+assets (`chrome_overworld`, `puzzle_cover`) have no DOS source, so they are
+scaled from the pack copy and are best re-authored. Re-run it after changing
+the pack or the output map.
 
 ## Troubleshooting
 
