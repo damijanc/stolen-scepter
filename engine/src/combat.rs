@@ -52,6 +52,58 @@ pub enum CombatEvent {
 /// How many lines the combat log retains, C's `COMBAT_LOG_LINES`.
 pub const COMBAT_LOG_LINES: usize = 8;
 
+/// How one replay-record entry classifies its action, C's `CombatActionKind`.
+/// The label only picks the animator's draw flavor; the positions and counts
+/// are the load-bearing data.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CombatActionKind {
+    /// The acting unit walked to (`to_x`, `to_y`).
+    Move,
+    /// The acting unit flew to (`to_x`, `to_y`).
+    Fly,
+    /// The acting unit struck an adjacent target.
+    Melee,
+    /// The acting unit shot a ranged target.
+    Shoot,
+    /// The acting unit passed; no positional or count change.
+    Wait,
+}
+
+/// One per-action replay entry, C's `CombatTurnEntry`. C also stores the
+/// pre-formatted log line; this engine records DATA, so it carries the
+/// [`CombatEvent`] the action left instead and a shell formats it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CombatTurnEntry {
+    pub act_side: u8,
+    pub act_slot: u8,
+    pub kind: CombatActionKind,
+    /// Target (side, slot), or `0xFF` when the action had none.
+    pub tgt_side: u8,
+    pub tgt_slot: u8,
+    pub from_x: i8,
+    pub from_y: i8,
+    pub to_x: i8,
+    pub to_y: i8,
+    pub act_count_after: i16,
+    pub tgt_count_after: i16,
+    /// The engine's most recent log event when the action resolved, if any.
+    pub log_event: Option<CombatEvent>,
+}
+
+/// The per-action record of one headless fight, C's `CombatTurnRecord`. It is
+/// write-only observation: it never feeds the damage formula or the RNG, so
+/// the digest goldens are unaffected.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct CombatTurnRecord {
+    pub entries: Vec<CombatTurnEntry>,
+    /// Mirrors `Combat.result`: 1 win / 2 loss / 0 none.
+    pub result: i32,
+    /// Defender (AI side) non-empty stacks left at the end.
+    pub ai_stacks: i32,
+    /// Sum of `count * hit_points` over those stacks.
+    pub ai_hp: i64,
+}
+
 pub const COMBAT_POWER_INCREASED_DAMAGE: u8 = 1 << 0;
 pub const COMBAT_POWER_QUARTER_PROTECTION: u8 = 1 << 1;
 
@@ -917,6 +969,108 @@ pub fn combat_run_headless(
     target: &CombatTarget,
     cap_rounds: i32,
 ) -> CombatResult {
+    run_headless(game, resources, mode, target, cap_rounds, None)
+}
+
+/// The same fight, additionally filling `record` with the per-action replay
+/// sequence. Ports `combat_run_headless_rec`: the record is write-only
+/// observation, so the result is byte-identical to [`combat_run_headless`].
+pub fn combat_run_headless_rec(
+    game: &mut Game,
+    resources: &Resources,
+    mode: CombatMode,
+    target: &CombatTarget,
+    cap_rounds: i32,
+    record: &mut CombatTurnRecord,
+) -> CombatResult {
+    run_headless(game, resources, mode, target, cap_rounds, Some(record))
+}
+
+/// Append one per-action entry, porting `combat_rec_append`. Classifies the
+/// action from the observable before/after deltas; the kind only picks the
+/// animator's draw flavor, so an imperfect classification is cosmetic.
+fn combat_rec_append(
+    record: &mut CombatTurnRecord,
+    c: &Combat,
+    act_side: usize,
+    act_slot: usize,
+    pre_x: i32,
+    pre_y: i32,
+    pre_count: &[[i32; COMBAT_SLOTS]; COMBAT_SIDES],
+) {
+    let actor = &c.units[act_side][act_slot];
+    let valid_actor = actor.troop_idx >= 0;
+    let (to_x, to_y, act_count_after) = if valid_actor {
+        (actor.x as i8, actor.y as i8, actor.count as i16)
+    } else {
+        (pre_x as i8, pre_y as i8, 0)
+    };
+
+    let enemy = act_side ^ 1;
+    let mut dropped: Option<usize> = None;
+    for slot in 0..COMBAT_SLOTS {
+        if c.units[enemy][slot].count < pre_count[enemy][slot] {
+            dropped = Some(slot);
+            break;
+        }
+    }
+
+    let moved = valid_actor && (actor.x != pre_x || actor.y != pre_y);
+    let (kind, tgt_side, tgt_slot, tgt_count_after) = if let Some(slot) = dropped {
+        let target = &c.units[enemy][slot];
+        let dx = actor.x - target.x;
+        let dy = actor.y - target.y;
+        let adjacent = (-1..=1).contains(&dx) && (-1..=1).contains(&dy);
+        let kind = if adjacent {
+            CombatActionKind::Melee
+        } else {
+            CombatActionKind::Shoot
+        };
+        (kind, enemy as u8, slot as u8, target.count as i16)
+    } else if moved {
+        let dx = actor.x - pre_x;
+        let dy = actor.y - pre_y;
+        let far = dx < -1 || dx > 1 || dy < -1 || dy > 1;
+        let kind = if far {
+            CombatActionKind::Fly
+        } else {
+            CombatActionKind::Move
+        };
+        (kind, 0xFF, 0xFF, 0)
+    } else {
+        (CombatActionKind::Wait, 0xFF, 0xFF, 0)
+    };
+
+    record.entries.push(CombatTurnEntry {
+        act_side: act_side as u8,
+        act_slot: act_slot as u8,
+        kind,
+        tgt_side,
+        tgt_slot,
+        from_x: pre_x as i8,
+        from_y: pre_y as i8,
+        to_x,
+        to_y,
+        act_count_after,
+        tgt_count_after,
+        log_event: c.log.last().copied(),
+    });
+}
+
+fn run_headless(
+    game: &mut Game,
+    resources: &Resources,
+    mode: CombatMode,
+    target: &CombatTarget,
+    cap_rounds: i32,
+    mut record: Option<&mut CombatTurnRecord>,
+) -> CombatResult {
+    if let Some(rec) = record.as_deref_mut() {
+        rec.entries.clear();
+        rec.result = 0;
+        rec.ai_stacks = 0;
+        rec.ai_hp = 0;
+    }
     let mut c = Combat::default();
     combat_init(&mut c, game, resources, mode);
     combat_seed_rng(&mut c, game, mode, target);
@@ -970,10 +1124,49 @@ pub fn combat_run_headless(
             }
         }
 
+        // Capture the pre-action state for the replay record. A metrics-only
+        // caller (no record) skips this and pays no hot-loop cost.
+        let rec_side = c.side;
+        let rec_slot = c.unit_id;
+        let mut rec_px = 0;
+        let mut rec_py = 0;
+        let mut pre_count = [[0i32; COMBAT_SLOTS]; COMBAT_SIDES];
+        if record.is_some() {
+            if rec_slot >= 0 && (rec_slot as usize) < COMBAT_SLOTS {
+                rec_px = c.units[rec_side][rec_slot as usize].x;
+                rec_py = c.units[rec_side][rec_slot as usize].y;
+            }
+            for s in 0..COMBAT_SIDES {
+                for i in 0..COMBAT_SLOTS {
+                    pre_count[s][i] = c.units[s][i].count;
+                }
+            }
+        }
+
         // Both sides use the AI policy: C's headless entry point passes
         // combat_ai_action as the default player policy.
         let acted = combat_ai_action(&mut c, resources);
         if acted != 0 {
+            // Record the action before compaction renumbers slots.
+            if let Some(rec) = record.as_deref_mut() {
+                if rec_slot >= 0 && (rec_slot as usize) < COMBAT_SLOTS {
+                    combat_rec_append(
+                        rec,
+                        &c,
+                        rec_side,
+                        rec_slot as usize,
+                        rec_px,
+                        rec_py,
+                        &pre_count,
+                    );
+                }
+            }
+            if c.unit_id >= 0 {
+                let prev = &mut c.units[c.side][c.unit_id as usize];
+                if prev.troop_idx >= 0 {
+                    prev.frame = 0;
+                }
+            }
             combat_compact(&mut c);
             if combat_test_dead(&c, COMBAT_SIDE_AI) {
                 c.result = 1;
@@ -991,6 +1184,26 @@ pub fn combat_run_headless(
             }
         }
         actions += 1;
+    }
+
+    if let Some(rec) = record.as_deref_mut() {
+        rec.result = c.result;
+        // Defender (AI side) survivors at resolution: observation-only
+        // end-state for the recruit optimizer's loss ranking.
+        let mut stacks = 0;
+        let mut hp = 0i64;
+        for i in 0..COMBAT_SLOTS {
+            let u = c.units[COMBAT_SIDE_AI][i];
+            if u.troop_idx < 0 || u.count <= 0 {
+                continue;
+            }
+            stacks += 1;
+            if let Some(troop) = resources.troop_by_index(u.troop_idx) {
+                hp += u.count as i64 * troop.hit_points as i64;
+            }
+        }
+        rec.ai_stacks = stacks;
+        rec.ai_hp = hp;
     }
 
     if c.result == 1 {
@@ -2090,6 +2303,86 @@ mod tests {
         assert_eq!(result, CombatResult::Loss);
         assert_eq!(game.stats.gold, 100, "no spoils on a loss");
         assert_eq!(game.army[0].count, 1, "no writeback on a loss");
+    }
+
+    #[test]
+    fn a_recorded_fight_appends_entries_and_mirrors_the_result() {
+        let resources = combat_fixture();
+        let mut game = game_with_army(&[("ogres", 50)]);
+        let garrison = [unit("peasants", 2)];
+        let mut record = CombatTurnRecord::default();
+
+        let result = combat_run_headless_rec(
+            &mut game,
+            &resources,
+            CombatMode::Foe,
+            &target(&garrison, "weak_foe"),
+            COMBAT_MAX_ROUNDS,
+            &mut record,
+        );
+
+        assert_eq!(result, CombatResult::Win);
+        assert_eq!(record.result, 1);
+        assert!(!record.entries.is_empty());
+        for entry in &record.entries {
+            assert!(entry.act_side < COMBAT_SIDES as u8);
+            assert!(entry.act_slot < COMBAT_SLOTS as u8);
+        }
+        // A won fight leaves no AI stacks.
+        assert_eq!(record.ai_stacks, 0);
+        assert_eq!(record.ai_hp, 0);
+    }
+
+    #[test]
+    fn a_recorded_loss_reports_the_surviving_defenders() {
+        let resources = combat_fixture();
+        let mut game = game_with_army(&[("peasants", 1)]);
+        let garrison = [unit("ogres", 40)];
+        let mut record = CombatTurnRecord::default();
+
+        let result = combat_run_headless_rec(
+            &mut game,
+            &resources,
+            CombatMode::Foe,
+            &target(&garrison, "doom"),
+            COMBAT_MAX_ROUNDS,
+            &mut record,
+        );
+
+        assert_eq!(result, CombatResult::Loss);
+        assert_eq!(record.result, 2);
+        assert!(record.ai_stacks > 0);
+        assert!(record.ai_hp > 0);
+    }
+
+    #[test]
+    fn recording_does_not_change_the_resolution() {
+        let resources = combat_fixture();
+        let garrison = [unit("peasants", 2)];
+
+        let mut plain = game_with_army(&[("ogres", 50)]);
+        let plain_result = combat_run_headless(
+            &mut plain,
+            &resources,
+            CombatMode::Foe,
+            &target(&garrison, "weak_foe"),
+            COMBAT_MAX_ROUNDS,
+        );
+
+        let mut recorded = game_with_army(&[("ogres", 50)]);
+        let mut record = CombatTurnRecord::default();
+        let recorded_result = combat_run_headless_rec(
+            &mut recorded,
+            &resources,
+            CombatMode::Foe,
+            &target(&garrison, "weak_foe"),
+            COMBAT_MAX_ROUNDS,
+            &mut record,
+        );
+
+        assert_eq!(plain_result, recorded_result);
+        assert_eq!(plain.army[0].count, recorded.army[0].count);
+        assert_eq!(plain.stats.gold, recorded.stats.gold);
     }
 
     #[test]

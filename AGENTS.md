@@ -199,7 +199,7 @@ Implemented and tested:
   read-only options reference, which draws the fixed movement list plus the
   pack's `strings.keybinds` (mount-conditional rows hidden).
 
-Test coverage is 345 engine unit tests, 259 shell unit tests, 25 combat digest
+Test coverage is 348 engine unit tests, 259 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
@@ -291,10 +291,11 @@ length instead. Unreachable for any pack C would load. Fixing it means
 deciding how a library crate should express a fatal pack error, which is its
 own slice.
 
-What remains is shell-facing: the `player_io` message/prompt queue (the
-engine returns outcome enums where C queues a dialog) and the two combat
-omissions noted below. Those only pay off once a shell exists, so consider
-selecting the shell before porting its scaffolding.
+What remains is mostly presentational. The shell is ported -- the startup
+wizard, the overworld, the views, combat, the town/castle/dwelling flows and
+the options reference all run -- and `player_io.c`'s text queue stays
+unported by design: the engine returns outcome enums where C queues a dialog,
+and the shell writes the text.
 
 Traps the save slice turned up, worth knowing before touching that format:
 
@@ -320,12 +321,13 @@ is already a directly callable engine method here, so a shell can call the
 one it means instead of routing through a mirrored global. What a shell
 cannot get from the engine is the text, and that is the point.
 
-One standing omission:
+No standing engine omissions remain. `CombatTurnRecord` -- the per-action
+replay record -- is now `combat_run_headless_rec` (write-only observation that
+never touches the formula or the RNG), so a shell animator can replay a
+resolved fight entry by entry. C stores the pre-formatted log line in each
+entry; this engine records DATA and carries the last `CombatEvent` instead.
 
-- `CombatTurnRecord`, write-only replay data for a shell's animation. This
-  really is shell-shaped and can wait.
-
-The combat spells USED to sit in that bullet, deferred on the grounds
+The combat spells USED to sit in that deferral list, deferred on the grounds
 that only a player policy reaches them. That reason was wrong: it explained
 why they are unreachable, not why they are unportable. They are damage
 formulas, IMMUNE handling and a once-per-round latch -- engine rules that
