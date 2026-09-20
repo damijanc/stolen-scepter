@@ -398,6 +398,16 @@ including `resources_format_template` and its `%VAR%` substitution.
      interactions print to stdout, until the dialog and view layers land.
 8. **Combat loop and rendering**, then `CombatTurnRecord` once its consumer
    exists and its shape is known.
+9. **Mouse support** for menus, views, dialogs and prompts. See
+   `specs/mouse-support-design.md`. A deliberate divergence -- the DOS release
+   is keyboard-only -- confined to the shell, in service of the modern mode
+   this document already anticipates. Two rules carry the whole design: a view
+   emits its hit regions from the SAME rect it draws (so the two cannot drift),
+   and a click resolves to the outcome value the keyboard path already returns
+   (so the pointer can never reach a transaction the keyboard cannot). When
+   adding a view from here on, push its hit regions in the draw function and
+   copy the anti-drift test; a forgotten region renders perfectly and only
+   misbehaves under the pointer.
 
 ## Still deliberately unported in the engine
 
