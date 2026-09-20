@@ -491,7 +491,7 @@ pub enum RenderMode {
 }
 
 /// Render geometry declared by the pack. Ports `ResRender`.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResRender {
     pub mode: RenderMode,
     /// Modern only. Legacy forces 48x34 whatever the pack declares.
@@ -500,6 +500,27 @@ pub struct ResRender {
     /// Viewport in tiles. Must be odd on both axes.
     pub tiles_w: i32,
     pub tiles_h: i32,
+    /// The pack's art pixel multiple. `1` is the DOS original; a pack shipping
+    /// art upscaled `N` times declares `N` so the shell presents at least that
+    /// scale and never downsamples the art below 1:1. This is a Rust-side
+    /// extension: C has no such field, but it is the same presentation
+    /// contract as `mode`, so it lives in the render block.
+    pub scale: i32,
+}
+
+impl Default for ResRender {
+    fn default() -> Self {
+        Self {
+            mode: RenderMode::None,
+            tile_w: 0,
+            tile_h: 0,
+            tiles_w: 0,
+            tiles_h: 0,
+            // A pack that declares no render block is not HD; the DOS original
+            // is the baseline.
+            scale: 1,
+        }
+    }
 }
 
 /// The final-score formula's knobs. Ports `ResScoring`.
@@ -1838,6 +1859,9 @@ impl Resources {
         let Some(render) = root.get("render") else {
             return Ok(());
         };
+        // Read the art pixel multiple for either mode; absent means 1, the
+        // DOS original. Layout validates it.
+        self.render.scale = optional_i32_field(render, "scale", 1)?;
         let mode = render
             .get("mode")
             .and_then(|mode| mode.as_str())
@@ -3105,6 +3129,26 @@ mod tests {
         assert_eq!(resources.render.mode, RenderMode::Modern);
         assert_eq!((resources.render.tile_w, resources.render.tile_h), (64, 96));
         assert_eq!((resources.render.tiles_w, resources.render.tiles_h), (7, 9));
+    }
+
+    #[test]
+    fn the_art_pixel_scale_defaults_to_one_and_is_recorded_as_declared() {
+        let plain = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
+        assert_eq!(plain.render.scale, 1);
+
+        // A legacy HD pack keeps the DOS geometry but declares its art is 4x.
+        let hd =
+            Resources::from_json_str(r#"{"render": {"mode": "legacy", "scale": 4}, "troops": []}"#)
+                .expect("fixture parses");
+        assert_eq!(hd.render.mode, RenderMode::Legacy);
+        assert_eq!((hd.render.tile_w, hd.render.tile_h), (48, 34));
+        assert_eq!(hd.render.scale, 4);
+
+        // An invalid value is recorded, not clamped; layout rejects it.
+        let bad =
+            Resources::from_json_str(r#"{"render": {"mode": "legacy", "scale": 0}, "troops": []}"#)
+                .expect("fixture parses");
+        assert_eq!(bad.render.scale, 0);
     }
 
     #[test]

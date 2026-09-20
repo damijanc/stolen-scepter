@@ -102,16 +102,33 @@ impl Present {
         let fit_x = win_w / layout.screen_w;
         let fit_y = win_h / layout.screen_h;
         let fit = fit_x.min(fit_y);
-        let ceiling = target.scale_ceiling();
+        // A pack shipping art at `pixel_scale` times the logical size must not
+        // be presented below that, or the art is downsampled and aliases. The
+        // ceiling rides along so a large window can still scale an HD pack up.
+        let pixel = layout.pixel_scale.max(1);
+        let ceiling = target.scale_ceiling() * pixel;
 
         if !layout.is_modern {
             // Floor then ceiling, in that order and separately, as C does.
             // A single clamp would read the same today but panics the moment
             // a ceiling is ever set below the floor, where C just returns the
             // ceiling.
-            let mut scale = fit;
+            //
+            // An HD pack snaps to a whole multiple of its art scale. Without
+            // that, a window with room for 5x presents 4x art at 5/4, so some
+            // source pixels land on one screen pixel and some on two; the
+            // multiple keeps every source pixel square. A plain pack (pixel 1)
+            // skips this and is byte-for-byte what it was before.
+            let mut scale = if pixel > 1 {
+                pixel * (fit / pixel).max(1)
+            } else {
+                fit
+            };
             if scale < SCALE_MIN {
                 scale = SCALE_MIN;
+            }
+            if scale < pixel {
+                scale = pixel;
             }
             if scale > ceiling {
                 scale = ceiling;
@@ -128,8 +145,9 @@ impl Present {
         } else {
             // Auto-fit: floor first, then ceiling. The floor belongs to the
             // geometry -- 320x200 needs 2x to be usable, while a modern pack
-            // is already large and sits at 1:1.
-            fit.max(layout.default_scale)
+            // is already large and sits at 1:1. A pack that declares an art
+            // pixel multiple floors there instead.
+            fit.max(layout.default_scale.max(pixel))
         };
         scale.min(ceiling)
     }
@@ -236,6 +254,27 @@ mod tests {
 
         assert_eq!(present.scale(&layout, 960, 600, Target::Desktop), 3);
         assert_eq!(present.scale_override(), 5, "the choice is still recorded");
+    }
+
+    #[test]
+    fn an_hd_pack_is_never_presented_below_its_art_scale() {
+        // A legacy HD pack: DOS geometry, art authored 4x.
+        let layout = layout_for(r#"{"mode": "legacy", "scale": 4}"#);
+        let present = Present::new();
+
+        // A window with room only for 2x still gets 4x, so the 4x art is not
+        // downsampled; it overhangs the window exactly as a plain legacy pack
+        // does at its own floor.
+        assert_eq!(present.scale(&layout, 640, 400, Target::Desktop), 4);
+        // A 1920x1080 window fits 5x, but 4x art snaps down to the nearest
+        // whole multiple (4x) rather than showing uneven 5/4 pixels.
+        assert_eq!(present.scale(&layout, 1920, 1080, Target::Desktop), 4);
+        // A window that fits exactly 8x takes 2x the art scale.
+        assert_eq!(present.scale(&layout, 2560, 1600, Target::Desktop), 8);
+        // Legacy still ignores an explicit scale choice.
+        let mut chosen = Present::new();
+        chosen.set_scale(1);
+        assert_eq!(chosen.scale(&layout, 640, 400, Target::Desktop), 4);
     }
 
     #[test]

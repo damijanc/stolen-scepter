@@ -221,6 +221,44 @@ assets (`chrome_overworld`, `puzzle_cover`) have no DOS source, so they are
 scaled from the pack copy and are best re-authored. Re-run it after changing
 the pack or the output map.
 
+### Upscaling the art
+
+`upscale.py` reads `hd_assets.json` and writes every asset at `native * scale`
+into `game-assets/generated/`, mirroring the pack layout:
+
+```sh
+# Exact integer replication: the always-available baseline.
+python3 tools/upscale.py --clean --scale 4
+
+# Or delegate to any upscaler, then normalise back to the target size.
+# `{src}`, `{dst}` and `{scale}` are substituted.
+python3 tools/upscale.py --scale 4 --method external \
+    --cmd "realesrgan-ncnn-vulkan -i {src} -o {dst} -s {scale}"
+```
+
+Tiles are forced fully opaque; every colour-keyed asset gets a hard 1-bit
+alpha, so no soft halo survives nearest sampling. Each written file is checked
+against `native * scale` and the run fails loudly on a mismatch. The tool is
+dependency-free (stdlib `zlib` plus a small PNG codec).
+
+### Building a launchable HD pack
+
+`make_hd_pack.py` copies the reference pack, overlays the generated art, and
+patches `render.scale` so the shell presents at the art's pixel multiple:
+
+```sh
+python3 tools/make_hd_pack.py --scale 4
+cargo run -p openbounty-shell -- game-assets/hd-pack/game.json
+```
+
+How it renders: the logical design space stays the DOS 320x200; `render.scale`
+raises the presentation floor and snaps the window scale to a whole multiple of
+the art scale, so 4x art is never downsampled and every source pixel stays
+square. Because the shell already multiplies rects, chrome bands and font cells
+by the window scale, no other code changes are needed. The HD font is sampled
+1:1 by deriving the glyph source size from the loaded strip. An HD pack is a
+local build product under the gitignored `game-assets/`, never committed.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |

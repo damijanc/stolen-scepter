@@ -28,7 +28,7 @@ pub mod sprites;
 pub mod startup;
 pub mod views;
 
-use macroquad::prelude::{get_time, next_frame, Conf};
+use macroquad::prelude::{get_time, next_frame, request_new_screen_size, Conf};
 
 use anim::HeroAnimator;
 use backend::{Backend, MacroquadKeys, MacroquadPointer};
@@ -652,6 +652,11 @@ async fn main() {
             return;
         }
     };
+
+    // The macroquad window opens at the legacy default before the pack is
+    // known. Grow it to what this pack actually wants, or an HD (or modern)
+    // pack renders larger than its window and gets cropped.
+    request_new_screen_size(layout.window_w() as f32, layout.window_h() as f32);
 
     let catalog = SpriteCatalog::from_resources(&resources);
     let backend = Backend::load(&resources, &catalog).await;

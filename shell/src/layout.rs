@@ -77,6 +77,9 @@ pub enum LayoutError {
     ViewportNotOdd { tiles_w: i32, tiles_h: i32 },
     /// Tiles must be at least 8px on both axes.
     TilesTooSmall { tile_w: i32, tile_h: i32 },
+    /// The art pixel multiple must be at least 1. A pack that ships art
+    /// upscaled `N` times declares `render.scale = N`.
+    PixelScaleInvalid { scale: i32 },
 }
 
 impl std::fmt::Display for LayoutError {
@@ -94,6 +97,9 @@ impl std::fmt::Display for LayoutError {
                 f,
                 "render tiles must be at least 8px (got {tile_w}x{tile_h})"
             ),
+            Self::PixelScaleInvalid { scale } => {
+                write!(f, "render.scale must be at least 1 (got {scale})")
+            }
         }
     }
 }
@@ -120,6 +126,11 @@ pub struct Layout {
     /// indistinguishable from the build before render modes existed, so
     /// anything new is gated on this.
     pub is_modern: bool,
+    /// The pack's art pixel multiple, at least 1. The shell presents at a
+    /// window scale no lower than this, so art authored `N` times the logical
+    /// size is never sampled below 1:1. `1` is the DOS original and leaves the
+    /// old presentation exactly as it was.
+    pub pixel_scale: i32,
 }
 
 impl Layout {
@@ -148,6 +159,11 @@ impl Layout {
                 tile_h: render.tile_h,
             });
         }
+        if render.scale < 1 {
+            return Err(LayoutError::PixelScaleInvalid {
+                scale: render.scale,
+            });
+        }
 
         let map_w = render.tile_w * render.tiles_w;
         let map_h = render.tile_h * render.tiles_h;
@@ -164,12 +180,13 @@ impl Layout {
             sidebar_w,
             screen_w: FRAME_LEFT_W + map_w + sidebar_w + FRAME_RIGHT_W,
             screen_h: FRAME_TOP_H + STATUS_H + BAR_H + map_h + FRAME_BOTTOM_H,
-            // Legacy opens at 2x because 320x200 is tiny on a modern display.
-            // A modern pack is already large -- 800x702 at 2x would be
-            // 1600x1404, taller than a 1080p screen -- so it opens 1:1 and
-            // the user scales up if they want to.
-            default_scale: if is_modern { 1 } else { 2 },
+            // Legacy opens at 2x because 320x200 is tiny on a modern display;
+            // an HD pack opens at its art scale instead, or the initial window
+            // is too small to show it. A modern pack is already large -- at 2x
+            // it would exceed 1080p -- so it opens 1:1 and the user scales up.
+            default_scale: if is_modern { 1 } else { render.scale.max(2) },
             is_modern,
+            pixel_scale: render.scale,
         })
     }
 
@@ -288,6 +305,32 @@ mod tests {
     }
 
     #[test]
+    fn the_art_pixel_scale_defaults_to_one_and_legacy_keeps_its_geometry() {
+        let layout = Layout::from_resources(&pack(r#"{"mode": "legacy"}"#)).expect("lays out");
+        assert_eq!(layout.pixel_scale, 1);
+
+        // An HD pack keeps the DOS logical geometry and only moves the
+        // presentation floor, so nothing else about the layout changes.
+        let hd =
+            Layout::from_resources(&pack(r#"{"mode": "legacy", "scale": 4}"#)).expect("lays out");
+        assert_eq!(hd.pixel_scale, 4);
+        assert_eq!((hd.screen_w, hd.screen_h), (320, 200));
+        assert_eq!((hd.tile_w, hd.tile_h), (48, 34));
+        assert_eq!((hd.tiles_w, hd.tiles_h), (5, 5));
+        // It opens at the art scale, so the window is big enough to show it.
+        assert_eq!(hd.default_scale, 4);
+        assert_eq!((hd.window_w(), hd.window_h()), (1280, 800));
+    }
+
+    #[test]
+    fn a_pixel_scale_below_one_is_refused() {
+        assert_eq!(
+            Layout::from_resources(&pack(r#"{"mode": "legacy", "scale": 0}"#)),
+            Err(LayoutError::PixelScaleInvalid { scale: 0 })
+        );
+    }
+
+    #[test]
     fn modern_derives_a_larger_screen_from_the_pack() {
         let layout = Layout::from_resources(&pack(
             r#"{"mode": "modern", "tile_w": 96, "tile_h": 96, "tiles_w": 7, "tiles_h": 7}"#,
@@ -376,5 +419,20 @@ mod tests {
         let layout = Layout::from_resources(&resources).expect("the shipped pack lays out");
         assert_eq!((layout.screen_w, layout.screen_h), (320, 200));
         assert!(!layout.is_modern);
+    }
+
+    #[test]
+    fn the_hd_pack_lays_out_at_its_art_scale() {
+        // Built by `tools/make_hd_pack.py`; skipped when it has not been run.
+        let path = "../game-assets/hd-pack/game.json";
+        let Ok(resources) = Resources::from_json_file(path) else {
+            eprintln!("SKIPPED: no HD pack at {path}");
+            return;
+        };
+        let layout = Layout::from_resources(&resources).expect("the HD pack lays out");
+        // The logical geometry is the DOS original; only the art scale moves.
+        assert_eq!((layout.screen_w, layout.screen_h), (320, 200));
+        assert_eq!((layout.tile_w, layout.tile_h), (48, 34));
+        assert_eq!(layout.pixel_scale, 4);
     }
 }

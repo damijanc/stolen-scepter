@@ -242,6 +242,12 @@ impl Backend {
             return;
         };
         let tint = mq_color(color);
+        // The strip's own pixels per glyph: 8x8 for the DOS font, 8N x 8N for
+        // an upscaled one. Deriving it from the loaded texture keeps the
+        // destination cell at GLYPH_W/H logical pixels either way, so an HD
+        // font samples 1:1 at the matching window scale.
+        let glyph_w = (strip.width() / font::GLYPH_COUNT as f32).max(1.0);
+        let glyph_h = strip.height().max(1.0);
         let cell = Vec2::new(
             font::GLYPH_W as f32 * frame.scale,
             font::GLYPH_H as f32 * frame.scale,
@@ -262,12 +268,7 @@ impl Backend {
                 tint,
                 DrawTextureParams {
                     dest_size: Some(cell),
-                    source: Some(MqRect::new(
-                        glyph * font::GLYPH_W as f32,
-                        0.0,
-                        font::GLYPH_W as f32,
-                        font::GLYPH_H as f32,
-                    )),
+                    source: Some(MqRect::new(glyph * glyph_w, 0.0, glyph_w, glyph_h)),
                     ..Default::default()
                 },
             );
