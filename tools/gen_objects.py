@@ -255,6 +255,52 @@ def dwelling_dungeon():
     return c.px
 
 
+def artifact_chest():
+    c = grass_canvas()
+    c.rect(11, 30, 26, 3, STONE_XD)
+    c.rect(12, 15, 24, 15, (92, 62, 44))
+    c.hline(12, 15, 24, (128, 92, 62))
+    c.hline(12, 29, 24, (64, 42, 30))
+    c.vline(12, 15, 15, (128, 92, 62))
+    c.vline(35, 15, 15, (64, 42, 30))
+    c.rect(12, 13, 24, 4, (64, 42, 30))
+    c.hline(12, 13, 24, (128, 92, 62))
+    c.rect(22, 16, 4, 14, IRON)
+    c.rect(20, 20, 8, 5, GOLD)
+    c.set(23, 22, (90, 190, 220))
+    c.set(24, 22, (90, 190, 220))
+    return c.px
+
+
+def artifact_ring():
+    c = grass_canvas()
+    for y in range(10, 35):
+        for x in range(12, 37):
+            d2 = (x - 24) ** 2 + (y - 22) ** 2
+            if 16 <= d2 <= 100:
+                lit = y < 22
+                c.set(x, y, (246, 220, 120) if lit else GOLD)
+    c.set(24, 12, (90, 190, 220))
+    c.set(25, 12, (90, 190, 220))
+    c.set(24, 13, (150, 220, 240))
+    return c.px
+
+
+def wandering_army():
+    c = grass_canvas()
+    c.frame(22, 4, 4, 22, WOOD_D)
+    c.rect(23, 4, 2, 22, WOOD)
+    c.tri(24, 4, 24, 16, 40, 10, ROOF)
+    c.tri(24, 4, 24, 16, 8, 10, ROOF_D)
+    c.rect(18, 22, 12, 9, (72, 74, 84))
+    c.rect(19, 20, 10, 4, (110, 112, 122))
+    c.rect(20, 24, 2, 2, (30, 32, 40))
+    c.rect(26, 24, 2, 2, (30, 32, 40))
+    c.rect(19, 30, 3, 2, (40, 42, 50))
+    c.rect(26, 30, 3, 2, (40, 42, 50))
+    return c.px
+
+
 def sign():
     c = grass_canvas()
     c.rect(22, 12, 4, 18, WOOD)
@@ -298,6 +344,9 @@ def main():
     tiles = {
         "town": town(),
         "chest": chest(),
+        "artifact_chest": artifact_chest(),
+        "artifact_ring": artifact_ring(),
+        "wandering_army": wandering_army(),
         "dwelling_plains": dwelling_plains(),
         "dwelling_forest": dwelling_forest(),
         "dwelling_hills": dwelling_hills(),

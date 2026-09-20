@@ -484,6 +484,27 @@
       "source": "original",
       "license": "CC0-1.0",
       "date": "2026-09-20"
+    },
+    "art/tiles/artifact_chest.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/artifact_ring.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/tiles/wandering_army.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
     }
   }
 }
