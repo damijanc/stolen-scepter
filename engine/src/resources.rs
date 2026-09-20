@@ -934,6 +934,26 @@ pub const RES_CREDIT_GROUPS: usize = 6;
 pub const RES_CREDIT_NAMES: usize = 4;
 pub const RES_CREDIT_COPYRIGHT: usize = 4;
 pub const RES_CREDIT_TEXT_LEN: usize = 64;
+pub const RES_MAX_KEYBINDS: usize = 24;
+pub const RES_KEYBIND_KEY_LEN: usize = 8;
+pub const RES_KEYBIND_LABEL_LEN: usize = 24;
+
+/// One keybinding reference row, C's `ResKeybind`. The options screen lists
+/// these, skipping the mount-conditional ones.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResKeybind {
+    pub key: FixedStr<RES_KEYBIND_KEY_LEN>,
+    pub label: FixedStr<RES_KEYBIND_LABEL_LEN>,
+}
+
+impl Default for ResKeybind {
+    fn default() -> Self {
+        Self {
+            key: FixedStr::empty(),
+            label: FixedStr::empty(),
+        }
+    }
+}
 
 /// One credits group: a heading and its indented names. C's `credits.groups`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1007,6 +1027,9 @@ pub struct Resources {
     /// lets a view be ported without first transcribing every string a view
     /// that does not exist yet would want.
     pub strings: std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>,
+    /// The options screen's keybinding reference, from `strings.keybinds`.
+    pub keybinds: [ResKeybind; RES_MAX_KEYBINDS],
+    pub keybind_count: usize,
     pub tuning: ResTuning,
     pub spawn: ResSpawn,
     towns: [ResTown; RES_MAX_TOWNS],
@@ -1054,6 +1077,8 @@ impl Default for Resources {
             colors: ResColors::default(),
             controls: ResControls::default(),
             strings: std::collections::BTreeMap::new(),
+            keybinds: [ResKeybind::default(); RES_MAX_KEYBINDS],
+            keybind_count: 0,
             tuning: ResTuning::default(),
             spawn: ResSpawn::default(),
             towns: [ResTown::default(); RES_MAX_TOWNS],
@@ -1116,6 +1141,7 @@ impl Resources {
         resources.parse_controls(&root)?;
         resources.parse_strings(&root);
         resources.parse_difficulty_labels(&root);
+        resources.parse_keybinds(&root);
         resources.parse_tuning(&root)?;
         resources.parse_spawn(&root)?;
         resources.parse_combat(&root)?;
@@ -1610,6 +1636,35 @@ impl Resources {
         }
         if !table.is_empty() {
             self.strings.insert("difficulty".to_owned(), table);
+        }
+    }
+
+    /// Read `strings.keybinds` into the options-screen reference list,
+    /// porting `parse_ui`'s keybind loop. Bounded at `RES_MAX_KEYBINDS`.
+    fn parse_keybinds(&mut self, root: &serde_json::Value) {
+        self.keybind_count = 0;
+        let Some(items) = root
+            .get("strings")
+            .and_then(|strings| strings.get("keybinds"))
+            .and_then(serde_json::Value::as_array)
+        else {
+            return;
+        };
+        for item in items {
+            if self.keybind_count >= RES_MAX_KEYBINDS {
+                break;
+            }
+            let Some(item) = item.as_object() else {
+                continue;
+            };
+            let slot = self.keybind_count;
+            if let Some(key) = item.get("key").and_then(serde_json::Value::as_str) {
+                self.keybinds[slot].key.copy_from_str(key);
+            }
+            if let Some(label) = item.get("label").and_then(serde_json::Value::as_str) {
+                self.keybinds[slot].label.copy_from_str(label);
+            }
+            self.keybind_count += 1;
         }
     }
 
@@ -3586,6 +3641,22 @@ mod tests {
             resources.credits.copyright[1].as_str(),
             "New World Computing"
         );
+    }
+
+    #[test]
+    fn keybinds_are_parsed_from_the_strings_group() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [],
+                "strings": {"keybinds": [
+                  {"key": "A", "label": "View Army"},
+                  {"key": "F", "label": "Fly"}
+                ]}}"#,
+        )
+        .expect("fixture parses");
+        assert_eq!(resources.keybind_count, 2);
+        assert_eq!(resources.keybinds[0].key.as_str(), "A");
+        assert_eq!(resources.keybinds[0].label.as_str(), "View Army");
+        assert_eq!(resources.keybinds[1].key.as_str(), "F");
     }
 
     #[test]
