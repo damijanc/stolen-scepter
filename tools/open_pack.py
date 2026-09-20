@@ -96,7 +96,11 @@ def cmd_checklist(_args):
                 label = f"{g}_{frames[0]:02d}.png"
             else:
                 label = f"{g}_{frames[0]:02d}.._{frames[-1]:02d}.png"
-            lines.append(f"- [ ] `{label}` - {n} frame(s), {size}, {info['alpha']}, {info['role']}")
+            present = sum(1 for _, p in info["frames"] if os.path.exists(pack_file(p)))
+            tick = "x" if present == n else " "
+            note = f"  ({present}/{n})" if 0 < present < n else ""
+            lines.append(f"- [{tick}] `{label}` - {n} frame(s), {size}, {info['alpha']}, "
+                         f"{info['role']}{note}")
             total += n
         lines.append("")
     lines.append(f"Total: {total} slots.")
