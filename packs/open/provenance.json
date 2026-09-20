@@ -589,6 +589,111 @@
       "source": "original",
       "license": "CC0-1.0",
       "date": "2026-09-20"
+    },
+    "art/combat/field_grass.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/obstacle_01.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/obstacle_02.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/obstacle_03.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_spike.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_wall_01.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_wall_02.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_wall_03.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_wall_04.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_wall_05.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/castle_wall_06.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/cursor_01.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/cursor_02.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/cursor_03.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/combat/cursor_04.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
     }
   }
 }

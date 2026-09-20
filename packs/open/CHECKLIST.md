@@ -14,11 +14,11 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 
 ## combat (15)
 
-- [ ] `art/combat/castle_spike.png` - 1 frame(s), 48x34, color_key, combat_tile
-- [ ] `art/combat/castle_wall_01.._06.png` - 6 frame(s), 48x34, color_key, combat_tile
-- [ ] `art/combat/cursor_01.._04.png` - 4 frame(s), 48x34, color_key, combat_tile
-- [ ] `art/combat/field_grass.png` - 1 frame(s), 48x34, opaque, combat_tile
-- [ ] `art/combat/obstacle_01.._03.png` - 3 frame(s), 48x34, color_key, combat_tile
+- [x] `art/combat/castle_spike.png` - 1 frame(s), 48x34, color_key, combat_tile
+- [x] `art/combat/castle_wall_01.._06.png` - 6 frame(s), 48x34, color_key, combat_tile
+- [x] `art/combat/cursor_01.._04.png` - 4 frame(s), 48x34, color_key, combat_tile
+- [x] `art/combat/field_grass.png` - 1 frame(s), 48x34, opaque, combat_tile
+- [x] `art/combat/obstacle_01.._03.png` - 3 frame(s), 48x34, color_key, combat_tile
 
 ## font (1)
 
