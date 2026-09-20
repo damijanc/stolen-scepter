@@ -505,6 +505,90 @@
       "source": "original",
       "license": "CC0-1.0",
       "date": "2026-09-20"
+    },
+    "art/sprites/hero_walk_00.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/boat_00.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/hero_walk_01.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/boat_01.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/hero_walk_02.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/boat_02.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/hero_walk_03.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/sprites/boat_03.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/classes/knight.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/classes/paladin.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/classes/sorceress.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
+    },
+    "art/classes/barbarian.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "source": "original",
+      "license": "CC0-1.0",
+      "date": "2026-09-20"
     }
   }
 }

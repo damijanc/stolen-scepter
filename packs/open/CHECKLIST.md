@@ -7,10 +7,10 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 
 ## classes (4)
 
-- [ ] `art/classes/barbarian.png` - 1 frame(s), 96x102, color_key, class_portrait
-- [ ] `art/classes/knight.png` - 1 frame(s), 96x102, color_key, class_portrait
-- [ ] `art/classes/paladin.png` - 1 frame(s), 96x102, color_key, class_portrait
-- [ ] `art/classes/sorceress.png` - 1 frame(s), 96x102, color_key, class_portrait
+- [x] `art/classes/barbarian.png` - 1 frame(s), 96x102, color_key, class_portrait
+- [x] `art/classes/knight.png` - 1 frame(s), 96x102, color_key, class_portrait
+- [x] `art/classes/paladin.png` - 1 frame(s), 96x102, color_key, class_portrait
+- [x] `art/classes/sorceress.png` - 1 frame(s), 96x102, color_key, class_portrait
 
 ## combat (15)
 
@@ -26,13 +26,13 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 
 ## sprites (8)
 
-- [ ] `art/sprites/boat_00.._03.png` - 4 frame(s), 48x34, color_key, hero_anim
-- [ ] `art/sprites/hero_walk_00.._03.png` - 4 frame(s), 48x34, color_key, hero_anim
+- [x] `art/sprites/boat_00.._03.png` - 4 frame(s), 48x34, color_key, hero_anim
+- [x] `art/sprites/hero_walk_00.._03.png` - 4 frame(s), 48x34, color_key, hero_anim
 
 ## tiles (72)
 
-- [ ] `art/tiles/artifact_chest.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/artifact_ring.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/artifact_chest.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/artifact_ring.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/bridge_h.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/bridge_v.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/castle_br.png` - 1 frame(s), 48x34, opaque, map_tile
@@ -56,7 +56,7 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 - [x] `art/tiles/mountain_edge_01.._12.png` - 12 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/sign.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/town.png` - 1 frame(s), 48x34, opaque, map_tile
-- [ ] `art/tiles/wandering_army.png` - 1 frame(s), 48x34, opaque, map_tile
+- [x] `art/tiles/wandering_army.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/water.png` - 1 frame(s), 48x34, opaque, map_tile
 - [x] `art/tiles/water_edge_00.._11.png` - 12 frame(s), 48x34, opaque, map_tile
 
