@@ -1229,6 +1229,28 @@ impl Views {
             Some(ViewKind::Lose) => self.draw_end_game(list, layout, palette, false),
             None => {}
         }
+
+        // Views with no menu of their own dismiss on any key; a click anywhere
+        // over one does the same, so they publish one full-screen region.
+        if matches!(
+            self.active(),
+            Some(
+                ViewKind::Character
+                    | ViewKind::Army
+                    | ViewKind::Contract
+                    | ViewKind::Puzzle
+                    | ViewKind::Worldmap
+                    | ViewKind::Dwelling
+                    | ViewKind::Options
+                    | ViewKind::Win
+                    | ViewKind::Lose
+            )
+        ) {
+            hits.push(
+                Rect::new(0, 0, layout.screen_w, layout.screen_h),
+                HitTarget::ViewDismiss,
+            );
+        }
     }
 
     /// Ports `draw_puzzle`: a 5x5 grid of villain faces and artifact icons
@@ -4600,6 +4622,36 @@ mod tests {
         assert_eq!(
             views.own_castle_key(&Keys::pressed(&[Key::Escape])),
             OwnCastleAction::Dismiss
+        );
+    }
+
+    #[test]
+    fn a_read_only_view_publishes_a_full_screen_dismiss_region() {
+        let (resources, layout, catalog) = spells_fixtures();
+        let mut views = Views::new();
+        views.set(ViewKind::Army);
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &Game::default(),
+            &present,
+            0.0,
+        );
+
+        assert_eq!(hits.hit(5, 5), Some(HitTarget::ViewDismiss));
+        assert_eq!(
+            hits.hit(layout.screen_w - 1, layout.screen_h - 1),
+            Some(HitTarget::ViewDismiss)
         );
     }
 

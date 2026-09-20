@@ -57,7 +57,7 @@ use openbounty_engine::step::{
     consume_step, game_step_basic, search_here, spend_week, SearchOutcome, StepInteraction,
     StepResult,
 };
-use pointer::{Button, HitList, PointerSource};
+use pointer::{Button, HitList, HitTarget, PointerSource};
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use savepath::SavePaths;
@@ -1118,7 +1118,7 @@ async fn main() {
                 } else {
                     views.dismiss();
                 }
-            } else if keys.any_pressed() {
+            } else if keys.any_pressed() || clicked == Some(HitTarget::ViewDismiss) {
                 views.dismiss();
             }
         } else if fast_quit {

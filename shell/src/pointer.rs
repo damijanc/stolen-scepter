@@ -28,6 +28,8 @@ pub enum HitTarget {
     RecruitRow(usize),
     HomeCastleRow(usize),
     OwnCastleSlot(usize),
+    /// A read-only view: a click anywhere dismisses it, as any key does.
+    ViewDismiss,
     DialogDismiss,
     PromptYes,
     PromptNo,
