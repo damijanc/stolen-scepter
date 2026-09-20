@@ -703,6 +703,20 @@ impl Views {
         false
     }
 
+    /// Resolve a pointer hit to the confirmation `gate_update` reports for
+    /// Enter on that row: set the cursor and chosen index, then dismiss.
+    pub fn gate_click(&mut self, target: HitTarget) -> bool {
+        match target {
+            HitTarget::GateRow(index) if index < self.gate_count => {
+                self.gate_cursor = index;
+                self.gate_chosen = index as i32;
+                self.dismiss();
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Open the town menu with the visiting town's context, porting
     /// `views_open_town`. The cursor starts on the contract row.
     pub fn town_open(&mut self, display_name: &str, record_key: &str, boat_x: i32, boat_y: i32) {
@@ -1078,7 +1092,7 @@ impl Views {
             }
             Some(ViewKind::Options) => draw_options(list, layout, palette, resources, game),
             Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
-            Some(ViewKind::Gate) => self.draw_gate(list, layout, palette),
+            Some(ViewKind::Gate) => self.draw_gate(list, hits, layout, palette),
             Some(ViewKind::Town) => {
                 self.draw_town(list, hits, layout, palette, resources, catalog, game, time)
             }
@@ -1565,7 +1579,13 @@ impl Views {
 
     /// Ports `draw_gate`: a cursored, two-column list of gate destinations.
     /// The panel covers the map and the sidebar so long names fit.
-    fn draw_gate(&self, list: &mut DrawList, layout: &Layout, palette: &Palette) {
+    fn draw_gate(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+    ) {
         let vx = MAP_X;
         let vw = layout.map_w + layout.sidebar_w;
         let vy = MAP_Y;
@@ -1588,6 +1608,7 @@ impl Views {
         let row_h = font::GLYPH_H + 2;
         let col_l = vx + VIEW_PAD + 2;
         let col_r = vx + vw / 2 + 2;
+        let col_w = vw / 2 - VIEW_PAD - 4;
 
         for r in 0..left {
             for side in 0..2 {
@@ -1621,6 +1642,8 @@ impl Views {
                     .collect();
                 let label = format!("{}{}) {}", if selected { ">" } else { " " }, key, short);
                 list.text(&label, x, y, fg);
+                // Same rect, one line apart: the row's band spans its column.
+                hits.push(Rect::new(x, y, col_w, row_h), HitTarget::GateRow(index));
             }
         }
 
@@ -3941,6 +3964,67 @@ mod tests {
         assert!(list.has_text_containing("Bari"));
         assert!(list.has_text_containing("Cortona"));
         assert!(list.has_text_containing("Enter go"));
+    }
+
+    #[test]
+    fn the_gate_hit_regions_line_up_with_the_drawn_rows() {
+        let (resources, layout, _) = spells_fixtures();
+        let mut views = Views::new();
+        views.gate_open(
+            &[gate_dest("Avalon"), gate_dest("Bari"), gate_dest("Cortona")],
+            false,
+        );
+        let palette = Palette::fallback();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        let catalog = SpriteCatalog::from_resources(&resources);
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &palette,
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &Game::default(),
+            &present,
+            0.0,
+        );
+
+        for index in 0..views.gate_count() {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::GateRow(index))
+                .unwrap_or_else(|| panic!("row {index} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::GateRow(index)));
+        }
+    }
+
+    #[test]
+    fn clicking_a_gate_row_matches_selecting_it_by_key() {
+        let destinations = [gate_dest("Avalon"), gate_dest("Bari"), gate_dest("Cortona")];
+
+        // Keyboard: move down to row 1, then Enter.
+        let mut by_key = Views::new();
+        by_key.gate_open(&destinations, false);
+        by_key.gate_update(&Keys::pressed(&[Key::Down]));
+        by_key.gate_update(&Keys::pressed(&[Key::Enter]));
+        let keyed = by_key.gate_take_chosen();
+
+        // Pointer: click row 1 directly.
+        let mut by_click = Views::new();
+        by_click.gate_open(&destinations, false);
+        by_click.gate_click(HitTarget::GateRow(1));
+        let clicked = by_click.gate_take_chosen();
+
+        assert_eq!(keyed, Some(1));
+        assert_eq!(clicked, keyed);
     }
 
     #[test]

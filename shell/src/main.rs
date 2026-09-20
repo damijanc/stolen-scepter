@@ -1011,7 +1011,12 @@ async fn main() {
         } else if views.active() == Some(ViewKind::Gate) {
             // The gate picker owns its arrows/letter/Enter input; a confirmed
             // choice teleports through the engine, which also spends the charge.
-            if views.gate_update(&keys) {
+            // A click resolves to the same confirmation as Enter.
+            let confirmed = match clicked {
+                Some(target) => views.gate_click(target),
+                None => views.gate_update(&keys),
+            };
+            if confirmed {
                 let chosen = views.gate_take_chosen();
                 if let Some(index) = chosen {
                     let destination = views.gate_dest(index).copied();

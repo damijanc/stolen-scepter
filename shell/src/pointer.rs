@@ -23,6 +23,7 @@ pub enum Button {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HitTarget {
     TownRow(TownRow),
+    GateRow(usize),
     DialogDismiss,
     PromptYes,
     PromptNo,
