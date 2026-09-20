@@ -295,6 +295,21 @@ fn schedule_week_end(pending: &mut Option<WeekEnd>, game: &Game, resources: &Res
     });
 }
 
+/// Ports `show_win_game`: record the win and open the ending, starting with
+/// the cartoon cutscene when the pack ships its tiles.
+fn show_win_game(views: &mut Views, resources: &Resources, game: &mut Game) {
+    game.stats.game_over = true;
+    let body = interact::end_message(resources, game, true);
+    views.win_cartoon_open(resources, &body);
+}
+
+/// Ports `show_lose_game`: open the ending screen. `game_over` is already set
+/// by whatever ran out of days.
+fn show_lose_game(views: &mut Views, resources: &Resources, game: &Game) {
+    let body = interact::end_message(resources, game, false);
+    views.open_end_game(false, &body);
+}
+
 /// Show the next pending week-end screen when nothing modal is up, porting
 /// `pump_week_end_dialog`. Astrology queues the budget behind it.
 fn pump_week_end(
@@ -342,6 +357,7 @@ fn dispatch_answer(
     pending_week: &mut Option<WeekEnd>,
     prompt: &mut Prompt,
     dialog: &mut Dialog,
+    views: &mut Views,
 ) -> Option<CombatFlow> {
     let flow = std::mem::take(pending);
     match flow {
@@ -349,7 +365,9 @@ fn dispatch_answer(
             if answer == PromptResult::Yes {
                 match search_here(game, resources) {
                     SearchOutcome::Won => {
-                        // The win cartoon and screen are the end-game slice.
+                        // The win ends input and shows the ending; the cartoon
+                        // is a later slice.
+                        show_win_game(views, resources, game);
                     }
                     SearchOutcome::NothingFound {
                         week_commission, ..
@@ -360,8 +378,8 @@ fn dispatch_answer(
                         }
                     }
                     SearchOutcome::OutOfTime => {
-                        // game_over is now set; the lose screen is the
-                        // end-game slice.
+                        // `game_over` is already set; show the ending.
+                        show_lose_game(views, resources, game);
                     }
                 }
             }
@@ -440,6 +458,9 @@ fn dispatch_answer(
                     let (_weeks, paid) = spend_week(game, resources);
                     if paid > 0 {
                         schedule_week_end(pending_week, game, resources, paid);
+                    }
+                    if game.stats.game_over {
+                        show_lose_game(views, resources, game);
                     }
                 } else {
                     dialog.open("", "Cannot reach that continent.");
@@ -779,6 +800,13 @@ async fn main() {
             pump_week_end(&mut pending_week, &game, &resources, &mut dialog);
         }
 
+        // The win cutscene yields to the win screen when it runs out of frames.
+        if views.active() == Some(ViewKind::WinCartoon)
+            && views.win_cartoon_done(&resources, get_time())
+        {
+            views.finish_win_cartoon();
+        }
+
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
 
         // Input priority: combat first, then the message dialog owns the keys
@@ -874,6 +902,7 @@ async fn main() {
                     &mut pending_week,
                     &mut prompt,
                     &mut dialog,
+                    &mut views,
                 );
                 if let Some(flow) = combat_flow {
                     combat = Some(start_combat(&game, &resources, flow));
@@ -1010,6 +1039,12 @@ async fn main() {
                     }
                 }
             }
+        } else if views.active() == Some(ViewKind::WinCartoon) {
+            // Any key skips the win cutscene; the frame clock's own end is
+            // handled at the top of the loop.
+            if keys.any_pressed() {
+                views.finish_win_cartoon();
+            }
         } else if views.is_active() {
             // The worldmap alone treats SPACE specially: with the crystal orb
             // it toggles fog-only vs whole-map; without it SPACE dismisses
@@ -1049,6 +1084,9 @@ async fn main() {
                     if paid > 0 {
                         schedule_week_end(&mut pending_week, &game, &resources, paid);
                     }
+                    if game.stats.game_over {
+                        show_lose_game(&mut views, &resources, &game);
+                    }
                 }
                 Action::Rest => {
                     let advance = consume_step(&mut game, &resources, false);
@@ -1059,6 +1097,9 @@ async fn main() {
                             &resources,
                             advance.commission_paid,
                         );
+                    }
+                    if game.stats.game_over {
+                        show_lose_game(&mut views, &resources, &game);
                     }
                 }
                 Action::FastQuit => fast_quit = true,
@@ -1341,6 +1382,9 @@ async fn main() {
                             }
                         }
                     }
+                }
+                if game.stats.game_over {
+                    show_lose_game(&mut views, &resources, &game);
                 }
             }
         }

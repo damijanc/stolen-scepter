@@ -1455,6 +1455,29 @@ pub fn budget_message(
     (header, body)
 }
 
+/// Compose the win/lose end-screen body, porting `flows.c`'s `show_win_game` /
+/// `show_lose_game`: `%NAME%`, `%RANK%` and `%SCORE%` substituted into the
+/// pack's header/body/footer, joined by blank lines when more than one is set.
+pub fn end_message(resources: &Resources, game: &Game, won: bool) -> String {
+    let group = if won { "win" } else { "lose" };
+    let name = game.character.name.as_str();
+    let rank = game.character.cls.rank_title.as_str();
+    let score = game.compute_score(resources).to_string();
+    let vars: [banner::Var<'_>; 3] = [("NAME", name), ("RANK", rank), ("SCORE", &score)];
+    let header = banner::formatted(resources, group, "header", "", &vars);
+    let body = banner::formatted(resources, group, "body", "", &vars);
+    let footer = banner::formatted(resources, group, "footer", "", &vars);
+    if !header.is_empty() && !footer.is_empty() {
+        format!("{header}\n\n{body}\n\n{footer}")
+    } else if !header.is_empty() {
+        format!("{header}\n\n{body}")
+    } else if !footer.is_empty() {
+        format!("{body}\n\n{footer}")
+    } else {
+        body
+    }
+}
+
 pub fn castle_display_name(resources: &Resources, castle_id: &str) -> String {
     resources
         .castle_by_id(castle_id)
@@ -2259,5 +2282,28 @@ mod tests {
         assert!(body.contains("Army"));
         assert!(body.contains("Peasants"));
         assert!(body.contains("100"));
+    }
+
+    #[test]
+    fn the_end_message_substitutes_name_rank_and_score() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "classes": [{"index":0,"id":"knight","name":"Knight"}],
+                "strings": {"win": {
+                  "header": "Victory",
+                  "body": "History remembers %NAME%, the %RANK%.\nFinal Score: %SCORE%",
+                  "footer": ""
+                }}}"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.character.name.copy_from_str("Rust");
+        game.character.cls.rank_title.copy_from_str("General");
+
+        let body = end_message(&resources, &game, true);
+        // The header and body join with a blank line; empty footer is dropped.
+        assert!(body.starts_with("Victory\n\n"));
+        assert!(body.contains("History remembers Rust, the General."));
+        assert!(body.contains("Final Score:"));
     }
 }

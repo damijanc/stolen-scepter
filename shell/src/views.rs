@@ -24,7 +24,7 @@ use crate::banner;
 use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::input::{Key, KeySource};
-use crate::layout::{Layout, MAP_X, MAP_Y, PANEL_H, PANEL_PAD_X};
+use crate::layout::{Layout, FRAME_BOTTOM_H, FRAME_RIGHT_W, MAP_X, MAP_Y, PANEL_H, PANEL_PAD_X};
 use crate::palette::{Pal, Palette};
 use crate::present::Present;
 use crate::sprites::SpriteCatalog;
@@ -128,6 +128,9 @@ pub enum ViewKind {
     OwnCastle,
     RecruitSoldiers,
     Dwelling,
+    WinCartoon,
+    Win,
+    Lose,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -189,6 +192,16 @@ const RECRUIT_SLOTS: usize = 5;
 /// hero keeps several weeks of boat upkeep.
 const RECRUIT_GOLD_RESERVE: i32 = 1000;
 
+/// End-screen geometry, C's `screen_end_game_draw` constants: the native
+/// ending art is 144x170, inset from the text by `MARGIN_L`/`MARGIN_T`.
+const END_IMG_W: i32 = 144;
+const END_IMG_H: i32 = 170;
+const END_MARGIN_L: i32 = 6;
+const END_MARGIN_T: i32 = 2;
+
+/// Seconds per cartoon tick, C's `tick_interval`.
+const CARTOON_TICK: f64 = 0.08;
+
 /// The view stack. `Views::default()` is the empty (overworld) stack.
 #[derive(Clone, Debug, Default)]
 pub struct Views {
@@ -247,6 +260,14 @@ pub struct Views {
     dwelling_cost: i32,
     dwelling_gold: i32,
     dwelling_cap: i32,
+    /// The end-screen body and verdict, porting `screen_end_game.c`'s cached
+    /// `s_body` / `s_won`.
+    end_won: bool,
+    end_body: String,
+    /// When the win cartoon became active, for its frame clock, and whether it
+    /// was active the previous frame.
+    cartoon_started: f64,
+    cartoon_was_active: bool,
 }
 
 impl Views {
@@ -273,6 +294,189 @@ impl Views {
         self.stack.pop();
     }
 
+    /// Open the win or lose end screen, porting `screen_end_game_open`: the
+    /// verdict and the already-substituted body are cached for the renderer.
+    pub fn open_end_game(&mut self, won: bool, body: &str) {
+        self.end_won = won;
+        self.end_body = body.to_owned();
+        self.set(if won { ViewKind::Win } else { ViewKind::Lose });
+    }
+
+    pub fn end_won(&self) -> bool {
+        self.end_won
+    }
+
+    pub fn end_body(&self) -> &str {
+        &self.end_body
+    }
+
+    /// Open the win ending, starting with the cartoon cutscene when the pack
+    /// ships its tiles, porting `run_end_cartoon` + `show_win_game`.
+    pub fn win_cartoon_open(&mut self, resources: &Resources, body: &str) {
+        self.end_won = true;
+        self.end_body = body.to_owned();
+        let ending = &resources.ending;
+        if ending.grass_tile.is_empty()
+            || ending.carpet_tile.is_empty()
+            || ending.hero_tile.is_empty()
+        {
+            self.set(ViewKind::Win);
+        } else {
+            self.cartoon_started = 0.0;
+            self.cartoon_was_active = false;
+            self.set(ViewKind::WinCartoon);
+        }
+    }
+
+    /// Leave the cartoon for the win screen.
+    pub fn finish_win_cartoon(&mut self) {
+        self.set(ViewKind::Win);
+    }
+
+    /// True once the cartoon has played past its last frame.
+    pub fn win_cartoon_done(&self, resources: &Resources, time: f64) -> bool {
+        let (_, frame) = cartoon_clock(resources, time - self.cartoon_started);
+        let max_frames = if resources.ending.frame_count > 0 {
+            resources.ending.frame_count
+        } else {
+            10
+        };
+        frame > max_frames
+    }
+
+    /// Ports `screen_end_game_draw`: the ending art on the right of the map
+    /// area over a DBlue field, with the pre-wrapped body text on the left.
+    ///
+    /// DIVERGENCE, deliberate: C crops the image's left `MARGIN_L` pixels to
+    /// clear the text. The DrawList blit has no source rectangle, so this
+    /// squeezes the whole image into the same narrowed box instead.
+    fn draw_end_game(&self, list: &mut DrawList, layout: &Layout, palette: &Palette, won: bool) {
+        let left = MAP_X;
+        let top = MAP_Y;
+        let w = layout.screen_w - MAP_X - FRAME_RIGHT_W;
+        let h = layout.screen_h - MAP_Y - FRAME_BOTTOM_H;
+        list.rect(Rect::new(left, top, w, h), palette.clr(Pal::DBlue));
+
+        let draw_w = (END_IMG_W - END_MARGIN_L).max(1);
+        let img_x = left + w - draw_w;
+        let sprite = if won {
+            Sprite::EndingWin
+        } else {
+            Sprite::EndingLose
+        };
+        list.blit(sprite, Dst::rect(img_x, top, draw_w, END_IMG_H));
+
+        let max_chars = ((w - END_IMG_W) / font::GLYPH_W).max(1) as usize;
+        let tx = left + END_MARGIN_L;
+        let mut ty = top + END_MARGIN_T;
+        let floor_y = top + h;
+
+        for logical in self.end_body.split('\n') {
+            let mut cursor = logical.to_owned();
+            while cursor.chars().count() > max_chars && ty + font::GLYPH_H <= floor_y {
+                // Break at the last space that fits, hard-breaking if none.
+                let chars: Vec<char> = cursor.chars().collect();
+                let mut cut = max_chars;
+                while cut > 0 && chars[cut] != ' ' {
+                    cut -= 1;
+                }
+                if cut == 0 {
+                    cut = max_chars;
+                }
+                let line: String = chars[..cut].iter().collect();
+                list.text(&line, tx, ty, palette.clr(Pal::White));
+                ty += font::GLYPH_H;
+                cursor = chars[cut..]
+                    .iter()
+                    .collect::<String>()
+                    .trim_start_matches(' ')
+                    .to_owned();
+            }
+            if ty + font::GLYPH_H <= floor_y {
+                list.text(&cursor, tx, ty, palette.clr(Pal::White));
+                ty += font::GLYPH_H;
+            }
+        }
+    }
+
+    /// Ports `run_end_cartoon`'s `draw_cartoon_frame`: grass across the grid, a
+    /// carpet column growing from the bottom, the hero advancing along it, and
+    /// the troop border filling the other cells.
+    fn draw_win_cartoon(
+        &self,
+        list: &mut DrawList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        catalog: &SpriteCatalog,
+        time: f64,
+    ) {
+        let ending = &resources.ending;
+        let gw = if ending.grid_width > 0 {
+            ending.grid_width
+        } else {
+            6
+        };
+        let gh = if ending.grid_height > 0 {
+            ending.grid_height
+        } else {
+            5
+        };
+        let carpet_col = ending.carpet_column;
+        let carpet_max = ending.carpet_length;
+        let tile_w = layout.tile_w;
+        let tile_h = layout.tile_h;
+        let total_w = gw * tile_w;
+        let origin_x = ((layout.screen_w - total_w) / 2).max(0);
+        let origin_y = MAP_Y;
+
+        let (tick, frame) = cartoon_clock(resources, time - self.cartoon_started);
+        let bridge_len = frame.min(carpet_max);
+        let hero_prog = (frame - 5).min(gh - 1);
+
+        // C clears the whole screen to black before the grid, so the cartoon
+        // owns the frame (no chrome showing through).
+        list.rect(
+            Rect::new(0, 0, layout.screen_w, layout.screen_h),
+            palette.clr(Pal::Black),
+        );
+
+        let cell = |x: i32, y: i32| {
+            Dst::rect(origin_x + x * tile_w, origin_y + y * tile_h, tile_w, tile_h)
+        };
+
+        for y in 0..gh {
+            for x in 0..gw {
+                list.blit(Sprite::EndGrass, cell(x, y));
+            }
+        }
+        for i in 0..bridge_len {
+            list.blit(Sprite::EndCarpet, cell(carpet_col, gh - 1 - i));
+        }
+        if hero_prog >= 0 {
+            list.blit(Sprite::EndHero, cell(carpet_col, gh - 1 - hero_prog));
+        }
+        if ending.troop_border {
+            let nt = resources.troops_count().min(25);
+            let mut x = 0;
+            let mut y = 0;
+            let mut index = 0;
+            while index < nt && y < gh {
+                let flip = x == gw - 1;
+                list.blit_flipped(troop_cartoon_sprite(catalog, index, tick), cell(x, y), flip);
+                x += 1;
+                if x == carpet_col {
+                    x = carpet_col + 1;
+                }
+                if x >= gw {
+                    x = 0;
+                    y += 1;
+                }
+                index += 1;
+            }
+        }
+    }
+
     /// True when the active view swaps the status bar to "Press 'ESC' to
     /// exit". The character, army and puzzle views always do; the contract
     /// view only when a contract is actually active. The worldmap is handled
@@ -291,7 +495,10 @@ impl Views {
                 | ViewKind::HomeCastle
                 | ViewKind::OwnCastle
                 | ViewKind::RecruitSoldiers
-                | ViewKind::Dwelling,
+                | ViewKind::Dwelling
+                | ViewKind::WinCartoon
+                | ViewKind::Win
+                | ViewKind::Lose,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
             Some(ViewKind::Worldmap) | None => false,
@@ -809,6 +1016,13 @@ impl Views {
         }
         self.puzzle_was_active = puzzle_active;
 
+        // The win cartoon's frame clock resets when it becomes active.
+        let cartoon_active = self.active() == Some(ViewKind::WinCartoon);
+        if cartoon_active && !self.cartoon_was_active {
+            self.cartoon_started = time;
+        }
+        self.cartoon_was_active = cartoon_active;
+
         match self.active() {
             Some(ViewKind::Character) => draw_character(list, layout, palette, resources, game),
             Some(ViewKind::Army) => {
@@ -844,6 +1058,11 @@ impl Views {
             Some(ViewKind::Dwelling) => {
                 self.draw_dwelling(list, layout, palette, resources, catalog)
             }
+            Some(ViewKind::WinCartoon) => {
+                self.draw_win_cartoon(list, layout, palette, resources, catalog, time)
+            }
+            Some(ViewKind::Win) => self.draw_end_game(list, layout, palette, true),
+            Some(ViewKind::Lose) => self.draw_end_game(list, layout, palette, false),
             None => {}
         }
     }
@@ -1825,6 +2044,33 @@ pub fn controls_visible(resources: &Resources) -> Vec<usize> {
 /// keybind list, porting `draw_options`. Read-only -- any key dismisses it via
 /// the caller. The list is capped to the rows that fit, and the three
 /// mount-conditional entries are hidden when they do not apply.
+/// The cartoon's `(display tick, frame)` at `elapsed` seconds, porting
+/// `run_end_cartoon`: a tick every `CARTOON_TICK`, a frame every
+/// `ticks_per_step` ticks, the display tick wrapping at 4.
+fn cartoon_clock(resources: &Resources, elapsed: f64) -> (i32, i32) {
+    let ticks_per_step = if resources.ending.ticks_per_step > 0 {
+        resources.ending.ticks_per_step
+    } else {
+        2
+    };
+    let total = (elapsed.max(0.0) / CARTOON_TICK) as i32;
+    (total % 4, total / ticks_per_step)
+}
+
+/// The sprite for one cartoon troop cell, animating when the pack ships a
+/// cycle and falling back to the still otherwise.
+fn troop_cartoon_sprite(catalog: &SpriteCatalog, troop: usize, tick: i32) -> Sprite {
+    let frames = catalog.troop_anim_len(troop);
+    if frames > 0 {
+        Sprite::TroopAnim {
+            troop,
+            frame: crate::sprites::frame_index(tick, frames) as i32,
+        }
+    } else {
+        Sprite::TroopStill(troop)
+    }
+}
+
 fn draw_options(
     list: &mut DrawList,
     _layout: &Layout,
@@ -3266,6 +3512,84 @@ mod tests {
         assert!(!texts.iter().any(|(_, _, t)| t.contains("Make Landing")));
         assert!(!texts.iter().any(|(_, _, t)| t.contains("Sail Away")));
         assert!(texts.iter().any(|(_, _, t)| t.contains("View Army")));
+    }
+
+    #[test]
+    fn the_win_screen_draws_the_ending_art_and_body() {
+        let (resources, layout, _) = controls_fixtures();
+        let mut views = Views::new();
+        views.open_end_game(true, "Good job, soldier!\nFinal Score: 42");
+        assert!(views.end_won());
+        let present = Present::for_layout(&layout);
+        let list = draw_controls_view(&mut views, &resources, &layout, &Game::default(), &present);
+
+        let texts = list.texts();
+        assert!(texts
+            .iter()
+            .any(|(_, _, t)| t.contains("Good job, soldier!")));
+        assert!(texts.iter().any(|(_, _, t)| t.contains("Final Score: 42")));
+        assert_eq!(list.blits_of(Sprite::EndingWin).len(), 1);
+        assert_eq!(list.blits_of(Sprite::EndingLose).len(), 0);
+    }
+
+    fn cartoon_fixture() -> (Resources, Layout) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [
+                  {"index":0,"id":"peasants","name":"Peasants","skill_level":1,"hit_points":1,
+                   "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,
+                   "spoils_factor":1,"abilities":"","morale_group":"A"}
+                ],
+                "ending": {"grass_tile":"g.png","carpet_tile":"c.png","hero_tile":"h.png",
+                           "grid_width":6,"grid_height":5,"carpet_column":4,
+                           "carpet_length":5,"frame_count":10,"ticks_per_step":2,
+                           "troop_border":true}}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        (resources, layout)
+    }
+
+    #[test]
+    fn cartoon_clock_advances_a_frame_per_step_and_wraps_the_tick() {
+        let (resources, _) = cartoon_fixture();
+        assert_eq!(cartoon_clock(&resources, 0.0), (0, 0));
+        assert_eq!(cartoon_clock(&resources, 0.08), (1, 0));
+        assert_eq!(cartoon_clock(&resources, 0.16), (2, 1));
+        assert_eq!(cartoon_clock(&resources, 0.32), (0, 2));
+    }
+
+    #[test]
+    fn the_win_cartoon_draws_the_grid_and_completes() {
+        let (resources, layout) = cartoon_fixture();
+        let mut views = Views::new();
+        views.win_cartoon_open(&resources, "You win!");
+        assert_eq!(views.active(), Some(ViewKind::WinCartoon));
+        let game = Game::default();
+        let present = Present::for_layout(&layout);
+        let (map, fog) = map_and_fog();
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let palette = Palette::fallback();
+
+        // Frame 0: grass across the grid, no carpet or hero yet.
+        let list = draw_controls_view(&mut views, &resources, &layout, &game, &present);
+        assert_eq!(list.blits_of(Sprite::EndGrass).len(), 30);
+        assert_eq!(list.blits_of(Sprite::EndCarpet).len(), 0);
+        assert_eq!(list.blits_of(Sprite::EndHero).len(), 0);
+        // The fixture ships no troop animation, so the border falls back to
+        // the still sprite.
+        assert_eq!(list.blits_of(Sprite::TroopStill(0)).len(), 1);
+        assert!(!views.win_cartoon_done(&resources, 0.0));
+
+        // Frame 10: the carpet is at full length and the hero stands on it.
+        let mut list = DrawList::new();
+        views.draw(
+            &mut list, &layout, &palette, &resources, &catalog, &map, &fog, &game, &present, 1.6,
+        );
+        assert_eq!(list.blits_of(Sprite::EndGrass).len(), 30);
+        assert_eq!(list.blits_of(Sprite::EndCarpet).len(), 5);
+        assert_eq!(list.blits_of(Sprite::EndHero).len(), 1);
+        // Past the last frame, the cutscene is done.
+        assert!(views.win_cartoon_done(&resources, 2.0));
     }
 
     #[test]
