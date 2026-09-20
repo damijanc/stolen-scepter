@@ -148,6 +148,35 @@ impl Present {
         let h = layout.screen_h * scale;
         Rect::new((win_w - w) / 2, (win_h - h) / 2, w, h)
     }
+
+    /// The inverse of [`Present::blit_rect`]: a window pixel to a logical one.
+    ///
+    /// `None` when the point is outside the game's rectangle -- the letterbox.
+    /// Note the division is `div_euclid`, not `/`: when the target overhangs
+    /// the window `blit_rect` returns a NEGATIVE origin, and truncating
+    /// division would fold the first `scale - 1` pixels left of the edge onto
+    /// logical 0 instead of rejecting them.
+    pub fn window_to_logical(
+        &self,
+        layout: &Layout,
+        win_w: i32,
+        win_h: i32,
+        target: Target,
+        px: i32,
+        py: i32,
+    ) -> Option<(i32, i32)> {
+        let scale = self.scale(layout, win_w, win_h, target);
+        if scale <= 0 {
+            return None;
+        }
+        let rect = self.blit_rect(layout, win_w, win_h, target);
+        let lx = (px - rect.x).div_euclid(scale);
+        let ly = (py - rect.y).div_euclid(scale);
+        if lx < 0 || ly < 0 || lx >= layout.screen_w || ly >= layout.screen_h {
+            return None;
+        }
+        Some((lx, ly))
+    }
 }
 
 #[cfg(test)]
@@ -308,5 +337,82 @@ mod tests {
         let rect = present.blit_rect(&legacy_layout(), 500, 300, Target::Desktop);
 
         assert_eq!(rect, Rect::new(-70, -50, 640, 400));
+    }
+
+    #[test]
+    fn window_to_logical_inverts_blit_rect_at_the_origin() {
+        let layout = legacy_layout();
+        let present = Present::new();
+        let (win_w, win_h) = (1280, 800);
+        let rect = present.blit_rect(&layout, win_w, win_h, Target::Desktop);
+        // The blit rect's own origin is logical (0, 0).
+        assert_eq!(
+            present.window_to_logical(&layout, win_w, win_h, Target::Desktop, rect.x, rect.y),
+            Some((0, 0))
+        );
+    }
+
+    #[test]
+    fn window_to_logical_rejects_the_letterbox() {
+        let layout = legacy_layout();
+        let present = Present::new();
+        // 1920x800 fits 4x (1280x800) with 320 to each side: a real horizontal
+        // letterbox. (1280x800 is exactly 4x, so it would not.)
+        let (win_w, win_h) = (1920, 800);
+        let rect = present.blit_rect(&layout, win_w, win_h, Target::Desktop);
+        assert!(rect.x > 0, "this window should letterbox horizontally");
+        assert_eq!(
+            present.window_to_logical(&layout, win_w, win_h, Target::Desktop, rect.x - 1, rect.y),
+            None
+        );
+    }
+
+    #[test]
+    fn window_to_logical_maps_the_last_pixel_inside() {
+        let layout = legacy_layout();
+        let present = Present::new();
+        let (win_w, win_h) = (1280, 800);
+        let rect = present.blit_rect(&layout, win_w, win_h, Target::Desktop);
+        let got = present.window_to_logical(
+            &layout,
+            win_w,
+            win_h,
+            Target::Desktop,
+            rect.x + rect.w - 1,
+            rect.y + rect.h - 1,
+        );
+        assert_eq!(got, Some((layout.screen_w - 1, layout.screen_h - 1)));
+        // One past the edge is outside.
+        assert_eq!(
+            present.window_to_logical(
+                &layout,
+                win_w,
+                win_h,
+                Target::Desktop,
+                rect.x + rect.w,
+                rect.y + rect.h
+            ),
+            None
+        );
+    }
+
+    /// Legacy floors the scale at 2x, so a small window gets a target that
+    /// OVERHANGS it and `blit_rect` returns a negative origin. The inversion must
+    /// cope with that rather than clamping -- a window pixel then maps to a
+    /// logical coordinate that really is on screen.
+    #[test]
+    fn window_to_logical_handles_the_legacy_overhang() {
+        let layout = legacy_layout();
+        let present = Present::new();
+        let (win_w, win_h) = (500, 300);
+        let rect = present.blit_rect(&layout, win_w, win_h, Target::Desktop);
+        assert!(rect.x < 0 && rect.y < 0, "expected an overhanging target");
+
+        // Window pixel (0, 0) is inside the game, some way in from its left edge.
+        let got = present
+            .window_to_logical(&layout, win_w, win_h, Target::Desktop, 0, 0)
+            .expect("window origin is over the game");
+        assert!(got.0 > 0 && got.1 > 0);
+        assert!(got.0 < layout.screen_w && got.1 < layout.screen_h);
     }
 }
