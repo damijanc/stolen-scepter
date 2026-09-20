@@ -277,6 +277,57 @@ fn finish_combat(
     capture
 }
 
+/// A pending end-of-week screen, porting `pending_week_phase`: the astrology
+/// banner first, then the budget panel once it is dismissed.
+enum WeekEnd {
+    Astrology { week_id: i32, troop: i32, paid: i32 },
+    Budget { week_id: i32, paid: i32 },
+}
+
+/// Arm the week-end screens, porting `schedule_week_end`. `week_id` and the
+/// astrology troop are read now, while the boundary that produced them is
+/// still current.
+fn schedule_week_end(pending: &mut Option<WeekEnd>, game: &Game, resources: &Resources, paid: i32) {
+    *pending = Some(WeekEnd::Astrology {
+        week_id: game.week_id(resources),
+        troop: game.stats.last_astrology_troop,
+        paid,
+    });
+}
+
+/// Show the next pending week-end screen when nothing modal is up, porting
+/// `pump_week_end_dialog`. Astrology queues the budget behind it.
+fn pump_week_end(
+    pending: &mut Option<WeekEnd>,
+    game: &Game,
+    resources: &Resources,
+    dialog: &mut Dialog,
+) {
+    let Some(week) = pending.take() else {
+        return;
+    };
+    match week {
+        WeekEnd::Astrology {
+            week_id,
+            troop,
+            paid,
+        } => {
+            let name = resources
+                .troop_by_index(troop)
+                .map(|troop| troop.name.as_str())
+                .filter(|name| !name.is_empty())
+                .unwrap_or("Peasants");
+            let (header, body) = interact::astrology_message(resources, week_id, name);
+            dialog.open(&header, &body);
+            *pending = Some(WeekEnd::Budget { week_id, paid });
+        }
+        WeekEnd::Budget { week_id, paid } => {
+            let (header, body) = interact::budget_message(resources, game, week_id, paid);
+            dialog.open(&header, &body);
+        }
+    }
+}
+
 /// Route a prompt answer into the engine, porting the shell half of
 /// `shell_promptdispatch.c`. The engine cores are called directly rather than
 /// through a mirrored queue; each answer either mutates game state, opens a
@@ -288,6 +339,7 @@ fn dispatch_answer(
     resources: &Resources,
     answer: PromptResult,
     pending: &mut PendingFlow,
+    pending_week: &mut Option<WeekEnd>,
     prompt: &mut Prompt,
     dialog: &mut Dialog,
 ) -> Option<CombatFlow> {
@@ -299,8 +351,13 @@ fn dispatch_answer(
                     SearchOutcome::Won => {
                         // The win cartoon and screen are the end-game slice.
                     }
-                    SearchOutcome::NothingFound { .. } => {
+                    SearchOutcome::NothingFound {
+                        week_commission, ..
+                    } => {
                         dialog.open("", "Your search of this area has\nrevealed nothing.");
+                        if week_commission > 0 {
+                            schedule_week_end(pending_week, game, resources, week_commission);
+                        }
                     }
                     SearchOutcome::OutOfTime => {
                         // game_over is now set; the lose screen is the
@@ -380,7 +437,10 @@ fn dispatch_answer(
             };
             if let Some(target) = index.and_then(|i| zones.get(i)) {
                 if game.switch_zone(resources, map, fog, target) {
-                    spend_week(game, resources);
+                    let (_weeks, paid) = spend_week(game, resources);
+                    if paid > 0 {
+                        schedule_week_end(pending_week, game, resources, paid);
+                    }
                 } else {
                     dialog.open("", "Cannot reach that continent.");
                 }
@@ -701,12 +761,24 @@ async fn main() {
         dialog.open("", &body);
     }
     let mut pending = PendingFlow::None;
+    let mut pending_week: Option<WeekEnd> = None;
     let mut views = Views::new();
     // A running interactive battle; while Some, combat owns the screen and
     // the keys.
     let mut combat: Option<CombatSession> = None;
 
     loop {
+        // Pop pending week-end screens (astrology -> budget) before input, as
+        // C does, but only when nothing modal is up.
+        if pending_week.is_some()
+            && combat.is_none()
+            && !dialog.is_active()
+            && !prompt.is_active()
+            && !views.is_active()
+        {
+            pump_week_end(&mut pending_week, &game, &resources, &mut dialog);
+        }
+
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
 
         // Input priority: combat first, then the message dialog owns the keys
@@ -799,6 +871,7 @@ async fn main() {
                     &resources,
                     answer,
                     &mut pending,
+                    &mut pending_week,
                     &mut prompt,
                     &mut dialog,
                 );
@@ -972,10 +1045,21 @@ async fn main() {
                     game.land_here(&map);
                 }
                 Action::EndWeek => {
-                    spend_week(&mut game, &resources);
+                    let (_weeks, paid) = spend_week(&mut game, &resources);
+                    if paid > 0 {
+                        schedule_week_end(&mut pending_week, &game, &resources, paid);
+                    }
                 }
                 Action::Rest => {
-                    consume_step(&mut game, &resources, false);
+                    let advance = consume_step(&mut game, &resources, false);
+                    if advance.week_ended {
+                        schedule_week_end(
+                            &mut pending_week,
+                            &game,
+                            &resources,
+                            advance.commission_paid,
+                        );
+                    }
                 }
                 Action::FastQuit => fast_quit = true,
                 Action::Search => {
@@ -1070,10 +1154,23 @@ async fn main() {
                 let result = game_step_basic(
                     &mut game, &mut map, &mut fog, &resources, input.dx, input.dy,
                 );
-                if let StepResult::Moved { interaction, .. } = &result {
+                if let StepResult::Moved {
+                    interaction,
+                    advance,
+                    ..
+                } = &result
+                {
                     // The clock the hero animates on: he walks for a moment
                     // after each step, then holds still.
                     last_step = Some(get_time());
+                    if advance.week_ended {
+                        schedule_week_end(
+                            &mut pending_week,
+                            &game,
+                            &resources,
+                            advance.commission_paid,
+                        );
+                    }
                     match interaction {
                         StepInteraction::Sign { title, body, .. } => dialog.open(title, body),
                         StepInteraction::TreasureChest { roll, .. } => {

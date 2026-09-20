@@ -707,6 +707,17 @@ const DEFAULT_ENCOUNTER_JOIN_NUMERIC: &str = "You encounter:\n  %COUNT% %TROOP%\
     Press Enter to accept, Esc\nto refuse.";
 const DEFAULT_ENCOUNTER_WANDERERS: &str = "A band of wanderers passes\nby, looking grim.";
 
+/// End-of-week astrology + budget banners, porting `shell_weekend.c`.
+const DEFAULT_ASTROLOGY_HEADER: &str = "Week #%WEEK%";
+const DEFAULT_ASTROLOGY_BODY: &str = "Astrologers proclaim:\nWeek of the %TROOP%\n\n\
+    All %TROOP% dwellings are\nrepopulated.         (space)";
+const DEFAULT_BUDGET_HEADER: &str = "Week #%WEEK%             Budget";
+const DEFAULT_BUDGET_ON_HAND: &str = "On Hand";
+const DEFAULT_BUDGET_PAYMENT: &str = "Payment";
+const DEFAULT_BUDGET_BOAT: &str = "Boat   ";
+const DEFAULT_BUDGET_ARMY: &str = "Army   ";
+const DEFAULT_BUDGET_BALANCE: &str = "Balance";
+
 /// The town header and gold label, used by the town menu panel.
 pub fn town_header_text(resources: &Resources, name: &str) -> String {
     banner::formatted(
@@ -1320,6 +1331,128 @@ pub fn friendly_flees(resources: &Resources) -> String {
         DEFAULT_ENCOUNTER_WANDERERS,
     )
     .to_owned()
+}
+
+/// The end-of-week astrology banner, porting `pump_week_end_dialog`'s
+/// `WK_PHASE_ASTROLOGY` branch.
+pub fn astrology_message(
+    resources: &Resources,
+    week_id: i32,
+    troop_name: &str,
+) -> (String, String) {
+    let week = week_id.to_string();
+    let header = banner::formatted(
+        resources,
+        "banners",
+        "astrology_header",
+        DEFAULT_ASTROLOGY_HEADER,
+        &[("WEEK", &week)],
+    );
+    let body = banner::formatted(
+        resources,
+        "banners",
+        "astrology_body",
+        DEFAULT_ASTROLOGY_BODY,
+        &[("TROOP", troop_name)],
+    );
+    (header, body)
+}
+
+/// The end-of-week budget panel, porting `pump_week_end_dialog`'s
+/// `WK_PHASE_BUDGET` branch. The "Army" total shows the FULL recruit cost even
+/// though the real deduction is /10, so "On Hand" is reconstructed from the
+/// /10 figure as C does.
+pub fn budget_message(
+    resources: &Resources,
+    game: &Game,
+    week_id: i32,
+    paid: i32,
+) -> (String, String) {
+    let week = week_id.to_string();
+    let header = banner::formatted(
+        resources,
+        "banners",
+        "budget_header",
+        DEFAULT_BUDGET_HEADER,
+        &[("WEEK", &week)],
+    );
+
+    let mut upkeep_display = 0i32;
+    for slot in 0..game.army.len() {
+        let stack = &game.army[slot];
+        if stack.id.is_empty() || stack.count == 0 {
+            continue;
+        }
+        if let Some(troop) = resources.troop_by_id(stack.id.as_str()) {
+            upkeep_display =
+                upkeep_display.wrapping_add(stack.count.wrapping_mul(troop.recruit_cost));
+        }
+    }
+    let boat = if game.boat.has_boat {
+        game.boat_cost(resources)
+    } else {
+        0
+    };
+    let upkeep_real = upkeep_display / 10;
+    let on_hand = game
+        .stats
+        .gold
+        .wrapping_sub(paid)
+        .wrapping_add(upkeep_real)
+        .wrapping_add(boat)
+        .max(0);
+
+    let labels = [
+        banner::text(
+            resources,
+            "banners",
+            "budget_on_hand",
+            DEFAULT_BUDGET_ON_HAND,
+        ),
+        banner::text(
+            resources,
+            "banners",
+            "budget_payment",
+            DEFAULT_BUDGET_PAYMENT,
+        ),
+        banner::text(resources, "banners", "budget_boat", DEFAULT_BUDGET_BOAT),
+        banner::text(resources, "banners", "budget_army", DEFAULT_BUDGET_ARMY),
+        banner::text(
+            resources,
+            "banners",
+            "budget_balance",
+            DEFAULT_BUDGET_BALANCE,
+        ),
+    ];
+    let values = [on_hand, paid, boat, upkeep_display, game.stats.gold];
+
+    // The right column lists the leading non-empty army stacks, stopping at
+    // the first gap exactly as C's loop breaks.
+    let mut right_rows: Vec<(String, i32)> = Vec::new();
+    for slot in 0..game.army.len().min(5) {
+        let stack = &game.army[slot];
+        if stack.id.is_empty() || stack.count == 0 {
+            break;
+        }
+        let Some(troop) = resources.troop_by_id(stack.id.as_str()) else {
+            break;
+        };
+        right_rows.push((
+            troop.name.as_str().to_owned(),
+            stack.count.wrapping_mul(troop.recruit_cost),
+        ));
+    }
+
+    let mut body = String::new();
+    for (index, (label, value)) in labels.iter().zip(values).enumerate() {
+        let left = format!("{label}{value:>6}");
+        let right = match right_rows.get(index) {
+            Some((name, cost)) => format!("{name:<8}{cost:>6}"),
+            None => String::new(),
+        };
+        body.push_str(&format!("{left:<13} {right}\n"));
+    }
+    (header, body)
 }
 
 pub fn castle_display_name(resources: &Resources, castle_id: &str) -> String {
@@ -2097,5 +2230,34 @@ mod tests {
         assert!(body.contains("%COST%"));
 
         assert!(friendly_flees(&resources).contains("wanderers"));
+    }
+
+    #[test]
+    fn the_astrology_message_names_the_week_and_troop() {
+        let resources = town_resources();
+        let (header, body) = astrology_message(&resources, 3, "Sprites");
+        assert_eq!(header, "Week #3");
+        assert!(body.contains("Week of the Sprites"));
+    }
+
+    #[test]
+    fn the_budget_panel_totals_the_army_and_boat() {
+        let resources = town_resources();
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("peasants");
+        game.army[0].count = 10;
+        game.stats.gold = 5000;
+        game.boat.has_boat = true;
+
+        let (header, body) = budget_message(&resources, &game, 2, 100);
+        assert!(header.contains("Week #2"));
+        assert!(header.contains("Budget"));
+        // Labels come from the pack or the C defaults.
+        assert!(body.contains("On Hand"));
+        assert!(body.contains("Balance"));
+        // The army row shows the full recruit cost (10 * 10) and the troop.
+        assert!(body.contains("Army"));
+        assert!(body.contains("Peasants"));
+        assert!(body.contains("100"));
     }
 }

@@ -198,8 +198,13 @@ Implemented and tested:
   and shows the save-confirm banner. `O` (`Action::OptionsMenu`) opens the
   read-only options reference, which draws the fixed movement list plus the
   pack's `strings.keybinds` (mount-conditional rows hidden).
+- The end-of-week screens (`shell/src/main.rs` + `interact::astrology_message`
+  / `budget_message`): the astrology banner then the budget panel, queued
+  whenever a step, rest, `W`, search or sail crosses a week boundary and
+  pumped one at a time while nothing modal is up. `pending_week`
+  (`WeekEnd`) is the shell counterpart of C's `pending_week_phase`.
 
-Test coverage is 348 engine unit tests, 259 shell unit tests, 25 combat digest
+Test coverage is 348 engine unit tests, 261 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
@@ -292,10 +297,15 @@ deciding how a library crate should express a fatal pack error, which is its
 own slice.
 
 What remains is mostly presentational. The shell is ported -- the startup
-wizard, the overworld, the views, combat, the town/castle/dwelling flows and
-the options reference all run -- and `player_io.c`'s text queue stays
-unported by design: the engine returns outcome enums where C queues a dialog,
-and the shell writes the text.
+wizard, the overworld, the views, combat, the town/castle/dwelling flows, the
+end-of-week screens and the options reference all run -- and `player_io.c`'s
+text queue stays unported by design: the engine returns outcome enums where C
+queues a dialog, and the shell writes the text.
+
+The one real gameplay gap left is the ENDGAME: `search_here` sets `stats.won`
+(and `game_over` when days run out) but the win cartoon (`src/end_cartoon.c`)
+and the `VIEW_WIN` / `VIEW_LOSE` screens are unported, so a win neither stops
+the game nor shows a screen, and a loss freezes input with no screen.
 
 Traps the save slice turned up, worth knowing before touching that format:
 
