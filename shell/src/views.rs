@@ -1035,6 +1035,34 @@ impl Views {
         false
     }
 
+    /// Resolve a pointer hit on a troop row to the same selection the A-E keys
+    /// make: set the chosen slot and its max. Only phase 0 selects; a click in
+    /// the count phase (or on an out-of-leadership troop) does nothing.
+    pub fn recruit_click(
+        &mut self,
+        game: &mut Game,
+        resources: &Resources,
+        target: HitTarget,
+    ) -> bool {
+        if !self.recruit_error.is_empty() || self.recruit_whom != 0 {
+            return false;
+        }
+        if let HitTarget::RecruitRow(i) = target {
+            if i < self.recruit_pool_count {
+                let troop = resources.troop_by_index(self.recruit_pool[i]);
+                let unreachable = troop.map_or(true, |t| {
+                    t.hit_points <= 0 || game.stats.leadership_current < t.hit_points * 6
+                });
+                if !unreachable {
+                    self.recruit_whom = (i + 1) as i32;
+                    self.recruit_max = self.recruit_recompute_max(resources, game, i);
+                    self.recruit_input.clear();
+                }
+            }
+        }
+        false
+    }
+
     /// Open the dwelling screen, porting `screen_dwelling_open`.
     pub fn dwelling_open(
         &mut self,
@@ -1117,9 +1145,8 @@ impl Views {
             Some(ViewKind::OwnCastle) => {
                 self.draw_own_castle(list, layout, palette, resources, catalog, game, time)
             }
-            Some(ViewKind::RecruitSoldiers) => {
-                self.draw_recruit_soldiers(list, layout, palette, resources, catalog, game, time)
-            }
+            Some(ViewKind::RecruitSoldiers) => self
+                .draw_recruit_soldiers(list, hits, layout, palette, resources, catalog, game, time),
             Some(ViewKind::Dwelling) => {
                 self.draw_dwelling(list, layout, palette, resources, catalog)
             }
@@ -1896,6 +1923,7 @@ impl Views {
     fn draw_recruit_soldiers(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1965,6 +1993,11 @@ impl Views {
                 tx,
                 troop_ty + i as i32 * row_h,
                 palette.clr(Pal::White),
+            );
+            // Same rect, one line apart: one clickable band per troop row.
+            hits.push(
+                Rect::new(tx, troop_ty + i as i32 * row_h, w - 2 * PANEL_PAD_X, row_h),
+                HitTarget::RecruitRow(i),
             );
         }
 
@@ -4443,6 +4476,63 @@ mod tests {
             &resources,
             &Keys::pressed(&[Key::Escape])
         ));
+    }
+
+    #[test]
+    fn the_recruit_hit_regions_line_up_with_the_drawn_rows() {
+        let (resources, layout, catalog) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &game,
+            &present,
+            0.0,
+        );
+
+        for i in 0..views.recruit_pool_count {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::RecruitRow(i))
+                .unwrap_or_else(|| panic!("row {i} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::RecruitRow(i)));
+        }
+    }
+
+    #[test]
+    fn clicking_a_recruit_row_matches_pressing_its_letter() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+
+        let mut by_key = Views::new();
+        by_key.recruit_soldiers_open(&resources, &game);
+        by_key.recruit_soldiers_update(&mut game, &resources, &Keys::pressed(&[Key::A]));
+
+        let mut by_click = Views::new();
+        by_click.recruit_soldiers_open(&resources, &game);
+        by_click.recruit_click(&mut game, &resources, HitTarget::RecruitRow(0));
+
+        assert_eq!(by_key.recruit_whom, 1);
+        assert_eq!(by_click.recruit_whom, by_key.recruit_whom);
+        assert_eq!(by_click.recruit_max, by_key.recruit_max);
     }
 
     #[test]

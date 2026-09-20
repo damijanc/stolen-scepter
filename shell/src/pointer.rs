@@ -25,6 +25,7 @@ pub enum HitTarget {
     TownRow(TownRow),
     GateRow(usize),
     Spell(i32),
+    RecruitRow(usize),
     DialogDismiss,
     PromptYes,
     PromptNo,

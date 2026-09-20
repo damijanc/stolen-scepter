@@ -1059,8 +1059,13 @@ async fn main() {
                 pending_audience_message = Some(king);
             }
         } else if views.active() == Some(ViewKind::RecruitSoldiers) {
-            // The recruit screen owns its letters, digits and Enter/ESC.
-            if views.recruit_soldiers_update(&mut game, &resources, &keys) {
+            // The recruit screen owns its letters, digits and Enter/ESC. A
+            // click selects a troop row like its letter.
+            let close = match clicked {
+                Some(target) => views.recruit_click(&mut game, &resources, target),
+                None => views.recruit_soldiers_update(&mut game, &resources, &keys),
+            };
+            if close {
                 views.dismiss();
             }
         } else if views.active() == Some(ViewKind::OwnCastle) {
