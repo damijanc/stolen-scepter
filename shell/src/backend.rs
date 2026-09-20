@@ -19,9 +19,10 @@ use std::collections::HashMap;
 
 use macroquad::prelude::{
     clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
-    get_char_pressed, get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed, load_file,
-    load_texture, screen_height, screen_width, Color as MqColor, DrawTextureParams, FilterMode,
-    KeyCode, Rect as MqRect, Texture2D, Vec2,
+    get_char_pressed, get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed,
+    is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, load_file,
+    load_texture, mouse_position, screen_height, screen_width, Color as MqColor, DrawTextureParams,
+    FilterMode, KeyCode, MouseButton, Rect as MqRect, Texture2D, Vec2,
 };
 use openbounty_engine::resources::Resources;
 
@@ -30,6 +31,7 @@ use crate::font;
 use crate::input::{Key, KeySource};
 use crate::layout::Layout;
 use crate::palette::Palette;
+use crate::pointer::{Button, PointerSource};
 use crate::present::{Present, Target};
 use crate::sprites::{tile_art_names, tile_art_path, SpriteCatalog};
 
@@ -456,5 +458,40 @@ impl KeySource for MacroquadKeys {
             chars.push(ch);
         }
         chars
+    }
+}
+
+/// The real pointer. Like [`MacroquadKeys`], this is the only place our
+/// vocabulary meets macroquad's.
+pub struct MacroquadPointer;
+
+impl MacroquadPointer {
+    fn button(button: Button) -> MouseButton {
+        match button {
+            Button::Left => MouseButton::Left,
+            Button::Right => MouseButton::Right,
+        }
+    }
+}
+
+impl PointerSource for MacroquadPointer {
+    fn position(&self) -> Option<(i32, i32)> {
+        let (x, y) = mouse_position();
+        if !x.is_finite() || !y.is_finite() {
+            return None;
+        }
+        Some((x as i32, y as i32))
+    }
+
+    fn pressed(&self, button: Button) -> bool {
+        is_mouse_button_pressed(Self::button(button))
+    }
+
+    fn down(&self, button: Button) -> bool {
+        is_mouse_button_down(Self::button(button))
+    }
+
+    fn released(&self, button: Button) -> bool {
+        is_mouse_button_released(Self::button(button))
     }
 }
