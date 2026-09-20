@@ -180,6 +180,16 @@ pub enum TownInput {
     RunRow(TownRow),
 }
 
+/// The home-castle menu's choices, as the keyboard and the pointer both
+/// resolve them.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HomeCastleAction {
+    None,
+    Dismiss,
+    Recruit,
+    Audience,
+}
+
 /// The town menu's five rows.
 const TOWN_ROW_COUNT: i32 = 5;
 
@@ -848,6 +858,29 @@ impl Views {
         self.set(ViewKind::HomeCastle);
     }
 
+    /// Read the home-castle menu's keys: ESC dismisses, A recruits, B holds an
+    /// audience. Shared with the pointer so the two cannot diverge.
+    pub fn home_castle_key(&self, keys: &dyn KeySource) -> HomeCastleAction {
+        if keys.pressed(Key::Escape) {
+            HomeCastleAction::Dismiss
+        } else if keys.pressed(Key::A) {
+            HomeCastleAction::Recruit
+        } else if keys.pressed(Key::B) {
+            HomeCastleAction::Audience
+        } else {
+            HomeCastleAction::None
+        }
+    }
+
+    /// Resolve a pointer hit to the same action `home_castle_key` returns.
+    pub fn home_castle_click(&self, target: HitTarget) -> HomeCastleAction {
+        match target {
+            HitTarget::HomeCastleRow(0) => HomeCastleAction::Recruit,
+            HitTarget::HomeCastleRow(1) => HomeCastleAction::Audience,
+            _ => HomeCastleAction::None,
+        }
+    }
+
     /// Open the own-castle screen, porting `screen_own_castle_open`. The mode
     /// starts on REMOVE, as C does.
     pub fn own_castle_open(&mut self, castle_id: &str) {
@@ -1140,7 +1173,7 @@ impl Views {
                 self.draw_town(list, hits, layout, palette, resources, catalog, game, time)
             }
             Some(ViewKind::HomeCastle) => {
-                self.draw_home_castle(list, layout, palette, resources, catalog, game, time)
+                self.draw_home_castle(list, hits, layout, palette, resources, catalog, game, time)
             }
             Some(ViewKind::OwnCastle) => {
                 self.draw_own_castle(list, layout, palette, resources, catalog, game, time)
@@ -1812,6 +1845,7 @@ impl Views {
     fn draw_home_castle(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1840,11 +1874,16 @@ impl Views {
         let body = crate::interact::home_castle_body(resources);
         let row_h = font::GLYPH_H + 1;
         let mut ty = y + PANEL_PAD_X;
-        for line in body.split('\n') {
+        for (row, line) in body.split('\n').enumerate() {
             if ty + row_h > y + h - PANEL_PAD_X {
                 break;
             }
             list.text(line, x + PANEL_PAD_X, ty, palette.clr(Pal::White));
+            // Same rect, one line apart: one clickable band per menu line.
+            hits.push(
+                Rect::new(x + PANEL_PAD_X, ty, w - 2 * PANEL_PAD_X, row_h),
+                HitTarget::HomeCastleRow(row),
+            );
             ty += row_h;
         }
     }
@@ -4385,6 +4424,62 @@ mod tests {
         assert!(!list
             .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Castle))
             .is_empty());
+    }
+
+    #[test]
+    fn the_home_castle_hit_regions_line_up_with_the_drawn_lines() {
+        let (resources, layout, catalog) = castle_fixtures();
+        let mut views = Views::new();
+        views.home_castle_open();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &Game::default(),
+            &present,
+            0.0,
+        );
+
+        for row in 0..2 {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::HomeCastleRow(row))
+                .unwrap_or_else(|| panic!("row {row} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::HomeCastleRow(row)));
+        }
+    }
+
+    #[test]
+    fn clicking_a_home_castle_line_matches_pressing_its_key() {
+        let views = Views::new();
+        assert_eq!(
+            views.home_castle_key(&Keys::pressed(&[Key::A])),
+            HomeCastleAction::Recruit
+        );
+        assert_eq!(
+            views.home_castle_click(HitTarget::HomeCastleRow(0)),
+            HomeCastleAction::Recruit
+        );
+        assert_eq!(
+            views.home_castle_key(&Keys::pressed(&[Key::B])),
+            HomeCastleAction::Audience
+        );
+        assert_eq!(
+            views.home_castle_click(HitTarget::HomeCastleRow(1)),
+            HomeCastleAction::Audience
+        );
     }
 
     #[test]

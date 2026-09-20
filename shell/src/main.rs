@@ -63,7 +63,10 @@ use prompt::{Prompt, PromptResult};
 use savepath::SavePaths;
 use sprites::SpriteCatalog;
 use startup::{Startup, StartupAction};
-use views::{controls_visible, worldmap_has_orb, SpellsInput, TownInput, TownRow, ViewKind, Views};
+use views::{
+    controls_visible, worldmap_has_orb, HomeCastleAction, SpellsInput, TownInput, TownRow,
+    ViewKind, Views,
+};
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1046,17 +1049,23 @@ async fn main() {
             }
         } else if views.active() == Some(ViewKind::HomeCastle) {
             // Throne room / barracks: ESC pops, A opens the recruit screen, B
-            // runs the audience-with-the-king flow.
-            if keys.pressed(Key::Escape) {
-                views.dismiss();
-            } else if keys.pressed(Key::A) {
-                views.recruit_soldiers_open(&resources, &game);
-            } else if keys.pressed(Key::B) {
-                let (outcome, needed) = game.audience_with_king(&resources);
-                let (fanfare, king) =
-                    interact::audience_messages(&resources, &game, outcome, needed);
-                dialog.open("", &fanfare);
-                pending_audience_message = Some(king);
+            // runs the audience-with-the-king flow. A click on a menu line
+            // resolves to the same action as its key.
+            let action = match clicked {
+                Some(target) => views.home_castle_click(target),
+                None => views.home_castle_key(&keys),
+            };
+            match action {
+                HomeCastleAction::Dismiss => views.dismiss(),
+                HomeCastleAction::Recruit => views.recruit_soldiers_open(&resources, &game),
+                HomeCastleAction::Audience => {
+                    let (outcome, needed) = game.audience_with_king(&resources);
+                    let (fanfare, king) =
+                        interact::audience_messages(&resources, &game, outcome, needed);
+                    dialog.open("", &fanfare);
+                    pending_audience_message = Some(king);
+                }
+                HomeCastleAction::None => {}
             }
         } else if views.active() == Some(ViewKind::RecruitSoldiers) {
             // The recruit screen owns its letters, digits and Enter/ESC. A
