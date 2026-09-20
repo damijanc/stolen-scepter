@@ -48,7 +48,7 @@ use openbounty_engine::game::{
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
-use openbounty_engine::savegame::save_read;
+use openbounty_engine::savegame::{save_read, save_write};
 use openbounty_engine::spells_adventure::{
     spell_index_by_adventure_effect, try_build_bridge, AdventureCast, AdventureEffect, SpellCast,
 };
@@ -123,6 +123,7 @@ const DEFAULT_TEMP_DEATH: &str = "After being disgraced on the\n\
     tactics, he reluctantly re-\n\
     issues your commission and\n\
     sends you on your way.";
+const DEFAULT_BODY_SAVE_CONFIRM: &str = "Press Control-Q to Quit or\nany other key to continue.";
 
 /// Which battle a combat session is resolving.
 enum CombatFlow {
@@ -682,6 +683,23 @@ async fn main() {
     // single-slot prompt and dialog globals.
     let mut prompt = Prompt::default();
     let mut dialog = Dialog::default();
+    // C queues a post-init message: a new game is being created, or a loaded
+    // one is being prepared. It follows the startup intro rather than
+    // replacing it.
+    {
+        let name = game.character.name.as_str();
+        let rank = game.character.cls.rank_title.as_str();
+        let body = if choice.action == StartupAction::Load {
+            format!(
+                "{name} the {rank},\n\nPlease wait while I prepare a suitable environment for your bountying enjoyment!"
+            )
+        } else {
+            format!(
+                "{name} the {rank},\n\nA new game is being created. Please wait while I perform godlike actions to make this game playable."
+            )
+        };
+        dialog.open("", &body);
+    }
     let mut pending = PendingFlow::None;
     let mut views = Views::new();
     // A running interactive battle; while Some, combat owns the screen and
@@ -1029,9 +1047,25 @@ async fn main() {
                     }
                 }
                 Action::None => {}
-                // Views and saving still need layers that do not exist yet.
-                // Say so rather than swallowing the key.
-                other => println!("{other:?} is not wired up yet"),
+                Action::OptionsMenu => {
+                    println!("OptionsMenu is not wired up yet: the Options screen is unported");
+                }
+                Action::SaveQuit => {
+                    // C saves slot 0 unconditionally, then shows the confirm
+                    // banner; Ctrl-Q during that dialog exits.
+                    if let Some(path) = save_paths.slot(resources.pack_id.as_str(), 0) {
+                        if let Err(err) = save_write(&path, &game, &resources, &map, &fog) {
+                            eprintln!("save failed: {err:?}");
+                        }
+                    }
+                    let body = banner::text(
+                        &resources,
+                        "banners",
+                        "body_save_confirm",
+                        DEFAULT_BODY_SAVE_CONFIRM,
+                    );
+                    dialog.open("", body);
+                }
             }
 
             if input.is_move() {

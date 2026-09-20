@@ -192,8 +192,10 @@ Implemented and tested:
   `--seed <n>` picks the catalog seed, and with no flag the seed is derived
   from time + name + class as C does. `Resources` flattens
   `strings.difficulty` into the generic string map so the picker can read the
-  pack's labels. NOT yet ported: the two splash screens, the credits screen,
-  the post-init message, and saving (`Action::SaveQuit` / `OptionsMenu`).
+  pack's labels. A NEW or LOAD choice then queues C's post-init message, and
+  `Q` (`Action::SaveQuit`) writes slot 0 and shows the save-confirm banner.
+  NOT yet ported: the two splash screens, the credits screen, and the Options
+  screen behind `Action::OptionsMenu`.
 
 Test coverage is 343 engine unit tests, 253 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
