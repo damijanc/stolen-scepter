@@ -930,12 +930,62 @@ impl Default for ResVillainDesc {
     }
 }
 
+pub const RES_CREDIT_GROUPS: usize = 6;
+pub const RES_CREDIT_NAMES: usize = 4;
+pub const RES_CREDIT_COPYRIGHT: usize = 4;
+pub const RES_CREDIT_TEXT_LEN: usize = 64;
+
+/// One credits group: a heading and its indented names. C's `credits.groups`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResCreditGroup {
+    pub label: FixedStr<RES_CREDIT_TEXT_LEN>,
+    pub names: [FixedStr<RES_CREDIT_TEXT_LEN>; RES_CREDIT_NAMES],
+    pub name_count: usize,
+}
+
+impl Default for ResCreditGroup {
+    fn default() -> Self {
+        Self {
+            label: FixedStr::empty(),
+            names: [FixedStr::empty(); RES_CREDIT_NAMES],
+            name_count: 0,
+        }
+    }
+}
+
+/// The credits screen's content, porting C's `credits` block. A pack overrides
+/// it; an empty one means the screen is skipped.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResCredits {
+    /// The pack's declared inset path. C actually draws the class-select
+    /// highlight sprite, so this only gates whether an inset is drawn.
+    pub image: FixedStr<RES_PATH_LEN>,
+    pub groups: [ResCreditGroup; RES_CREDIT_GROUPS],
+    pub group_count: usize,
+    pub copyright: [FixedStr<RES_CREDIT_TEXT_LEN>; RES_CREDIT_COPYRIGHT],
+    pub copyright_count: usize,
+}
+
+impl Default for ResCredits {
+    fn default() -> Self {
+        Self {
+            image: FixedStr::empty(),
+            groups: [ResCreditGroup::default(); RES_CREDIT_GROUPS],
+            group_count: 0,
+            copyright: [FixedStr::empty(); RES_CREDIT_COPYRIGHT],
+            copyright_count: 0,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resources {
     resource_root: FixedStr<CAT_PATH_LEN>,
     /// Pack identity. The save loader refuses a save written against a
     /// different pack, since its ids belong to that pack's catalog.
     pub pack_id: FixedStr<RES_ID_LEN>,
+    /// Pack version, substituted into credits lines as `%VERSION%`.
+    pub version: i32,
     pub time: ResTime,
     pub world: ResWorld,
     pub contract: ResContract,
@@ -946,6 +996,7 @@ pub struct Resources {
     /// overflows the stack.
     pub sprites: Box<ResSprites>,
     pub ending: ResEnding,
+    pub credits: ResCredits,
     pub colors: ResColors,
     pub controls: ResControls,
     /// Every string the pack declares, as `group -> key -> text`.
@@ -991,6 +1042,7 @@ impl Default for Resources {
         Self {
             resource_root: FixedStr::empty(),
             pack_id: FixedStr::empty(),
+            version: 0,
             time: ResTime::default(),
             world: ResWorld::default(),
             contract: ResContract::default(),
@@ -998,6 +1050,7 @@ impl Default for Resources {
             render: ResRender::default(),
             sprites: Box::new(ResSprites::default()),
             ending: ResEnding::default(),
+            credits: ResCredits::default(),
             colors: ResColors::default(),
             controls: ResControls::default(),
             strings: std::collections::BTreeMap::new(),
@@ -1047,6 +1100,10 @@ impl Resources {
         if let Some(pack_id) = optional_string_field(&root, "pack_id")? {
             resources.pack_id.copy_from_str(pack_id);
         }
+        resources.version = root
+            .get("version")
+            .and_then(serde_json::Value::as_i64)
+            .map_or(0, |value| value as i32);
         resources.parse_time(&root)?;
         resources.parse_world(&root)?;
         resources.parse_contract(&root)?;
@@ -1054,6 +1111,7 @@ impl Resources {
         resources.parse_render(&root)?;
         resources.parse_sprites(&root);
         resources.parse_ending(&root);
+        resources.parse_credits(&root);
         resources.parse_colors(&root);
         resources.parse_controls(&root)?;
         resources.parse_strings(&root);
@@ -1584,6 +1642,58 @@ impl Resources {
         self.ending.ticks_per_step = int("ticks_per_step", self.ending.ticks_per_step);
         if let Some(border) = obj.get("troop_border").and_then(serde_json::Value::as_bool) {
             self.ending.troop_border = border;
+        }
+    }
+
+    /// Read the credits screen's content, porting `parse_credits`. Infallible,
+    /// like the sprite manifest: it is presentation data, and a wrong type
+    /// leaves the default (an empty credits block, which the shell skips).
+    fn parse_credits(&mut self, root: &serde_json::Value) {
+        self.credits = ResCredits::default();
+        let Some(obj) = root.get("credits").filter(|v| v.is_object()) else {
+            return;
+        };
+        if let Some(image) = obj.get("image").and_then(serde_json::Value::as_str) {
+            self.credits.image.copy_from_str(image);
+        }
+        if let Some(groups) = obj.get("groups").and_then(serde_json::Value::as_array) {
+            for group in groups {
+                if self.credits.group_count >= RES_CREDIT_GROUPS {
+                    break;
+                }
+                let Some(group) = group.as_object() else {
+                    continue;
+                };
+                let slot = self.credits.group_count;
+                if let Some(label) = group.get("label").and_then(serde_json::Value::as_str) {
+                    self.credits.groups[slot].label.copy_from_str(label);
+                }
+                if let Some(names) = group.get("names").and_then(serde_json::Value::as_array) {
+                    for name in names {
+                        if self.credits.groups[slot].name_count >= RES_CREDIT_NAMES {
+                            break;
+                        }
+                        if let Some(name) = name.as_str() {
+                            let index = self.credits.groups[slot].name_count;
+                            self.credits.groups[slot].names[index].copy_from_str(name);
+                            self.credits.groups[slot].name_count += 1;
+                        }
+                    }
+                }
+                self.credits.group_count += 1;
+            }
+        }
+        if let Some(copyright) = obj.get("copyright").and_then(serde_json::Value::as_array) {
+            for line in copyright {
+                if self.credits.copyright_count >= RES_CREDIT_COPYRIGHT {
+                    break;
+                }
+                if let Some(line) = line.as_str() {
+                    let index = self.credits.copyright_count;
+                    self.credits.copyright[index].copy_from_str(line);
+                    self.credits.copyright_count += 1;
+                }
+            }
         }
     }
 
@@ -3447,6 +3557,35 @@ mod tests {
         );
         // A difficulty the pack omits stays absent, so the shell falls back.
         assert_eq!(resources.string("difficulty", "impossible.label"), None);
+    }
+
+    #[test]
+    fn credits_are_parsed_into_bounded_groups() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [], "version": 7,
+                "credits": {
+                  "image": "art/ui/highlight.png",
+                  "groups": [
+                    {"label": "Programmed By:", "names": ["A", "B"]},
+                    {"label": "Graphics By:"}
+                  ],
+                  "copyright": ["Copyright 1990", "New World Computing"]
+                }}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(resources.version, 7);
+        assert_eq!(resources.credits.image.as_str(), "art/ui/highlight.png");
+        assert_eq!(resources.credits.group_count, 2);
+        assert_eq!(resources.credits.groups[0].label.as_str(), "Programmed By:");
+        assert_eq!(resources.credits.groups[0].name_count, 2);
+        assert_eq!(resources.credits.groups[0].names[1].as_str(), "B");
+        assert_eq!(resources.credits.groups[1].name_count, 0);
+        assert_eq!(resources.credits.copyright_count, 2);
+        assert_eq!(
+            resources.credits.copyright[1].as_str(),
+            "New World Computing"
+        );
     }
 
     #[test]
