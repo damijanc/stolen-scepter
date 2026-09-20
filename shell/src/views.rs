@@ -596,6 +596,19 @@ impl Views {
         }
     }
 
+    /// Resolve a pointer hit to the same [`SpellsInput`] the keyboard
+    /// produces: a spell cell casts that spell, anything else is a plain
+    /// dismiss, as any non-letter key is.
+    pub fn spells_click(&mut self, target: HitTarget) -> SpellsInput {
+        match target {
+            HitTarget::Spell(index) if self.spells_cast_mode && (0..14).contains(&index) => {
+                self.dismiss();
+                SpellsInput::Cast(index)
+            }
+            _ => SpellsInput::None,
+        }
+    }
+
     /// Open the gate destination picker with a snapshot of the eligible list,
     /// porting `views_gate_open`.
     pub fn gate_open(&mut self, destinations: &[GateDestination], is_town: bool) {
@@ -1091,7 +1104,9 @@ impl Views {
                 self.draw_controls(list, layout, palette, resources, game, present)
             }
             Some(ViewKind::Options) => draw_options(list, layout, palette, resources, game),
-            Some(ViewKind::Spells) => self.draw_spells(list, layout, palette, resources, game),
+            Some(ViewKind::Spells) => {
+                self.draw_spells(list, hits, layout, palette, resources, game)
+            }
             Some(ViewKind::Gate) => self.draw_gate(list, hits, layout, palette),
             Some(ViewKind::Town) => {
                 self.draw_town(list, hits, layout, palette, resources, catalog, game, time)
@@ -1495,6 +1510,7 @@ impl Views {
     fn draw_spells(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1540,6 +1556,7 @@ impl Views {
 
         let row_y = head_y + font::GLYPH_H + 4;
         let row_h = font::GLYPH_H + 1;
+        let col_w = layout.map_w / 2 - VIEW_PAD - 8;
         for i in 0..7 {
             let combat = resources.spell_by_index(i);
             let adventure = resources.spell_by_index(i + 7);
@@ -1564,6 +1581,11 @@ impl Views {
                     spell.name.as_str()
                 );
                 list.text(&label, col_l, row_y + i * row_h, lc);
+                // Same rect, one line apart: one cell per row per column.
+                hits.push(
+                    Rect::new(col_l, row_y + i * row_h, col_w, row_h),
+                    HitTarget::Spell(i),
+                );
             }
             if let Some(spell) = adventure {
                 let label = format!(
@@ -1573,6 +1595,10 @@ impl Views {
                     ca
                 );
                 list.text(&label, col_r, row_y + i * row_h, rc);
+                hits.push(
+                    Rect::new(col_r, row_y + i * row_h, col_w, row_h),
+                    HitTarget::Spell(i + 7),
+                );
             }
         }
     }
@@ -3809,6 +3835,59 @@ mod tests {
         // the right.
         assert!(list.has_text_containing("2 A Fireball"));
         assert!(list.has_text_containing("A Time Stop"));
+    }
+
+    #[test]
+    fn the_spells_hit_regions_line_up_with_the_drawn_cells() {
+        let (resources, layout, catalog) = spells_fixtures();
+        let mut game = Game::default();
+        game.spells.counts[0] = 2;
+        game.spells.counts[7] = 1;
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &game,
+            &present,
+            0.0,
+        );
+
+        for index in [0, 7] {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::Spell(index))
+                .unwrap_or_else(|| panic!("spell {index} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::Spell(index)));
+        }
+    }
+
+    #[test]
+    fn clicking_a_spell_matches_pressing_its_letter_in_cast_mode() {
+        let mut by_key = Views::new();
+        by_key.spells_set_cast_mode(true);
+        let keyed = by_key.spells_update(&Keys::pressed(&[Key::A]));
+
+        let mut by_click = Views::new();
+        by_click.spells_set_cast_mode(true);
+        let clicked = by_click.spells_click(HitTarget::Spell(7));
+
+        assert_eq!(keyed, SpellsInput::Cast(7));
+        assert_eq!(clicked, keyed);
     }
 
     #[test]

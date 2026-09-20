@@ -24,6 +24,7 @@ pub enum Button {
 pub enum HitTarget {
     TownRow(TownRow),
     GateRow(usize),
+    Spell(i32),
     DialogDismiss,
     PromptYes,
     PromptNo,

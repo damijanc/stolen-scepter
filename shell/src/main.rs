@@ -987,8 +987,13 @@ async fn main() {
             }
         } else if views.active() == Some(ViewKind::Spells) {
             // Left/Right switch columns, A-G cast from the current column,
-            // ESC cancels. Any other key dismisses the read-only book.
-            match views.spells_update(&keys) {
+            // ESC cancels. Any other key (or a click that names no spell)
+            // dismisses the read-only book.
+            let input = match clicked {
+                Some(target) => views.spells_click(target),
+                None => views.spells_update(&keys),
+            };
+            match input {
                 SpellsInput::Cast(spell_idx) => {
                     dispatch_spell(
                         &mut game,
@@ -1003,7 +1008,7 @@ async fn main() {
                 }
                 SpellsInput::Handled => {}
                 SpellsInput::None => {
-                    if keys.any_pressed() {
+                    if keys.any_pressed() || clicked.is_some() {
                         views.dismiss();
                     }
                 }
