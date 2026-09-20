@@ -899,8 +899,16 @@ async fn main() {
                     bridge_waiting = false;
                     dialog.dismiss();
                 }
-            } else if keys.any_pressed() {
-                if !dialog.advance() {
+            } else {
+                // A click dismisses like any key. While a dialog is up only the
+                // dialog drew regions, so `clicked` can only be its dismiss
+                // target.
+                let advanced = match clicked {
+                    Some(target) => dialog.click(target),
+                    None if keys.any_pressed() => dialog.advance(),
+                    None => true,
+                };
+                if !advanced {
                     dialog.dismiss();
                     if let Some(king) = pending_audience_message.take() {
                         // The king's words render as the header (yellow), as C
@@ -912,7 +920,10 @@ async fn main() {
                 }
             }
         } else if prompt.is_active() {
-            let answer = prompt.update(&keys);
+            let answer = match clicked {
+                Some(target) => prompt.click(target),
+                None => prompt.update(&keys),
+            };
             if answer != PromptResult::None {
                 let combat_flow = dispatch_answer(
                     &mut game,
@@ -1489,10 +1500,10 @@ async fn main() {
         // covers a prompt that is up at the same time, exactly as C's overlay
         // orders them.
         if prompt.is_active() {
-            prompt.draw(&mut list, &layout, backend.palette(), &resources);
+            prompt.draw(&mut list, &mut hits, &layout, backend.palette(), &resources);
         }
         if dialog.is_active() {
-            dialog.draw(&mut list, &layout, backend.palette());
+            dialog.draw(&mut list, &mut hits, &layout, backend.palette());
         }
 
         backend.execute(&list, &catalog, &layout, &present);

@@ -26,6 +26,7 @@ use crate::font;
 use crate::input::{Key, KeySource, DIGITS, NUMPAD_DIGITS};
 use crate::layout::{Layout, PANEL_COLS, PANEL_H, PANEL_PAD_X};
 use crate::palette::{Pal, Palette};
+use crate::pointer::{HitList, HitTarget};
 
 /// What a prompt returned once answered. Ports `PromptResult`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -147,6 +148,31 @@ impl Prompt {
         self.body.clear();
     }
 
+    /// Settle a yes/no answer: dismiss and report it. Shared by the keyboard
+    /// (`update`) and the pointer (`click`) so the two cannot diverge.
+    fn yes_no_answer(&mut self, yes: bool) -> PromptResult {
+        self.dismiss();
+        if yes {
+            PromptResult::Yes
+        } else {
+            PromptResult::No
+        }
+    }
+
+    /// Same outcome `update` returns for Y / N on a yes/no prompt. The other
+    /// kinds have no clickable affordance, so no regions are published for
+    /// them and their clicks resolve to [`PromptResult::None`].
+    pub fn click(&mut self, target: HitTarget) -> PromptResult {
+        if self.kind != Kind::YesNo {
+            return PromptResult::None;
+        }
+        match target {
+            HitTarget::PromptYes => self.yes_no_answer(true),
+            HitTarget::PromptNo => self.yes_no_answer(false),
+            _ => PromptResult::None,
+        }
+    }
+
     /// Poll one frame of input. Returns [`PromptResult::None`] while still
     /// waiting; anything else means the prompt answered itself (and, for a
     /// text input, the typed value is left readable through
@@ -166,17 +192,14 @@ impl Prompt {
             Kind::None => PromptResult::None,
             Kind::YesNo => {
                 if keys.pressed(Key::Y) {
-                    self.dismiss();
-                    return PromptResult::Yes;
+                    return self.yes_no_answer(true);
                 }
                 if keys.pressed(Key::N) {
-                    self.dismiss();
-                    return PromptResult::No;
+                    return self.yes_no_answer(false);
                 }
                 // Enter counts as "yes", as in C.
                 if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) {
-                    self.dismiss();
-                    return PromptResult::Yes;
+                    return self.yes_no_answer(true);
                 }
                 PromptResult::None
             }
@@ -238,6 +261,7 @@ impl Prompt {
     pub fn draw(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -326,6 +350,17 @@ impl Prompt {
                 };
                 list.text_centered(hint, x + w / 2, y + h - row_h - 2, palette.clr(Pal::Yellow));
             }
+        }
+
+        // A yes/no prompt is two clickable halves of its hint row: Yes on the
+        // left, No on the right, matching the "(y/n)?" order.
+        if self.kind == Kind::YesNo {
+            let hint_y = y + h - row_h - 2;
+            hits.push(Rect::new(x, hint_y, w / 2, row_h), HitTarget::PromptYes);
+            hits.push(
+                Rect::new(x + w / 2, hint_y, w - w / 2, row_h),
+                HitTarget::PromptNo,
+            );
         }
     }
 }
@@ -601,7 +636,8 @@ mod tests {
         prompt.yes_no("Search...", "It will take some days.");
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert_eq!(
             list.as_slice()[0],
@@ -638,7 +674,8 @@ mod tests {
         prompt.yes_no("Search...", "It will take some days.");
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("Search..."));
         assert!(list.has_text_containing("It will take"));
@@ -671,7 +708,8 @@ mod tests {
         prompt.yes_no("h", "one two three four five six seven eight nine ten");
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         let body: Vec<_> = list
             .texts()
@@ -711,7 +749,8 @@ mod tests {
         prompt.numeric("Go to which continent?", "1 a 2 b 3 c", 3);
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("(1-3 or ESC)"));
     }
@@ -725,7 +764,8 @@ mod tests {
         prompt.numeric("Dismiss Army", "1 militia", 5);
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("(1-5 or ESC)"));
     }
@@ -740,7 +780,8 @@ mod tests {
         prompt.update(&Keys::pressed(&[Key::Digit2]));
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("2_"));
         assert!(list.has_text_containing("(Enter to confirm / ESC cancel)"));
@@ -755,7 +796,8 @@ mod tests {
         prompt.ab("Treasure", "A) gold  B) leadership");
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(!list.has_text_containing("(y/n)?"));
         assert!(!list.has_text_containing("(1-5 or ESC)"));
@@ -771,7 +813,8 @@ mod tests {
         prompt.yes_no("Search...", "body");
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
         assert!(list.has_text_containing("yes?"));
     }
 
@@ -783,7 +826,61 @@ mod tests {
         let prompt = Prompt::default();
 
         let mut list = DrawList::new();
-        prompt.draw(&mut list, &layout, &palette, &resources);
+        let mut hits = HitList::new();
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
         assert!(list.is_empty());
+    }
+
+    #[test]
+    fn clicking_yes_matches_pressing_y() {
+        let mut by_key = Prompt::default();
+        by_key.yes_no("Header", "Body");
+        let keyed = by_key.update(&Keys::pressed(&[Key::Y]));
+
+        let mut by_click = Prompt::default();
+        by_click.yes_no("Header", "Body");
+        let clicked = by_click.click(HitTarget::PromptYes);
+
+        assert_eq!(keyed, PromptResult::Yes);
+        assert_eq!(clicked, keyed);
+    }
+
+    #[test]
+    fn a_yes_no_prompt_publishes_two_halves_left_yes_right_no() {
+        let resources = pack("{}");
+        let layout = legacy_layout(&resources);
+        let mut prompt = Prompt::default();
+        prompt.yes_no("Header", "Body");
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        prompt.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+        );
+
+        let yes = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::PromptYes)
+            .expect("yes region");
+        let no = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::PromptNo)
+            .expect("no region");
+        assert!(yes.rect.x < no.rect.x, "Yes is the left half");
+        // A point in each half resolves to its own target.
+        assert_eq!(
+            hits.hit(yes.rect.x + 1, yes.rect.y + 1),
+            Some(HitTarget::PromptYes)
+        );
+        assert_eq!(
+            hits.hit(no.rect.x + 1, no.rect.y + 1),
+            Some(HitTarget::PromptNo)
+        );
     }
 }

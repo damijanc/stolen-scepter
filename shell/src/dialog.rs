@@ -20,6 +20,7 @@ use crate::draw::{DrawList, Rect};
 use crate::font;
 use crate::layout::{Layout, PANEL_COLS, PANEL_H, PANEL_PAD_X};
 use crate::palette::{Pal, Palette};
+use crate::pointer::{HitList, HitTarget};
 
 /// Body rows per page in the bottom panel. Both the renderer and the page
 /// count use this, so the pager and the display never disagree about how many
@@ -94,9 +95,24 @@ impl Dialog {
         }
     }
 
+    /// Same outcome `advance` returns for any key. A dialog is one big dismiss
+    /// region; anything else is ignored.
+    pub fn click(&mut self, target: HitTarget) -> bool {
+        match target {
+            HitTarget::DialogDismiss => self.advance(),
+            _ => false,
+        }
+    }
+
     /// Draw the bottom panel with its current page, porting
     /// `draw_dialog_ex(DLG_MODE_BOTTOM)`. Does nothing when inactive.
-    pub fn draw(&self, list: &mut DrawList, layout: &Layout, palette: &Palette) {
+    pub fn draw(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+    ) {
         if !self.active {
             return;
         }
@@ -115,6 +131,8 @@ impl Dialog {
             palette.clr(Pal::DBlue),
             palette.clr(Pal::Yellow),
         );
+        // The whole panel is one dismiss region.
+        hits.push(Rect::new(x, y, w, h), HitTarget::DialogDismiss);
 
         let tx = x + pad_x;
         let mut ty = y + PAD_Y;
@@ -279,7 +297,8 @@ mod tests {
         let palette = Palette::fallback();
 
         let mut list = DrawList::new();
-        dialog.draw(&mut list, &layout, &palette);
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &palette);
 
         assert_eq!(
             list.as_slice()[0],
@@ -319,7 +338,8 @@ mod tests {
         let palette = Palette::fallback();
 
         let mut list = DrawList::new();
-        dialog.draw(&mut list, &layout, &palette);
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &palette);
 
         let texts: Vec<_> = list
             .as_slice()
@@ -345,7 +365,8 @@ mod tests {
         let palette = Palette::fallback();
 
         let mut list = DrawList::new();
-        dialog.draw(&mut list, &layout, &palette);
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &palette);
 
         let texts = list.texts();
         assert!(!texts.iter().any(|(_, _, t)| *t == ""));
@@ -369,7 +390,8 @@ mod tests {
         let palette = Palette::fallback();
 
         let mut list = DrawList::new();
-        dialog.draw(&mut list, &layout, &palette);
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &palette);
 
         let yellow: Vec<_> = list
             .texts()
@@ -392,7 +414,8 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        dialog.draw(&mut list, &layout, &palette);
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &palette);
 
         let body: Vec<String> = list
             .texts()
@@ -423,7 +446,38 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        dialog.draw(&mut list, &layout, &palette);
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &palette);
         assert!(list.is_empty());
+    }
+
+    #[test]
+    fn a_dialog_publishes_one_dismiss_region_covering_its_panel() {
+        let layout = layout();
+        let mut dialog = Dialog::default();
+        dialog.open("Header", "Body");
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        dialog.draw(&mut list, &mut hits, &layout, &Palette::fallback());
+
+        let region = hits.regions().first().expect("one region");
+        assert_eq!(region.target, HitTarget::DialogDismiss);
+        let cx = region.rect.x + region.rect.w / 2;
+        let cy = region.rect.y + region.rect.h / 2;
+        assert_eq!(hits.hit(cx, cy), Some(HitTarget::DialogDismiss));
+    }
+
+    #[test]
+    fn clicking_a_dialog_advances_it_like_any_key() {
+        let mut by_key = Dialog::default();
+        by_key.open("Header", "Body");
+        let keyed = by_key.advance();
+
+        let mut by_click = Dialog::default();
+        by_click.open("Header", "Body");
+        let clicked = by_click.click(HitTarget::DialogDismiss);
+
+        assert_eq!(clicked, keyed);
     }
 }
