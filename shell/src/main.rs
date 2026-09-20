@@ -64,8 +64,8 @@ use savepath::SavePaths;
 use sprites::SpriteCatalog;
 use startup::{Startup, StartupAction};
 use views::{
-    controls_visible, worldmap_has_orb, HomeCastleAction, SpellsInput, TownInput, TownRow,
-    ViewKind, Views,
+    controls_visible, worldmap_has_orb, HomeCastleAction, OwnCastleAction, SpellsInput, TownInput,
+    TownRow, ViewKind, Views,
 };
 
 /// Which decision a prompt answer resolves, porting C's `pending_flow`.
@@ -1078,28 +1078,28 @@ async fn main() {
                 views.dismiss();
             }
         } else if views.active() == Some(ViewKind::OwnCastle) {
-            // SPACE toggles garrison/remove; A..E transfer the chosen stack.
-            if keys.pressed(Key::Escape) {
-                views.dismiss();
-            } else if keys.pressed(Key::Space) {
-                views.own_castle_toggle_mode();
-            } else {
-                let castle_id = views.own_castle_castle_id().to_owned();
-                let garrison_mode = views.own_castle_garrison_mode();
-                let keys_abcd = [Key::A, Key::B, Key::C, Key::D, Key::E];
-                for (slot, key) in keys_abcd.iter().enumerate().take(GAME_ARMY_SLOTS) {
-                    if keys.pressed(*key) {
-                        let outcome = if garrison_mode {
-                            game.garrison_troop(&castle_id, slot)
-                        } else {
-                            game.ungarrison_troop(&castle_id, slot)
-                        };
-                        if outcome != GarrisonOutcome::Ok {
-                            dialog.open("", interact::garrison_refusal(&resources, outcome));
-                        }
-                        break;
+            // SPACE toggles garrison/remove; A..E transfer the chosen stack. A
+            // click on a slot resolves to the same transfer.
+            let action = match clicked {
+                Some(target) => views.own_castle_click(target),
+                None => views.own_castle_key(&keys),
+            };
+            match action {
+                OwnCastleAction::Dismiss => views.dismiss(),
+                OwnCastleAction::Toggle => views.own_castle_toggle_mode(),
+                OwnCastleAction::Slot(slot) => {
+                    let castle_id = views.own_castle_castle_id().to_owned();
+                    let garrison_mode = views.own_castle_garrison_mode();
+                    let outcome = if garrison_mode {
+                        game.garrison_troop(&castle_id, slot)
+                    } else {
+                        game.ungarrison_troop(&castle_id, slot)
+                    };
+                    if outcome != GarrisonOutcome::Ok {
+                        dialog.open("", interact::garrison_refusal(&resources, outcome));
                     }
                 }
+                OwnCastleAction::None => {}
             }
         } else if views.active() == Some(ViewKind::WinCartoon) {
             // Any key skips the win cutscene; the frame clock's own end is

@@ -190,6 +190,16 @@ pub enum HomeCastleAction {
     Audience,
 }
 
+/// The own-castle screen's choices, as the keyboard and the pointer both
+/// resolve them.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OwnCastleAction {
+    None,
+    Dismiss,
+    Toggle,
+    Slot(usize),
+}
+
 /// The town menu's five rows.
 const TOWN_ROW_COUNT: i32 = 5;
 
@@ -900,6 +910,35 @@ impl Views {
         self.own_castle_garrison_mode = !self.own_castle_garrison_mode;
     }
 
+    /// Read the own-castle keys: ESC pops, SPACE toggles the mode, A-E act on
+    /// a slot. Shared with the pointer so the two cannot diverge.
+    pub fn own_castle_key(&self, keys: &dyn KeySource) -> OwnCastleAction {
+        if keys.pressed(Key::Escape) {
+            return OwnCastleAction::Dismiss;
+        }
+        if keys.pressed(Key::Space) {
+            return OwnCastleAction::Toggle;
+        }
+        for (slot, key) in [Key::A, Key::B, Key::C, Key::D, Key::E]
+            .iter()
+            .enumerate()
+            .take(GAME_ARMY_SLOTS)
+        {
+            if keys.pressed(*key) {
+                return OwnCastleAction::Slot(slot);
+            }
+        }
+        OwnCastleAction::None
+    }
+
+    /// Resolve a pointer hit to the same action `own_castle_key` returns.
+    pub fn own_castle_click(&self, target: HitTarget) -> OwnCastleAction {
+        match target {
+            HitTarget::OwnCastleSlot(slot) if slot < GAME_ARMY_SLOTS => OwnCastleAction::Slot(slot),
+            _ => OwnCastleAction::None,
+        }
+    }
+
     /// The castle the own-castle screen is bound to, porting
     /// `screen_own_castle_castle_id`.
     pub fn own_castle_castle_id(&self) -> &str {
@@ -1176,7 +1215,7 @@ impl Views {
                 self.draw_home_castle(list, hits, layout, palette, resources, catalog, game, time)
             }
             Some(ViewKind::OwnCastle) => {
-                self.draw_own_castle(list, layout, palette, resources, catalog, game, time)
+                self.draw_own_castle(list, hits, layout, palette, resources, catalog, game, time)
             }
             Some(ViewKind::RecruitSoldiers) => self
                 .draw_recruit_soldiers(list, hits, layout, palette, resources, catalog, game, time),
@@ -1893,6 +1932,7 @@ impl Views {
     fn draw_own_castle(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1953,6 +1993,11 @@ impl Views {
                 slot,
             );
             list.text(&line, tx, ty, palette.clr(Pal::White));
+            // Same rect, one line apart: the slot's A-E band.
+            hits.push(
+                Rect::new(tx, ty, w - 2 * PANEL_PAD_X, row_h),
+                HitTarget::OwnCastleSlot(slot),
+            );
             ty += row_h;
         }
     }
@@ -4496,6 +4541,66 @@ mod tests {
         assert!(list.has_text_containing("Castle Darkstone"));
         assert!(list.has_text_containing("Remove troops"));
         assert!(list.has_text_containing("Peasants"));
+    }
+
+    #[test]
+    fn the_own_castle_hit_regions_line_up_with_the_drawn_slots() {
+        let (resources, layout, catalog) = castle_fixtures();
+        let mut game = Game::default();
+        game.castles[0].id.copy_from_str("castle0");
+        game.castles[0].garrison[0].id.copy_from_str("peasants");
+        game.castles[0].garrison[0].count = 5;
+        let mut views = Views::new();
+        views.own_castle_open("castle0");
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &game,
+            &present,
+            0.0,
+        );
+
+        for slot in 0..GAME_ARMY_SLOTS {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::OwnCastleSlot(slot))
+                .unwrap_or_else(|| panic!("slot {slot} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::OwnCastleSlot(slot)));
+        }
+    }
+
+    #[test]
+    fn clicking_an_own_castle_slot_matches_pressing_its_key() {
+        let views = Views::new();
+        assert_eq!(
+            views.own_castle_key(&Keys::pressed(&[Key::A])),
+            OwnCastleAction::Slot(0)
+        );
+        assert_eq!(
+            views.own_castle_click(HitTarget::OwnCastleSlot(0)),
+            OwnCastleAction::Slot(0)
+        );
+        assert_eq!(
+            views.own_castle_key(&Keys::pressed(&[Key::Space])),
+            OwnCastleAction::Toggle
+        );
+        assert_eq!(
+            views.own_castle_key(&Keys::pressed(&[Key::Escape])),
+            OwnCastleAction::Dismiss
+        );
     }
 
     fn recruit_fixtures() -> (Resources, Layout, SpriteCatalog) {
