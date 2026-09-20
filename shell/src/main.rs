@@ -31,7 +31,7 @@ pub mod views;
 use macroquad::prelude::{get_time, next_frame, Conf};
 
 use anim::HeroAnimator;
-use backend::{Backend, MacroquadKeys};
+use backend::{Backend, MacroquadKeys, MacroquadPointer};
 use chrome::{Chrome, StatusMode};
 use combat::{combat_render, CombatLoop, CombatStatus};
 use dialog::Dialog;
@@ -57,7 +57,7 @@ use openbounty_engine::step::{
     consume_step, game_step_basic, search_here, spend_week, SearchOutcome, StepInteraction,
     StepResult,
 };
-use pointer::HitList;
+use pointer::{Button, HitList, PointerSource};
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use savepath::SavePaths;
@@ -673,6 +673,7 @@ async fn main() {
     // input; see specs/mouse-support-design.md.
     let mut hits = HitList::new();
     let keys = MacroquadKeys;
+    let pointer = MacroquadPointer;
 
     // Pre-game wizard: class select, then name/difficulty. It blocks on the
     // player, exactly as C's `startup_flow` does before the game exists.
@@ -813,6 +814,21 @@ async fn main() {
         }
 
         hero_anim.update(get_time(), last_step, &game.stats.options, has_idle);
+
+        // Where the pointer is, in logical coordinates, and what it is over.
+        // It hit-tests the PREVIOUS frame's HitList (one frame of latency).
+        let (win_w, win_h) = backend.window_size();
+        let hovered = pointer
+            .position()
+            .and_then(|(px, py)| {
+                present.window_to_logical(&layout, win_w, win_h, present::Target::Desktop, px, py)
+            })
+            .and_then(|(lx, ly)| hits.hit(lx, ly));
+        let clicked = if pointer.pressed(Button::Left) {
+            hovered
+        } else {
+            None
+        };
 
         // Input priority: combat first, then the message dialog owns the keys
         // while it is open (C's issue #19 gate), then the prompt, then the
@@ -996,8 +1012,13 @@ async fn main() {
             }
         } else if views.active() == Some(ViewKind::Town) {
             // The town menu owns its arrows/letter/Enter input; executing a row
-            // runs the engine transaction and shows its info toast.
-            match views.town_update(&keys) {
+            // runs the engine transaction and shows its info toast. A click
+            // resolves to the same TownInput the keyboard produces.
+            let town = match clicked {
+                Some(target) => views.town_click(target),
+                None => views.town_update(&keys),
+            };
+            match town {
                 TownInput::RunRow(row) => run_town_row(&mut game, &resources, &mut views, row),
                 TownInput::Dismissed | TownInput::Handled | TownInput::None => {}
             }

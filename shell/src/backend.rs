@@ -125,6 +125,12 @@ impl Backend {
         self.textures.len()
     }
 
+    /// The window size in pixels. Here because `backend.rs` is the only
+    /// module that may name macroquad.
+    pub fn window_size(&self) -> (i32, i32) {
+        (screen_width() as i32, screen_height() as i32)
+    }
+
     fn texture(&self, catalog: &SpriteCatalog, sprite: &Sprite) -> Option<&Texture2D> {
         match sprite {
             Sprite::Tile(art) => self.textures.get(&tile_art_path(art.as_str())),
