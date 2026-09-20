@@ -957,7 +957,19 @@ async fn main() {
             };
             if count > 0 {
                 let cur = views.controls_cursor() as usize;
-                if keys.pressed(Key::Up) || keys.pressed(Key::Kp8) {
+                // A click selects (and advances) a row, exactly as its digit
+                // key does.
+                let click_row = clicked
+                    .and_then(|target| views.controls_click(target))
+                    .filter(|row| *row < count);
+                if let Some(row) = click_row {
+                    views.controls_set_cursor(row as i32);
+                    if row == scale_row {
+                        present.advance_scale();
+                    } else {
+                        views.controls_advance(&mut game, &resources, vis[row]);
+                    }
+                } else if keys.pressed(Key::Up) || keys.pressed(Key::Kp8) {
                     views.controls_set_cursor(((cur + count - 1) % count) as i32);
                 } else if keys.pressed(Key::Down) || keys.pressed(Key::Kp2) {
                     views.controls_set_cursor(((cur + 1) % count) as i32);

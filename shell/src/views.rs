@@ -553,6 +553,15 @@ impl Views {
         self.controls_cursor = row.max(0);
     }
 
+    /// The visible row a pointer hit names, or `None`. The caller sets the
+    /// cursor and advances it exactly as the row's digit key does.
+    pub fn controls_click(&self, target: HitTarget) -> Option<usize> {
+        match target {
+            HitTarget::ControlsRow(row) => Some(row),
+            _ => None,
+        }
+    }
+
     /// Cycle one control's value in `stats.options`, porting
     /// `views_controls_advance`. A disabled row is a no-op, and the range is
     /// floored at 2 so a value always has somewhere to go.
@@ -1201,7 +1210,7 @@ impl Views {
                 self.draw_worldmap(list, layout, palette, resources, map, fog, game, time)
             }
             Some(ViewKind::Controls) => {
-                self.draw_controls(list, layout, palette, resources, game, present)
+                self.draw_controls(list, hits, layout, palette, resources, game, present)
             }
             Some(ViewKind::Options) => draw_options(list, layout, palette, resources, game),
             Some(ViewKind::Spells) => {
@@ -1511,6 +1520,7 @@ impl Views {
     fn draw_controls(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -1573,6 +1583,11 @@ impl Views {
 
             let label = format!("{} {}", char::from(b'1' + k as u8), control.label.as_str());
             list.text(&label, tx, ty, fg);
+            // Same rect, one line apart: the row's clickable band.
+            hits.push(
+                Rect::new(tx, ty, w - 2 * CTL_PAD, font::GLYPH_H + 2),
+                HitTarget::ControlsRow(k),
+            );
 
             let value = game.stats.options[index];
             if control.kind.as_str() == "bool" {
@@ -1613,6 +1628,10 @@ impl Views {
             };
             let label = format!("{} Scale", char::from(b'1' + vis.len() as u8));
             list.text(&label, tx, ty, fg);
+            hits.push(
+                Rect::new(tx, ty, w - 2 * CTL_PAD, font::GLYPH_H + 2),
+                HitTarget::ControlsRow(vis.len()),
+            );
 
             let sc = present.scale_override();
             let value = if sc <= 0 {
@@ -3870,6 +3889,62 @@ mod tests {
 
         views.controls_advance(&mut game, &resources, 2);
         assert_eq!(game.stats.options[2], 0, "Animation bool 1 -> 0");
+    }
+
+    #[test]
+    fn clicking_a_controls_row_advances_the_same_row_its_digit_does() {
+        let (resources, _, _) = controls_fixtures();
+        let mut by_key = Game::default();
+        let mut by_click = Game::default();
+        let views = Views::new();
+
+        // Digit '1' selects row 0 (Delay) and advances it.
+        views.controls_advance(&mut by_key, &resources, 0);
+        // A click on row 0 names the same control, which the loop advances.
+        let row = views
+            .controls_click(HitTarget::ControlsRow(0))
+            .expect("row 0");
+        views.controls_advance(&mut by_click, &resources, row);
+
+        assert_eq!(by_click.stats.options[0], by_key.stats.options[0]);
+        // A non-row target names nothing.
+        assert_eq!(views.controls_click(HitTarget::ViewDismiss), None);
+    }
+
+    #[test]
+    fn the_controls_hit_regions_line_up_with_the_drawn_rows() {
+        let (resources, layout, catalog) = controls_fixtures();
+        let game = Game::default();
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::for_layout(&layout);
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &game,
+            &present,
+            0.0,
+        );
+
+        for row in 0..controls_visible(&resources).len() {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::ControlsRow(row))
+                .unwrap_or_else(|| panic!("row {row} published no region"));
+            let cx = region.rect.x + region.rect.w / 2;
+            let cy = region.rect.y + region.rect.h / 2;
+            assert_eq!(hits.hit(cx, cy), Some(HitTarget::ControlsRow(row)));
+        }
     }
 
     #[test]
