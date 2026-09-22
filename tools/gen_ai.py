@@ -330,9 +330,9 @@ def prompt_all(path):
     if path.startswith("art/troops/"):
         unit = stem.rsplit("_", 1)[0]
         return (f"a single {TROOP.get(unit, unit)}, one lone figure, full body, side view, "
-                f"centered, isolated game asset sprite, one character only, painterly "
-                f"fantasy strategy game unit, plain flat neutral background, soft light, "
-                f"high detail"), True
+                f"centered, large in frame, isolated game asset sprite, one character only, "
+                f"painterly fantasy strategy game unit, plain flat neutral background, "
+                f"crisp, high detail"), True
     if path.startswith("art/villains/"):
         who = stem.rsplit("_", 1)[0].replace("_", " ")
         return (f"a single villain portrait bust, {who}, menacing, painterly fantasy "
@@ -451,29 +451,63 @@ def fit_sprite(w, h, rgba, tw, th):
     return tw, th, crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th)
 
 
-def render_group_frames(args, path, tw, th):
-    """4 animation frames. Prefer an AI sprite sheet; fall back to a bob."""
+IDLE = [(0, 0), (1, -1), (0, -2), (-1, -1)]
+
+
+def idle_frames(tw, th, rgba):
+    """Four distinct idle frames from one sprite: a small circular bob."""
+    out = []
+    for dx, dy in IDLE:
+        canvas = bytearray(tw * th * 4)
+        for y in range(th):
+            sy = y + dy
+            if not (0 <= sy < th):
+                continue
+            row = sy * tw * 4
+            if dx == 0:
+                canvas[y * tw * 4:(y + 1) * tw * 4] = rgba[row:row + tw * 4]
+            else:
+                for x in range(tw):
+                    sx = x + dx
+                    if 0 <= sx < tw:
+                        canvas[(y * tw + x) * 4:(y * tw + x) * 4 + 4] = \
+                            rgba[row + sx * 4:row + sx * 4 + 4]
+        out.append(bytes(canvas))
+    return out
+
+
+def try_sheet(args, path, tw, th):
     sp = sheet_prompt(path)
-    if sp:
-        seed = stable_seed(path)
-        for attempt in range(args.tries + 1):
-            rgba = generate_sprite(args, path, sp, True, SHEET_W, SHEET_H, seed + attempt, NEG_SHEET)
-            comps = alpha_components(SHEET_W, SHEET_H, rgba)
-            total = sum(len(c) for c in comps) or 1
-            big = [c for c in comps if len(c) > 0.03 * total]
-            if len(big) >= 4:
-                big = sorted(big, key=lambda c: min(j % SHEET_W for j in c))[:4]
-                frames = []
-                for blob in big:
-                    xs = [j % SHEET_W for j in blob]
-                    ys = [j // SHEET_W for j in blob]
-                    frames.append(crop_fit(SHEET_W, SHEET_H, rgba, min(xs), min(ys),
-                                           max(xs), max(ys), tw, th))
-                return frames
-            print(f"  sheet had {len(big)} figures, retry {attempt + 1}", flush=True)
+    if not sp:
+        return None
+    seed = stable_seed(path)
+    for attempt in range(args.tries + 1):
+        rgba = generate_sprite(args, path, sp, True, SHEET_W, SHEET_H, seed + attempt, NEG_SHEET)
+        comps = alpha_components(SHEET_W, SHEET_H, rgba)
+        total = sum(len(c) for c in comps) or 1
+        big = [c for c in comps if len(c) > 0.03 * total]
+        if len(big) >= 4:
+            big = sorted(big, key=lambda c: min(j % SHEET_W for j in c))[:4]
+            frames = []
+            for blob in big:
+                xs = [j % SHEET_W for j in blob]
+                ys = [j // SHEET_W for j in blob]
+                frames.append(crop_fit(SHEET_W, SHEET_H, rgba, min(xs), min(ys),
+                                       max(xs), max(ys), tw, th))
+            return frames
+        print(f"  sheet had {len(big)} figures, retry {attempt + 1}", flush=True)
+    return None
+
+
+def render_group_frames(args, path, tw, th):
+    """4 animation frames: single sprite + idle bob (default), or an AI sheet."""
+    if getattr(args, "sheet", False):
+        frames = try_sheet(args, path, tw, th)
+        if frames:
+            return frames
     p = prompt_all(path)
     _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
-    return [frame_shift(tw, th, rgba, k) for k in (0, 2, 0, 2)]
+    return idle_frames(tw, th, rgba)
 
 
 def render_asset(args, path, positive, matte_wanted, tw, th, base_seed=None):
@@ -699,6 +733,8 @@ def main():
     b.add_argument("--only", default="", help="paths containing this substring")
     b.add_argument("--limit", type=int, default=0, help="stop after N groups")
     b.add_argument("--resume", action="store_true", help="skip existing outputs")
+    b.add_argument("--sheet", action="store_true",
+                   help="try an AI sprite sheet for animated units (experimental)")
     b.set_defaults(func=cmd_batch)
     sub.add_parser("sheet").set_defaults(func=cmd_sheet)
     args = ap.parse_args()
