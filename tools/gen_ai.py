@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 import urllib.parse
 import urllib.request
 
@@ -33,7 +34,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.3"
+VERSION = "1.4"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -904,6 +905,7 @@ def cmd_batch(args):
         except Exception as exc:  # noqa: BLE001
             failed += 1
             print(f"  FAIL {path}: {exc}", file=sys.stderr, flush=True)
+            traceback.print_exc()
             continue
 
     if not args.category or args.category == "tiles":
