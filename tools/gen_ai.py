@@ -34,7 +34,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.5"
+VERSION = "1.6"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -596,10 +596,10 @@ def fit_sprite(w, h, rgba, tw, th):
 # splat overlay, so there is no walk/attack frame split -- it is one resting
 # cycle. The hero is the exception: `hero_walk` plays while he moves on the map.
 IDLE_POSES = [
-    "standing at the ready, weapon held steady",
-    "weight shifting onto the front foot, weapon lifted a little",
-    "standing at the ready, chest up as if breathing in",
-    "weight shifting back, weapon lowered a little",
+    "standing at rest with the weapon lowered at the side",
+    "raising the weapon, arm midway up, torso turning",
+    "weapon raised high overhead, ready to strike",
+    "lowering the weapon back down, returning to rest",
 ]
 WALK_POSES = [
     "standing with feet together",
@@ -975,7 +975,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tries", type=int, default=2,
                     help="retries when a sprite sheet has the wrong figure count")
-    ap.add_argument("--denoise", type=float, default=0.35,
+    ap.add_argument("--denoise", type=float, default=0.45,
                     help="img2img strength for animation frames (0 disables)")
     ap.add_argument("--matte", choices=("cli", "node", "none"), default="cli",
                     help="how to cut out alpha (default: rembg CLI)")
