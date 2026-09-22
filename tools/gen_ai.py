@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "0.6"
+VERSION = "0.7"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -556,23 +556,62 @@ def render_group_frames(args, path, tw, th):
     return idle_frames(tw, th, rgba)
 
 
+def gen_size(tw, th):
+    """A generation size matching the target aspect, multiples of 64, <= 1536."""
+    aspect = tw / th
+    base = 1024
+    if aspect >= 1:
+        w, h = base, int(base / aspect)
+    else:
+        w, h = int(base * aspect), base
+    w = max(256, (w // 64) * 64)
+    h = max(256, (h // 64) * 64)
+    return min(w, 1536), min(h, 1536)
+
+
 def render_asset(args, path, positive, matte_wanted, tw, th, base_seed=None):
     """Generate, and for sprites retry until one blob then frame it in the cell."""
     seed = stable_seed(path) if base_seed is None else base_seed
+    gw, gh = (GEN_W, GEN_H) if matte_wanted else gen_size(tw, th)
     last = None
     for attempt in range(args.tries + 1):
-        rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H, seed + attempt)
+        rgba = generate_sprite(args, path, positive, matte_wanted, gw, gh, seed + attempt)
         if not matte_wanted:
-            _, _, scaled = box_downscale(GEN_W, GEN_H, rgba, tw, th)
+            _, _, scaled = box_downscale(gw, gh, rgba, tw, th)
             return tw, th, scaled
-        comps = alpha_components(GEN_W, GEN_H, rgba)
+        comps = alpha_components(gw, gh, rgba)
         total = sum(len(c) for c in comps) or 1
         big = [c for c in comps if len(c) > 0.05 * total]
         last = rgba
         if len(big) <= 1:
             break
         print(f"  {os.path.basename(path)}: {len(big)} figures, retry {attempt + 1}")
-    return fit_sprite(GEN_W, GEN_H, last, tw, th)
+    return fit_sprite(gw, gh, last, tw, th)
+
+
+CASTLE = {"castle_tl": (0, 0), "castle_br": (1, 0), "castle_tr": (2, 0),
+          "castle_ml": (0, 1), "castle_gate": (1, 1), "castle_mr": (2, 1)}
+
+
+def render_castle(args, scale):
+    """One 3x2 castle image, sliced into the six aligned, opaque pieces."""
+    cw, ch = 48 * scale * 3, 34 * scale * 2
+    gw, gh = gen_size(cw, ch)
+    positive = ("a medieval fantasy stone castle with a central gate and two side towers, "
+                "front view, centered, standing on grassy ground, painterly digital "
+                "painting, fantasy strategy game art, warm light, high detail")
+    rgba = generate_sprite(args, "art/tiles/castle_gate.png", positive, False, gw, gh,
+                           stable_seed("castle"))
+    _, _, full = box_downscale(gw, gh, rgba, cw, ch)
+    tw, th = cw // 3, ch // 2
+    tiles = {}
+    for name, (cx, cy) in CASTLE.items():
+        t = bytearray()
+        for y in range(cy * th, (cy + 1) * th):
+            s = (y * cw + cx * tw) * 4
+            t += full[s:s + tw * 4]
+        tiles[name] = bytes(t)
+    return tiles, tw, th
 
 
 def compose_edges(tiles_dir):
@@ -670,6 +709,22 @@ def cmd_batch(args):
         if key in seen_groups:
             continue
         seen_groups.add(key)
+
+        if stem in CASTLE:
+            if "castle" in seen_groups:
+                continue
+            seen_groups.add("castle")
+            print("gen       castle (3x2) -> 6 pieces", flush=True)
+            try:
+                tiles, ctw, cth = render_castle(args, args.scale)
+                for pname, px in tiles.items():
+                    write_png(os.path.join(OUT, "art", "tiles", pname + ".png"),
+                              ctw, cth, grade(ctw, cth, px))
+                done += 1
+            except Exception as exc:  # noqa: BLE001
+                failed += 1
+                print(f"  FAIL castle: {exc}", file=sys.stderr, flush=True)
+            continue
 
         prompt = prompt_all(path)
         if prompt is None:
