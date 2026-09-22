@@ -34,7 +34,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.7"
+VERSION = "1.8"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -291,6 +291,46 @@ def build_img2img(ckpt, positive, negative, seed, image_name, denoise):
         "10": {"class_type": "SaveImage",
                "inputs": {"images": ["8", 0], "filename_prefix": "ob"}},
     }
+
+
+def build_ipadapter_img2img(ckpt, positive, negative, seed, image_name, denoise,
+                            preset, weight):
+    return {
+        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
+        "20": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "30": {"class_type": "IPAdapterUnifiedLoader",
+               "inputs": {"model": ["4", 0], "preset": preset}},
+        "31": {"class_type": "IPAdapter",
+               "inputs": {"model": ["30", 0], "ipadapter": ["30", 1], "image": ["20", 0],
+                          "weight": weight, "start_at": 0.0, "end_at": 1.0,
+                          "weight_type": "standard"}},
+        "21": {"class_type": "VAEEncode", "inputs": {"pixels": ["20", 0], "vae": ["4", 2]}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
+        "7": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
+        "3": {"class_type": "KSampler",
+              "inputs": {"seed": seed, "steps": 30, "cfg": 6.0,
+                         "sampler_name": "dpmpp_2m", "scheduler": "karras",
+                         "denoise": denoise, "model": ["31", 0],
+                         "positive": ["6", 0], "negative": ["7", 0],
+                         "latent_image": ["21", 0]}},
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
+        "10": {"class_type": "SaveImage",
+               "inputs": {"images": ["8", 0], "filename_prefix": "ob"}},
+    }
+
+
+def resolve_ip_preset(info, want):
+    choices = (info.get("IPAdapterUnifiedLoader", {}).get("input", {})
+               .get("required", {}).get("preset", [[]])[0])
+    if want and want in choices:
+        return want
+    for c in choices:
+        if "PLUS" in c and "FACE" not in c:
+            return c
+    for c in choices:
+        if "STANDARD" in c:
+            return c
+    return choices[0] if choices else "STANDARD (medium strength)"
 
 
 def run_graph_matted(args, graph, matte_wanted):
@@ -708,9 +748,16 @@ def render_group_frames(args, path, tw, th):
     if denoise > 0:
         try:
             name = upload_image(args.host, init)
+            info = http_get(args.host, "/object_info")
             for i in range(1, 4):
                 pos, _ = frame_prompt(path, i)
-                graph = build_img2img(args.ckpt, pos, NEG, seed, name, denoise)
+                if getattr(args, "ipadapter", False):
+                    preset = resolve_ip_preset(info, getattr(args, "ip_preset", ""))
+                    graph = build_ipadapter_img2img(
+                        args.ckpt, pos, NEG, seed, name, denoise, preset,
+                        getattr(args, "ip_weight", 0.8))
+                else:
+                    graph = build_img2img(args.ckpt, pos, NEG, seed, name, denoise)
                 png = generate(args.host, graph)
                 raw = os.path.join(OUT, f"_raw_{i}.png")
                 with open(raw, "wb") as fh:
@@ -989,6 +1036,10 @@ def main():
                     help="retries when a sprite sheet has the wrong figure count")
     ap.add_argument("--denoise", type=float, default=0.45,
                     help="img2img strength for animation frames (0 disables)")
+    ap.add_argument("--ipadapter", action="store_true",
+                    help="condition animation frames on frame 0 via IP-Adapter")
+    ap.add_argument("--ip-weight", type=float, default=0.8)
+    ap.add_argument("--ip-preset", default="", help="IPAdapterUnifiedLoader preset")
     ap.add_argument("--matte", choices=("cli", "node", "none"), default="cli",
                     help="how to cut out alpha (default: rembg CLI)")
     ap.add_argument("--rembg", default="rembg", help="path to the rembg executable")
