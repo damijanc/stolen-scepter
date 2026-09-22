@@ -34,7 +34,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.4"
+VERSION = "1.5"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -691,7 +691,7 @@ def render_group_frames(args, path, tw, th):
     raw0 = generate_sprite(args, path, pos0, False, GEN_W, GEN_H, seed)
     init = os.path.join(OUT, "_init.png")
     write_png(init, GEN_W, GEN_H, raw0)
-    frames = [fit_sprite(GEN_W, GEN_H, matte_file(args, init, "0"), tw, th)]
+    frames = [fit_sprite(GEN_W, GEN_H, matte_file(args, init, "0"), tw, th)[2]]
     denoise = getattr(args, "denoise", 0.0)
     if denoise > 0:
         try:
@@ -703,7 +703,7 @@ def render_group_frames(args, path, tw, th):
                 raw = os.path.join(OUT, f"_raw_{i}.png")
                 with open(raw, "wb") as fh:
                     fh.write(png)
-                frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th))
+                frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th)[2])
             return frames
         except Exception as exc:  # noqa: BLE001
             print(f"  img2img failed ({exc}); using independent frames", flush=True)
@@ -712,7 +712,7 @@ def render_group_frames(args, path, tw, th):
         rgba = generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed)
         raw = os.path.join(OUT, f"_raw_{i}.png")
         write_png(raw, GEN_W, GEN_H, rgba)
-        frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th))
+        frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th)[2])
     return frames
 
 
