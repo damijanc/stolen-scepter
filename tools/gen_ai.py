@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "0.9"
+VERSION = "1.0"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -263,6 +263,12 @@ def run_graph_matted(args, graph, matte_wanted):
         subprocess.run([args.rembg, "i", tmp, cut], check=True)
         src = cut
     return read_png(src)[2]
+
+
+def matte_file(args, raw_path, tag):
+    cut = os.path.join(OUT, f"_cut_{tag}.png")
+    subprocess.run([args.rembg, "i", raw_path, cut], check=True)
+    return read_png(cut)[2]
 
 
 def box_downscale(w, h, rgba, nw, nh):
@@ -647,28 +653,33 @@ def render_group_frames(args, path, tw, th):
         _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
         return idle_frames(tw, th, rgba)
     seed = stable_seed(path)
-    pos0, matte = frame_prompt(path, 0)
-    rgba0 = generate_sprite(args, path, pos0, matte, GEN_W, GEN_H, seed)
-    frames = [fit_sprite(GEN_W, GEN_H, rgba0, tw, th)]
+    os.makedirs(OUT, exist_ok=True)
+    pos0, _ = frame_prompt(path, 0)
+    raw0 = generate_sprite(args, path, pos0, False, GEN_W, GEN_H, seed)
+    init = os.path.join(OUT, "_init.png")
+    write_png(init, GEN_W, GEN_H, raw0)
+    frames = [fit_sprite(GEN_W, GEN_H, matte_file(args, init, "0"), tw, th)]
     denoise = getattr(args, "denoise", 0.0)
     if denoise > 0:
         try:
-            os.makedirs(OUT, exist_ok=True)
-            init = os.path.join(OUT, "_init.png")
-            write_png(init, GEN_W, GEN_H, rgba0)
             name = upload_image(args.host, init)
             for i in range(1, 4):
                 pos, _ = frame_prompt(path, i)
                 graph = build_img2img(args.ckpt, pos, NEG, seed, name, denoise)
-                rgba = run_graph_matted(args, graph, True)
-                frames.append(fit_sprite(GEN_W, GEN_H, rgba, tw, th))
+                png = generate(args.host, graph)
+                raw = os.path.join(OUT, f"_raw_{i}.png")
+                with open(raw, "wb") as fh:
+                    fh.write(png)
+                frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th))
             return frames
         except Exception as exc:  # noqa: BLE001
             print(f"  img2img failed ({exc}); using independent frames", flush=True)
     for i in range(1, 4):
         pos, _ = frame_prompt(path, i)
-        rgba = generate_sprite(args, path, pos, True, GEN_W, GEN_H, seed)
-        frames.append(fit_sprite(GEN_W, GEN_H, rgba, tw, th))
+        rgba = generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed)
+        raw = os.path.join(OUT, f"_raw_{i}.png")
+        write_png(raw, GEN_W, GEN_H, rgba)
+        frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th))
     return frames
 
 
@@ -927,7 +938,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tries", type=int, default=2,
                     help="retries when a sprite sheet has the wrong figure count")
-    ap.add_argument("--denoise", type=float, default=0.5,
+    ap.add_argument("--denoise", type=float, default=0.35,
                     help="img2img strength for animation frames (0 disables)")
     ap.add_argument("--matte", choices=("cli", "node", "none"), default="cli",
                     help="how to cut out alpha (default: rembg CLI)")
