@@ -33,8 +33,14 @@ OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
 GEN_W, GEN_H = 896, 640
-NEG = ("text, watermark, ui, border, frame, perspective, horizon, people, buildings, "
-       "multiple characters, group, crowd, collage, grid, split image, duplicates, "
+SHEET_W, SHEET_H = 1344, 448
+NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
+             "different characters, inconsistent design, mismatched, overlap, cropped, "
+             "blurry, low quality, deformed")
+NEG = ("text, watermark, ui, border, frame, perspective, horizon, buildings, "
+       "multiple figures, two characters, three characters, several, group, crowd, army, "
+       "squad, party, lineup, concept art, character sheet, turnaround, reference sheet, "
+       "collage, grid, split image, panel, clone, duplicate, mirror, reflection, "
        "signature, blurry, low quality, deformed")
 
 TROOP = {
@@ -288,6 +294,24 @@ CLASS = {
 }
 
 
+def sheet_prompt(path):
+    """A 4-pose horizontal sprite sheet for an animated unit, or None."""
+    stem = os.path.basename(path)[:-4]
+    if path.startswith("art/troops/"):
+        unit = stem.rsplit("_", 1)[0]
+        desc = TROOP.get(unit, unit)
+    elif path.startswith("art/sprites/"):
+        if stem.rsplit("_", 1)[0] != "hero_walk":
+            return None
+        desc = "knight hero"
+    else:
+        return None
+    return (f"animation sprite sheet: the same {desc} in 4 sequential idle-animation frames, "
+            f"arranged left to right in one horizontal row, identical character in every "
+            f"frame, full body, side view, evenly spaced, plain flat neutral background, "
+            f"painterly fantasy strategy game art, high detail")
+
+
 def stable_seed(path):
     h = 2166136261
     for ch in path:
@@ -305,9 +329,10 @@ def prompt_all(path):
         return None
     if path.startswith("art/troops/"):
         unit = stem.rsplit("_", 1)[0]
-        return (f"a single {TROOP.get(unit, unit)}, full body, side view, centered, one "
-                f"character only, painterly fantasy strategy game unit sprite, plain flat "
-                f"neutral background, soft light, high detail"), True
+        return (f"a single {TROOP.get(unit, unit)}, one lone figure, full body, side view, "
+                f"centered, isolated game asset sprite, one character only, painterly "
+                f"fantasy strategy game unit, plain flat neutral background, soft light, "
+                f"high detail"), True
     if path.startswith("art/villains/"):
         who = stem.rsplit("_", 1)[0].replace("_", " ")
         return (f"a single villain portrait bust, {who}, menacing, painterly fantasy "
@@ -346,6 +371,128 @@ def frame_shift(w, h, rgba, k):
         if 0 <= sy < h:
             out[y * w * 4:(y + 1) * w * 4] = rgba[sy * w * 4:(sy + 1) * w * 4]
     return bytes(out)
+
+
+def alpha_components(w, h, rgba):
+    """Connected blobs of opaque pixels, largest first."""
+    seen = bytearray(w * h)
+    comps = []
+    for i in range(w * h):
+        if seen[i] or rgba[i * 4 + 3] < 16:
+            continue
+        stack = [i]
+        seen[i] = 1
+        blob = []
+        while stack:
+            j = stack.pop()
+            blob.append(j)
+            x, y = j % w, j // w
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < w and 0 <= ny < h:
+                    k = ny * w + nx
+                    if not seen[k] and rgba[k * 4 + 3] >= 16:
+                        seen[k] = 1
+                        stack.append(k)
+        comps.append(blob)
+    comps.sort(key=len, reverse=True)
+    return comps
+
+
+def bilinear_resize(w, h, rgba, nw, nh):
+    out = bytearray(nw * nh * 4)
+    for y in range(nh):
+        sy = (y + 0.5) * h / nh - 0.5
+        y0 = max(0, min(h - 1, int(sy)))
+        y1 = min(h - 1, y0 + 1)
+        ty = sy - int(sy)
+        for x in range(nw):
+            sx = (x + 0.5) * w / nw - 0.5
+            x0 = max(0, min(w - 1, int(sx)))
+            x1 = min(w - 1, x0 + 1)
+            tx = sx - int(sx)
+            for c in range(4):
+                a = rgba[(y0 * w + x0) * 4 + c]
+                b = rgba[(y0 * w + x1) * 4 + c]
+                d = rgba[(y1 * w + x0) * 4 + c]
+                e = rgba[(y1 * w + x1) * 4 + c]
+                out[(y * nw + x) * 4 + c] = int((a * (1 - tx) + b * tx) * (1 - ty)
+                                                + (d * (1 - tx) + e * tx) * ty)
+    return nw, nh, bytes(out)
+
+
+def crop_fit(w, h, rgba, x0, y0, x1, y1, tw, th):
+    """Crop a source box and letterbox it into a tw x th cell, aspect kept."""
+    bw, bh = x1 - x0 + 1, y1 - y0 + 1
+    crop = bytearray(bw * bh * 4)
+    for y in range(bh):
+        s = ((y0 + y) * w + x0) * 4
+        crop[y * bw * 4:(y + 1) * bw * 4] = rgba[s:s + bw * 4]
+    scale = min(tw / bw, th / bh)
+    nw, nh = max(1, min(tw, int(bw * scale))), max(1, min(th, int(bh * scale)))
+    if (nw, nh) != (bw, bh):
+        _, _, crop = bilinear_resize(bw, bh, bytes(crop), nw, nh)
+    canvas = bytearray(tw * th * 4)
+    ox, oy = (tw - nw) // 2, (th - nh) // 2
+    for y in range(nh):
+        s = y * nw * 4
+        d = ((oy + y) * tw + ox) * 4
+        canvas[d:d + nw * 4] = crop[s:s + nw * 4]
+    return bytes(canvas)
+
+
+def fit_sprite(w, h, rgba, tw, th):
+    """Keep the largest blob, crop to it, and fit it into a tw x th cell."""
+    comps = alpha_components(w, h, rgba)
+    if not comps:
+        return tw, th, bytes(tw * th * 4)
+    blob = comps[0]
+    xs = [j % w for j in blob]
+    ys = [j // w for j in blob]
+    return tw, th, crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th)
+
+
+def render_group_frames(args, path, tw, th):
+    """4 animation frames. Prefer an AI sprite sheet; fall back to a bob."""
+    sp = sheet_prompt(path)
+    if sp:
+        seed = stable_seed(path)
+        for attempt in range(args.tries + 1):
+            rgba = generate_sprite(args, path, sp, True, SHEET_W, SHEET_H, seed + attempt, NEG_SHEET)
+            comps = alpha_components(SHEET_W, SHEET_H, rgba)
+            total = sum(len(c) for c in comps) or 1
+            big = [c for c in comps if len(c) > 0.03 * total]
+            if len(big) >= 4:
+                big = sorted(big, key=lambda c: min(j % SHEET_W for j in c))[:4]
+                frames = []
+                for blob in big:
+                    xs = [j % SHEET_W for j in blob]
+                    ys = [j // SHEET_W for j in blob]
+                    frames.append(crop_fit(SHEET_W, SHEET_H, rgba, min(xs), min(ys),
+                                           max(xs), max(ys), tw, th))
+                return frames
+            print(f"  sheet had {len(big)} figures, retry {attempt + 1}", flush=True)
+    p = prompt_all(path)
+    _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
+    return [frame_shift(tw, th, rgba, k) for k in (0, 2, 0, 2)]
+
+
+def render_asset(args, path, positive, matte_wanted, tw, th, base_seed=None):
+    """Generate, and for sprites retry until one blob then frame it in the cell."""
+    seed = stable_seed(path) if base_seed is None else base_seed
+    last = None
+    for attempt in range(args.tries + 1):
+        rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H, seed + attempt)
+        if not matte_wanted:
+            _, _, scaled = box_downscale(GEN_W, GEN_H, rgba, tw, th)
+            return tw, th, scaled
+        comps = alpha_components(GEN_W, GEN_H, rgba)
+        total = sum(len(c) for c in comps) or 1
+        big = [c for c in comps if len(c) > 0.05 * total]
+        last = rgba
+        if len(big) <= 1:
+            break
+        print(f"  {os.path.basename(path)}: {len(big)} figures, retry {attempt + 1}")
+    return fit_sprite(GEN_W, GEN_H, last, tw, th)
 
 
 def compose_edges(tiles_dir):
@@ -399,9 +546,9 @@ def need_rembg(args, category="", assets=None):
              "~/dev/ai/matte-venv) or pass --rembg /full/path/to/rembg.")
 
 
-def generate_sprite(args, path, positive, matte_wanted, w, h):
+def generate_sprite(args, path, positive, matte_wanted, w, h, seed, neg=NEG):
     matte = None
-    graph = build_graph(args.ckpt, positive, NEG, stable_seed(path), w, h, matte)
+    graph = build_graph(args.ckpt, positive, neg, seed, w, h, matte)
     png = generate(args.host, graph)
     tmp = os.path.join(OUT, "_raw.png")
     with open(tmp, "wb") as fh:
@@ -455,20 +602,16 @@ def cmd_batch(args):
             print(f"skip      {path}")
             continue
         try:
+            tw = asset["native"]["w"] * args.scale
+            th = asset["native"]["h"] * args.scale
             if group is None:
                 print(f"gen       {path}", flush=True)
-                rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H)
-                tw, th = asset["native"]["w"] * args.scale, asset["native"]["h"] * args.scale
-                _, _, rgba = box_downscale(GEN_W, GEN_H, rgba, tw, th)
-                rgba = grade(tw, th, rgba)
-                write_png(outs[0], tw, th, rgba)
+                tw, th, rgba = render_asset(args, path, positive, matte_wanted, tw, th)
+                write_png(outs[0], tw, th, grade(tw, th, rgba))
             else:
                 print(f"gen       {group}  -> 4 frames", flush=True)
-                rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H)
-                tw, th = asset["native"]["w"] * args.scale, asset["native"]["h"] * args.scale
-                _, _, rgba = box_downscale(GEN_W, GEN_H, rgba, tw, th)
-                for i, k in enumerate((0, 2, 0, 2)):
-                    f = frame_shift(tw, th, rgba, k)
+                frames = render_group_frames(args, path, tw, th)
+                for i, f in enumerate(frames):
                     write_png(outs[i], tw, th, grade(tw, th, f))
             done += 1
         except Exception as exc:  # noqa: BLE001
@@ -515,35 +658,17 @@ def cmd_one(args):
     if asset is None:
         sys.exit(f"no such asset in manifest: {args.path}")
     positive, matte_wanted = prompt_for(args.path)
-    mode = args.matte if matte_wanted else "none"
+    mode = "cli" if (matte_wanted and args.matte != "none") else "none"
     if mode == "cli":
         need_rembg(args, assets=[asset])
-    matte = None
-    if mode == "node":
-        info = http_get(args.host, "/object_info")
-        cls = args.matte_node or find_matte(info)
-        if cls:
-            slot = matte_image_slot(info, cls)
-            matte = (cls, matte_node_inputs(info, cls, ["8", 0]), slot)
     print(f"asset     {args.path}")
     print(f"positive  {positive}")
     print(f"matte     {mode}")
 
-    graph = build_graph(args.ckpt, positive, NEG, args.seed, GEN_W, GEN_H, matte)
-    png = generate(args.host, graph)
     os.makedirs(OUT, exist_ok=True)
-    tmp = os.path.join(OUT, "_raw.png")
-    with open(tmp, "wb") as fh:
-        fh.write(png)
-    src_file = tmp
-    if mode == "cli":
-        cut = os.path.join(OUT, "_cut.png")
-        subprocess.run([args.rembg, "i", tmp, cut], check=True)
-        src_file = cut
-    w, h, rgba = read_png(src_file)
     tw = asset["native"]["w"] * args.scale
     th = asset["native"]["h"] * args.scale
-    w, h, rgba = box_downscale(w, h, rgba, tw, th)
+    w, h, rgba = render_asset(args, args.path, positive, matte_wanted, tw, th, args.seed)
     rgba = grade(w, h, rgba)
     dst = os.path.join(OUT, args.path)
     write_png(dst, w, h, rgba)
@@ -558,6 +683,8 @@ def main():
     ap.add_argument("--ckpt", default=CKPT)
     ap.add_argument("--scale", type=int, default=4)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--tries", type=int, default=2,
+                    help="retries when a sprite sheet has the wrong figure count")
     ap.add_argument("--matte", choices=("cli", "node", "none"), default="cli",
                     help="how to cut out alpha (default: rembg CLI)")
     ap.add_argument("--rembg", default="rembg", help="path to the rembg executable")
