@@ -34,7 +34,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.6"
+VERSION = "1.7"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -151,6 +151,18 @@ def cmd_probe(args):
         print("matte inputs:", {k: v[0] if isinstance(v, list) else v for k, v in req.items()})
         print("matte outputs:", info[matte].get("output_name", info[matte].get("output")))
     print("prompt endpoint reachable:", http_get(args.host, "/queue") is not None)
+    print("--- IP-Adapter nodes ---")
+    for cls, spec in sorted(info.items()):
+        if "ipadapter" in cls.lower():
+            req = spec.get("input", {}).get("required", {})
+            fields = {}
+            for k, v in req.items():
+                t = v[0] if v else None
+                if isinstance(t, list):
+                    fields[k] = f"choice[{len(t)}] e.g. {t[:3]}"
+                else:
+                    fields[k] = t
+            print(f"{cls}: in={fields} out={spec.get('output_name') or spec.get('output')}")
     return 0
 
 
