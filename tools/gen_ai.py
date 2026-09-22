@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "0.7"
+VERSION = "0.8"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -321,6 +321,52 @@ def stable_seed(path):
     return h % 1_000_000_000
 
 
+UI_FULL = {
+    "backdrop_town", "backdrop_castle", "backdrop_plains", "backdrop_forest",
+    "backdrop_hillcave", "backdrop_dungeon", "splash_title", "class_select_picker",
+    "hud_bar_strip", "hud_puzzle_grid", "end_grass", "end_carpet",
+    "end_win_screen", "end_lose_screen", "chrome_overworld",
+}
+UI_DESC = {
+    "backdrop_town": "a medieval fantasy town, distant view",
+    "backdrop_castle": "a medieval castle on a hill, distant view",
+    "backdrop_plains": "rolling grassy plains, distant view",
+    "backdrop_forest": "a dense green forest, distant view",
+    "backdrop_hillcave": "a rocky cave entrance in green hills",
+    "backdrop_dungeon": "a dark stone dungeon interior lit by torches",
+    "splash_logo": "an ornate fantasy game emblem in gold",
+    "splash_title": "an epic fantasy strategy game title: a great castle under a "
+                    "dramatic sky",
+    "class_select_picker": "an ornate empty stone frame for character portraits",
+    "class_select_highlight": "a glowing golden selection frame",
+    "hud_bar_strip": "an ornate horizontal decorative stone bar",
+    "hud_contract_silhouette": "a hooded villain silhouette",
+    "hud_siege_silhouette": "a catapult siege engine silhouette",
+    "hud_magic_silhouette": "a spellbook silhouette",
+    "hud_puzzle_grid": "a small parchment map grid",
+    "hud_gold_purse": "a small bag of gold coins",
+    "end_grass": "a top-down green grass tile",
+    "end_carpet": "a top-down red carpet tile",
+    "end_hero": "a small knight hero standing on a tile",
+    "end_win_screen": "a triumphant victory scene with a hero on a throne",
+    "end_lose_screen": "a sombre defeat scene in a dark throne room",
+    "chrome_overworld": "an ornate stone game interface frame border with an empty center",
+}
+
+
+def ui_prompt(stem):
+    if stem.startswith("inventory_artifact_"):
+        return f"an inventory icon of a {stem[len('inventory_artifact_'):]}, painterly", True
+    if stem.startswith("inventory_zone_"):
+        return (f"a rolled parchment map icon of {stem[len('inventory_zone_'):]}, painterly"), True
+    if stem.startswith(("hud_siege_", "hud_magic_")):
+        return f"{stem}, a small game icon, painterly", True
+    if stem in UI_DESC:
+        return (f"{UI_DESC[stem]}, painterly digital painting, fantasy strategy game art, "
+                f"high detail"), stem not in UI_FULL
+    return None
+
+
 def prompt_all(path):
     name = os.path.basename(path)
     stem = name[:-4]
@@ -352,7 +398,7 @@ def prompt_all(path):
                     "high detail"), True
         return None
     if path.startswith("art/classes/"):
-        return (f"a single {CLASS.get(stem, stem)} character portrait bust, painterly fantasy "
+        return (f"{CLASS.get(stem, stem)}, character portrait bust, painterly fantasy "
                 f"strategy game art, centered, plain background, high detail"), True
     if path.startswith("art/objects/") or stem in OBJECT:
         desc = OBJECT.get(stem)
@@ -361,8 +407,10 @@ def prompt_all(path):
                     f"asset, plain flat neutral background, high detail"), True
     if stem in COMBAT:
         opaque = stem == "field_grass"
-        return (f"a single {COMBAT[stem]}, centered, painterly fantasy strategy game asset, "
+        return (f"{COMBAT[stem]}, centered, painterly fantasy strategy game asset, "
                 f"plain flat neutral background, high detail"), not opaque
+    if path.startswith("art/ui/"):
+        return ui_prompt(stem)
     return None
 
 
