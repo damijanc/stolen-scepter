@@ -16,6 +16,7 @@ Stdlib only. ComfyUI must be running (default http://127.0.0.1:8188).
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -371,6 +372,33 @@ def compose_edges(tiles_dir):
     print("composed 48 terrain edges")
 
 
+def resolve_rembg(arg):
+    """Find the rembg executable: an explicit path, PATH, or the matte venv."""
+    if arg and arg != "rembg":
+        return arg if os.path.exists(arg) else shutil.which(arg)
+    found = shutil.which("rembg")
+    if found:
+        return found
+    fallback = os.path.expanduser("~/dev/ai/matte-venv/bin/rembg")
+    return fallback if os.path.exists(fallback) else None
+
+
+def need_rembg(args, category="", assets=None):
+    if args.matte != "cli":
+        return None
+    found = resolve_rembg(getattr(args, "rembg", "rembg"))
+    if found:
+        args.rembg = found
+        return found
+    if category == "tiles" or (assets is not None and not any(
+            a["path"].startswith(("art/troops/", "art/villains/", "art/sprites/",
+                                  "art/classes/", "art/combat/", "art/objects/"))
+            for a in assets)):
+        return None
+    sys.exit("rembg not found. Install it (pip install \"rembg[cpu]\" in "
+             "~/dev/ai/matte-venv) or pass --rembg /full/path/to/rembg.")
+
+
 def generate_sprite(args, path, positive, matte_wanted, w, h):
     matte = None
     graph = build_graph(args.ckpt, positive, NEG, stable_seed(path), w, h, matte)
@@ -391,6 +419,7 @@ def cmd_batch(args):
         assets = [a for a in json.load(fh)["assets"] if a["engine_used"]]
     if args.category:
         assets = [a for a in assets if a["path"].startswith("art/" + args.category + "/")]
+    need_rembg(args, args.category, assets)
     os.makedirs(OUT, exist_ok=True)
     tiles_dir = os.path.join(OUT, "art", "tiles")
     os.makedirs(tiles_dir, exist_ok=True)
@@ -487,6 +516,8 @@ def cmd_one(args):
         sys.exit(f"no such asset in manifest: {args.path}")
     positive, matte_wanted = prompt_for(args.path)
     mode = args.matte if matte_wanted else "none"
+    if mode == "cli":
+        need_rembg(args, assets=[asset])
     matte = None
     if mode == "node":
         info = http_get(args.host, "/object_info")
