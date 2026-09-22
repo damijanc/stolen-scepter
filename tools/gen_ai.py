@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.1"
+VERSION = "1.2"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -960,6 +960,7 @@ def cmd_one(args):
 
 
 def main():
+    global OUT
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="http://127.0.0.1:8188")
@@ -974,6 +975,7 @@ def main():
                     help="how to cut out alpha (default: rembg CLI)")
     ap.add_argument("--rembg", default="rembg", help="path to the rembg executable")
     ap.add_argument("--matte-node", default="")
+    ap.add_argument("--out", default=OUT, help="output directory")
     sub = ap.add_subparsers(dest="command", required=True)
     sub.add_parser("probe").set_defaults(func=cmd_probe)
     p = sub.add_parser("one")
@@ -991,6 +993,7 @@ def main():
     b.set_defaults(func=cmd_batch)
     sub.add_parser("sheet").set_defaults(func=cmd_sheet)
     args = ap.parse_args()
+    OUT = os.path.abspath(args.out)
     sys.exit(args.func(args))
 
 
