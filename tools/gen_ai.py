@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "0.4"
+VERSION = "0.5"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -453,6 +453,27 @@ def fit_sprite(w, h, rgba, tw, th):
     return tw, th, crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th)
 
 
+FRAME_POSES = [
+    "standing with the feet together",
+    "mid-stride with the left leg stepping forward, weapon raised",
+    "standing with the feet together, body lifted slightly",
+    "mid-stride with the right leg stepping forward, weapon lowered",
+]
+
+
+def frame_prompt(path, i):
+    stem = os.path.basename(path)[:-4]
+    if path.startswith("art/troops/"):
+        desc = TROOP.get(stem.rsplit("_", 1)[0], stem)
+    elif path.startswith("art/sprites/") and stem.rsplit("_", 1)[0] == "hero_walk":
+        desc = "knight hero"
+    else:
+        return None
+    return (f"a single {desc}, {FRAME_POSES[i]}, full body, side view, centered, large in "
+            f"frame, one character only, consistent character design, painterly fantasy "
+            f"strategy game unit, plain flat neutral background, crisp, high detail"), True
+
+
 def idle_frames(tw, th, rgba):
     """Four distinct idle frames from one sprite: a small circular bob.
 
@@ -504,11 +525,19 @@ def try_sheet(args, path, tw, th):
 
 
 def render_group_frames(args, path, tw, th):
-    """4 animation frames: single sprite + idle bob (default), or an AI sheet."""
+    """4 frames: per-frame pose prompts (default), an AI sheet (--sheet), or a bob."""
     if getattr(args, "sheet", False):
         frames = try_sheet(args, path, tw, th)
         if frames:
             return frames
+    if frame_prompt(path, 0) is not None:
+        seed = stable_seed(path)
+        frames = []
+        for i in range(4):
+            pos, matte = frame_prompt(path, i)
+            _, _, rgba = render_asset(args, path, pos, matte, tw, th, base_seed=seed + i)
+            frames.append(rgba)
+        return frames
     p = prompt_all(path)
     _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
     return idle_frames(tw, th, rgba)
