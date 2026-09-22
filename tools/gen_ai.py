@@ -34,7 +34,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.8"
+VERSION = "1.9"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -151,6 +151,16 @@ def cmd_probe(args):
         print("matte inputs:", {k: v[0] if isinstance(v, list) else v for k, v in req.items()})
         print("matte outputs:", info[matte].get("output_name", info[matte].get("output")))
     print("prompt endpoint reachable:", http_get(args.host, "/queue") is not None)
+
+    import glob
+    for base in ("~/dev/ai/ComfyUI", "~/ComfyUI", "~/Development/ComfyUI"):
+        root = os.path.expanduser(base)
+        if os.path.isdir(os.path.join(root, "models", "clip_vision")):
+            for sub in ("clip_vision", "ipadapter"):
+                files = [os.path.basename(p)
+                         for p in glob.glob(os.path.join(root, "models", sub, "*"))]
+                print(f"{sub} files:", files)
+            break
     print("--- IP-Adapter nodes ---")
     for cls, spec in sorted(info.items()):
         if "ipadapter" in cls.lower():
@@ -244,7 +254,8 @@ def generate(host, graph, timeout=600):
     while time.time() - start < timeout:
         hist = http_get(host, f"/history/{pid}")
         if pid in hist:
-            outputs = hist[pid].get("outputs", {})
+            entry = hist[pid]
+            outputs = entry.get("outputs", {})
             for node in outputs.values():
                 for img in node.get("images", []):
                     if img.get("type") in ("output", None):
@@ -252,6 +263,11 @@ def generate(host, graph, timeout=600):
                              f"&subfolder={urllib.parse.quote(img.get('subfolder',''))}"
                              f"&type=output")
                         return http_get(host, q, raw=True)
+            status = entry.get("status", {})
+            if status.get("status_str") == "error":
+                raise RuntimeError(f"comfyui error: {status.get('messages', status)}")
+            if not outputs and status.get("completed"):
+                raise RuntimeError("comfyui returned no output image")
         time.sleep(2)
     raise TimeoutError("generation timed out")
 
