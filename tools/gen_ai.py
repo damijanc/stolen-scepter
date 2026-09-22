@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "0.8"
+VERSION = "0.9"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -212,6 +212,57 @@ def generate(host, graph, timeout=600):
                         return http_get(host, q, raw=True)
         time.sleep(2)
     raise TimeoutError("generation timed out")
+
+
+def upload_image(host, path):
+    """POST a PNG to ComfyUI's input dir; returns the name LoadImage expects."""
+    data = open(path, "rb").read()
+    boundary = "----ob-boundary-7f3a"
+    body = (f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="image"; filename="ob_frame.png"\r\n'
+            f"Content-Type: image/png\r\n\r\n").encode() + data + b"\r\n"
+    body += (f"--{boundary}\r\n"
+             f'Content-Disposition: form-data; name="overwrite"\r\n\r\n1\r\n').encode()
+    body += f"--{boundary}--\r\n".encode()
+    req = urllib.request.Request(host + "/upload/image", data=body,
+                                 headers={"Content-Type":
+                                          f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        doc = json.loads(r.read())
+    return doc.get("name", "ob_frame.png")
+
+
+def build_img2img(ckpt, positive, negative, seed, image_name, denoise):
+    return {
+        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
+        "20": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "21": {"class_type": "VAEEncode", "inputs": {"pixels": ["20", 0], "vae": ["4", 2]}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
+        "7": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
+        "3": {"class_type": "KSampler",
+              "inputs": {"seed": seed, "steps": 30, "cfg": 6.0,
+                         "sampler_name": "dpmpp_2m", "scheduler": "karras",
+                         "denoise": denoise, "model": ["4", 0],
+                         "positive": ["6", 0], "negative": ["7", 0],
+                         "latent_image": ["21", 0]}},
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
+        "10": {"class_type": "SaveImage",
+               "inputs": {"images": ["8", 0], "filename_prefix": "ob"}},
+    }
+
+
+def run_graph_matted(args, graph, matte_wanted):
+    png = generate(args.host, graph)
+    os.makedirs(OUT, exist_ok=True)
+    tmp = os.path.join(OUT, "_raw.png")
+    with open(tmp, "wb") as fh:
+        fh.write(png)
+    src = tmp
+    if matte_wanted and args.matte == "cli":
+        cut = os.path.join(OUT, "_cut.png")
+        subprocess.run([args.rembg, "i", tmp, cut], check=True)
+        src = cut
+    return read_png(src)[2]
 
 
 def box_downscale(w, h, rgba, nw, nh):
@@ -586,22 +637,39 @@ def try_sheet(args, path, tw, th):
 
 
 def render_group_frames(args, path, tw, th):
-    """4 frames: per-frame pose prompts (default), an AI sheet (--sheet), or a bob."""
+    """4 frames: single sprite + img2img poses (default), AI sheet, or a bob."""
     if getattr(args, "sheet", False):
         frames = try_sheet(args, path, tw, th)
         if frames:
             return frames
-    if frame_prompt(path, 0) is not None:
-        seed = stable_seed(path)
-        frames = []
-        for i in range(4):
-            pos, matte = frame_prompt(path, i)
-            _, _, rgba = render_asset(args, path, pos, matte, tw, th, base_seed=seed + i)
-            frames.append(rgba)
-        return frames
-    p = prompt_all(path)
-    _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
-    return idle_frames(tw, th, rgba)
+    if frame_prompt(path, 0) is None:
+        p = prompt_all(path)
+        _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
+        return idle_frames(tw, th, rgba)
+    seed = stable_seed(path)
+    pos0, matte = frame_prompt(path, 0)
+    rgba0 = generate_sprite(args, path, pos0, matte, GEN_W, GEN_H, seed)
+    frames = [fit_sprite(GEN_W, GEN_H, rgba0, tw, th)]
+    denoise = getattr(args, "denoise", 0.0)
+    if denoise > 0:
+        try:
+            os.makedirs(OUT, exist_ok=True)
+            init = os.path.join(OUT, "_init.png")
+            write_png(init, GEN_W, GEN_H, rgba0)
+            name = upload_image(args.host, init)
+            for i in range(1, 4):
+                pos, _ = frame_prompt(path, i)
+                graph = build_img2img(args.ckpt, pos, NEG, seed, name, denoise)
+                rgba = run_graph_matted(args, graph, True)
+                frames.append(fit_sprite(GEN_W, GEN_H, rgba, tw, th))
+            return frames
+        except Exception as exc:  # noqa: BLE001
+            print(f"  img2img failed ({exc}); using independent frames", flush=True)
+    for i in range(1, 4):
+        pos, _ = frame_prompt(path, i)
+        rgba = generate_sprite(args, path, pos, True, GEN_W, GEN_H, seed)
+        frames.append(fit_sprite(GEN_W, GEN_H, rgba, tw, th))
+    return frames
 
 
 def gen_size(tw, th):
@@ -714,18 +782,8 @@ def need_rembg(args, category="", assets=None):
 
 
 def generate_sprite(args, path, positive, matte_wanted, w, h, seed, neg=NEG):
-    matte = None
-    graph = build_graph(args.ckpt, positive, neg, seed, w, h, matte)
-    png = generate(args.host, graph)
-    tmp = os.path.join(OUT, "_raw.png")
-    with open(tmp, "wb") as fh:
-        fh.write(png)
-    src = tmp
-    if matte_wanted and args.matte == "cli":
-        cut = os.path.join(OUT, "_cut.png")
-        subprocess.run([args.rembg, "i", tmp, cut], check=True)
-        src = cut
-    return read_png(src)[2]
+    graph = build_graph(args.ckpt, positive, neg, seed, w, h, None)
+    return run_graph_matted(args, graph, matte_wanted)
 
 
 def cmd_batch(args):
@@ -869,6 +927,8 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tries", type=int, default=2,
                     help="retries when a sprite sheet has the wrong figure count")
+    ap.add_argument("--denoise", type=float, default=0.5,
+                    help="img2img strength for animation frames (0 disables)")
     ap.add_argument("--matte", choices=("cli", "node", "none"), default="cli",
                     help="how to cut out alpha (default: rembg CLI)")
     ap.add_argument("--rembg", default="rembg", help="path to the rembg executable")
