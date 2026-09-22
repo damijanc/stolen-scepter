@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "0.5"
+VERSION = "0.6"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -331,8 +331,8 @@ def prompt_all(path):
         return None
     if path.startswith("art/troops/"):
         unit = stem.rsplit("_", 1)[0]
-        return (f"a single {TROOP.get(unit, unit)}, one lone figure, full body, side view, "
-                f"centered, large in frame, isolated game asset sprite, one character only, "
+        return (f"a single {TROOP.get(unit, unit)}, one lone figure, full body, side view "
+                f"facing right, centered, large in frame, isolated game asset sprite, one character only, "
                 f"painterly fantasy strategy game unit, plain flat neutral background, "
                 f"crisp, high detail"), True
     if path.startswith("art/villains/"):
@@ -453,11 +453,21 @@ def fit_sprite(w, h, rgba, tw, th):
     return tw, th, crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th)
 
 
-FRAME_POSES = [
-    "standing with the feet together",
-    "mid-stride with the left leg stepping forward, weapon raised",
-    "standing with the feet together, body lifted slightly",
-    "mid-stride with the right leg stepping forward, weapon lowered",
+# Combat units loop a 4-frame IDLE animation (combat.h: `frame // 0..3 idle
+# anim`, advanced by `combat_tick_anim`). Movement is instant and attacks are a
+# splat overlay, so there is no walk/attack frame split -- it is one resting
+# cycle. The hero is the exception: `hero_walk` plays while he moves on the map.
+IDLE_POSES = [
+    "standing at the ready, weapon held steady",
+    "weight shifting onto the front foot, weapon lifted a little",
+    "standing at the ready, chest up as if breathing in",
+    "weight shifting back, weapon lowered a little",
+]
+WALK_POSES = [
+    "standing with feet together",
+    "mid-stride with the left leg forward, weapon raised",
+    "standing with feet together, body lifted",
+    "mid-stride with the right leg forward, weapon lowered",
 ]
 
 
@@ -465,13 +475,16 @@ def frame_prompt(path, i):
     stem = os.path.basename(path)[:-4]
     if path.startswith("art/troops/"):
         desc = TROOP.get(stem.rsplit("_", 1)[0], stem)
+        poses = IDLE_POSES
     elif path.startswith("art/sprites/") and stem.rsplit("_", 1)[0] == "hero_walk":
         desc = "knight hero"
+        poses = WALK_POSES
     else:
         return None
-    return (f"a single {desc}, {FRAME_POSES[i]}, full body, side view, centered, large in "
-            f"frame, one character only, consistent character design, painterly fantasy "
-            f"strategy game unit, plain flat neutral background, crisp, high detail"), True
+    return (f"a single {desc}, {poses[i]}, full body, side view facing right, centered, "
+            f"large in frame, one character only, consistent character design, painterly "
+            f"fantasy strategy game unit, plain flat neutral background, crisp, high "
+            f"detail"), True
 
 
 def idle_frames(tw, th, rgba):
