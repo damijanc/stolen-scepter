@@ -15,6 +15,7 @@ Stdlib only. ComfyUI must be running (default http://127.0.0.1:8188).
 """
 import argparse
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -32,7 +33,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.2"
+VERSION = "1.3"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -537,21 +538,24 @@ def bilinear_resize(w, h, rgba, nw, nh):
     out = bytearray(nw * nh * 4)
     for y in range(nh):
         sy = (y + 0.5) * h / nh - 0.5
-        y0 = max(0, min(h - 1, int(sy)))
+        y0 = math.floor(sy)
+        ty = min(1.0, max(0.0, sy - y0))
+        y0 = max(0, min(h - 1, y0))
         y1 = min(h - 1, y0 + 1)
-        ty = sy - int(sy)
         for x in range(nw):
             sx = (x + 0.5) * w / nw - 0.5
-            x0 = max(0, min(w - 1, int(sx)))
+            x0 = math.floor(sx)
+            tx = min(1.0, max(0.0, sx - x0))
+            x0 = max(0, min(w - 1, x0))
             x1 = min(w - 1, x0 + 1)
-            tx = sx - int(sx)
+            base = (y * nw + x) * 4
             for c in range(4):
                 a = rgba[(y0 * w + x0) * 4 + c]
                 b = rgba[(y0 * w + x1) * 4 + c]
                 d = rgba[(y1 * w + x0) * 4 + c]
                 e = rgba[(y1 * w + x1) * 4 + c]
-                out[(y * nw + x) * 4 + c] = int((a * (1 - tx) + b * tx) * (1 - ty)
-                                                + (d * (1 - tx) + e * tx) * ty)
+                v = (a * (1 - tx) + b * tx) * (1 - ty) + (d * (1 - tx) + e * tx) * ty
+                out[base + c] = min(255, max(0, int(v + 0.5)))
     return nw, nh, bytes(out)
 
 
