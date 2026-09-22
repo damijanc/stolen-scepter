@@ -32,7 +32,8 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-GEN_W, GEN_H = 896, 640
+VERSION = "0.4"
+GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
              "different characters, inconsistent design, mismatched, overlap, cropped, "
@@ -108,6 +109,7 @@ def find_matte(info):
 
 
 def cmd_probe(args):
+    print(f"gen_ai version {VERSION}")
     info = http_get(args.host, "/object_info")
     ckpts = info.get("CheckpointLoaderSimple", {}).get("input", {}).get("required", {}) \
                 .get("ckpt_name", [[]])[0]
@@ -451,13 +453,15 @@ def fit_sprite(w, h, rgba, tw, th):
     return tw, th, crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th)
 
 
-IDLE = [(0, 0), (1, -1), (0, -2), (-1, -1)]
-
-
 def idle_frames(tw, th, rgba):
-    """Four distinct idle frames from one sprite: a small circular bob."""
+    """Four distinct idle frames from one sprite: a small circular bob.
+
+    The bob amplitude scales with the cell so it stays visible as the art
+    resolution grows.
+    """
+    amp = max(1, th // 68)
     out = []
-    for dx, dy in IDLE:
+    for dx, dy in [(0, 0), (amp, -amp), (0, -2 * amp), (-amp, -amp)]:
         canvas = bytearray(tw * th * 4)
         for y in range(th):
             sy = y + dy
@@ -600,6 +604,7 @@ def cmd_batch(args):
         assets = [a for a in json.load(fh)["assets"] if a["engine_used"]]
     if args.category:
         assets = [a for a in assets if a["path"].startswith("art/" + args.category + "/")]
+    print(f"gen_ai version {VERSION}, scale {args.scale}, gen {GEN_W}x{GEN_H}", flush=True)
     need_rembg(args, args.category, assets)
     os.makedirs(OUT, exist_ok=True)
     tiles_dir = os.path.join(OUT, "art", "tiles")
@@ -715,7 +720,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="http://127.0.0.1:8188")
     ap.add_argument("--ckpt", default=CKPT)
-    ap.add_argument("--scale", type=int, default=4)
+    ap.add_argument("--scale", type=int, default=6, help="art pixel multiple (6 -> 288x204)")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tries", type=int, default=2,
                     help="retries when a sprite sheet has the wrong figure count")
