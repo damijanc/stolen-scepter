@@ -39,6 +39,13 @@ Every behavioral claim carries the layer it came from:
   the game is complete.
 - **DEAD** -- present in the pack or C headers but never used by C. Listed so
   nobody "fixes" it into existence.
+- **BY DESIGN** -- C does it and this port deliberately does not.
+- **OUT OF SCOPE** -- C shell tooling that is not part of playing.
+
+Last refreshed 2026-09-22, against `06db5cb`. Several §13 entries had gone
+stale by then -- the startup wizard, the defeat message and the villain
+capture banner were all listed as missing after they shipped. Re-check a
+status against the code before trusting it.
 
 ## How to run
 
@@ -66,11 +73,16 @@ suspect and needs checking against the manual or the original binaries in
 
 # 1. Starting a game
 
-**Status: GAP.** The class picker, name entry, difficulty selection and the save
-slot picker are all unported (`reference/src/startup.c`, 856 lines). The shell
-hardcodes a Knight named "sir rust" on seed 42, so every run is identical.
+**Status: OK.** The pre-game wizard (`shell/src/startup.rs`) runs the two splash
+screens, the credits screen, class select, name entry and the difficulty picker
+before the world loads. `L` on class select opens the save slot picker
+(`shell/src/savepath.rs`), and a LOAD choice hydrates through `save_read`.
 
-What the finished flow owes, once built:
+The seed comes from `--seed <n>` when the flag is passed, and otherwise from
+time + name + class exactly as C derives it, so an unflagged run is a fresh
+world each time.
+
+What the flow offers:
 
 - Four classes [PACK] [MANUAL] -- these four stat lines are confirmed to match
   the manual exactly, which is a good sign for the pack's fidelity:
@@ -86,8 +98,12 @@ What the finished flow owes, once built:
 - Four difficulties, which set the day budget [PACK]: easy 900, normal 600,
   hard 400, impossible 200.
 
-**Verify when built:** that the Sorceress alone can cast from turn one, and that
-choosing a difficulty actually changes the starting day count.
+**Verify in play:**
+
+1. That the Sorceress alone can cast from turn one.
+2. That choosing a difficulty actually changes the starting day count.
+3. Start two runs with no `--seed` and confirm the worlds differ; then pass the
+   same `--seed` twice and confirm they match.
 
 ---
 
@@ -302,8 +318,10 @@ Other quirks:
   animation ticks while it is up [C]. Both are read-only and close on any key.
   Both openers are suppressed while a spell cast or a target picker is
   mid-flight, because `A` is also the picker's confirm key [C].
-- C also opens an Options menu from combat with `O`. **GAP** -- the shell has no
-  Options view yet (§13), so that key does nothing here.
+- C also opens an Options menu from combat with `O`. **GAP** -- the Options view
+  exists and `O` opens it on the overworld (`main.rs` `Action::OptionsMenu`),
+  but the combat key handler only emits `CombatStatus::OpenView` for Army and
+  Character (`combat.rs:482`), so `O` does nothing during a fight.
 - The AI acts **once per completed 4-frame animation cycle** (150ms per frame)
   so its units visibly walk [C].
 - Retaliation is melee-only, once per round per defender, and ranged attacks
@@ -312,8 +330,9 @@ Other quirks:
   attack, including one that kills the whole stack [C].
 - Victory credits spoils, writes surviving stacks back, and compacts the army so
   the army view has no gaps [C].
-- Defeat forfeits army, siege weapons and boat, and returns the hero to the home
-  spawn -- **but currently shows no message. GAP** (see §13).
+- Defeat forfeits army, siege weapons and boat, returns the hero to the home
+  spawn, and shows the pack's untitled `banners.temp_death` text afterwards
+  (`main.rs:265`).
 - Morale is a 5x5 chart [PACK]; check it against the manual's morale chart.
 
 **Verify in play:**
@@ -384,8 +403,8 @@ the peasants for leadership [C].
 1. Siege a villain's castle without his contract. Expect him set free with his
    castle intact and his army rebuilt.
 2. Dig on a wrong tile and confirm exactly 10 days are spent.
-3. Confirm the victory banner names the **villain**, not the castle. *Known
-   issue: it currently names the castle. See §13.*
+3. Confirm the victory banner names the **villain**, not the castle
+   (`interact::capture_message`).
 
 ---
 
@@ -395,9 +414,15 @@ Do not file these as findings; they are already tracked.
 
 | Area | Status | Effect in play |
 |---|---|---|
-| Sidebar HUD, overlay | GAP | Not drawn |
-| Audio | GAP | Silent |
-| Pack picker | GAP | Pack path passed on the command line |
+| Sidebar HUD | GAP | The 48px right column is reserved by `layout.rs` and never painted. No contract portrait, siege or magic indicator, mini puzzle grid, or **gold purse** -- so the gold figure is only visible in the Character view. `reference/src/hud.c` has no Rust counterpart; everything below the draw layer (the `Sprite::Hud*` variants, `ResSprites`'s `hud_*` paths, `SpriteCatalog` resolution) is already in place |
+| In-game menu | GAP | `reference/src/shell_menu.c` and C's `VIEW_MENU` are unported. `Q` saves to slot 0 **and quits**; there is no save-and-continue, no mid-session load, and no New Game. Loading is possible only from the startup wizard's `L` |
+| Audio | GAP | Silent. `reference/src/audio.c` has no Rust counterpart. The Controls panel already draws the pack's Sounds / Music / Volume / Walk Beep rows and cycles `stats.options[]`, so those rows toggle a value nothing reads. C also grays the three audio rows out when no device is present, which this shell cannot decide |
+| Combat `O` | GAP | See §9 -- the Options view exists but combat does not route the key |
+| Pack picker | GAP | `reference/src/pack_select.c` unported; the pack path is a required command-line argument |
+| Open content pack | GAP | `packs/open` covers 267/311 art slots (missing: the 43 `ui/` slots and the bitmap font), and there is no open `game.json` or maps -- `tools/open_pack.py build` overlays art onto the gitignored reference clone. Playing still requires a local OpenBounty checkout |
+| Cheat menu (F10) | GAP | `reference/src/shell_cheats.c` unported. Only affects how fast the scenarios in this document can be set up |
+| `game.hud_visible` | DEAD | C writes it when an overlay opens and closes, and `draw_frame` never reads it. Do not wire it up |
+| Recorder, autoplay, demo | OUT OF SCOPE | `--movie`, `--autoplay`, `--demo`, `--headless`, `--validate-pack` and `--fullscreen` are dev tooling, not play |
 | Mouse: overworld & combat | BY DESIGN | Click-to-move and click-in-combat are design non-goals |
 | Mouse: count entry | BY DESIGN | Recruit/dwelling "how many" is keyboard-only |
 
@@ -433,6 +458,13 @@ final arbiter, and the manual is the cheaper first check.
 
 ## Maintenance
 
-Update this document when a GAP closes or a listed issue is fixed. Keep the
-source tags accurate -- an untagged claim is not verifiable, because a reader
-cannot tell which layer to suspect when play disagrees.
+Update this document when a GAP closes or a listed issue is fixed, and move the
+"Last refreshed" line above when you do. Keep the source tags accurate -- an
+untagged claim is not verifiable, because a reader cannot tell which layer to
+suspect when play disagrees.
+
+A stale GAP costs more than a missing one: it sends a playtester looking for a
+screen that already works, and it tells the next implementer that a slice is
+open when it has shipped. When you close one, grep this file for the feature
+name rather than trusting the §13 table alone -- the startup wizard was listed
+as unported in three separate places.

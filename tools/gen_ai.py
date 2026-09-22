@@ -396,6 +396,7 @@ def cmd_batch(args):
     os.makedirs(tiles_dir, exist_ok=True)
 
     done = 0
+    failed = 0
     seen_groups = set()
     for asset in assets:
         path = asset["path"]
@@ -424,27 +425,32 @@ def cmd_batch(args):
         if args.resume and all(os.path.exists(o) for o in outs):
             print(f"skip      {path}")
             continue
-        if group is None:
-            print(f"gen       {path}")
-            rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H)
-            tw, th = asset["native"]["w"] * args.scale, asset["native"]["h"] * args.scale
-            _, _, rgba = box_downscale(GEN_W, GEN_H, rgba, tw, th)
-            rgba = grade(tw, th, rgba)
-            write_png(outs[0], tw, th, rgba)
-        else:
-            print(f"gen       {group}  -> 4 frames")
-            rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H)
-            tw, th = asset["native"]["w"] * args.scale, asset["native"]["h"] * args.scale
-            _, _, rgba = box_downscale(GEN_W, GEN_H, rgba, tw, th)
-            for i, k in enumerate((0, 2, 0, 2)):
-                f = frame_shift(tw, th, rgba, k)
-                write_png(outs[i], tw, th, grade(tw, th, f))
-        done += 1
+        try:
+            if group is None:
+                print(f"gen       {path}", flush=True)
+                rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H)
+                tw, th = asset["native"]["w"] * args.scale, asset["native"]["h"] * args.scale
+                _, _, rgba = box_downscale(GEN_W, GEN_H, rgba, tw, th)
+                rgba = grade(tw, th, rgba)
+                write_png(outs[0], tw, th, rgba)
+            else:
+                print(f"gen       {group}  -> 4 frames", flush=True)
+                rgba = generate_sprite(args, path, positive, matte_wanted, GEN_W, GEN_H)
+                tw, th = asset["native"]["w"] * args.scale, asset["native"]["h"] * args.scale
+                _, _, rgba = box_downscale(GEN_W, GEN_H, rgba, tw, th)
+                for i, k in enumerate((0, 2, 0, 2)):
+                    f = frame_shift(tw, th, rgba, k)
+                    write_png(outs[i], tw, th, grade(tw, th, f))
+            done += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            print(f"  FAIL {path}: {exc}", file=sys.stderr, flush=True)
+            continue
 
     if not args.category or args.category == "tiles":
         compose_edges(tiles_dir)
-    print(f"batch done: {done} generations")
-    return 0
+    print(f"batch done: {done} generations, {failed} failed")
+    return 1 if failed else 0
 
 
 def cmd_sheet(args):
