@@ -32,7 +32,7 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.0"
+VERSION = "1.1"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -98,6 +98,34 @@ def http_post(host, path, obj):
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace")
         raise RuntimeError(f"HTTP {e.code} from {path}: {detail}") from None
+
+
+def http_post_quiet(host, path, obj):
+    body = json.dumps(obj).encode()
+    req = urllib.request.Request(host + path, data=body,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            r.read()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def clear_queue(host):
+    """Stop any running prompt and drop the pending queue.
+
+    Ctrl-C kills this script, not the ComfyUI prompt: it keeps generating and
+    can save over the next run's files. Clear before a batch starts.
+    """
+    http_post_quiet(host, "/interrupt", {})
+    http_post_quiet(host, "/queue", {"clear": True})
+    try:
+        q = http_get(host, "/queue")
+        running = len(q.get("queue_running", []))
+        pending = len(q.get("queue_pending", []))
+        print(f"queue cleared (running {running}, pending {pending})", flush=True)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def find_matte(info):
@@ -803,6 +831,8 @@ def cmd_batch(args):
     if args.category:
         assets = [a for a in assets if a["path"].startswith("art/" + args.category + "/")]
     print(f"gen_ai version {VERSION}, scale {args.scale}, gen {GEN_W}x{GEN_H}", flush=True)
+    if not getattr(args, "no_clear", False):
+        clear_queue(args.host)
     need_rembg(args, args.category, assets)
     os.makedirs(OUT, exist_ok=True)
     tiles_dir = os.path.join(OUT, "art", "tiles")
@@ -956,6 +986,8 @@ def main():
     b.add_argument("--resume", action="store_true", help="skip existing outputs")
     b.add_argument("--sheet", action="store_true",
                    help="try an AI sprite sheet for animated units (experimental)")
+    b.add_argument("--no-clear", action="store_true",
+                   help="do not interrupt/clear the ComfyUI queue first")
     b.set_defaults(func=cmd_batch)
     sub.add_parser("sheet").set_defaults(func=cmd_sheet)
     args = ap.parse_args()
