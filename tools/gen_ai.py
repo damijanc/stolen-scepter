@@ -31,10 +31,11 @@ from upscale import read_png, write_png  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(ROOT, "tools", "hd_assets.json")
 PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
+LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.9"
+VERSION = "1.10"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -140,6 +141,12 @@ def find_matte(info):
 
 def cmd_probe(args):
     print(f"gen_ai version {VERSION}")
+    if os.path.exists(LAYOUT):
+        with open(LAYOUT) as fh:
+            n = len(json.load(fh)["slots"])
+        print(f"registration: {args.registration} ({n} slots in tools/asset_layout.json)")
+    else:
+        print(f"registration: {args.registration} (no tools/asset_layout.json)")
     info = http_get(args.host, "/object_info")
     ckpts = info.get("CheckpointLoaderSimple", {}).get("input", {}).get("required", {}) \
                 .get("ckpt_name", [[]])[0]
@@ -659,6 +666,115 @@ def fit_sprite(w, h, rgba, tw, th):
     return tw, th, crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th)
 
 
+_LAYOUT = None
+
+
+def layout_slot(path):
+    """The original's measured geometry for a pack path (tools/asset_layout.json)."""
+    global _LAYOUT
+    if _LAYOUT is None:
+        try:
+            with open(LAYOUT) as fh:
+                _LAYOUT = json.load(fh)
+        except FileNotFoundError:
+            _LAYOUT = {"slots": {}, "conventions": {}}
+    spec = _LAYOUT["slots"].get(path)
+    if spec is None or spec["mask"] == "full":
+        return None
+    return spec
+
+
+def use_spec(args, paths):
+    """Slot specs for `paths` when spec registration applies to all of them."""
+    if getattr(args, "registration", "spec") != "spec":
+        return None
+    specs = [layout_slot(p) for p in paths]
+    return specs if all(specs) else None
+
+
+def cut_subject(w, h, rgba, blob=None, foot_frac=0.1):
+    """Cut one blob (default: the largest) out on its own.
+
+    Returns (bw, bh, crop, foot_x): the blob's box size, its pixels with every
+    other blob cleared, and the x centre of its bottom `foot_frac` rows,
+    relative to the box. None if the image is empty.
+    """
+    if blob is None:
+        comps = alpha_components(w, h, rgba)
+        if not comps:
+            return None
+        blob = comps[0]
+    xs = [j % w for j in blob]
+    ys = [j // w for j in blob]
+    x0, y0 = min(xs), min(ys)
+    bw, bh = max(xs) + 1 - x0, max(ys) + 1 - y0
+    crop = bytearray(bw * bh * 4)
+    for j, x, y in zip(blob, xs, ys):
+        d = ((y - y0) * bw + (x - x0)) * 4
+        crop[d:d + 4] = rgba[j * 4:j * 4 + 4]
+    band = y0 + bh - max(1, round(bh * foot_frac))
+    feet = [x for x, y in zip(xs, ys) if y >= band]
+    return bw, bh, bytes(crop), sum(feet) / len(feet) + 0.5 - x0
+
+
+def foot_frac(spec):
+    rows = (_LAYOUT or {}).get("conventions", {}).get("foot_rows", 3)
+    return rows / max(1, spec["bbox"][3] - spec["bbox"][1])
+
+
+def register_frames(subjects, specs, tw, th):
+    """Place cut-out subjects where the originals stood in their cells.
+
+    One scale for the whole group, chosen so frame 0 is as tall as the
+    original frame 0 (shrunk if any frame would overflow the cell), so the
+    unit does not change size between frames. Each frame's bottom lands on its
+    original's baseline and its foot centre on the original's foot centre;
+    a frame that would leave the cell is pushed back inside.
+    """
+    cw, ch = specs[0]["cell"]
+    sx, sy = tw / cw, th / ch
+    b0 = specs[0]["bbox"]
+    scale = (b0[3] - b0[1]) * sy / subjects[0][1]
+    for bw, bh, _, _ in subjects:
+        scale = min(scale, tw / bw, th / bh)
+    frames = []
+    for (bw, bh, crop, foot), spec in zip(subjects, specs):
+        nw, nh = max(1, min(tw, round(bw * scale))), max(1, min(th, round(bh * scale)))
+        _, _, img = bilinear_resize(bw, bh, crop, nw, nh)
+        ox = round((spec["foot_cx"] + 0.5) * sx - foot * scale)
+        oy = round(spec["baseline"] * sy) - nh
+        ox, oy = max(0, min(tw - nw, ox)), max(0, min(th - nh, oy))
+        canvas = bytearray(tw * th * 4)
+        for y in range(nh):
+            d = ((oy + y) * tw + ox) * 4
+            canvas[d:d + nw * 4] = img[y * nw * 4:(y + 1) * nw * 4]
+        frames.append(bytes(canvas))
+    return frames
+
+
+def place_frames(args, paths, images, tw, th):
+    """Frame matted gen-size images into cells: registered per spec, else fill.
+
+    `images` is a list of (w, h, rgba) or (w, h, rgba, blob), one per path.
+    """
+    specs = use_spec(args, paths)
+    if specs:
+        subjects = [cut_subject(*im[:3], blob=im[3] if len(im) > 3 else None,
+                                foot_frac=foot_frac(s)) for im, s in zip(images, specs)]
+        if all(subjects):
+            return register_frames(subjects, specs, tw, th)
+    out = []
+    for im in images:
+        w, h, rgba = im[:3]
+        if len(im) > 3:
+            xs = [j % w for j in im[3]]
+            ys = [j // w for j in im[3]]
+            out.append(crop_fit(w, h, rgba, min(xs), min(ys), max(xs), max(ys), tw, th))
+        else:
+            out.append(fit_sprite(w, h, rgba, tw, th)[2])
+    return out
+
+
 # Combat units loop a 4-frame IDLE animation (combat.h: `frame // 0..3 idle
 # anim`, advanced by `combat_tick_anim`). Movement is instant and attacks are a
 # splat overlay, so there is no walk/attack frame split -- it is one resting
@@ -720,6 +836,12 @@ def idle_frames(tw, th, rgba):
     return out
 
 
+def group_paths(path):
+    """The 4 frame paths of the animated group `path` belongs to."""
+    group = os.path.basename(path)[:-4].rsplit("_", 1)[0]
+    return [f"{os.path.dirname(path)}/{group}_{i:02d}.png" for i in range(4)]
+
+
 def try_sheet(args, path, tw, th):
     sp = sheet_prompt(path)
     if not sp:
@@ -732,13 +854,8 @@ def try_sheet(args, path, tw, th):
         big = [c for c in comps if len(c) > 0.03 * total]
         if len(big) >= 4:
             big = sorted(big, key=lambda c: min(j % SHEET_W for j in c))[:4]
-            frames = []
-            for blob in big:
-                xs = [j % SHEET_W for j in blob]
-                ys = [j // SHEET_W for j in blob]
-                frames.append(crop_fit(SHEET_W, SHEET_H, rgba, min(xs), min(ys),
-                                       max(xs), max(ys), tw, th))
-            return frames
+            return place_frames(args, group_paths(path),
+                                [(SHEET_W, SHEET_H, rgba, blob) for blob in big], tw, th)
         print(f"  sheet had {len(big)} figures, retry {attempt + 1}", flush=True)
     return None
 
@@ -759,7 +876,8 @@ def render_group_frames(args, path, tw, th):
     raw0 = generate_sprite(args, path, pos0, False, GEN_W, GEN_H, seed)
     init = os.path.join(OUT, "_init.png")
     write_png(init, GEN_W, GEN_H, raw0)
-    frames = [fit_sprite(GEN_W, GEN_H, matte_file(args, init, "0"), tw, th)[2]]
+    paths = group_paths(path)
+    matted = [(GEN_W, GEN_H, matte_file(args, init, "0"))]
     denoise = getattr(args, "denoise", 0.0)
     if denoise > 0:
         try:
@@ -778,17 +896,18 @@ def render_group_frames(args, path, tw, th):
                 raw = os.path.join(OUT, f"_raw_{i}.png")
                 with open(raw, "wb") as fh:
                     fh.write(png)
-                frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th)[2])
-            return frames
+                matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
+            return place_frames(args, paths, matted, tw, th)
         except Exception as exc:  # noqa: BLE001
             print(f"  img2img failed ({exc}); using independent frames", flush=True)
+            matted = matted[:1]
     for i in range(1, 4):
         pos, _ = frame_prompt(path, i)
         rgba = generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed)
         raw = os.path.join(OUT, f"_raw_{i}.png")
         write_png(raw, GEN_W, GEN_H, rgba)
-        frames.append(fit_sprite(GEN_W, GEN_H, matte_file(args, raw, str(i)), tw, th)[2])
-    return frames
+        matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
+    return place_frames(args, paths, matted, tw, th)
 
 
 def gen_size(tw, th):
@@ -821,7 +940,7 @@ def render_asset(args, path, positive, matte_wanted, tw, th, base_seed=None):
         if len(big) <= 1:
             break
         print(f"  {os.path.basename(path)}: {len(big)} figures, retry {attempt + 1}")
-    return fit_sprite(gw, gh, last, tw, th)
+    return tw, th, place_frames(args, [path], [(gw, gh, last)], tw, th)[0]
 
 
 CASTLE = {"castle_tl": (0, 0), "castle_br": (1, 0), "castle_tr": (2, 0),
@@ -910,7 +1029,8 @@ def cmd_batch(args):
         assets = [a for a in json.load(fh)["assets"] if a["engine_used"]]
     if args.category:
         assets = [a for a in assets if a["path"].startswith("art/" + args.category + "/")]
-    print(f"gen_ai version {VERSION}, scale {args.scale}, gen {GEN_W}x{GEN_H}", flush=True)
+    print(f"gen_ai version {VERSION}, scale {args.scale}, gen {GEN_W}x{GEN_H}, "
+          f"registration {args.registration}", flush=True)
     if not getattr(args, "no_clear", False):
         clear_queue(args.host)
     need_rembg(args, args.category, assets)
@@ -1056,6 +1176,10 @@ def main():
                     help="condition animation frames on frame 0 via IP-Adapter")
     ap.add_argument("--ip-weight", type=float, default=0.8)
     ap.add_argument("--ip-preset", default="", help="IPAdapterUnifiedLoader preset")
+    ap.add_argument("--registration", choices=("spec", "fill"),
+                    default="spec" if os.path.exists(LAYOUT) else "fill",
+                    help="spec: place sprites at the original's baseline, foot centre "
+                         "and height (tools/asset_layout.json); fill: stretch to the cell")
     ap.add_argument("--matte", choices=("cli", "node", "none"), default="cli",
                     help="how to cut out alpha (default: rembg CLI)")
     ap.add_argument("--rembg", default="rembg", help="path to the rembg executable")

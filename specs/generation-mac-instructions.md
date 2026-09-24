@@ -34,9 +34,12 @@ git pull
 python3 tools/gen_ai.py probe
 ```
 
-Expect (near the top): `gen_ai version <latest>`, your `checkpoints:` list, and
-`prompt endpoint reachable: True`. If it says connection refused, ComfyUI isn't
-running (step 1).
+Expect (near the top): `gen_ai version <latest>`,
+`registration: spec (208 slots in tools/asset_layout.json)`, your
+`checkpoints:` list, and `prompt endpoint reachable: True`. If it says
+connection refused, ComfyUI isn't running (step 1). If it says
+`registration: fill (no tools/asset_layout.json)`, `git pull` again: the
+layout file is committed and needed for sprite placement.
 
 ---
 
@@ -86,6 +89,14 @@ python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 
 Look for: **one** archer per frame, four **different poses**, same character
 through the four frames, transparent background, ~288×204.
+
+Placement (`--registration spec`, the default): each unit is scaled once for
+all four frames, to the original's height in the cell, and stands on the
+original's ground line with its feet where the original's were. So units no
+longer all fill the cell: a peasant is shorter than a dragon, and the four
+frames do not change size. `--registration fill` restores the old
+stretch-to-cell behaviour for comparison. Nothing about ComfyUI changes; this
+happens after matting.
 
 Tune if needed (flags go **before** `batch`):
 
