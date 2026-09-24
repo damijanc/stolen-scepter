@@ -1,0 +1,6659 @@
+{
+ "schema": 1,
+ "generated_by": "tools/asset_layout.py",
+ "description": "Functional geometry of the original colour-keyed art (numbers only). bbox is [x0,y0,x1,y1], x1/y1 exclusive; baseline = y1. Used by tools/gen_ai.py --registration spec.",
+ "conventions": {
+  "dust_px": 4,
+  "foot_rows": 3
+ },
+ "slots": {
+  "art/classes/barbarian.png": {
+   "mask": "full",
+   "cell": [
+    96,
+    102
+   ],
+   "bbox": [
+    0,
+    0,
+    96,
+    102
+   ],
+   "baseline": 102,
+   "cx": 47.5,
+   "cy": 50.5,
+   "foot_cx": 47.5,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 1.0
+  },
+  "art/classes/knight.png": {
+   "mask": "full",
+   "cell": [
+    96,
+    102
+   ],
+   "bbox": [
+    0,
+    0,
+    96,
+    102
+   ],
+   "baseline": 102,
+   "cx": 47.5,
+   "cy": 50.5,
+   "foot_cx": 47.5,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 1.0
+  },
+  "art/classes/paladin.png": {
+   "mask": "full",
+   "cell": [
+    96,
+    102
+   ],
+   "bbox": [
+    0,
+    0,
+    96,
+    102
+   ],
+   "baseline": 102,
+   "cx": 47.5,
+   "cy": 50.5,
+   "foot_cx": 47.5,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 1.0
+  },
+  "art/classes/sorceress.png": {
+   "mask": "full",
+   "cell": [
+    96,
+    102
+   ],
+   "bbox": [
+    0,
+    0,
+    96,
+    102
+   ],
+   "baseline": 102,
+   "cx": 47.5,
+   "cy": 50.5,
+   "foot_cx": 47.5,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 1.0
+  },
+  "art/combat/castle_spike.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    0,
+    47,
+    33
+   ],
+   "baseline": 33,
+   "cx": 25.46,
+   "cy": 16.12,
+   "foot_cx": 25.56,
+   "frac": [
+    0.8333,
+    0.9706
+   ],
+   "fill": 0.3597
+  },
+  "art/combat/castle_wall_01.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.9,
+   "cy": 15.72,
+   "foot_cx": 24.03,
+   "frac": [
+    0.9792,
+    1.0
+   ],
+   "fill": 0.8082
+  },
+  "art/combat/castle_wall_02.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.99,
+   "cy": 15.69,
+   "foot_cx": 22.23,
+   "frac": [
+    0.9792,
+    1.0
+   ],
+   "fill": 0.8021
+  },
+  "art/combat/castle_wall_03.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.02,
+   "cy": 20.19,
+   "foot_cx": 24.92,
+   "frac": [
+    1.0,
+    0.9412
+   ],
+   "fill": 0.6562
+  },
+  "art/combat/castle_wall_04.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    0,
+    34,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.2,
+   "cy": 16.5,
+   "foot_cx": 18.46,
+   "frac": [
+    0.6875,
+    1.0
+   ],
+   "fill": 0.5766
+  },
+  "art/combat/castle_wall_05.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    13,
+    0,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "cx": 28.97,
+   "cy": 16.47,
+   "foot_cx": 29.15,
+   "frac": [
+    0.7083,
+    1.0
+   ],
+   "fill": 0.5582
+  },
+  "art/combat/castle_wall_06.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 28.02,
+   "cy": 20.13,
+   "foot_cx": 21.63,
+   "frac": [
+    1.0,
+    0.9412
+   ],
+   "fill": 0.6612
+  },
+  "art/combat/cursor_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    9,
+    1,
+    40,
+    32
+   ],
+   "baseline": 32,
+   "cx": 24.0,
+   "cy": 16.0,
+   "foot_cx": 24.0,
+   "frac": [
+    0.6458,
+    0.9118
+   ],
+   "fill": 0.1054
+  },
+  "art/combat/cursor_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    12,
+    4,
+    37,
+    29
+   ],
+   "baseline": 29,
+   "cx": 24.0,
+   "cy": 16.0,
+   "foot_cx": 24.0,
+   "frac": [
+    0.5208,
+    0.7353
+   ],
+   "fill": 0.0858
+  },
+  "art/combat/cursor_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    16,
+    8,
+    33,
+    25
+   ],
+   "baseline": 25,
+   "cx": 24.0,
+   "cy": 16.0,
+   "foot_cx": 24.0,
+   "frac": [
+    0.3542,
+    0.5
+   ],
+   "fill": 0.0515
+  },
+  "art/combat/cursor_04.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    22,
+    14,
+    27,
+    19
+   ],
+   "baseline": 19,
+   "cx": 24.0,
+   "cy": 16.0,
+   "foot_cx": 24.0,
+   "frac": [
+    0.1042,
+    0.1471
+   ],
+   "fill": 0.0098
+  },
+  "art/combat/obstacle_01.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    2,
+    46,
+    33
+   ],
+   "baseline": 33,
+   "cx": 22.82,
+   "cy": 16.58,
+   "foot_cx": 18.68,
+   "frac": [
+    0.8958,
+    0.9118
+   ],
+   "fill": 0.5349
+  },
+  "art/combat/obstacle_02.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    1,
+    43,
+    31
+   ],
+   "baseline": 31,
+   "cx": 21.74,
+   "cy": 15.47,
+   "foot_cx": 20.02,
+   "frac": [
+    0.875,
+    0.8824
+   ],
+   "fill": 0.6189
+  },
+  "art/combat/obstacle_03.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    3,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.42,
+   "cy": 18.92,
+   "foot_cx": 11.62,
+   "frac": [
+    0.9167,
+    0.9118
+   ],
+   "fill": 0.5625
+  },
+  "art/sprites/boat_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    4,
+    45,
+    30
+   ],
+   "baseline": 30,
+   "cx": 22.92,
+   "cy": 17.86,
+   "foot_cx": 22.67,
+   "frac": [
+    0.9167,
+    0.7647
+   ],
+   "fill": 0.4565
+  },
+  "art/sprites/boat_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    4,
+    45,
+    30
+   ],
+   "baseline": 30,
+   "cx": 23.18,
+   "cy": 17.84,
+   "foot_cx": 22.52,
+   "frac": [
+    0.9167,
+    0.7647
+   ],
+   "fill": 0.4614
+  },
+  "art/sprites/boat_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    4,
+    45,
+    31
+   ],
+   "baseline": 31,
+   "cx": 23.04,
+   "cy": 18.15,
+   "foot_cx": 24.03,
+   "frac": [
+    0.9167,
+    0.7941
+   ],
+   "fill": 0.4632
+  },
+  "art/sprites/boat_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    4,
+    46,
+    31
+   ],
+   "baseline": 31,
+   "cx": 23.98,
+   "cy": 18.43,
+   "foot_cx": 21.78,
+   "frac": [
+    0.9167,
+    0.7941
+   ],
+   "fill": 0.4706
+  },
+  "art/sprites/hero_idle_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    1,
+    44,
+    33
+   ],
+   "baseline": 33,
+   "cx": 23.08,
+   "cy": 15.77,
+   "foot_cx": 16.53,
+   "frac": [
+    0.875,
+    0.9412
+   ],
+   "fill": 0.4406
+  },
+  "art/sprites/hero_idle_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    1,
+    45,
+    33
+   ],
+   "baseline": 33,
+   "cx": 26.16,
+   "cy": 17.51,
+   "foot_cx": 22.75,
+   "frac": [
+    0.8958,
+    0.9412
+   ],
+   "fill": 0.4926
+  },
+  "art/sprites/hero_idle_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    1,
+    44,
+    33
+   ],
+   "baseline": 33,
+   "cx": 23.05,
+   "cy": 15.86,
+   "foot_cx": 16.53,
+   "frac": [
+    0.875,
+    0.9412
+   ],
+   "fill": 0.4387
+  },
+  "art/sprites/hero_idle_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    0,
+    47,
+    33
+   ],
+   "baseline": 33,
+   "cx": 27.57,
+   "cy": 16.42,
+   "foot_cx": 33.88,
+   "frac": [
+    0.9583,
+    0.9706
+   ],
+   "fill": 0.5098
+  },
+  "art/sprites/hero_walk_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.34,
+   "cy": 18.69,
+   "foot_cx": 20.1,
+   "frac": [
+    0.8542,
+    0.9412
+   ],
+   "fill": 0.4007
+  },
+  "art/sprites/hero_walk_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.54,
+   "cy": 18.99,
+   "foot_cx": 20.1,
+   "frac": [
+    0.8542,
+    0.9412
+   ],
+   "fill": 0.3922
+  },
+  "art/sprites/hero_walk_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.35,
+   "cy": 18.75,
+   "foot_cx": 20.1,
+   "frac": [
+    0.8542,
+    0.9412
+   ],
+   "fill": 0.4013
+  },
+  "art/sprites/hero_walk_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.58,
+   "cy": 18.09,
+   "foot_cx": 22.01,
+   "frac": [
+    0.8125,
+    0.9412
+   ],
+   "fill": 0.3854
+  },
+  "art/tiles/artifact_chest.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    12,
+    7,
+    36,
+    26
+   ],
+   "baseline": 26,
+   "cx": 23.8,
+   "cy": 15.84,
+   "foot_cx": 21.72,
+   "frac": [
+    0.5,
+    0.5588
+   ],
+   "fill": 0.1538
+  },
+  "art/tiles/artifact_ring.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    14,
+    10,
+    33,
+    30
+   ],
+   "baseline": 30,
+   "cx": 23.14,
+   "cy": 18.68,
+   "foot_cx": 23.18,
+   "frac": [
+    0.3958,
+    0.5882
+   ],
+   "fill": 0.1379
+  },
+  "art/tiles/chest.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    7,
+    34,
+    33
+   ],
+   "baseline": 33,
+   "cx": 20.58,
+   "cy": 19.63,
+   "foot_cx": 18.43,
+   "frac": [
+    0.625,
+    0.7647
+   ],
+   "fill": 0.3223
+  },
+  "art/tiles/dwelling_dungeon.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.88,
+   "cy": 16.71,
+   "foot_cx": 20.45,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.8346
+  },
+  "art/tiles/dwelling_forest.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.52,
+   "cy": 17.28,
+   "foot_cx": 20.44,
+   "frac": [
+    0.9167,
+    0.9706
+   ],
+   "fill": 0.6189
+  },
+  "art/tiles/dwelling_hills.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    3,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.4,
+   "cy": 20.22,
+   "foot_cx": 21.76,
+   "frac": [
+    0.9583,
+    0.9118
+   ],
+   "fill": 0.6679
+  },
+  "art/tiles/dwelling_plains.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    1,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.52,
+   "cy": 17.77,
+   "foot_cx": 16.13,
+   "frac": [
+    0.875,
+    0.9706
+   ],
+   "fill": 0.5362
+  },
+  "art/tiles/sign.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    2,
+    37,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.16,
+   "cy": 19.3,
+   "foot_cx": 17.52,
+   "frac": [
+    0.6458,
+    0.9412
+   ],
+   "fill": 0.1581
+  },
+  "art/tiles/town.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    4,
+    44,
+    32
+   ],
+   "baseline": 32,
+   "cx": 22.84,
+   "cy": 18.23,
+   "foot_cx": 21.14,
+   "frac": [
+    0.8958,
+    0.8235
+   ],
+   "fill": 0.5815
+  },
+  "art/tiles/wandering_army.png": {
+   "mask": "ground_diff",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    0,
+    37,
+    33
+   ],
+   "baseline": 33,
+   "cx": 24.59,
+   "cy": 17.56,
+   "foot_cx": 23.06,
+   "frac": [
+    0.6667,
+    0.9706
+   ],
+   "fill": 0.3346
+  },
+  "art/troops/archers_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    4,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.57,
+   "cy": 18.8,
+   "foot_cx": 21.01,
+   "frac": [
+    0.8333,
+    0.8824
+   ],
+   "fill": 0.3885
+  },
+  "art/troops/archers_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    4,
+    40,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.99,
+   "cy": 18.91,
+   "foot_cx": 20.68,
+   "frac": [
+    0.7708,
+    0.8824
+   ],
+   "fill": 0.3842
+  },
+  "art/troops/archers_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    5,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 16.28,
+   "cy": 19.57,
+   "foot_cx": 19.35,
+   "frac": [
+    0.7292,
+    0.8529
+   ],
+   "fill": 0.3425
+  },
+  "art/troops/archers_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    4,
+    40,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.02,
+   "cy": 18.88,
+   "foot_cx": 20.12,
+   "frac": [
+    0.7708,
+    0.8824
+   ],
+   "fill": 0.3762
+  },
+  "art/troops/archmages_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    1,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.16,
+   "cy": 16.62,
+   "foot_cx": 23.5,
+   "frac": [
+    0.8958,
+    0.9706
+   ],
+   "fill": 0.5533
+  },
+  "art/troops/archmages_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    0,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.5,
+   "cy": 17.71,
+   "foot_cx": 24.85,
+   "frac": [
+    0.8542,
+    1.0
+   ],
+   "fill": 0.5882
+  },
+  "art/troops/archmages_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.21,
+   "cy": 18.17,
+   "foot_cx": 23.07,
+   "frac": [
+    0.875,
+    0.9412
+   ],
+   "fill": 0.5325
+  },
+  "art/troops/archmages_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.24,
+   "cy": 16.47,
+   "foot_cx": 22.85,
+   "frac": [
+    0.8958,
+    1.0
+   ],
+   "fill": 0.5631
+  },
+  "art/troops/barbarians_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    1,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.79,
+   "cy": 18.5,
+   "foot_cx": 20.95,
+   "frac": [
+    0.6875,
+    0.9706
+   ],
+   "fill": 0.4118
+  },
+  "art/troops/barbarians_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    0,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.84,
+   "cy": 15.15,
+   "foot_cx": 23.92,
+   "frac": [
+    0.8542,
+    1.0
+   ],
+   "fill": 0.5208
+  },
+  "art/troops/barbarians_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 26.3,
+   "cy": 16.03,
+   "foot_cx": 24.84,
+   "frac": [
+    0.8333,
+    0.9706
+   ],
+   "fill": 0.4939
+  },
+  "art/troops/barbarians_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    0,
+    39,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.19,
+   "cy": 15.62,
+   "foot_cx": 20.18,
+   "frac": [
+    0.7292,
+    1.0
+   ],
+   "fill": 0.4283
+  },
+  "art/troops/cavalry_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    4,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 26.42,
+   "cy": 20.29,
+   "foot_cx": 29.01,
+   "frac": [
+    0.8333,
+    0.8824
+   ],
+   "fill": 0.3866
+  },
+  "art/troops/cavalry_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    9,
+    3,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 27.1,
+   "cy": 18.89,
+   "foot_cx": 28.03,
+   "frac": [
+    0.8125,
+    0.9118
+   ],
+   "fill": 0.3775
+  },
+  "art/troops/cavalry_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    2,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.87,
+   "cy": 16.78,
+   "foot_cx": 26.69,
+   "frac": [
+    0.8958,
+    0.9412
+   ],
+   "fill": 0.3915
+  },
+  "art/troops/cavalry_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    6,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.68,
+   "cy": 21.29,
+   "foot_cx": 26.38,
+   "frac": [
+    0.875,
+    0.8235
+   ],
+   "fill": 0.3732
+  },
+  "art/troops/demons_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    0,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.38,
+   "cy": 16.05,
+   "foot_cx": 20.13,
+   "frac": [
+    0.875,
+    1.0
+   ],
+   "fill": 0.5699
+  },
+  "art/troops/demons_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.45,
+   "cy": 18.39,
+   "foot_cx": 17.41,
+   "frac": [
+    0.8958,
+    0.9706
+   ],
+   "fill": 0.5245
+  },
+  "art/troops/demons_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.06,
+   "cy": 16.09,
+   "foot_cx": 19.86,
+   "frac": [
+    0.9583,
+    1.0
+   ],
+   "fill": 0.6072
+  },
+  "art/troops/demons_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.82,
+   "cy": 15.26,
+   "foot_cx": 21.0,
+   "frac": [
+    0.9792,
+    1.0
+   ],
+   "fill": 0.5711
+  },
+  "art/troops/dragons_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.23,
+   "cy": 19.62,
+   "foot_cx": 22.23,
+   "frac": [
+    0.9583,
+    1.0
+   ],
+   "fill": 0.5962
+  },
+  "art/troops/dragons_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.36,
+   "cy": 18.33,
+   "foot_cx": 21.73,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.7328
+  },
+  "art/troops/dragons_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.65,
+   "cy": 20.53,
+   "foot_cx": 24.73,
+   "frac": [
+    0.9583,
+    1.0
+   ],
+   "fill": 0.6109
+  },
+  "art/troops/dragons_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.85,
+   "cy": 19.38,
+   "foot_cx": 22.04,
+   "frac": [
+    1.0,
+    0.9706
+   ],
+   "fill": 0.7065
+  },
+  "art/troops/druids_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    1,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.17,
+   "cy": 20.41,
+   "foot_cx": 24.6,
+   "frac": [
+    0.75,
+    0.9706
+   ],
+   "fill": 0.4871
+  },
+  "art/troops/druids_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    0,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.04,
+   "cy": 20.02,
+   "foot_cx": 24.72,
+   "frac": [
+    0.7917,
+    1.0
+   ],
+   "fill": 0.5453
+  },
+  "art/troops/druids_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    1,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.17,
+   "cy": 20.41,
+   "foot_cx": 24.6,
+   "frac": [
+    0.75,
+    0.9706
+   ],
+   "fill": 0.4871
+  },
+  "art/troops/druids_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 27.29,
+   "cy": 17.64,
+   "foot_cx": 22.88,
+   "frac": [
+    0.875,
+    1.0
+   ],
+   "fill": 0.6287
+  },
+  "art/troops/dwarves_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    0,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.95,
+   "cy": 19.33,
+   "foot_cx": 24.06,
+   "frac": [
+    0.75,
+    1.0
+   ],
+   "fill": 0.3983
+  },
+  "art/troops/dwarves_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    0,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.25,
+   "cy": 16.22,
+   "foot_cx": 19.75,
+   "frac": [
+    0.6458,
+    1.0
+   ],
+   "fill": 0.4271
+  },
+  "art/troops/dwarves_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.06,
+   "cy": 15.93,
+   "foot_cx": 20.59,
+   "frac": [
+    0.8542,
+    1.0
+   ],
+   "fill": 0.4688
+  },
+  "art/troops/dwarves_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    0,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.23,
+   "cy": 16.19,
+   "foot_cx": 19.48,
+   "frac": [
+    0.6458,
+    1.0
+   ],
+   "fill": 0.4265
+  },
+  "art/troops/elves_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    8,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.66,
+   "cy": 22.33,
+   "foot_cx": 21.35,
+   "frac": [
+    0.7917,
+    0.7647
+   ],
+   "fill": 0.3309
+  },
+  "art/troops/elves_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.38,
+   "cy": 19.31,
+   "foot_cx": 21.3,
+   "frac": [
+    0.875,
+    0.9412
+   ],
+   "fill": 0.3775
+  },
+  "art/troops/elves_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.55,
+   "cy": 18.94,
+   "foot_cx": 21.3,
+   "frac": [
+    0.9167,
+    0.9706
+   ],
+   "fill": 0.3897
+  },
+  "art/troops/elves_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    6,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.01,
+   "cy": 21.04,
+   "foot_cx": 21.35,
+   "frac": [
+    0.875,
+    0.8235
+   ],
+   "fill": 0.3787
+  },
+  "art/troops/ghosts_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    6,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.53,
+   "cy": 21.3,
+   "foot_cx": 17.19,
+   "frac": [
+    0.7917,
+    0.8235
+   ],
+   "fill": 0.3578
+  },
+  "art/troops/ghosts_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    4,
+    40,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.28,
+   "cy": 19.78,
+   "foot_cx": 14.73,
+   "frac": [
+    0.7292,
+    0.8824
+   ],
+   "fill": 0.3585
+  },
+  "art/troops/ghosts_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    37,
+    34
+   ],
+   "baseline": 34,
+   "cx": 17.24,
+   "cy": 15.81,
+   "foot_cx": 16.81,
+   "frac": [
+    0.75,
+    0.9412
+   ],
+   "fill": 0.4271
+  },
+  "art/troops/ghosts_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 26.88,
+   "cy": 19.12,
+   "foot_cx": 20.98,
+   "frac": [
+    0.8958,
+    1.0
+   ],
+   "fill": 0.5748
+  },
+  "art/troops/giants_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    9,
+    1,
+    37,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.65,
+   "cy": 18.05,
+   "foot_cx": 21.91,
+   "frac": [
+    0.5833,
+    0.9706
+   ],
+   "fill": 0.394
+  },
+  "art/troops/giants_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    1,
+    37,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.77,
+   "cy": 16.86,
+   "foot_cx": 20.86,
+   "frac": [
+    0.625,
+    0.9706
+   ],
+   "fill": 0.4197
+  },
+  "art/troops/giants_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.6,
+   "cy": 16.21,
+   "foot_cx": 23.85,
+   "frac": [
+    0.8333,
+    1.0
+   ],
+   "fill": 0.4179
+  },
+  "art/troops/giants_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    9,
+    8,
+    35,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.23,
+   "cy": 21.15,
+   "foot_cx": 21.31,
+   "frac": [
+    0.5417,
+    0.7647
+   ],
+   "fill": 0.3419
+  },
+  "art/troops/gnomes_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    1,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.59,
+   "cy": 17.13,
+   "foot_cx": 24.72,
+   "frac": [
+    0.7708,
+    0.9706
+   ],
+   "fill": 0.3891
+  },
+  "art/troops/gnomes_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    1,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.71,
+   "cy": 16.9,
+   "foot_cx": 24.72,
+   "frac": [
+    0.7917,
+    0.9706
+   ],
+   "fill": 0.3922
+  },
+  "art/troops/gnomes_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    1,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 15.17,
+   "foot_cx": 24.72,
+   "frac": [
+    0.7292,
+    0.9706
+   ],
+   "fill": 0.3738
+  },
+  "art/troops/gnomes_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    0,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.23,
+   "cy": 13.3,
+   "foot_cx": 24.72,
+   "frac": [
+    0.9375,
+    1.0
+   ],
+   "fill": 0.4491
+  },
+  "art/troops/knights_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    0,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.92,
+   "cy": 17.27,
+   "foot_cx": 20.33,
+   "frac": [
+    0.9167,
+    1.0
+   ],
+   "fill": 0.489
+  },
+  "art/troops/knights_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    0,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.87,
+   "cy": 15.98,
+   "foot_cx": 20.57,
+   "frac": [
+    0.8958,
+    1.0
+   ],
+   "fill": 0.4847
+  },
+  "art/troops/knights_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    37,
+    34
+   ],
+   "baseline": 34,
+   "cx": 17.66,
+   "cy": 15.29,
+   "foot_cx": 16.86,
+   "frac": [
+    0.7708,
+    1.0
+   ],
+   "fill": 0.4161
+  },
+  "art/troops/knights_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.79,
+   "cy": 15.56,
+   "foot_cx": 23.59,
+   "frac": [
+    0.8542,
+    1.0
+   ],
+   "fill": 0.4234
+  },
+  "art/troops/militia_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    2,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.51,
+   "cy": 18.41,
+   "foot_cx": 20.9,
+   "frac": [
+    0.75,
+    0.9412
+   ],
+   "fill": 0.3781
+  },
+  "art/troops/militia_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    2,
+    36,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.12,
+   "cy": 16.75,
+   "foot_cx": 19.96,
+   "frac": [
+    0.75,
+    0.9412
+   ],
+   "fill": 0.421
+  },
+  "art/troops/militia_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    2,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.56,
+   "cy": 18.46,
+   "foot_cx": 21.55,
+   "frac": [
+    0.75,
+    0.9412
+   ],
+   "fill": 0.3793
+  },
+  "art/troops/militia_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    11,
+    2,
+    39,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.71,
+   "cy": 17.8,
+   "foot_cx": 22.62,
+   "frac": [
+    0.5833,
+    0.9412
+   ],
+   "fill": 0.3817
+  },
+  "art/troops/nomads_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.73,
+   "cy": 18.85,
+   "foot_cx": 25.63,
+   "frac": [
+    0.7917,
+    0.9706
+   ],
+   "fill": 0.4252
+  },
+  "art/troops/nomads_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    0,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.75,
+   "cy": 17.4,
+   "foot_cx": 26.4,
+   "frac": [
+    0.8542,
+    1.0
+   ],
+   "fill": 0.432
+  },
+  "art/troops/nomads_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    2,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.73,
+   "cy": 16.44,
+   "foot_cx": 26.5,
+   "frac": [
+    0.8958,
+    0.9412
+   ],
+   "fill": 0.4614
+  },
+  "art/troops/nomads_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    7,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.77,
+   "cy": 19.9,
+   "foot_cx": 25.44,
+   "frac": [
+    0.8958,
+    0.7941
+   ],
+   "fill": 0.4191
+  },
+  "art/troops/ogres_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    2,
+    40,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.96,
+   "cy": 16.79,
+   "foot_cx": 19.82,
+   "frac": [
+    0.7917,
+    0.9412
+   ],
+   "fill": 0.4148
+  },
+  "art/troops/ogres_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    2,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.01,
+   "cy": 17.42,
+   "foot_cx": 24.18,
+   "frac": [
+    0.7917,
+    0.9412
+   ],
+   "fill": 0.3781
+  },
+  "art/troops/ogres_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    2,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.09,
+   "cy": 19.18,
+   "foot_cx": 24.22,
+   "frac": [
+    0.625,
+    0.9412
+   ],
+   "fill": 0.3346
+  },
+  "art/troops/ogres_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.37,
+   "cy": 16.81,
+   "foot_cx": 20.98,
+   "frac": [
+    0.7083,
+    0.9412
+   ],
+   "fill": 0.3701
+  },
+  "art/troops/orcs_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.4,
+   "cy": 17.24,
+   "foot_cx": 18.73,
+   "frac": [
+    0.9375,
+    0.9412
+   ],
+   "fill": 0.4026
+  },
+  "art/troops/orcs_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    3,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.89,
+   "cy": 17.04,
+   "foot_cx": 19.31,
+   "frac": [
+    0.8958,
+    0.9118
+   ],
+   "fill": 0.4259
+  },
+  "art/troops/orcs_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.92,
+   "cy": 17.16,
+   "foot_cx": 19.31,
+   "frac": [
+    0.875,
+    0.9412
+   ],
+   "fill": 0.4161
+  },
+  "art/troops/orcs_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    36,
+    34
+   ],
+   "baseline": 34,
+   "cx": 17.3,
+   "cy": 17.21,
+   "foot_cx": 16.42,
+   "frac": [
+    0.7292,
+    0.9412
+   ],
+   "fill": 0.3897
+  },
+  "art/troops/peasants_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    2,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.04,
+   "cy": 17.26,
+   "foot_cx": 19.56,
+   "frac": [
+    0.8542,
+    0.9412
+   ],
+   "fill": 0.3934
+  },
+  "art/troops/peasants_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    3,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.78,
+   "cy": 19.43,
+   "foot_cx": 21.87,
+   "frac": [
+    0.8333,
+    0.9118
+   ],
+   "fill": 0.4381
+  },
+  "art/troops/peasants_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    4,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.01,
+   "cy": 19.83,
+   "foot_cx": 23.94,
+   "frac": [
+    0.8542,
+    0.8824
+   ],
+   "fill": 0.4381
+  },
+  "art/troops/peasants_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    5,
+    3,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.78,
+   "cy": 19.4,
+   "foot_cx": 21.83,
+   "frac": [
+    0.8333,
+    0.9118
+   ],
+   "fill": 0.4369
+  },
+  "art/troops/pikemen_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.07,
+   "cy": 17.58,
+   "foot_cx": 19.62,
+   "frac": [
+    0.8333,
+    0.9706
+   ],
+   "fill": 0.3787
+  },
+  "art/troops/pikemen_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 17.56,
+   "cy": 17.36,
+   "foot_cx": 19.16,
+   "frac": [
+    0.8333,
+    0.9706
+   ],
+   "fill": 0.3732
+  },
+  "art/troops/pikemen_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    1,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.13,
+   "cy": 17.62,
+   "foot_cx": 22.5,
+   "frac": [
+    0.8542,
+    0.9706
+   ],
+   "fill": 0.3885
+  },
+  "art/troops/pikemen_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 17.53,
+   "cy": 17.34,
+   "foot_cx": 18.86,
+   "frac": [
+    0.8333,
+    0.9706
+   ],
+   "fill": 0.3725
+  },
+  "art/troops/skeletons_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    10,
+    3,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.38,
+   "cy": 16.71,
+   "foot_cx": 22.69,
+   "frac": [
+    0.7083,
+    0.9118
+   ],
+   "fill": 0.2996
+  },
+  "art/troops/skeletons_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    2,
+    39,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.85,
+   "cy": 17.97,
+   "foot_cx": 18.9,
+   "frac": [
+    0.8125,
+    0.9412
+   ],
+   "fill": 0.3229
+  },
+  "art/troops/skeletons_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    3,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 26.86,
+   "cy": 19.54,
+   "foot_cx": 28.01,
+   "frac": [
+    0.8333,
+    0.9118
+   ],
+   "fill": 0.318
+  },
+  "art/troops/skeletons_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    2,
+    39,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.78,
+   "cy": 17.97,
+   "foot_cx": 18.33,
+   "frac": [
+    0.8125,
+    0.9412
+   ],
+   "fill": 0.3229
+  },
+  "art/troops/sprites_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    8,
+    1,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.57,
+   "cy": 13.01,
+   "foot_cx": 21.56,
+   "frac": [
+    0.7083,
+    0.9706
+   ],
+   "fill": 0.2868
+  },
+  "art/troops/sprites_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    8,
+    41,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.51,
+   "cy": 17.85,
+   "foot_cx": 21.7,
+   "frac": [
+    0.7083,
+    0.7647
+   ],
+   "fill": 0.2567
+  },
+  "art/troops/sprites_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    4,
+    5,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.72,
+   "cy": 16.51,
+   "foot_cx": 17.36,
+   "frac": [
+    0.9167,
+    0.8529
+   ],
+   "fill": 0.4277
+  },
+  "art/troops/sprites_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    7,
+    35,
+    34
+   ],
+   "baseline": 34,
+   "cx": 16.51,
+   "cy": 16.94,
+   "foot_cx": 15.7,
+   "frac": [
+    0.7083,
+    0.7941
+   ],
+   "fill": 0.2567
+  },
+  "art/troops/trolls_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    1,
+    41,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.05,
+   "cy": 16.43,
+   "foot_cx": 18.47,
+   "frac": [
+    0.8125,
+    0.9706
+   ],
+   "fill": 0.5055
+  },
+  "art/troops/trolls_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.79,
+   "cy": 16.76,
+   "foot_cx": 20.92,
+   "frac": [
+    0.9583,
+    0.9706
+   ],
+   "fill": 0.5423
+  },
+  "art/troops/trolls_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    1,
+    41,
+    34
+   ],
+   "baseline": 34,
+   "cx": 20.15,
+   "cy": 16.25,
+   "foot_cx": 18.71,
+   "frac": [
+    0.8125,
+    0.9706
+   ],
+   "fill": 0.5135
+  },
+  "art/troops/trolls_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    1,
+    39,
+    34
+   ],
+   "baseline": 34,
+   "cx": 18.92,
+   "cy": 17.01,
+   "foot_cx": 18.71,
+   "frac": [
+    0.7917,
+    0.9706
+   ],
+   "fill": 0.5803
+  },
+  "art/troops/vampires_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    1,
+    2,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.52,
+   "cy": 20.58,
+   "foot_cx": 20.83,
+   "frac": [
+    0.8958,
+    0.9412
+   ],
+   "fill": 0.5411
+  },
+  "art/troops/vampires_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    2,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.79,
+   "cy": 20.15,
+   "foot_cx": 23.99,
+   "frac": [
+    0.7917,
+    0.9412
+   ],
+   "fill": 0.4798
+  },
+  "art/troops/vampires_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    3,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.79,
+   "cy": 20.0,
+   "foot_cx": 23.5,
+   "frac": [
+    0.75,
+    0.9118
+   ],
+   "fill": 0.5551
+  },
+  "art/troops/vampires_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    6,
+    3,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 24.58,
+   "cy": 19.24,
+   "foot_cx": 24.0,
+   "frac": [
+    0.875,
+    0.9118
+   ],
+   "fill": 0.6072
+  },
+  "art/troops/wolves_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    10,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 22.04,
+   "cy": 23.16,
+   "foot_cx": 21.2,
+   "frac": [
+    0.8333,
+    0.7059
+   ],
+   "fill": 0.3248
+  },
+  "art/troops/wolves_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    8,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.87,
+   "cy": 22.68,
+   "foot_cx": 19.53,
+   "frac": [
+    0.75,
+    0.7647
+   ],
+   "fill": 0.307
+  },
+  "art/troops/wolves_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    2,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "cx": 26.0,
+   "cy": 18.88,
+   "foot_cx": 20.22,
+   "frac": [
+    0.8958,
+    0.9412
+   ],
+   "fill": 0.4032
+  },
+  "art/troops/wolves_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    2,
+    8,
+    38,
+    34
+   ],
+   "baseline": 34,
+   "cx": 19.87,
+   "cy": 22.67,
+   "foot_cx": 19.48,
+   "frac": [
+    0.75,
+    0.7647
+   ],
+   "fill": 0.3064
+  },
+  "art/troops/zombies_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    3,
+    1,
+    41,
+    34
+   ],
+   "baseline": 34,
+   "cx": 21.6,
+   "cy": 17.73,
+   "foot_cx": 18.34,
+   "frac": [
+    0.7917,
+    0.9706
+   ],
+   "fill": 0.3621
+  },
+  "art/troops/zombies_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    2,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.41,
+   "cy": 19.03,
+   "foot_cx": 23.77,
+   "frac": [
+    0.75,
+    0.9412
+   ],
+   "fill": 0.3658
+  },
+  "art/troops/zombies_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    11,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 28.98,
+   "cy": 17.47,
+   "foot_cx": 24.74,
+   "frac": [
+    0.7708,
+    0.9706
+   ],
+   "fill": 0.3615
+  },
+  "art/troops/zombies_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    7,
+    2,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "cx": 25.36,
+   "cy": 19.08,
+   "foot_cx": 23.48,
+   "frac": [
+    0.75,
+    0.9412
+   ],
+   "fill": 0.3689
+  },
+  "art/villains/aimola_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/aimola_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/aimola_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/aimola_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/arech_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/arech_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/arech_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/arech_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.86,
+   "cy": 16.22,
+   "foot_cx": 23.04,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9222
+  },
+  "art/villains/auric_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/auric_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/auric_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/auric_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/bargash_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/bargash_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/bargash_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/bargash_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/baron_makahl_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/baron_makahl_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/baron_makahl_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/baron_makahl_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/barrowpine_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/barrowpine_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/barrowpine_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/barrowpine_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/caneghor_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/caneghor_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/caneghor_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/caneghor_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/czar_nickolai_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.82,
+   "cy": 16.18,
+   "foot_cx": 23.22,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.875
+  },
+  "art/villains/czar_nickolai_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.88,
+   "cy": 16.19,
+   "foot_cx": 23.6,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.8756
+  },
+  "art/villains/czar_nickolai_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.85,
+   "cy": 16.2,
+   "foot_cx": 23.6,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.8756
+  },
+  "art/villains/czar_nickolai_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.83,
+   "cy": 16.23,
+   "foot_cx": 23.22,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.8768
+  },
+  "art/villains/dread_rob_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/dread_rob_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/dread_rob_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/dread_rob_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/hack_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/hack_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/hack_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/hack_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/magus_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/magus_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/magus_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/magus_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/mahk_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/mahk_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/mahk_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/mahk_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/moradon_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/moradon_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/moradon_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/moradon_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/murray_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/murray_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/murray_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/murray_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ragface_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ragface_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ragface_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ragface_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/rinaldus_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/rinaldus_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/rinaldus_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/rinaldus_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/urthrax_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/urthrax_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/urthrax_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/urthrax_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  }
+ },
+ "groups": {
+  "art/sprites/boat": {
+   "frames": [
+    "art/sprites/boat_00.png",
+    "art/sprites/boat_01.png",
+    "art/sprites/boat_02.png",
+    "art/sprites/boat_03.png"
+   ],
+   "union_bbox": [
+    1,
+    4,
+    46,
+    31
+   ],
+   "baseline": 31,
+   "max_height_frac": 0.7941,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.26,
+     "dcy": -0.02,
+     "dfoot_cx": -0.15,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.12,
+     "dcy": 0.29,
+     "dfoot_cx": 1.36,
+     "dbaseline": 1,
+     "dheight": 1
+    },
+    {
+     "dcx": 1.06,
+     "dcy": 0.57,
+     "dfoot_cx": -0.89,
+     "dbaseline": 1,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/sprites/hero_idle": {
+   "frames": [
+    "art/sprites/hero_idle_00.png",
+    "art/sprites/hero_idle_01.png",
+    "art/sprites/hero_idle_02.png",
+    "art/sprites/hero_idle_03.png"
+   ],
+   "union_bbox": [
+    1,
+    0,
+    47,
+    33
+   ],
+   "baseline": 33,
+   "max_height_frac": 0.9706,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 3.08,
+     "dcy": 1.74,
+     "dfoot_cx": 6.22,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.03,
+     "dcy": 0.09,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 4.49,
+     "dcy": 0.65,
+     "dfoot_cx": 17.35,
+     "dbaseline": 0,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/sprites/hero_walk": {
+   "frames": [
+    "art/sprites/hero_walk_00.png",
+    "art/sprites/hero_walk_01.png",
+    "art/sprites/hero_walk_02.png",
+    "art/sprites/hero_walk_03.png"
+   ],
+   "union_bbox": [
+    1,
+    2,
+    42,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.2,
+     "dcy": 0.3,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.01,
+     "dcy": 0.06,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.24,
+     "dcy": -0.6,
+     "dfoot_cx": 1.91,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/archers": {
+   "frames": [
+    "art/troops/archers_00.png",
+    "art/troops/archers_01.png",
+    "art/troops/archers_02.png",
+    "art/troops/archers_03.png"
+   ],
+   "union_bbox": [
+    3,
+    4,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.8824,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.58,
+     "dcy": 0.11,
+     "dfoot_cx": -0.33,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -3.29,
+     "dcy": 0.77,
+     "dfoot_cx": -1.66,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": -1.55,
+     "dcy": 0.08,
+     "dfoot_cx": -0.89,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/archmages": {
+   "frames": [
+    "art/troops/archmages_00.png",
+    "art/troops/archmages_01.png",
+    "art/troops/archmages_02.png",
+    "art/troops/archmages_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 2.34,
+     "dcy": 1.09,
+     "dfoot_cx": 1.35,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": 3.05,
+     "dcy": 1.55,
+     "dfoot_cx": -0.43,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": 0.08,
+     "dcy": -0.15,
+     "dfoot_cx": -0.65,
+     "dbaseline": 0,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/troops/barbarians": {
+   "frames": [
+    "art/troops/barbarians_00.png",
+    "art/troops/barbarians_01.png",
+    "art/troops/barbarians_02.png",
+    "art/troops/barbarians_03.png"
+   ],
+   "union_bbox": [
+    4,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 3.05,
+     "dcy": -3.35,
+     "dfoot_cx": 2.97,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": 5.51,
+     "dcy": -2.47,
+     "dfoot_cx": 3.89,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.6,
+     "dcy": -2.88,
+     "dfoot_cx": -0.77,
+     "dbaseline": 0,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/troops/cavalry": {
+   "frames": [
+    "art/troops/cavalry_00.png",
+    "art/troops/cavalry_01.png",
+    "art/troops/cavalry_02.png",
+    "art/troops/cavalry_03.png"
+   ],
+   "union_bbox": [
+    3,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.68,
+     "dcy": -1.4,
+     "dfoot_cx": -0.98,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": -0.55,
+     "dcy": -3.51,
+     "dfoot_cx": -2.32,
+     "dbaseline": 0,
+     "dheight": 2
+    },
+    {
+     "dcx": -3.74,
+     "dcy": 1.0,
+     "dfoot_cx": -2.63,
+     "dbaseline": 0,
+     "dheight": -2
+    }
+   ]
+  },
+  "art/troops/demons": {
+   "frames": [
+    "art/troops/demons_00.png",
+    "art/troops/demons_01.png",
+    "art/troops/demons_02.png",
+    "art/troops/demons_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.07,
+     "dcy": 2.34,
+     "dfoot_cx": -2.72,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": 0.68,
+     "dcy": 0.04,
+     "dfoot_cx": -0.27,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.44,
+     "dcy": -0.79,
+     "dfoot_cx": 0.87,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/dragons": {
+   "frames": [
+    "art/troops/dragons_00.png",
+    "art/troops/dragons_01.png",
+    "art/troops/dragons_02.png",
+    "art/troops/dragons_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.13,
+     "dcy": -1.29,
+     "dfoot_cx": -0.5,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.42,
+     "dcy": 0.91,
+     "dfoot_cx": 2.5,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.38,
+     "dcy": -0.24,
+     "dfoot_cx": -0.19,
+     "dbaseline": 0,
+     "dheight": -1
+    }
+   ]
+  },
+  "art/troops/druids": {
+   "frames": [
+    "art/troops/druids_00.png",
+    "art/troops/druids_01.png",
+    "art/troops/druids_02.png",
+    "art/troops/druids_03.png"
+   ],
+   "union_bbox": [
+    5,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -1.13,
+     "dcy": -0.39,
+     "dfoot_cx": 0.12,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 2.12,
+     "dcy": -2.77,
+     "dfoot_cx": -1.72,
+     "dbaseline": 0,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/troops/dwarves": {
+   "frames": [
+    "art/troops/dwarves_00.png",
+    "art/troops/dwarves_01.png",
+    "art/troops/dwarves_02.png",
+    "art/troops/dwarves_03.png"
+   ],
+   "union_bbox": [
+    7,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.3,
+     "dcy": -3.11,
+     "dfoot_cx": -4.31,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 3.11,
+     "dcy": -3.4,
+     "dfoot_cx": -3.47,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.28,
+     "dcy": -3.14,
+     "dfoot_cx": -4.58,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/elves": {
+   "frames": [
+    "art/troops/elves_00.png",
+    "art/troops/elves_01.png",
+    "art/troops/elves_02.png",
+    "art/troops/elves_03.png"
+   ],
+   "union_bbox": [
+    0,
+    1,
+    44,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9706,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.72,
+     "dcy": -3.02,
+     "dfoot_cx": -0.05,
+     "dbaseline": 0,
+     "dheight": 6
+    },
+    {
+     "dcx": 0.89,
+     "dcy": -3.39,
+     "dfoot_cx": -0.05,
+     "dbaseline": 0,
+     "dheight": 7
+    },
+    {
+     "dcx": 1.35,
+     "dcy": -1.29,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 2
+    }
+   ]
+  },
+  "art/troops/ghosts": {
+   "frames": [
+    "art/troops/ghosts_00.png",
+    "art/troops/ghosts_01.png",
+    "art/troops/ghosts_02.png",
+    "art/troops/ghosts_03.png"
+   ],
+   "union_bbox": [
+    1,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -3.25,
+     "dcy": -1.52,
+     "dfoot_cx": -2.46,
+     "dbaseline": 0,
+     "dheight": 2
+    },
+    {
+     "dcx": -6.29,
+     "dcy": -5.49,
+     "dfoot_cx": -0.38,
+     "dbaseline": 0,
+     "dheight": 4
+    },
+    {
+     "dcx": 3.35,
+     "dcy": -2.18,
+     "dfoot_cx": 3.79,
+     "dbaseline": 0,
+     "dheight": 6
+    }
+   ]
+  },
+  "art/troops/giants": {
+   "frames": [
+    "art/troops/giants_00.png",
+    "art/troops/giants_01.png",
+    "art/troops/giants_02.png",
+    "art/troops/giants_03.png"
+   ],
+   "union_bbox": [
+    7,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.88,
+     "dcy": -1.19,
+     "dfoot_cx": -1.05,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.95,
+     "dcy": -1.84,
+     "dfoot_cx": 1.94,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": 0.58,
+     "dcy": 3.1,
+     "dfoot_cx": -0.6,
+     "dbaseline": 0,
+     "dheight": -7
+    }
+   ]
+  },
+  "art/troops/gnomes": {
+   "frames": [
+    "art/troops/gnomes_00.png",
+    "art/troops/gnomes_01.png",
+    "art/troops/gnomes_02.png",
+    "art/troops/gnomes_03.png"
+   ],
+   "union_bbox": [
+    2,
+    0,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.12,
+     "dcy": -0.23,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.28,
+     "dcy": -1.96,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.64,
+     "dcy": -3.83,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/troops/knights": {
+   "frames": [
+    "art/troops/knights_00.png",
+    "art/troops/knights_01.png",
+    "art/troops/knights_02.png",
+    "art/troops/knights_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.05,
+     "dcy": -1.29,
+     "dfoot_cx": 0.24,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -2.26,
+     "dcy": -1.98,
+     "dfoot_cx": -3.47,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.87,
+     "dcy": -1.71,
+     "dfoot_cx": 3.26,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/militia": {
+   "frames": [
+    "art/troops/militia_00.png",
+    "art/troops/militia_01.png",
+    "art/troops/militia_02.png",
+    "art/troops/militia_03.png"
+   ],
+   "union_bbox": [
+    0,
+    2,
+    43,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -2.39,
+     "dcy": -1.66,
+     "dfoot_cx": -0.94,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.05,
+     "dcy": 0.05,
+     "dfoot_cx": 0.65,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.2,
+     "dcy": -0.61,
+     "dfoot_cx": 1.72,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/nomads": {
+   "frames": [
+    "art/troops/nomads_00.png",
+    "art/troops/nomads_01.png",
+    "art/troops/nomads_02.png",
+    "art/troops/nomads_03.png"
+   ],
+   "union_bbox": [
+    1,
+    0,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.02,
+     "dcy": -1.45,
+     "dfoot_cx": 0.77,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": 2.0,
+     "dcy": -2.41,
+     "dfoot_cx": 0.87,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": -1.96,
+     "dcy": 1.05,
+     "dfoot_cx": -0.19,
+     "dbaseline": 0,
+     "dheight": -6
+    }
+   ]
+  },
+  "art/troops/ogres": {
+   "frames": [
+    "art/troops/ogres_00.png",
+    "art/troops/ogres_01.png",
+    "art/troops/ogres_02.png",
+    "art/troops/ogres_03.png"
+   ],
+   "union_bbox": [
+    2,
+    2,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 3.05,
+     "dcy": 0.63,
+     "dfoot_cx": 4.36,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.13,
+     "dcy": 2.39,
+     "dfoot_cx": 4.4,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 2.41,
+     "dcy": 0.02,
+     "dfoot_cx": 1.16,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/orcs": {
+   "frames": [
+    "art/troops/orcs_00.png",
+    "art/troops/orcs_01.png",
+    "art/troops/orcs_02.png",
+    "art/troops/orcs_03.png"
+   ],
+   "union_bbox": [
+    1,
+    2,
+    46,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.49,
+     "dcy": -0.2,
+     "dfoot_cx": 0.58,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": 1.52,
+     "dcy": -0.08,
+     "dfoot_cx": 0.58,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -1.1,
+     "dcy": -0.03,
+     "dfoot_cx": -2.31,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/peasants": {
+   "frames": [
+    "art/troops/peasants_00.png",
+    "art/troops/peasants_01.png",
+    "art/troops/peasants_02.png",
+    "art/troops/peasants_03.png"
+   ],
+   "union_bbox": [
+    5,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.74,
+     "dcy": 2.17,
+     "dfoot_cx": 2.31,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": 3.97,
+     "dcy": 2.57,
+     "dfoot_cx": 4.38,
+     "dbaseline": 0,
+     "dheight": -2
+    },
+    {
+     "dcx": 1.74,
+     "dcy": 2.14,
+     "dfoot_cx": 2.27,
+     "dbaseline": 0,
+     "dheight": -1
+    }
+   ]
+  },
+  "art/troops/pikemen": {
+   "frames": [
+    "art/troops/pikemen_00.png",
+    "art/troops/pikemen_01.png",
+    "art/troops/pikemen_02.png",
+    "art/troops/pikemen_03.png"
+   ],
+   "union_bbox": [
+    4,
+    1,
+    47,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9706,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -1.51,
+     "dcy": -0.22,
+     "dfoot_cx": -0.46,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.06,
+     "dcy": 0.04,
+     "dfoot_cx": 2.88,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -1.54,
+     "dcy": -0.24,
+     "dfoot_cx": -0.76,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/skeletons": {
+   "frames": [
+    "art/troops/skeletons_00.png",
+    "art/troops/skeletons_01.png",
+    "art/troops/skeletons_02.png",
+    "art/troops/skeletons_03.png"
+   ],
+   "union_bbox": [
+    0,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -3.53,
+     "dcy": 1.26,
+     "dfoot_cx": -3.79,
+     "dbaseline": 0,
+     "dheight": 1
+    },
+    {
+     "dcx": 3.48,
+     "dcy": 2.83,
+     "dfoot_cx": 5.32,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -3.6,
+     "dcy": 1.26,
+     "dfoot_cx": -4.36,
+     "dbaseline": 0,
+     "dheight": 1
+    }
+   ]
+  },
+  "art/troops/sprites": {
+   "frames": [
+    "art/troops/sprites_00.png",
+    "art/troops/sprites_01.png",
+    "art/troops/sprites_02.png",
+    "art/troops/sprites_03.png"
+   ],
+   "union_bbox": [
+    1,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9706,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.06,
+     "dcy": 4.84,
+     "dfoot_cx": 0.14,
+     "dbaseline": 0,
+     "dheight": -7
+    },
+    {
+     "dcx": 3.15,
+     "dcy": 3.5,
+     "dfoot_cx": -4.2,
+     "dbaseline": 0,
+     "dheight": -4
+    },
+    {
+     "dcx": -6.06,
+     "dcy": 3.93,
+     "dfoot_cx": -5.86,
+     "dbaseline": 0,
+     "dheight": -6
+    }
+   ]
+  },
+  "art/troops/trolls": {
+   "frames": [
+    "art/troops/trolls_00.png",
+    "art/troops/trolls_01.png",
+    "art/troops/trolls_02.png",
+    "art/troops/trolls_03.png"
+   ],
+   "union_bbox": [
+    1,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9706,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.74,
+     "dcy": 0.33,
+     "dfoot_cx": 2.45,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.1,
+     "dcy": -0.18,
+     "dfoot_cx": 0.24,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -1.13,
+     "dcy": 0.58,
+     "dfoot_cx": 0.24,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/troops/vampires": {
+   "frames": [
+    "art/troops/vampires_00.png",
+    "art/troops/vampires_01.png",
+    "art/troops/vampires_02.png",
+    "art/troops/vampires_03.png"
+   ],
+   "union_bbox": [
+    1,
+    2,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 1.27,
+     "dcy": -0.43,
+     "dfoot_cx": 3.16,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.73,
+     "dcy": -0.58,
+     "dfoot_cx": 2.67,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": 0.06,
+     "dcy": -1.34,
+     "dfoot_cx": 3.17,
+     "dbaseline": 0,
+     "dheight": -1
+    }
+   ]
+  },
+  "art/troops/wolves": {
+   "frames": [
+    "art/troops/wolves_00.png",
+    "art/troops/wolves_01.png",
+    "art/troops/wolves_02.png",
+    "art/troops/wolves_03.png"
+   ],
+   "union_bbox": [
+    2,
+    2,
+    45,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9412,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -2.17,
+     "dcy": -0.48,
+     "dfoot_cx": -1.67,
+     "dbaseline": 0,
+     "dheight": 2
+    },
+    {
+     "dcx": 3.96,
+     "dcy": -4.28,
+     "dfoot_cx": -0.98,
+     "dbaseline": 0,
+     "dheight": 8
+    },
+    {
+     "dcx": -2.17,
+     "dcy": -0.49,
+     "dfoot_cx": -1.72,
+     "dbaseline": 0,
+     "dheight": 2
+    }
+   ]
+  },
+  "art/troops/zombies": {
+   "frames": [
+    "art/troops/zombies_00.png",
+    "art/troops/zombies_01.png",
+    "art/troops/zombies_02.png",
+    "art/troops/zombies_03.png"
+   ],
+   "union_bbox": [
+    3,
+    1,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 0.9706,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 3.81,
+     "dcy": 1.3,
+     "dfoot_cx": 5.43,
+     "dbaseline": 0,
+     "dheight": -1
+    },
+    {
+     "dcx": 7.38,
+     "dcy": -0.26,
+     "dfoot_cx": 6.4,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 3.76,
+     "dcy": 1.35,
+     "dfoot_cx": 5.14,
+     "dbaseline": 0,
+     "dheight": -1
+    }
+   ]
+  },
+  "art/villains/aimola": {
+   "frames": [
+    "art/villains/aimola_00.png",
+    "art/villains/aimola_01.png",
+    "art/villains/aimola_02.png",
+    "art/villains/aimola_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/arech": {
+   "frames": [
+    "art/villains/arech_00.png",
+    "art/villains/arech_01.png",
+    "art/villains/arech_02.png",
+    "art/villains/arech_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.01,
+     "dcy": -0.06,
+     "dfoot_cx": -0.23,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/auric": {
+   "frames": [
+    "art/villains/auric_00.png",
+    "art/villains/auric_01.png",
+    "art/villains/auric_02.png",
+    "art/villains/auric_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/bargash": {
+   "frames": [
+    "art/villains/bargash_00.png",
+    "art/villains/bargash_01.png",
+    "art/villains/bargash_02.png",
+    "art/villains/bargash_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/baron_makahl": {
+   "frames": [
+    "art/villains/baron_makahl_00.png",
+    "art/villains/baron_makahl_01.png",
+    "art/villains/baron_makahl_02.png",
+    "art/villains/baron_makahl_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/barrowpine": {
+   "frames": [
+    "art/villains/barrowpine_00.png",
+    "art/villains/barrowpine_01.png",
+    "art/villains/barrowpine_02.png",
+    "art/villains/barrowpine_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/caneghor": {
+   "frames": [
+    "art/villains/caneghor_00.png",
+    "art/villains/caneghor_01.png",
+    "art/villains/caneghor_02.png",
+    "art/villains/caneghor_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/czar_nickolai": {
+   "frames": [
+    "art/villains/czar_nickolai_00.png",
+    "art/villains/czar_nickolai_01.png",
+    "art/villains/czar_nickolai_02.png",
+    "art/villains/czar_nickolai_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.06,
+     "dcy": 0.01,
+     "dfoot_cx": 0.38,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.03,
+     "dcy": 0.02,
+     "dfoot_cx": 0.38,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.01,
+     "dcy": 0.05,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/dread_rob": {
+   "frames": [
+    "art/villains/dread_rob_00.png",
+    "art/villains/dread_rob_01.png",
+    "art/villains/dread_rob_02.png",
+    "art/villains/dread_rob_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/hack": {
+   "frames": [
+    "art/villains/hack_00.png",
+    "art/villains/hack_01.png",
+    "art/villains/hack_02.png",
+    "art/villains/hack_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/magus": {
+   "frames": [
+    "art/villains/magus_00.png",
+    "art/villains/magus_01.png",
+    "art/villains/magus_02.png",
+    "art/villains/magus_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/mahk": {
+   "frames": [
+    "art/villains/mahk_00.png",
+    "art/villains/mahk_01.png",
+    "art/villains/mahk_02.png",
+    "art/villains/mahk_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/moradon": {
+   "frames": [
+    "art/villains/moradon_00.png",
+    "art/villains/moradon_01.png",
+    "art/villains/moradon_02.png",
+    "art/villains/moradon_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/murray": {
+   "frames": [
+    "art/villains/murray_00.png",
+    "art/villains/murray_01.png",
+    "art/villains/murray_02.png",
+    "art/villains/murray_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/ragface": {
+   "frames": [
+    "art/villains/ragface_00.png",
+    "art/villains/ragface_01.png",
+    "art/villains/ragface_02.png",
+    "art/villains/ragface_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/rinaldus": {
+   "frames": [
+    "art/villains/rinaldus_00.png",
+    "art/villains/rinaldus_01.png",
+    "art/villains/rinaldus_02.png",
+    "art/villains/rinaldus_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/urthrax": {
+   "frames": [
+    "art/villains/urthrax_00.png",
+    "art/villains/urthrax_01.png",
+    "art/villains/urthrax_02.png",
+    "art/villains/urthrax_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  }
+ }
+}
