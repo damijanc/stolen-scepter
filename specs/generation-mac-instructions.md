@@ -57,8 +57,7 @@ If it does not contain `CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors` (~2.5 GB):
 source ~/dev/ai/ComfyUI/venv/bin/activate
 hf download h94/IP-Adapter models/image_encoder/model.safetensors --local-dir /tmp/clip
 mkdir -p ~/dev/ai/ComfyUI/models/clip_vision
-mv /tmp/clip/models/image_encoder/model.safetensors \
-   ~/dev/ai/ComfyUI/models/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors
+mv /tmp/clip/models/image_encoder/model.safetensors ~/dev/ai/ComfyUI/models/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors
 ls -lh ~/dev/ai/ComfyUI/models/clip_vision
 ```
 
@@ -107,8 +106,7 @@ Then one unit, to check quality:
 
 ```sh
 cd ~/Development/king-bounty
-PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --controlnet --ipadapter batch --category troops --only archers
+PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --ipadapter batch --category troops --only archers
 
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
@@ -161,8 +159,7 @@ When archers look right, run the whole set with the same flags (resumable;
 safe to stop):
 
 ```sh
-PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --controlnet --ipadapter batch --category troops --resume 2>&1 | tee -a ~/ai-batch.log
+PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --ipadapter batch --category troops --resume 2>&1 | tee -a ~/ai-batch.log
 ```
 
 Then the other categories (same pattern):
