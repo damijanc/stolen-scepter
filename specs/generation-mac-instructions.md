@@ -111,7 +111,7 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-The log must print `gen_ai version 1.15` and `controlnet on`. A missing model
+The log must print `gen_ai version 1.16` and `controlnet on`. A missing model
 stops the run with the fix instead of quietly falling back.
 
 Look for: **one** archer per frame, **facing right**, same character through
@@ -119,7 +119,9 @@ the four frames, transparent background, ~288×204, and the four beats of the
 archer's own action in order: full draw → just loosed (no arrow) → bow pointed
 down → arrow nocked. Each troop's four frames are its attack loop, not a
 generic idle; the beats per unit are `TROOP_POSES` in `tools/gen_ai.py`, and
-the matching skeletons are `UNIT_POSES` in `tools/pose_rig.py`.
+the matching skeletons are `UNIT_POSES` in `tools/pose_rig.py`. Props a skeleton
+cannot place (an arrow that must be gone, a bow that must point down) are
+kept out per frame by `TROOP_NEG` in `tools/gen_ai.py`, the negative prompt.
 
 How the frames are made (`--controlnet`): every frame is a fresh generation
 drawn to its own skeleton, which fixes the pose and the facing. Frames 1-3 also
@@ -142,7 +144,9 @@ stretch-to-cell behaviour for comparison. This happens after matting.
 Tune if needed (flags go **before** `batch`):
 
 ```sh
-# poses lost only when IP-Adapter is on? loosen it (default 0.8)
+# poses lost only when IP-Adapter is on? let the skeleton set the pose first
+python3 tools/gen_ai.py --controlnet --ipadapter --ip-start 0.3 ... batch --category troops --only archers
+# ...or loosen IP-Adapter (default 0.8)
 python3 tools/gen_ai.py --controlnet --ipadapter --ip-weight 0.5 ... batch --category troops --only archers
 # figure stiff or broken? ease the ControlNet off (default 1.0, all steps)
 python3 tools/gen_ai.py --controlnet --ipadapter --cn-strength 0.7 ... batch --category troops --only archers

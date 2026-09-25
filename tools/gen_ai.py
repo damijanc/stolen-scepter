@@ -36,7 +36,7 @@ LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.15"
+VERSION = "1.16"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -370,8 +370,9 @@ def build_pose_graph(ckpt, positive, negative, seed, w, h, pose_name, cn_model,
                      strength, end, ip=None):
     """txt2img steered by an OpenPose control image; `ip` adds IP-Adapter.
 
-    `ip` is (image_name, preset, weight, weight_type): the reference image
-    whose LOOK the frame should share. The pose comes from the ControlNet.
+    `ip` is (image_name, preset, weight, weight_type, start): the reference
+    image whose LOOK the frame should share, applied from `start` (a fraction
+    of the steps). The pose comes from the ControlNet.
     """
     g = {
         "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
@@ -396,13 +397,13 @@ def build_pose_graph(ckpt, positive, negative, seed, w, h, pose_name, cn_model,
         "10": {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "ob"}},
     }
     if ip:
-        image_name, preset, weight, weight_type = ip
+        image_name, preset, weight, weight_type, start = ip
         g["20"] = {"class_type": "LoadImage", "inputs": {"image": image_name}}
         g["30"] = {"class_type": "IPAdapterUnifiedLoader",
                    "inputs": {"model": ["4", 0], "preset": preset}}
         g["31"] = {"class_type": "IPAdapter",
                    "inputs": {"model": ["30", 0], "ipadapter": ["30", 1], "image": ["20", 0],
-                              "weight": weight, "start_at": 0.0, "end_at": 1.0,
+                              "weight": weight, "start_at": start, "end_at": 1.0,
                               "weight_type": weight_type}}
         g["3"]["inputs"]["model"] = ["31", 0]
     return g
@@ -937,14 +938,15 @@ def place_frames(args, paths, images, tw, th):
 TROOP_POSES = {
     "archers": [
         "at full draw, bowstring pulled back to the cheek with an arrow nocked",
-        "just loosed the arrow, bow held forward, bowstring straight, no arrow",
+        "just loosed, bow arm held forward, bowstring snapped back straight, drawing "
+        "hand open and flung back behind the head, empty hands",
         "bow lowered and pointing down toward the feet, bowstring straight",
         "bow raised with an arrow nocked on the string, about to draw",
     ],
     "orcs": [
         "at full draw, bowstring pulled back with an arrow nocked",
         "just loosed the arrow, the arrow flying off to the right",
-        "bow held forward, bowstring straight, no arrow",
+        "bow held forward, relaxed straight bowstring, empty drawing hand at the side",
         "nocking a new arrow and starting to draw",
     ],
     "elves": [
@@ -1100,6 +1102,24 @@ WALK_POSES = [
 ]
 
 
+# Extra negative prompt per troop frame, for what a pose must NOT show. SDXL
+# reads "no arrow" in a positive prompt as "arrow", so an absent prop goes
+# here instead. Frame order matches TROOP_POSES.
+TROOP_NEG = {
+    "archers": ["", "arrow, nocked arrow, drawn bowstring, two bowstrings",
+                "aiming, raised bow, drawn bow, drawn bowstring, arrow", ""],
+    "orcs": ["", "", "arrow, nocked arrow, drawn bowstring, two bowstrings", ""],
+    "elves": ["", "", "", "nocked arrow, drawn bowstring, two bowstrings"],
+}
+
+
+def frame_negative(path, i):
+    """NEG plus the troop frame's own exclusions (TROOP_NEG)."""
+    extra = TROOP_NEG.get(unit_of(path), ["", "", "", ""])[i] \
+        if path.startswith("art/troops/") else ""
+    return f"{NEG}, {extra}" if extra else NEG
+
+
 def frame_prompt(path, i):
     stem = os.path.basename(path)[:-4]
     if path.startswith("art/troops/"):
@@ -1204,8 +1224,9 @@ def render_posed_frames(args, path, tw, th):
         ip = None
         if ref and getattr(args, "ipadapter", False):
             ip = (ref, resolve_ip_preset(info, getattr(args, "ip_preset", "")),
-                  args.ip_weight, resolve_ip_type(info, args))
-        graph = build_pose_graph(args.ckpt, pos, NEG, seed + i, GEN_W, GEN_H, pose_name,
+                  args.ip_weight, resolve_ip_type(info, args), args.ip_start)
+        graph = build_pose_graph(args.ckpt, pos, frame_negative(path, i), seed + i,
+                                 GEN_W, GEN_H, pose_name,
                                  cn, args.cn_strength, args.cn_end, ip)
         raw = os.path.join(OUT, f"_raw_{i}.png")
         with open(raw, "wb") as fh:
@@ -1247,10 +1268,12 @@ def render_group_frames(args, path, tw, th):
                 if getattr(args, "ipadapter", False):
                     preset = resolve_ip_preset(info, getattr(args, "ip_preset", ""))
                     graph = build_ipadapter_img2img(
-                        args.ckpt, pos, NEG, seed + i, name, denoise, preset,
+                        args.ckpt, pos, frame_negative(path, i), seed + i, name, denoise,
+                        preset,
                         getattr(args, "ip_weight", 0.8), resolve_ip_type(info, args))
                 else:
-                    graph = build_img2img(args.ckpt, pos, NEG, seed + i, name, denoise)
+                    graph = build_img2img(args.ckpt, pos, frame_negative(path, i), seed + i,
+                                          name, denoise)
                 png = generate(args.host, graph)
                 raw = os.path.join(OUT, f"_raw_{i}.png")
                 with open(raw, "wb") as fh:
@@ -1553,6 +1576,9 @@ def main():
                     help="IPAdapter weight_type; 'style transfer' keeps frame 0's look "
                          "but not its pose (default: 'style transfer' with --controlnet, "
                          "else 'standard')")
+    ap.add_argument("--ip-start", type=float, default=0.0,
+                    help="with --controlnet: start IP-Adapter at this fraction of the "
+                         "steps, so the skeleton sets the pose first (e.g. 0.3)")
     ap.add_argument("--controlnet", action="store_true",
                     help="draw each troop frame to its authored pose skeleton "
                          "(tools/pose_rig.py) via ControlNet OpenPose")
