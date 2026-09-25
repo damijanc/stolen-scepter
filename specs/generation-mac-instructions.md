@@ -87,8 +87,23 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-Look for: **one** archer per frame, four **different poses**, same character
-through the four frames, transparent background, ~288×204.
+Look for: **one** archer per frame, same character through the four frames,
+transparent background, ~288×204, and the four beats of the archer's own
+action in order: full draw → just loosed (no arrow) → bow pointed down → arrow
+nocked. Each troop's four frames are its attack loop, not a generic idle; the
+beats per unit are `TROOP_POSES` in `tools/gen_ai.py`.
+
+If the frames all look like frame 0 (img2img cannot move far from it), let
+IP-Adapter carry the identity alone and draw each pose fresh:
+
+```sh
+PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
+  --ipadapter --denoise 1.0 batch --category troops --only archers
+```
+
+At `--denoise 1.0` frame 0's pixels are ignored and only its look (via
+IP-Adapter) carries over, so the pose follows the prompt. Needs the CLIP-Vision
+encoder above.
 
 Placement (`--registration spec`, the default): each unit is scaled once for
 all four frames, to the original's height in the cell, and stands on the

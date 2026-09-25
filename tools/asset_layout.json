@@ -4,7 +4,8 @@
  "description": "Functional geometry of the original colour-keyed art (numbers only). bbox is [x0,y0,x1,y1], x1/y1 exclusive; baseline = y1. Used by tools/gen_ai.py --registration spec.",
  "conventions": {
   "dust_px": 4,
-  "foot_rows": 3
+  "foot_rows": 3,
+  "shadow_gap": 2
  },
  "slots": {
   "art/classes/barbarian.png": {
@@ -2657,17 +2658,23 @@
     8,
     1,
     42,
-    34
+    25
    ],
-   "baseline": 34,
-   "cx": 22.57,
-   "cy": 13.01,
-   "foot_cx": 21.56,
+   "baseline": 25,
+   "cx": 22.65,
+   "cy": 11.52,
+   "foot_cx": 16.43,
    "frac": [
     0.7083,
-    0.9706
+    0.7059
    ],
-   "fill": 0.2868
+   "fill": 0.2659,
+   "shadow": [
+    15,
+    31,
+    30,
+    34
+   ]
   },
   "art/troops/sprites_01.png": {
    "mask": "alpha",
@@ -2679,17 +2686,23 @@
     7,
     8,
     41,
-    34
+    29
    ],
-   "baseline": 34,
-   "cx": 22.51,
-   "cy": 17.85,
-   "foot_cx": 21.7,
+   "baseline": 29,
+   "cx": 22.59,
+   "cy": 16.48,
+   "foot_cx": 15.43,
    "frac": [
     0.7083,
-    0.7647
+    0.6176
    ],
-   "fill": 0.2567
+   "fill": 0.2341,
+   "shadow": [
+    15,
+    31,
+    30,
+    34
+   ]
   },
   "art/troops/sprites_02.png": {
    "mask": "alpha",
@@ -2701,17 +2714,23 @@
     4,
     5,
     48,
-    34
+    29
    ],
-   "baseline": 34,
-   "cx": 25.72,
-   "cy": 16.51,
-   "foot_cx": 17.36,
+   "baseline": 29,
+   "cx": 26.3,
+   "cy": 15.45,
+   "foot_cx": 12.43,
    "frac": [
     0.9167,
-    0.8529
+    0.7059
    ],
-   "fill": 0.4277
+   "fill": 0.4001,
+   "shadow": [
+    9,
+    31,
+    27,
+    34
+   ]
   },
   "art/troops/sprites_03.png": {
    "mask": "alpha",
@@ -2723,17 +2742,23 @@
     1,
     7,
     35,
-    34
+    28
    ],
-   "baseline": 34,
-   "cx": 16.51,
-   "cy": 16.94,
-   "foot_cx": 15.7,
+   "baseline": 28,
+   "cx": 16.59,
+   "cy": 15.48,
+   "foot_cx": 9.43,
    "frac": [
     0.7083,
-    0.7941
+    0.6176
    ],
-   "fill": 0.2567
+   "fill": 0.2341,
+   "shadow": [
+    9,
+    31,
+    24,
+    34
+   ]
   },
   "art/troops/trolls_00.png": {
    "mask": "alpha",
@@ -5654,10 +5679,10 @@
     1,
     1,
     48,
-    34
+    29
    ],
-   "baseline": 34,
-   "max_height_frac": 0.9706,
+   "baseline": 29,
+   "max_height_frac": 0.7059,
    "motion": [
     {
      "dcx": 0.0,
@@ -5668,24 +5693,24 @@
     },
     {
      "dcx": -0.06,
-     "dcy": 4.84,
-     "dfoot_cx": 0.14,
-     "dbaseline": 0,
-     "dheight": -7
+     "dcy": 4.96,
+     "dfoot_cx": -1.0,
+     "dbaseline": 4,
+     "dheight": -3
     },
     {
-     "dcx": 3.15,
-     "dcy": 3.5,
-     "dfoot_cx": -4.2,
-     "dbaseline": 0,
-     "dheight": -4
+     "dcx": 3.65,
+     "dcy": 3.93,
+     "dfoot_cx": -4.0,
+     "dbaseline": 4,
+     "dheight": 0
     },
     {
      "dcx": -6.06,
-     "dcy": 3.93,
-     "dfoot_cx": -5.86,
-     "dbaseline": 0,
-     "dheight": -6
+     "dcy": 3.96,
+     "dfoot_cx": -7.0,
+     "dbaseline": 3,
+     "dheight": -3
     }
    ]
   },

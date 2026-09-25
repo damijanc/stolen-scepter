@@ -19,6 +19,9 @@ Conventions:
     bottom FOOT_ROWS rows of the bbox -- the anchor to register on, since a
     raised weapon moves cx but not the feet.
   * Blobs smaller than DUST pixels (8-connected) are ignored.
+  * A blob SHADOW_GAP+ rows below the largest one is a detached ground shadow
+    (the hovering sprites): it is excluded from the subject and recorded as
+    `shadow` [x0, y0, x1, y1], so `baseline` is where the subject itself ends.
   * `mask` records how the subject was separated from its background:
       alpha        the PNG's own 0/255 alpha
       ground_diff  pixels differing from the ground tile the art is drawn on
@@ -41,6 +44,7 @@ OUT = os.path.join(ROOT, "tools", "asset_layout.json")
 
 DUST = 4
 FOOT_ROWS = 3
+SHADOW_GAP = 2
 
 # Map tiles that are an object on a ground, and the ground they bake in. The
 # bridges are left out: their water differs from water.png on every pixel, so
@@ -88,10 +92,10 @@ def mask_for(asset):
                                  for i in range(w * h)]
 
 
-def keep_blobs(w, h, mask):
-    """Drop 8-connected blobs smaller than DUST pixels."""
+def blobs(w, h, mask):
+    """8-connected blobs of at least DUST pixels, largest first."""
     seen = bytearray(w * h)
-    out = [False] * (w * h)
+    out = []
     for i in range(w * h):
         if seen[i] or not mask[i]:
             continue
@@ -110,21 +114,35 @@ def keep_blobs(w, h, mask):
                             seen[k] = 1
                             stack.append(k)
         if len(blob) >= DUST:
-            for j in blob:
-                out[j] = True
+            out.append(blob)
+    out.sort(key=len, reverse=True)
     return out
 
 
-def measure(method, w, h, mask):
-    mask = keep_blobs(w, h, mask)
-    pts = [(i % w, i // w) for i in range(w * h) if mask[i]]
-    if not pts:
-        return None
+def box(pts):
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
-    x0, y0, x1, y1 = min(xs), min(ys), max(xs) + 1, max(ys) + 1
+    return min(xs), min(ys), max(xs) + 1, max(ys) + 1
+
+
+def measure(method, w, h, mask):
+    found = [[(j % w, j // w) for j in b] for b in blobs(w, h, mask)]
+    if not found:
+        return None
+    # A blob at least SHADOW_GAP rows below the largest one is a detached
+    # ground shadow (the flying sprites hover over one). It is not the
+    # subject: keep it apart so the baseline is the subject's own bottom.
+    # demons_03 draws its legs detached one row under the body, which the gap
+    # rules out.
+    main_bottom = box(found[0])[3]
+    below = [b for b in found[1:] if box(b)[1] >= main_bottom + SHADOW_GAP]
+    shadow = [p for b in below for p in b]
+    pts = [p for b in found if b not in below for p in b]
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x0, y0, x1, y1 = box(pts)
     feet = [x for x, y in pts if y >= y1 - FOOT_ROWS]
-    return {
+    rec = {
         "mask": method,
         "cell": [w, h],
         "bbox": [x0, y0, x1, y1],
@@ -135,6 +153,9 @@ def measure(method, w, h, mask):
         "frac": [round((x1 - x0) / w, 4), round((y1 - y0) / h, 4)],
         "fill": round(len(pts) / (w * h), 4),
     }
+    if shadow:
+        rec["shadow"] = list(box(shadow))
+    return rec
 
 
 def group_of(path):
@@ -195,7 +216,7 @@ def build():
         "description": ("Functional geometry of the original colour-keyed art (numbers "
                         "only). bbox is [x0,y0,x1,y1], x1/y1 exclusive; baseline = y1. "
                         "Used by tools/gen_ai.py --registration spec."),
-        "conventions": {"dust_px": DUST, "foot_rows": FOOT_ROWS},
+        "conventions": {"dust_px": DUST, "foot_rows": FOOT_ROWS, "shadow_gap": SHADOW_GAP},
         "slots": dict(sorted(slots.items())),
         "groups": {g: summarise(sorted(fr)) for g, fr in sorted(groups.items())},
     }

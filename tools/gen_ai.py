@@ -35,7 +35,7 @@ LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.10"
+VERSION = "1.11"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -47,32 +47,35 @@ NEG = ("text, watermark, ui, border, frame, perspective, horizon, buildings, "
        "collage, grid, split image, panel, clone, duplicate, mirror, reflection, "
        "signature, blurry, low quality, deformed")
 
+# Each unit's kit is what its combat animation acts out (TROOP_POSES), so a
+# giant throws boulders and a troll fights bare-fisted -- a club would fight
+# the pose prompts.
 TROOP = {
-    "peasants": "peasant villager holding a pitchfork",
-    "militia": "militia soldier with a sword and shield",
-    "pikemen": "pikeman soldier holding a long pike",
-    "archers": "archer drawing a bow",
-    "knights": "armoured knight with a sword and shield",
-    "barbarians": "barbarian warrior with a battle axe",
-    "nomads": "nomad warrior with a scimitar",
-    "orcs": "orc warrior with an axe",
-    "ogres": "ogre warrior with a club",
-    "giants": "giant with a club",
-    "trolls": "troll with a club",
-    "zombies": "shambling zombie",
-    "skeletons": "skeleton warrior with a sword",
-    "vampires": "vampire lord with a dark cape",
-    "elves": "elf archer",
-    "dwarves": "dwarf warrior with an axe",
-    "gnomes": "gnome with a pointed hat",
-    "druids": "druid with a staff",
-    "archmages": "archmage wizard with a staff",
-    "demons": "winged demon warrior",
-    "wolves": "dire wolf",
-    "cavalry": "mounted knight on a horse",
-    "dragons": "dragon",
-    "ghosts": "ghostly spirit",
-    "sprites": "tiny fairy sprite",
+    "peasants": "peasant villager with a pitchfork",
+    "militia": "militia soldier with a short sword and a wooden shield",
+    "pikemen": "pikeman soldier with a long pike",
+    "archers": "archer with a longbow and a quiver",
+    "knights": "armoured knight with a spiked flail and a shield",
+    "barbarians": "barbarian warrior with a battle axe and a round shield",
+    "nomads": "desert nomad riding a horse, with a scimitar",
+    "orcs": "orc archer with a bow",
+    "ogres": "ogre with a wooden club and a round shield",
+    "giants": "huge bald giant who throws boulders",
+    "trolls": "hulking bare-fisted troll",
+    "zombies": "shambling clawed zombie",
+    "skeletons": "skeleton warrior with a long glaive",
+    "vampires": "vampire lord in a great bat-winged cloak",
+    "elves": "kneeling elf archer with a longbow",
+    "dwarves": "dwarf warrior with a war hammer and a round shield",
+    "gnomes": "bearded gnome mage in wide-sleeved robes",
+    "druids": "hooded druid with a wooden staff",
+    "archmages": "archmage in long robes who casts lightning",
+    "demons": "horned winged demon",
+    "wolves": "grey dire wolf",
+    "cavalry": "mounted knight on a horse, with a lance",
+    "dragons": "green winged dragon that breathes fire",
+    "ghosts": "hooded wraith with clawed hands",
+    "sprites": "tiny winged fairy flying in the air",
 }
 
 TERRAIN = {
@@ -748,8 +751,26 @@ def register_frames(subjects, specs, tw, th):
         for y in range(nh):
             d = ((oy + y) * tw + ox) * 4
             canvas[d:d + nw * 4] = img[y * nw * 4:(y + 1) * nw * 4]
+        if "shadow" in spec:
+            draw_shadow(canvas, tw, th, spec["shadow"], sx, sy)
         frames.append(bytes(canvas))
     return frames
+
+
+def draw_shadow(canvas, tw, th, box, sx, sy, alpha=150):
+    """A soft dark ellipse under a hovering unit, where the original's was.
+
+    Drawn only on empty pixels, so it never covers the unit itself.
+    """
+    x0, y0, x1, y1 = box[0] * sx, box[1] * sy, box[2] * sx, box[3] * sy
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    rx, ry = max(1.0, (x1 - x0) / 2), max(1.0, (y1 - y0) / 2)
+    for y in range(max(0, int(y0)), min(th, int(y1) + 1)):
+        for x in range(max(0, int(x0)), min(tw, int(x1) + 1)):
+            r = ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2
+            o = (y * tw + x) * 4
+            if r < 1.0 and canvas[o + 3] == 0:
+                canvas[o + 3] = int(alpha * min(1.0, (1.0 - r) * 3))
 
 
 def place_frames(args, paths, images, tw, th):
@@ -775,10 +796,165 @@ def place_frames(args, paths, images, tw, th):
     return out
 
 
-# Combat units loop a 4-frame IDLE animation (combat.h: `frame // 0..3 idle
-# anim`, advanced by `combat_tick_anim`). Movement is instant and attacks are a
-# splat overlay, so there is no walk/attack frame split -- it is one resting
-# cycle. The hero is the exception: `hero_walk` plays while he moves on the map.
+# Combat units loop one 4-frame animation (combat.h: `frame // 0..3 idle anim`,
+# advanced by `combat_tick_anim`). The engine calls it idle, but what each unit
+# loops is its own ACTION: archers shoot, dragons breathe fire, giants throw a
+# boulder. TROOP_POSES states each unit's four beats in the originals' frame
+# order (read from the frames' poses, described in our own words); IDLE_POSES
+# is only the fallback for a unit not listed. The hero is the exception:
+# `hero_walk` plays while he moves on the map.
+TROOP_POSES = {
+    "archers": [
+        "at full draw, bowstring pulled back to the cheek with an arrow nocked",
+        "just loosed the arrow, bow held forward, bowstring straight, no arrow",
+        "bow lowered and pointing down toward the feet, bowstring straight",
+        "bow raised with an arrow nocked on the string, about to draw",
+    ],
+    "orcs": [
+        "at full draw, bowstring pulled back with an arrow nocked",
+        "just loosed the arrow, the arrow flying off to the right",
+        "bow held forward, bowstring straight, no arrow",
+        "nocking a new arrow and starting to draw",
+    ],
+    "elves": [
+        "kneeling on one knee, bow held low and diagonal across the body",
+        "kneeling, raising the bow and starting to draw",
+        "kneeling, bow aimed up to the right at full draw",
+        "kneeling, just loosed, bow lowering forward",
+    ],
+    "archmages": [
+        "both arms raised to the sides, crackling magenta lightning between the hands",
+        "arms lifted, lightning arcing upward from both hands",
+        "leaning forward, hurling a lightning bolt straight ahead to the right",
+        "arms raised again, lightning gathering above the head",
+    ],
+    "barbarians": [
+        "standing, axe held low at the side",
+        "axe raised back over the shoulder, shield held forward",
+        "axe swung down and forward in a strike, with an impact flash",
+        "axe raised back over the shoulder again",
+    ],
+    "cavalry": [
+        "horse standing, lance held level",
+        "horse starting to charge, front legs lifting, lance couched",
+        "horse at full gallop with legs stretched out, rider leaning in",
+        "horse landing from the stride, lance level",
+    ],
+    "nomads": [
+        "horse standing, scimitar raised",
+        "horse rearing, scimitar swung up overhead",
+        "horse at full gallop, rider leaning forward",
+        "horse galloping, scimitar slashing forward",
+    ],
+    "demons": [
+        "standing tall, wings raised high",
+        "crouching low, wings half folded",
+        "wings spread wide, clawed arms out to the sides",
+        "leaning forward, firing a blue energy bolt straight ahead to the right",
+    ],
+    "dragons": [
+        "head raised, jaws closed",
+        "head raised, breathing a small burst of fire",
+        "head lowered, breathing fire down at the ground ahead",
+        "neck thrust forward, breathing a long jet of fire straight ahead",
+    ],
+    "druids": [
+        "hunched, holding the staff upright",
+        "staff lifted slightly",
+        "staff lowered slightly",
+        "staff crackling with lightning, glowing aura around the body",
+    ],
+    "dwarves": [
+        "hammer held low at the side, shield in front",
+        "hammer raised up at the shoulder",
+        "hammer swung forward in a strike, with sparks",
+        "hammer raised back at the shoulder",
+    ],
+    "ghosts": [
+        "floating, one clawed hand reaching forward",
+        "drifting forward, clawed hand reaching",
+        "rising up, arms spread wide",
+        "wreathed in fire, casting flames from the outstretched hand",
+    ],
+    "giants": [
+        "standing, holding a boulder at the chest",
+        "crouching, boulder wound back over the shoulder",
+        "arm flung forward, just thrown the boulder, hands empty",
+        "bent over, picking up a new boulder from the ground",
+    ],
+    "gnomes": [
+        "arms stretched out to the sides",
+        "arms slightly lowered",
+        "arms raised up",
+        "arms raised, a glowing magenta ring of magic in each hand",
+    ],
+    "knights": [
+        "flail held out forward, spiked ball hanging",
+        "flail swinging upward",
+        "flail whirled up over the head behind",
+        "flail striking forward, with impact sparks",
+    ],
+    "militia": [
+        "guard stance, sword pointed forward",
+        "sword raised back over the head",
+        "sword thrust forward with a glint",
+        "sword slashing low across the body",
+    ],
+    "ogres": [
+        "club raised high behind the head",
+        "club swung forward in a strike, with impact sparks",
+        "club swung all the way down to the ground",
+        "club raised at the shoulder",
+    ],
+    "peasants": [
+        "pitchfork held diagonally upward",
+        "pitchfork thrust forward, level",
+        "pitchfork jabbing forward, with impact sparks",
+        "pitchfork held level, pulling back",
+    ],
+    "pikemen": [
+        "pike held horizontally low across the body",
+        "pike levelled forward at the waist",
+        "lunging, thrusting the pike forward, with impact sparks",
+        "pike levelled, drawing back",
+    ],
+    "skeletons": [
+        "glaive held upright and diagonal",
+        "glaive levelled forward",
+        "lunging, thrusting the glaive forward, with impact sparks",
+        "glaive levelled, recovering",
+    ],
+    "sprites": [
+        "hovering in the air, wings raised",
+        "dipping lower in flight, wings swept back",
+        "casting a burst of blue-white magic from the hands",
+        "hovering, wings lowered",
+    ],
+    "trolls": [
+        "standing hunched, fists at the sides",
+        "punching forward with one fist",
+        "fists pulled back, shoulders hunched",
+        "standing tall, fists lowered",
+    ],
+    "vampires": [
+        "crouched, wrapped in the great cloak",
+        "cloak drawn tight, turning",
+        "cloak thrown open like bat wings",
+        "cloak open, firing a red beam straight ahead to the right",
+    ],
+    "wolves": [
+        "standing on all fours, alert",
+        "crouched low, ready to pounce",
+        "leaping up, jaws open",
+        "landing crouched",
+    ],
+    "zombies": [
+        "shambling, arms outstretched",
+        "lurching forward",
+        "clawing swipe, with impact sparks",
+        "arms outstretched, recovering",
+    ],
+}
 IDLE_POSES = [
     "standing at rest with the weapon lowered at the side",
     "raising the weapon, arm midway up, torso turning",
@@ -796,8 +972,9 @@ WALK_POSES = [
 def frame_prompt(path, i):
     stem = os.path.basename(path)[:-4]
     if path.startswith("art/troops/"):
-        desc = TROOP.get(stem.rsplit("_", 1)[0], stem)
-        poses = IDLE_POSES
+        unit = stem.rsplit("_", 1)[0]
+        desc = TROOP.get(unit, unit)
+        poses = TROOP_POSES.get(unit, IDLE_POSES)
     elif path.startswith("art/sprites/") and stem.rsplit("_", 1)[0] == "hero_walk":
         desc = "knight hero"
         poses = WALK_POSES
