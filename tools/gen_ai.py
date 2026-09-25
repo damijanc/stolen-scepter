@@ -36,7 +36,7 @@ LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.13"
+VERSION = "1.14"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -444,14 +444,50 @@ def run_graph_matted(args, graph, matte_wanted):
     src = tmp
     if matte_wanted and args.matte == "cli":
         cut = os.path.join(OUT, "_cut.png")
-        subprocess.run([args.rembg, "i", tmp, cut], check=True)
+        run_rembg(args, tmp, cut)
         src = cut
     return read_png(src)[2]
 
 
+def rembg_env():
+    """Environment for rembg: switch off onnxruntime telemetry.
+
+    onnxruntime 1.21+ on macOS can abort at process exit -- after rembg has
+    already written its alpha PNG -- with `recursive_mutex lock failed` when its
+    1DS telemetry uploader races static teardown (microsoft/onnxruntime#24579).
+    The env opt-out stops the uploader and its log manager being created at all,
+    so there is nothing to race.
+    """
+    env = dict(os.environ)
+    env["ORT_DISABLE_TELEMETRY"] = "1"
+    return env
+
+
+def run_rembg(args, src, dst):
+    """Cut `src` to `dst`, tolerating onnxruntime's macOS exit-time abort.
+
+    If rembg still aborts after writing a readable PNG, keep the frame instead
+    of failing the unit. Any other non-zero exit stays an error.
+    """
+    proc = subprocess.run([args.rembg, "i", src, dst], env=rembg_env())
+    if proc.returncode == 0:
+        return
+    if os.path.exists(dst):
+        try:
+            read_png(dst)
+        except Exception:
+            pass
+        else:
+            print(f"  warning: rembg exited {proc.returncode} after writing "
+                  f"{os.path.basename(dst)}; using it (onnxruntime macOS exit abort)",
+                  flush=True)
+            return
+    raise subprocess.CalledProcessError(proc.returncode, proc.args)
+
+
 def matte_file(args, raw_path, tag):
     cut = os.path.join(OUT, f"_cut_{tag}.png")
-    subprocess.run([args.rembg, "i", raw_path, cut], check=True)
+    run_rembg(args, raw_path, cut)
     return read_png(cut)[2]
 
 

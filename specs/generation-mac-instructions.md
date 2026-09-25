@@ -111,7 +111,7 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-The log must print `gen_ai version 1.13` and `controlnet on`. A missing model
+The log must print `gen_ai version 1.14` and `controlnet on`. A missing model
 stops the run with the fix instead of quietly falling back.
 
 Look for: **one** archer per frame, **facing right**, same character through
@@ -204,6 +204,7 @@ Common ones:
 | `ControlNet model ... not found` | § one-time ControlNet OpenPose above, then restart ComfyUI |
 | `rembg not found` | run with `PATH="$HOME/dev/ai/matte-venv/bin:$PATH"` or `--rembg /full/path` |
 | `No onnxruntime backend` | `pip install "rembg[cpu]"` in `~/dev/ai/matte-venv` |
+| `recursive_mutex lock failed` after a frame | onnxruntime's macOS exit-time telemetry abort; `git pull` (script sets `ORT_DISABLE_TELEMETRY=1` and keeps the cut PNG) |
 | `byte must be in range(0,256)` | old script; `git pull` to the latest version |
 | black/garbled images | restart ComfyUI with `--force-fp16` |
 | machine swapping hard | restart ComfyUI with `--lowvram` |
