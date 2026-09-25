@@ -148,8 +148,9 @@ python3 tools/gen_ai.py --controlnet --ipadapter --ip-weight 0.5 ... batch --cat
 python3 tools/gen_ai.py --controlnet --ipadapter --cn-strength 0.7 ... batch --category troops --only archers
 # character drifting between frames? tighten IP-Adapter (default 0.8)
 python3 tools/gen_ai.py --controlnet --ipadapter --ip-weight 1.0 ... batch --category troops --only archers
-# compare runs side by side
-... batch --category troops --only archers --out /tmp/run-a
+# compare runs side by side (--out is global: it goes BEFORE batch/sheet)
+python3 tools/gen_ai.py --out /tmp/run-a --controlnet --ipadapter ... batch --category troops --only archers
+python3 tools/gen_ai.py --out /tmp/run-a sheet && open /tmp/run-a/index.html
 ```
 
 `probe` lists the `weight_type` choices your IPAdapter node offers; `--ip-type`
