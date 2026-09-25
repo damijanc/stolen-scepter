@@ -82,10 +82,15 @@ cd ~/Development/king-bounty
 
 # one unit first, to check quality
 PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --ipadapter --denoise 0.6 batch --category troops --only archers
+  --ipadapter --denoise 1.0 batch --category troops --only archers
 
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
+
+First check the log: the run must print `gen_ai version 1.12` (older means
+`git pull` did not land) and must NOT print `img2img failed`. That line means
+IP-Adapter errored (usually the CLIP-Vision encoder above is missing) and the
+frames fell back to plain independent generations.
 
 Look for: **one** archer per frame, same character through the four frames,
 transparent background, ~288×204, and the four beats of the archer's own
@@ -93,17 +98,12 @@ action in order: full draw → just loosed (no arrow) → bow pointed down → a
 nocked. Each troop's four frames are its attack loop, not a generic idle; the
 beats per unit are `TROOP_POSES` in `tools/gen_ai.py`.
 
-If the frames all look like frame 0 (img2img cannot move far from it), let
-IP-Adapter carry the identity alone and draw each pose fresh:
-
-```sh
-PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --ipadapter --denoise 1.0 batch --category troops --only archers
-```
-
-At `--denoise 1.0` frame 0's pixels are ignored and only its look (via
-IP-Adapter) carries over, so the pose follows the prompt. Needs the CLIP-Vision
-encoder above.
+How the frames are made: frame 0 is drawn from its pose prompt. Frames 1-3
+each get their own pose prompt and seed, with frame 0 fed to IP-Adapter so the
+character stays the same. `--denoise` decides how much of frame 0's PICTURE
+survives: at `1.0` none does (only its look, through IP-Adapter), so the pose
+follows the prompt. Anything well below 1.0 (0.45-0.6) keeps frame 0's pose
+and only shifts colour -- do not use it for troops.
 
 Placement (`--registration spec`, the default): each unit is scaled once for
 all four frames, to the original's height in the cell, and stands on the
@@ -113,24 +113,28 @@ frames do not change size. `--registration fill` restores the old
 stretch-to-cell behaviour for comparison. Nothing about ComfyUI changes; this
 happens after matting.
 
-Tune if needed (flags go **before** `batch`):
+Tune if needed (flags go **before** `batch`; keep `--ipadapter --denoise 1.0`):
 
 ```sh
-# identity drifting? anchor it harder
-python3 tools/gen_ai.py --ipadapter --ip-weight 1.0 ... batch --category troops --only archers
-# pose too static? push denoise
-python3 tools/gen_ai.py --ipadapter --denoise 0.7 ... batch --category troops --only archers
-# pose too wild? pull it back
-python3 tools/gen_ai.py --ipadapter --denoise 0.5 ... batch --category troops --only archers
+# frames still copy frame 0's pose? keep the look, drop the composition
+python3 tools/gen_ai.py --ipadapter --denoise 1.0 --ip-type "style transfer" ... batch --category troops --only archers
+# ...or loosen IP-Adapter's grip
+python3 tools/gen_ai.py --ipadapter --denoise 1.0 --ip-weight 0.6 ... batch --category troops --only archers
+# character drifting between frames? tighten it
+python3 tools/gen_ai.py --ipadapter --denoise 1.0 --ip-weight 1.0 ... batch --category troops --only archers
 # compare runs side by side
 ... batch --category troops --only archers --out /tmp/run-a
 ```
 
-When archers look right, run the whole set (resumable; safe to stop):
+`probe` lists the `weight_type` choices your IPAdapter node offers; `--ip-type`
+must be one of them.
+
+When archers look right, run the whole set with the same flags (resumable;
+safe to stop):
 
 ```sh
 PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --ipadapter --denoise 0.6 batch --category troops --resume 2>&1 | tee -a ~/ai-batch.log
+  --ipadapter --denoise 1.0 batch --category troops --resume 2>&1 | tee -a ~/ai-batch.log
 ```
 
 Then the other categories (same pattern):

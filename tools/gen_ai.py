@@ -35,7 +35,7 @@ LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.11"
+VERSION = "1.12"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -178,7 +178,9 @@ def cmd_probe(args):
             fields = {}
             for k, v in req.items():
                 t = v[0] if v else None
-                if isinstance(t, list):
+                if isinstance(t, list) and k == "weight_type":
+                    fields[k] = t
+                elif isinstance(t, list):
                     fields[k] = f"choice[{len(t)}] e.g. {t[:3]}"
                 else:
                     fields[k] = t
@@ -320,7 +322,7 @@ def build_img2img(ckpt, positive, negative, seed, image_name, denoise):
 
 
 def build_ipadapter_img2img(ckpt, positive, negative, seed, image_name, denoise,
-                            preset, weight):
+                            preset, weight, weight_type="standard"):
     return {
         "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
         "20": {"class_type": "LoadImage", "inputs": {"image": image_name}},
@@ -329,7 +331,7 @@ def build_ipadapter_img2img(ckpt, positive, negative, seed, image_name, denoise,
         "31": {"class_type": "IPAdapter",
                "inputs": {"model": ["30", 0], "ipadapter": ["30", 1], "image": ["20", 0],
                           "weight": weight, "start_at": 0.0, "end_at": 1.0,
-                          "weight_type": "standard"}},
+                          "weight_type": weight_type}},
         "21": {"class_type": "VAEEncode", "inputs": {"pixels": ["20", 0], "vae": ["4", 2]}},
         "6": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
         "7": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
@@ -357,6 +359,16 @@ def resolve_ip_preset(info, want):
         if "STANDARD" in c:
             return c
     return choices[0] if choices else "STANDARD (medium strength)"
+
+
+def resolve_ip_type(info, args):
+    """The IPAdapter weight_type to use; fails on one the server lacks."""
+    want = getattr(args, "ip_type", "standard")
+    choices = (info.get("IPAdapter", {}).get("input", {}).get("required", {})
+               .get("weight_type", [[]])[0])
+    if choices and want not in choices:
+        raise RuntimeError(f"--ip-type {want!r} not offered by IPAdapter; one of {choices}")
+    return want
 
 
 def run_graph_matted(args, graph, matte_wanted):
@@ -1065,10 +1077,10 @@ def render_group_frames(args, path, tw, th):
                 if getattr(args, "ipadapter", False):
                     preset = resolve_ip_preset(info, getattr(args, "ip_preset", ""))
                     graph = build_ipadapter_img2img(
-                        args.ckpt, pos, NEG, seed, name, denoise, preset,
-                        getattr(args, "ip_weight", 0.8))
+                        args.ckpt, pos, NEG, seed + i, name, denoise, preset,
+                        getattr(args, "ip_weight", 0.8), resolve_ip_type(info, args))
                 else:
-                    graph = build_img2img(args.ckpt, pos, NEG, seed, name, denoise)
+                    graph = build_img2img(args.ckpt, pos, NEG, seed + i, name, denoise)
                 png = generate(args.host, graph)
                 raw = os.path.join(OUT, f"_raw_{i}.png")
                 with open(raw, "wb") as fh:
@@ -1080,7 +1092,7 @@ def render_group_frames(args, path, tw, th):
             matted = matted[:1]
     for i in range(1, 4):
         pos, _ = frame_prompt(path, i)
-        rgba = generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed)
+        rgba = generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed + i)
         raw = os.path.join(OUT, f"_raw_{i}.png")
         write_png(raw, GEN_W, GEN_H, rgba)
         matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
@@ -1352,6 +1364,9 @@ def main():
     ap.add_argument("--ipadapter", action="store_true",
                     help="condition animation frames on frame 0 via IP-Adapter")
     ap.add_argument("--ip-weight", type=float, default=0.8)
+    ap.add_argument("--ip-type", default="standard",
+                    help="IPAdapter weight_type; 'style transfer' keeps frame 0's look "
+                         "but not its pose")
     ap.add_argument("--ip-preset", default="", help="IPAdapterUnifiedLoader preset")
     ap.add_argument("--registration", choices=("spec", "fill"),
                     default="spec" if os.path.exists(LAYOUT) else "fill",
