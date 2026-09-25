@@ -73,55 +73,83 @@ ls -lh ~/dev/ai/ComfyUI/models/ipadapter
 
 ---
 
+## One-time: ControlNet OpenPose (required for `--controlnet`)
+
+Troop poses and facing come from pose skeletons the script draws itself
+(`tools/pose_rig.py`); a ControlNet makes SDXL follow them. It needs one model
+file and no custom nodes (`ControlNetLoader` / `ControlNetApplyAdvanced` are
+built into ComfyUI; `comfyui_controlnet_aux` is NOT needed -- nothing is
+detected from images).
+
+- Model: Hugging Face repo `xinsir/controlnet-openpose-sdxl-1.0`, file
+  `diffusion_pytorch_model.safetensors` (confirm the name in the repo).
+- Put it at `~/dev/ai/ComfyUI/models/controlnet/controlnet-openpose-sdxl-1.0.safetensors`
+  (that is the name the script loads; another name needs `--cn-model <name>`).
+- Restart ComfyUI.
+
+`probe` then prints `controlnet: ready`. `MISSING ...` means the file is not
+where ComfyUI looks, or has another name.
+
+---
+
 ## Generate troops (the current focus)
 
-Run in the second terminal. `rembg` lives in its own venv:
+Run in the second terminal. `rembg` lives in its own venv.
+
+Optional, no ComfyUI needed: look at the skeletons first. They land in
+`game-assets/ai-out/poses/` and show on the review sheet.
+
+```sh
+python3 tools/gen_ai.py poses --only archers
+```
+
+Then one unit, to check quality:
 
 ```sh
 cd ~/Development/king-bounty
-
-# one unit first, to check quality
 PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --ipadapter --denoise 1.0 batch --category troops --only archers
+  --controlnet --ipadapter batch --category troops --only archers
 
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-First check the log: the run must print `gen_ai version 1.12` (older means
-`git pull` did not land) and must NOT print `img2img failed`. That line means
-IP-Adapter errored (usually the CLIP-Vision encoder above is missing) and the
-frames fell back to plain independent generations.
+The log must print `gen_ai version 1.13` and `controlnet on`. A missing model
+stops the run with the fix instead of quietly falling back.
 
-Look for: **one** archer per frame, same character through the four frames,
-transparent background, ~288×204, and the four beats of the archer's own
-action in order: full draw → just loosed (no arrow) → bow pointed down → arrow
-nocked. Each troop's four frames are its attack loop, not a generic idle; the
-beats per unit are `TROOP_POSES` in `tools/gen_ai.py`.
+Look for: **one** archer per frame, **facing right**, same character through
+the four frames, transparent background, ~288×204, and the four beats of the
+archer's own action in order: full draw → just loosed (no arrow) → bow pointed
+down → arrow nocked. Each troop's four frames are its attack loop, not a
+generic idle; the beats per unit are `TROOP_POSES` in `tools/gen_ai.py`, and
+the matching skeletons are `UNIT_POSES` in `tools/pose_rig.py`.
 
-How the frames are made: frame 0 is drawn from its pose prompt. Frames 1-3
-each get their own pose prompt and seed, with frame 0 fed to IP-Adapter so the
-character stays the same. `--denoise` decides how much of frame 0's PICTURE
-survives: at `1.0` none does (only its look, through IP-Adapter), so the pose
-follows the prompt. Anything well below 1.0 (0.45-0.6) keeps frame 0's pose
-and only shifts colour -- do not use it for troops.
+How the frames are made (`--controlnet`): every frame is a fresh generation
+drawn to its own skeleton, which fixes the pose and the facing. Frames 1-3 also
+get frame 0 through IP-Adapter in `style transfer` mode, which carries the
+character's look but not its pose. `--denoise` does not apply here.
+
+Not posed (no human skeleton): cavalry, nomads, wolves, dragons. They are
+prompt-driven (fresh frames at the default `--denoise 1.0`, look carried by
+IP-Adapter), so check their facing; flip any that came out facing
+left with `--mirror`, e.g. `--mirror wolves,dragons_02` (path substrings),
+and re-run just that unit.
 
 Placement (`--registration spec`, the default): each unit is scaled once for
 all four frames, to the original's height in the cell, and stands on the
 original's ground line with its feet where the original's were. So units no
 longer all fill the cell: a peasant is shorter than a dragon, and the four
 frames do not change size. `--registration fill` restores the old
-stretch-to-cell behaviour for comparison. Nothing about ComfyUI changes; this
-happens after matting.
+stretch-to-cell behaviour for comparison. This happens after matting.
 
-Tune if needed (flags go **before** `batch`; keep `--ipadapter --denoise 1.0`):
+Tune if needed (flags go **before** `batch`):
 
 ```sh
-# frames still copy frame 0's pose? keep the look, drop the composition
-python3 tools/gen_ai.py --ipadapter --denoise 1.0 --ip-type "style transfer" ... batch --category troops --only archers
-# ...or loosen IP-Adapter's grip
-python3 tools/gen_ai.py --ipadapter --denoise 1.0 --ip-weight 0.6 ... batch --category troops --only archers
-# character drifting between frames? tighten it
-python3 tools/gen_ai.py --ipadapter --denoise 1.0 --ip-weight 1.0 ... batch --category troops --only archers
+# pose followed too loosely? push the ControlNet (default 0.9)
+python3 tools/gen_ai.py --controlnet --ipadapter --cn-strength 1.0 ... batch --category troops --only archers
+# figure stiff or broken? ease it off
+python3 tools/gen_ai.py --controlnet --ipadapter --cn-strength 0.7 ... batch --category troops --only archers
+# character drifting between frames? tighten IP-Adapter (default 0.8)
+python3 tools/gen_ai.py --controlnet --ipadapter --ip-weight 1.0 ... batch --category troops --only archers
 # compare runs side by side
 ... batch --category troops --only archers --out /tmp/run-a
 ```
@@ -134,7 +162,7 @@ safe to stop):
 
 ```sh
 PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py \
-  --ipadapter --denoise 1.0 batch --category troops --resume 2>&1 | tee -a ~/ai-batch.log
+  --controlnet --ipadapter batch --category troops --resume 2>&1 | tee -a ~/ai-batch.log
 ```
 
 Then the other categories (same pattern):
@@ -176,6 +204,7 @@ Common ones:
 |---|---|
 | `connection refused` | ComfyUI not running |
 | `ClipVision model not found` | § one-time CLIP-Vision above, then restart ComfyUI |
+| `ControlNet model ... not found` | § one-time ControlNet OpenPose above, then restart ComfyUI |
 | `rembg not found` | run with `PATH="$HOME/dev/ai/matte-venv/bin:$PATH"` or `--rembg /full/path` |
 | `No onnxruntime backend` | `pip install "rembg[cpu]"` in `~/dev/ai/matte-venv` |
 | `byte must be in range(0,256)` | old script; `git pull` to the latest version |

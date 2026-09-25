@@ -27,6 +27,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from upscale import read_png, write_png  # noqa: E402
+import pose_rig  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(ROOT, "tools", "hd_assets.json")
@@ -35,7 +36,7 @@ LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.12"
+VERSION = "1.13"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -166,11 +167,15 @@ def cmd_probe(args):
     for base in ("~/dev/ai/ComfyUI", "~/ComfyUI", "~/Development/ComfyUI"):
         root = os.path.expanduser(base)
         if os.path.isdir(os.path.join(root, "models", "clip_vision")):
-            for sub in ("clip_vision", "ipadapter"):
+            for sub in ("clip_vision", "ipadapter", "controlnet"):
                 files = [os.path.basename(p)
                          for p in glob.glob(os.path.join(root, "models", sub, "*"))]
                 print(f"{sub} files:", files)
             break
+    cn = (info.get("ControlNetLoader", {}).get("input", {}).get("required", {})
+          .get("control_net_name", [[]])[0])
+    print("controlnet models:", cn)
+    print("controlnet:", "ready" if args.cn_model in cn else f"MISSING {args.cn_model}")
     print("--- IP-Adapter nodes ---")
     for cls, spec in sorted(info.items()):
         if "ipadapter" in cls.lower():
@@ -284,12 +289,12 @@ def generate(host, graph, timeout=600):
     raise TimeoutError("generation timed out")
 
 
-def upload_image(host, path):
+def upload_image(host, path, name="ob_frame.png"):
     """POST a PNG to ComfyUI's input dir; returns the name LoadImage expects."""
     data = open(path, "rb").read()
     boundary = "----ob-boundary-7f3a"
     body = (f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="image"; filename="ob_frame.png"\r\n'
+            f'Content-Disposition: form-data; name="image"; filename="{name}"\r\n'
             f"Content-Type: image/png\r\n\r\n").encode() + data + b"\r\n"
     body += (f"--{boundary}\r\n"
              f'Content-Disposition: form-data; name="overwrite"\r\n\r\n1\r\n').encode()
@@ -299,7 +304,7 @@ def upload_image(host, path):
                                           f"multipart/form-data; boundary={boundary}"})
     with urllib.request.urlopen(req, timeout=60) as r:
         doc = json.loads(r.read())
-    return doc.get("name", "ob_frame.png")
+    return doc.get("name", name)
 
 
 def build_img2img(ckpt, positive, negative, seed, image_name, denoise):
@@ -361,9 +366,68 @@ def resolve_ip_preset(info, want):
     return choices[0] if choices else "STANDARD (medium strength)"
 
 
+def build_pose_graph(ckpt, positive, negative, seed, w, h, pose_name, cn_model,
+                     strength, end, ip=None):
+    """txt2img steered by an OpenPose control image; `ip` adds IP-Adapter.
+
+    `ip` is (image_name, preset, weight, weight_type): the reference image
+    whose LOOK the frame should share. The pose comes from the ControlNet.
+    """
+    g = {
+        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
+        "5": {"class_type": "EmptyLatentImage",
+              "inputs": {"width": w, "height": h, "batch_size": 1}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
+        "7": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
+        "40": {"class_type": "LoadImage", "inputs": {"image": pose_name}},
+        "41": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": cn_model}},
+        "42": {"class_type": "ControlNetApplyAdvanced",
+               "inputs": {"positive": ["6", 0], "negative": ["7", 0],
+                          "control_net": ["41", 0], "image": ["40", 0],
+                          "strength": strength, "start_percent": 0.0,
+                          "end_percent": end}},
+        "3": {"class_type": "KSampler",
+              "inputs": {"seed": seed, "steps": 30, "cfg": 6.0,
+                         "sampler_name": "dpmpp_2m", "scheduler": "karras",
+                         "denoise": 1.0, "model": ["4", 0],
+                         "positive": ["42", 0], "negative": ["42", 1],
+                         "latent_image": ["5", 0]}},
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
+        "10": {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "ob"}},
+    }
+    if ip:
+        image_name, preset, weight, weight_type = ip
+        g["20"] = {"class_type": "LoadImage", "inputs": {"image": image_name}}
+        g["30"] = {"class_type": "IPAdapterUnifiedLoader",
+                   "inputs": {"model": ["4", 0], "preset": preset}}
+        g["31"] = {"class_type": "IPAdapter",
+                   "inputs": {"model": ["30", 0], "ipadapter": ["30", 1], "image": ["20", 0],
+                              "weight": weight, "start_at": 0.0, "end_at": 1.0,
+                              "weight_type": weight_type}}
+        g["3"]["inputs"]["model"] = ["31", 0]
+    return g
+
+
+def resolve_cn_model(info, args):
+    """The ControlNet file to load; fails with the fix if the server lacks it."""
+    choices = (info.get("ControlNetLoader", {}).get("input", {}).get("required", {})
+               .get("control_net_name", [[]])[0])
+    if args.cn_model in choices:
+        return args.cn_model
+    sys.exit(f"ControlNet model {args.cn_model!r} not found in ComfyUI models/controlnet "
+             f"(found: {choices}). Install it (specs/generation-mac-instructions.md, "
+             f"'One-time: ControlNet OpenPose') or pass --cn-model <name>.")
+
+
 def resolve_ip_type(info, args):
-    """The IPAdapter weight_type to use; fails on one the server lacks."""
-    want = getattr(args, "ip_type", "standard")
+    """The IPAdapter weight_type to use; fails on one the server lacks.
+
+    Unset, it is 'style transfer' under --controlnet (the ControlNet owns the
+    pose, so IP-Adapter must not copy frame 0's composition) and 'standard'
+    otherwise.
+    """
+    want = getattr(args, "ip_type", None) or (
+        "style transfer" if getattr(args, "controlnet", False) else "standard")
     choices = (info.get("IPAdapter", {}).get("input", {}).get("required", {})
                .get("weight_type", [[]])[0])
     if choices and want not in choices:
@@ -785,11 +849,30 @@ def draw_shadow(canvas, tw, th, box, sx, sy, alpha=150):
                 canvas[o + 3] = int(alpha * min(1.0, (1.0 - r) * 3))
 
 
+def mirror_image(im):
+    """Flip (w, h, rgba[, blob]) left to right."""
+    w, h, rgba = im[:3]
+    out = bytearray(len(rgba))
+    for y in range(h):
+        for x in range(w):
+            s = (y * w + x) * 4
+            d = (y * w + (w - 1 - x)) * 4
+            out[d:d + 4] = rgba[s:s + 4]
+    if len(im) > 3:
+        return w, h, bytes(out), [(j // w) * w + (w - 1 - j % w) for j in im[3]]
+    return w, h, bytes(out)
+
+
 def place_frames(args, paths, images, tw, th):
     """Frame matted gen-size images into cells: registered per spec, else fill.
 
     `images` is a list of (w, h, rgba) or (w, h, rgba, blob), one per path.
+    A path matching a --mirror token is flipped first (a frame that came out
+    facing left).
     """
+    tokens = [t for t in getattr(args, "mirror", "").split(",") if t]
+    images = [mirror_image(im) if any(t in p for t in tokens) else im
+              for p, im in zip(paths, images)]
     specs = use_spec(args, paths)
     if specs:
         subjects = [cut_subject(*im[:3], blob=im[3] if len(im) > 3 else None,
@@ -1049,8 +1132,59 @@ def try_sheet(args, path, tw, th):
     return None
 
 
+def unit_of(path):
+    return os.path.basename(path)[:-4].rsplit("_", 1)[0]
+
+
+def write_pose(path, i, w, h):
+    """Render the authored skeleton for frame i of `path`'s unit; its file or None."""
+    pts = pose_rig.keypoints(unit_of(path), i)
+    if pts is None:
+        return None
+    dst = os.path.join(OUT, "poses", f"{unit_of(path)}_{i:02d}.png")
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    write_png(dst, w, h, pose_rig.render(pts, w, h))
+    return dst
+
+
+def render_posed_frames(args, path, tw, th):
+    """4 frames, each drawn to its authored OpenPose skeleton (tools/pose_rig.py).
+
+    Frame 0 is txt2img + ControlNet. Frames 1-3 are the same, plus IP-Adapter
+    on frame 0 (with --ipadapter) so the character keeps its look while the
+    skeleton sets the pose and the facing. No silent fallback: an error here
+    fails the unit.
+    """
+    info = http_get(args.host, "/object_info")
+    cn = resolve_cn_model(info, args)
+    seed = stable_seed(path)
+    unit = unit_of(path)
+    matted = []
+    ref = None
+    for i in range(4):
+        pose_file = write_pose(path, i, GEN_W, GEN_H)
+        pose_name = upload_image(args.host, pose_file, f"ob_pose_{unit}_{i}.png")
+        pos, _ = frame_prompt(path, i)
+        ip = None
+        if ref and getattr(args, "ipadapter", False):
+            ip = (ref, resolve_ip_preset(info, getattr(args, "ip_preset", "")),
+                  args.ip_weight, resolve_ip_type(info, args))
+        graph = build_pose_graph(args.ckpt, pos, NEG, seed + i, GEN_W, GEN_H, pose_name,
+                                 cn, args.cn_strength, args.cn_end, ip)
+        raw = os.path.join(OUT, f"_raw_{i}.png")
+        with open(raw, "wb") as fh:
+            fh.write(generate(args.host, graph))
+        if i == 0:
+            ref = upload_image(args.host, raw, f"ob_ref_{unit}.png")
+        matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
+    return place_frames(args, group_paths(path), matted, tw, th)
+
+
 def render_group_frames(args, path, tw, th):
-    """4 frames: single sprite + img2img poses (default), AI sheet, or a bob."""
+    """4 frames: posed ControlNet, single sprite + img2img, AI sheet, or a bob."""
+    if (getattr(args, "controlnet", False) and path.startswith("art/troops/")
+            and pose_rig.keypoints(unit_of(path), 0) is not None):
+        return render_posed_frames(args, path, tw, th)
     if getattr(args, "sheet", False):
         frames = try_sheet(args, path, tw, th)
         if frames:
@@ -1219,7 +1353,8 @@ def cmd_batch(args):
     if args.category:
         assets = [a for a in assets if a["path"].startswith("art/" + args.category + "/")]
     print(f"gen_ai version {VERSION}, scale {args.scale}, gen {GEN_W}x{GEN_H}, "
-          f"registration {args.registration}", flush=True)
+          f"registration {args.registration}, "
+          f"controlnet {'on' if args.controlnet else 'off'}", flush=True)
     if not getattr(args, "no_clear", False):
         clear_queue(args.host)
     need_rembg(args, args.category, assets)
@@ -1324,6 +1459,19 @@ def cmd_sheet(args):
     return 0
 
 
+def cmd_poses(args):
+    """Write every authored skeleton to ai-out/poses/ for review."""
+    n = 0
+    for unit in pose_rig.UNIT_POSES:
+        if args.only and args.only not in unit:
+            continue
+        for i in range(4):
+            write_pose(f"art/troops/{unit}_00.png", i, GEN_W, GEN_H)
+            n += 1
+    print(f"{os.path.relpath(os.path.join(OUT, 'poses'), ROOT)}: {n} skeletons")
+    return 0
+
+
 def cmd_one(args):
     with open(MANIFEST) as fh:
         manifest = json.load(fh)
@@ -1359,14 +1507,26 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tries", type=int, default=2,
                     help="retries when a sprite sheet has the wrong figure count")
-    ap.add_argument("--denoise", type=float, default=0.45,
-                    help="img2img strength for animation frames (0 disables)")
+    ap.add_argument("--denoise", type=float, default=1.0,
+                    help="img2img strength for unposed animation frames; below ~0.9 "
+                         "frames keep frame 0's pose (0 disables)")
     ap.add_argument("--ipadapter", action="store_true",
                     help="condition animation frames on frame 0 via IP-Adapter")
     ap.add_argument("--ip-weight", type=float, default=0.8)
-    ap.add_argument("--ip-type", default="standard",
+    ap.add_argument("--ip-type", default=None,
                     help="IPAdapter weight_type; 'style transfer' keeps frame 0's look "
-                         "but not its pose")
+                         "but not its pose (default: 'style transfer' with --controlnet, "
+                         "else 'standard')")
+    ap.add_argument("--controlnet", action="store_true",
+                    help="draw each troop frame to its authored pose skeleton "
+                         "(tools/pose_rig.py) via ControlNet OpenPose")
+    ap.add_argument("--cn-model", default="controlnet-openpose-sdxl-1.0.safetensors",
+                    help="ControlNet file in ComfyUI models/controlnet")
+    ap.add_argument("--cn-strength", type=float, default=0.9)
+    ap.add_argument("--cn-end", type=float, default=0.9,
+                    help="stop applying the ControlNet at this fraction of the steps")
+    ap.add_argument("--mirror", default="",
+                    help="comma list of path substrings to flip, e.g. wolves,dragons_02")
     ap.add_argument("--ip-preset", default="", help="IPAdapterUnifiedLoader preset")
     ap.add_argument("--registration", choices=("spec", "fill"),
                     default="spec" if os.path.exists(LAYOUT) else "fill",
@@ -1393,6 +1553,9 @@ def main():
                    help="do not interrupt/clear the ComfyUI queue first")
     b.set_defaults(func=cmd_batch)
     sub.add_parser("sheet").set_defaults(func=cmd_sheet)
+    ps = sub.add_parser("poses", help="render the pose skeletons only (no ComfyUI)")
+    ps.add_argument("--only", default="", help="units containing this substring")
+    ps.set_defaults(func=cmd_poses)
     args = ap.parse_args()
     OUT = os.path.abspath(args.out)
     sys.exit(args.func(args))
