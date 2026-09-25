@@ -111,7 +111,7 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-The log must print `gen_ai version 1.14` and `controlnet on`. A missing model
+The log must print `gen_ai version 1.15` and `controlnet on`. A missing model
 stops the run with the fix instead of quietly falling back.
 
 Look for: **one** archer per frame, **facing right**, same character through
@@ -142,9 +142,9 @@ stretch-to-cell behaviour for comparison. This happens after matting.
 Tune if needed (flags go **before** `batch`):
 
 ```sh
-# pose followed too loosely? push the ControlNet (default 0.9)
-python3 tools/gen_ai.py --controlnet --ipadapter --cn-strength 1.0 ... batch --category troops --only archers
-# figure stiff or broken? ease it off
+# poses lost only when IP-Adapter is on? loosen it (default 0.8)
+python3 tools/gen_ai.py --controlnet --ipadapter --ip-weight 0.5 ... batch --category troops --only archers
+# figure stiff or broken? ease the ControlNet off (default 1.0, all steps)
 python3 tools/gen_ai.py --controlnet --ipadapter --cn-strength 0.7 ... batch --category troops --only archers
 # character drifting between frames? tighten IP-Adapter (default 0.8)
 python3 tools/gen_ai.py --controlnet --ipadapter --ip-weight 1.0 ... batch --category troops --only archers

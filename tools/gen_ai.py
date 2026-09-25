@@ -36,7 +36,7 @@ LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
 CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.14"
+VERSION = "1.15"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -1558,8 +1558,8 @@ def main():
                          "(tools/pose_rig.py) via ControlNet OpenPose")
     ap.add_argument("--cn-model", default="controlnet-openpose-sdxl-1.0.safetensors",
                     help="ControlNet file in ComfyUI models/controlnet")
-    ap.add_argument("--cn-strength", type=float, default=0.9)
-    ap.add_argument("--cn-end", type=float, default=0.9,
+    ap.add_argument("--cn-strength", type=float, default=1.0)
+    ap.add_argument("--cn-end", type=float, default=1.0,
                     help="stop applying the ControlNet at this fraction of the steps")
     ap.add_argument("--mirror", default="",
                     help="comma list of path substrings to flip, e.g. wolves,dragons_02")
