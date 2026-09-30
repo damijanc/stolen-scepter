@@ -259,6 +259,14 @@ by the window scale, no other code changes are needed. The HD font is sampled
 1:1 by deriving the glyph source size from the loaded strip. An HD pack is a
 local build product under the gitignored `game-assets/`, never committed.
 
+## `engine_sweep.sh` -- list C engine functions with no Rust name match
+
+`sh tools/engine_sweep.sh` lists every function declared in
+`reference/engine/include/*.h` as HIT or MISS against `engine/src` and
+`shell/src`. It is a name-matching heuristic: every MISS needs a hand check,
+and a HIT can still be a core that does less than C. See
+`specs/engine-sweep-findings.md` for the last classified run.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
