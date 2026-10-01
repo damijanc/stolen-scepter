@@ -15,6 +15,7 @@ pub mod combat;
 pub mod dialog;
 pub mod draw;
 pub mod font;
+pub mod hud;
 pub mod input;
 pub mod interact;
 pub mod layout;

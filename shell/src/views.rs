@@ -2932,7 +2932,7 @@ fn draw_army(
 
 /// A villain's wanted-poster face: the animated frame when the pack declares
 /// one, else the still portrait.
-fn villain_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite> {
+pub(crate) fn villain_sprite(catalog: &SpriteCatalog, index: i32, tick: i32) -> Option<Sprite> {
     let index = usize::try_from(index).ok()?;
     let frames = catalog.villain_anim_len(index);
     if frames > 0 {
