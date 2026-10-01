@@ -132,6 +132,10 @@ pub enum ViewKind {
     WinCartoon,
     Win,
     Lose,
+    /// The in-game Game Menu. Its state lives in `crate::menu`, held by
+    /// `main.rs`; this kind only puts it on the stack so it inherits the
+    /// paused background and the input ordering.
+    Menu,
 }
 
 /// What one frame of spells-view input did, porting `views_spells_update`.
@@ -534,7 +538,8 @@ impl Views {
                 | ViewKind::Lose,
             ) => true,
             Some(ViewKind::Contract) => !game.contract.active_id.is_empty(),
-            Some(ViewKind::Worldmap) | None => false,
+            // The menu draws its own hints, as C's VIEW_MENU does.
+            Some(ViewKind::Worldmap | ViewKind::Menu) | None => false,
         }
     }
 
@@ -1245,7 +1250,8 @@ impl Views {
             }
             Some(ViewKind::Win) => self.draw_end_game(list, layout, palette, true),
             Some(ViewKind::Lose) => self.draw_end_game(list, layout, palette, false),
-            None => {}
+            // `main.rs` draws the menu, which owns its own state.
+            Some(ViewKind::Menu) | None => {}
         }
 
         // Views with no menu of their own dismiss on any key; a click anywhere
@@ -3221,6 +3227,16 @@ mod tests {
         assert!(!views.wants_exit_hint(&game));
         views.set(ViewKind::Character);
         assert!(views.wants_exit_hint(&game));
+    }
+
+    /// C returns false for VIEW_MENU at views.c:372 -- the menu draws its own
+    /// hints, so the generic "Press ESC to exit" line would be noise.
+    #[test]
+    fn the_menu_view_does_not_want_the_exit_hint() {
+        let game = knight_game();
+        let mut views = Views::new();
+        views.set(ViewKind::Menu);
+        assert!(!views.wants_exit_hint(&game));
     }
 
     #[test]

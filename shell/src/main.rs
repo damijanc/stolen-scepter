@@ -53,6 +53,7 @@ use hud::Hud;
 use input::{Action, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
+use menu::{Menu, MenuAction};
 use openbounty_engine::combat::{
     CombatMode, CombatResult, CombatTarget, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER, COMBAT_SLOTS,
 };
@@ -907,6 +908,8 @@ async fn main() {
     }
     push_audio_options(&mut audio, &game);
     audio.set_track(audio::Track::Openworld);
+    // The ESC Game Menu's cursor; on the view stack as `ViewKind::Menu`.
+    let mut menu = Menu::new();
 
     loop {
         // C pushes the toggles every frame because the Controls panel changes
@@ -1270,6 +1273,15 @@ async fn main() {
                 }
                 OwnCastleAction::None => {}
             }
+        } else if views.active() == Some(ViewKind::Menu) {
+            // The Game Menu owns its arrows, digits, Enter and ESC. It is only
+            // ever opened from the overworld branch below, so combat never
+            // reaches it: the save format carries no combat state.
+            match menu.update(&keys) {
+                Some(MenuAction::Close) => views.dismiss(),
+                // Wired in the next slice.
+                Some(MenuAction::Save | MenuAction::Load | MenuAction::Quit) | None => {}
+            }
         } else if views.active() == Some(ViewKind::WinCartoon) {
             // Any key skips the win cutscene; the frame clock's own end is
             // handled at the top of the loop.
@@ -1412,6 +1424,13 @@ async fn main() {
                 }
                 Action::None => {}
                 Action::OptionsMenu => views.set(ViewKind::Options),
+                // Bare ESC. Every other ESC consumer -- a view, the dialog,
+                // the prompt, the quit confirm -- sits earlier in this chain,
+                // so reaching here means nothing was open to dismiss.
+                Action::GameMenu => {
+                    menu = Menu::new();
+                    views.set(ViewKind::Menu);
+                }
                 Action::SaveQuit => {
                     // C saves slot 0 unconditionally, then shows the confirm
                     // banner; Ctrl-Q during that dialog exits.
@@ -1732,6 +1751,9 @@ async fn main() {
                 &present,
                 get_time(),
             );
+            if views.active() == Some(ViewKind::Menu) {
+                menu.draw(&mut list, &layout, backend.palette(), &resources);
+            }
         }
 
         // The prompt replaces the bottom frame; the dialog draws LAST so it

@@ -156,6 +156,9 @@ pub enum Action {
     FastQuit,
     /// Numpad 5: rest one day in place.
     Rest,
+    /// Bare ESC: open the in-game Game Menu. Not a C binding; see
+    /// `specs/ingame-menu-design.md`.
+    GameMenu,
 }
 
 /// One frame of input.
@@ -252,6 +255,13 @@ pub fn poll(keys: &dyn KeySource) -> InputState {
         } else {
             Action::SaveQuit
         };
+    }
+    // ESC last of all. It is NOT a C binding -- C's ESC only ever dismisses --
+    // so it stays out of the parity-ordered BINDINGS table above, and any
+    // letter pressed in the same frame wins. main.rs only reaches this when
+    // no view, prompt, dialog or quit confirm is up.
+    if state.action == Action::None && keys.pressed(Key::Escape) {
+        state.action = Action::GameMenu;
     }
     state
 }
@@ -409,8 +419,28 @@ mod tests {
 
     #[test]
     fn an_unbound_key_does_nothing() {
-        let state = poll_keys(&[Key::Escape]);
+        let state = poll_keys(&[Key::G]);
         assert_eq!(state, InputState::default());
+    }
+
+    #[test]
+    fn escape_asks_for_the_game_menu() {
+        assert_eq!(poll_keys(&[Key::Escape]).action, Action::GameMenu);
+    }
+
+    /// ESC is not a C binding, so it must not disturb the parity-ordered
+    /// letter table: a letter pressed in the same frame still wins, and so
+    /// does Q, which C checks last of its own keys.
+    #[test]
+    fn a_letter_still_beats_escape_in_the_same_frame() {
+        assert_eq!(poll_keys(&[Key::Escape, Key::A]).action, Action::ViewArmy);
+        assert_eq!(poll_keys(&[Key::Escape, Key::Q]).action, Action::SaveQuit);
+    }
+
+    /// Opening the menu is an action, so the arrow held with it is not a step.
+    #[test]
+    fn escape_suppresses_a_step_pressed_with_it() {
+        assert!(!poll_keys(&[Key::Escape, Key::Up]).is_move());
     }
 
     #[test]
