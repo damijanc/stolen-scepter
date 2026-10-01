@@ -26,6 +26,7 @@ pub mod input;
 pub mod interact;
 pub mod layout;
 pub mod map_render;
+pub mod menu;
 pub mod pack;
 pub mod pack_select;
 pub mod palette;
