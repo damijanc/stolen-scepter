@@ -22,6 +22,7 @@ pub mod interact;
 pub mod layout;
 pub mod map_render;
 pub mod pack;
+pub mod pack_select;
 pub mod palette;
 pub mod pointer;
 pub mod present;
