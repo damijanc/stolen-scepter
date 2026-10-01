@@ -36,6 +36,9 @@ use openbounty_engine::game::{Game, Mount};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
 
+use crate::dialog::Dialog;
+use crate::input::{Key, KeySource};
+
 /// The menu dialog's header, C's `player_io_message(game, "Debug menu", ..)`.
 pub const MENU_HEADER: &str = "Debug menu";
 
@@ -54,6 +57,37 @@ pub const RESULT_HEADER: &str = "Debug";
 /// `U` touches at most this many spell slots: C's hard-coded `si < 14`, the
 /// stock 7 combat + 7 adventure. The same bound `Game::discard_spell` uses.
 const SPELL_SLOTS: usize = 14;
+
+/// The letter keys in A..Z order, which is also the tie-break when two land
+/// in one frame.
+const LETTERS: [(Key, char); 26] = [
+    (Key::A, 'A'),
+    (Key::B, 'B'),
+    (Key::C, 'C'),
+    (Key::D, 'D'),
+    (Key::E, 'E'),
+    (Key::F, 'F'),
+    (Key::G, 'G'),
+    (Key::H, 'H'),
+    (Key::I, 'I'),
+    (Key::J, 'J'),
+    (Key::K, 'K'),
+    (Key::L, 'L'),
+    (Key::M, 'M'),
+    (Key::N, 'N'),
+    (Key::O, 'O'),
+    (Key::P, 'P'),
+    (Key::Q, 'Q'),
+    (Key::R, 'R'),
+    (Key::S, 'S'),
+    (Key::T, 'T'),
+    (Key::U, 'U'),
+    (Key::V, 'V'),
+    (Key::W, 'W'),
+    (Key::X, 'X'),
+    (Key::Y, 'Y'),
+    (Key::Z, 'Z'),
+];
 
 /// What one letter did.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -149,10 +183,86 @@ pub fn apply_cheat(
     CheatOutcome::Message(body)
 }
 
+/// What a frame of the menu did, porting `CheatResult`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CheatResult {
+    /// Nothing consumed: the menu is closed and F10 was not pressed, or the
+    /// menu is open and no key it reads went down.
+    Idle,
+    /// F10 opened the menu.
+    Opened,
+    /// ESC or F10 closed it.
+    Dismissed,
+    /// A non-terminal letter was applied and its result is in the dialog.
+    Dispatched,
+    /// `W` or `L`: the caller opens the ending. C's `CHEAT_DISPATCHED_TERMINAL`.
+    Terminal(CheatOutcome),
+}
+
+/// The menu's one piece of state, C's `s_cheat_menu_active`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CheatMenu {
+    active: bool,
+}
+
+impl CheatMenu {
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    /// One frame, porting `cheat_menu_tick`. The menu and its results are
+    /// shown in `dialog`; the endings are left to the caller, which owns the
+    /// views. The open branch returns before anything else is read, the way
+    /// C drains the key queue after opening, and ESC/F10 are tested before
+    /// the letters, as C tests them before `KEY_A..KEY_Z`.
+    pub fn tick(
+        &mut self,
+        keys: &dyn KeySource,
+        game: &mut Game,
+        resources: &Resources,
+        map: &Map,
+        fog: &mut Fog,
+        dialog: &mut Dialog,
+    ) -> CheatResult {
+        if !self.active {
+            if keys.pressed(Key::F10) {
+                self.active = true;
+                dialog.open(MENU_HEADER, MENU_BODY);
+                return CheatResult::Opened;
+            }
+            return CheatResult::Idle;
+        }
+
+        if keys.pressed(Key::Escape) || keys.pressed(Key::F10) {
+            self.active = false;
+            dialog.dismiss();
+            return CheatResult::Dismissed;
+        }
+        let Some(letter) = LETTERS
+            .iter()
+            .find(|(key, _)| keys.pressed(*key))
+            .map(|(_, letter)| *letter)
+        else {
+            return CheatResult::Idle;
+        };
+
+        self.active = false;
+        dialog.dismiss();
+        match apply_cheat(letter, game, resources, map, fog) {
+            CheatOutcome::Message(body) => {
+                dialog.open(RESULT_HEADER, &body);
+                CheatResult::Dispatched
+            }
+            ending => CheatResult::Terminal(ending),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dialog::Dialog;
+    use crate::input::Keys;
+    use crate::views::{ViewKind, Views};
 
     /// Three zones and sixteen spells: enough to see `N` walk the zone list
     /// and `U` stop at slot 14 with slots left over.
@@ -319,5 +429,179 @@ mod tests {
         // A menu letter is not an overworld binding: A is not "view army".
         assert_eq!(apply('A', &mut game), message("Unknown cheat: A"));
         assert_eq!(game, Game::default());
+    }
+
+    struct Frame {
+        menu: CheatMenu,
+        game: Game,
+        resources: Resources,
+        map: Map,
+        fog: Fog,
+        dialog: Dialog,
+    }
+
+    impl Frame {
+        fn new() -> Self {
+            Self {
+                menu: CheatMenu::default(),
+                game: Game::default(),
+                resources: resources(),
+                map: Map::new(4, 4),
+                fog: Fog::new(),
+                dialog: Dialog::default(),
+            }
+        }
+
+        fn press(&mut self, keys: &[Key]) -> CheatResult {
+            self.menu.tick(
+                &Keys::pressed(keys),
+                &mut self.game,
+                &self.resources,
+                &self.map,
+                &mut self.fog,
+                &mut self.dialog,
+            )
+        }
+    }
+
+    #[test]
+    fn the_menu_is_closed_until_f10_and_letters_do_nothing_meanwhile() {
+        let mut frame = Frame::new();
+        assert_eq!(frame.press(&[Key::G]), CheatResult::Idle);
+        assert_eq!(frame.game.stats.gold, 0);
+        assert!(!frame.menu.is_active());
+        assert!(!frame.dialog.is_active());
+    }
+
+    #[test]
+    fn f10_opens_the_menu_dialog() {
+        let mut frame = Frame::new();
+        assert_eq!(frame.press(&[Key::F10]), CheatResult::Opened);
+        assert!(frame.menu.is_active());
+        assert!(frame.dialog.is_active());
+        assert_eq!(frame.dialog.header_text(), MENU_HEADER);
+        assert_eq!(frame.dialog.body_text(), MENU_BODY);
+    }
+
+    #[test]
+    fn the_opening_press_does_not_also_close_the_menu() {
+        // C drains the key queue after opening so the same F10 is not read
+        // again as "close"; here the open path returns before the close check.
+        let mut frame = Frame::new();
+        assert_eq!(frame.press(&[Key::F10, Key::G]), CheatResult::Opened);
+        assert!(frame.menu.is_active());
+        assert_eq!(
+            frame.game.stats.gold, 0,
+            "the G in the opening frame is drained"
+        );
+    }
+
+    #[test]
+    fn escape_or_a_second_f10_closes_the_menu() {
+        for close in [Key::Escape, Key::F10] {
+            let mut frame = Frame::new();
+            frame.press(&[Key::F10]);
+            assert_eq!(frame.press(&[close]), CheatResult::Dismissed, "{close:?}");
+            assert!(!frame.menu.is_active());
+            assert!(!frame.dialog.is_active());
+        }
+    }
+
+    #[test]
+    fn a_non_letter_leaves_the_menu_open() {
+        let mut frame = Frame::new();
+        frame.press(&[Key::F10]);
+        assert_eq!(frame.press(&[Key::Up]), CheatResult::Idle);
+        assert_eq!(frame.press(&[Key::Digit1]), CheatResult::Idle);
+        assert_eq!(frame.press(&[]), CheatResult::Idle);
+        assert!(frame.menu.is_active());
+        assert_eq!(frame.dialog.header_text(), MENU_HEADER);
+    }
+
+    #[test]
+    fn a_letter_applies_closes_the_menu_and_shows_the_result() {
+        let mut frame = Frame::new();
+        frame.press(&[Key::F10]);
+        assert_eq!(frame.press(&[Key::G]), CheatResult::Dispatched);
+        assert_eq!(frame.game.stats.gold, 50000);
+        assert!(!frame.menu.is_active(), "one cheat per F10");
+        assert!(frame.dialog.is_active());
+        assert_eq!(frame.dialog.header_text(), RESULT_HEADER);
+        assert_eq!(frame.dialog.body_text(), "Gold +50000");
+
+        // Closed again, so a second G is idle.
+        assert_eq!(frame.press(&[Key::G]), CheatResult::Idle);
+        assert_eq!(frame.game.stats.gold, 50000);
+    }
+
+    #[test]
+    fn an_unknown_letter_still_closes_the_menu() {
+        let mut frame = Frame::new();
+        frame.press(&[Key::F10]);
+        assert_eq!(frame.press(&[Key::Q]), CheatResult::Dispatched);
+        assert!(!frame.menu.is_active());
+        assert_eq!(frame.dialog.body_text(), "Unknown cheat: Q");
+    }
+
+    #[test]
+    fn two_letters_in_one_frame_resolve_in_alphabetical_order() {
+        let mut frame = Frame::new();
+        frame.press(&[Key::F10]);
+        frame.press(&[Key::V, Key::G]);
+        assert_eq!(frame.game.stats.gold, 50000);
+        assert_eq!(frame.game.stats.leadership_base, 0);
+    }
+
+    #[test]
+    fn f10_over_an_open_dialog_replaces_it_with_the_menu() {
+        let mut frame = Frame::new();
+        frame.dialog.open("Sign", "Welcome");
+        frame.press(&[Key::F10]);
+        assert_eq!(frame.dialog.header_text(), MENU_HEADER);
+    }
+
+    #[test]
+    fn w_closes_the_menu_and_hands_the_win_to_the_caller() {
+        let mut frame = Frame::new();
+        frame.press(&[Key::F10]);
+        assert_eq!(
+            frame.press(&[Key::W]),
+            CheatResult::Terminal(CheatOutcome::Win)
+        );
+        assert!(!frame.menu.is_active());
+        assert!(
+            !frame.dialog.is_active(),
+            "no Debug message after an ending"
+        );
+        assert!(
+            !frame.game.stats.game_over,
+            "the caller's show_win_game sets it"
+        );
+
+        // What main.rs then does with it. The fixture ships no ending tiles,
+        // so the cartoon is skipped and the win screen opens directly.
+        let mut views = Views::new();
+        crate::show_win_game(&mut views, &frame.resources, &mut frame.game);
+        assert!(frame.game.stats.game_over);
+        assert!(!frame.game.stats.won, "C's show_win_game never sets won");
+        assert_eq!(views.active(), Some(ViewKind::Win));
+    }
+
+    #[test]
+    fn l_opens_the_lose_screen_without_ending_the_game() {
+        let mut frame = Frame::new();
+        frame.press(&[Key::F10]);
+        assert_eq!(
+            frame.press(&[Key::L]),
+            CheatResult::Terminal(CheatOutcome::Lose)
+        );
+        assert!(!frame.dialog.is_active());
+
+        let mut views = Views::new();
+        crate::show_lose_game(&mut views, &frame.resources, &frame.game);
+        assert_eq!(views.active(), Some(ViewKind::Lose));
+        // C's show_lose_game writes nothing, so dismissing the screen returns
+        // to a live board.
+        assert!(!frame.game.stats.game_over);
     }
 }
