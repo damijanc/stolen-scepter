@@ -207,7 +207,7 @@ Implemented and tested:
   pumped one at a time while nothing modal is up. `pending_week`
   (`WeekEnd`) is the shell counterpart of C's `pending_week_phase`.
 
-Test coverage is 352 engine unit tests, 325 shell unit tests, 25 combat digest
+Test coverage is 352 engine unit tests, 354 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
@@ -269,11 +269,13 @@ both live engine cores while this file called the headless engine complete;
 and the win condition itself (`flow_apply_search`, `GameSpendDays`,
 `GameComputeScore`) was unported one slice after that.
 
-The check that actually works is mechanical, not from memory: extract the
-declared functions from `reference/engine/include/*.h` and grep each against
-`engine/src/`. Most misses are host-side (`player_io_*`, `dialog_*`,
-`prompt_*`, `screen_*`, `views_*`, `pack_*`, `SavePath*`) and correctly out
-of scope, but that sweep is what surfaced the endgame.
+The check that actually works is mechanical, not from memory: run
+`sh tools/engine_sweep.sh`, which marks every function declared in
+`reference/engine/include/*.h` HIT or MISS against `engine/src` and
+`shell/src`, then classify each non-host MISS by hand. The last classified run,
+with its spot-check of the largest HITs and the stored-but-unread field audit,
+is `specs/engine-sweep-findings.md`; start from its "Proposed slices" table,
+which lists open GAPs, and re-run the script rather than trusting its totals.
 
 The sweep now reports no unported engine core. Given that three previous
 "nothing left" claims were wrong, treat that as "re-run the sweep", not as a
