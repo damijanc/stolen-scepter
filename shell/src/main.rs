@@ -8,6 +8,7 @@
 //! ```
 
 pub mod anim;
+pub mod audio;
 pub mod backend;
 pub mod banner;
 pub mod cheats;
