@@ -1074,6 +1074,10 @@ pub struct Resources {
     town_count: usize,
     zones: [ResZone; RES_MAX_ZONES],
     zone_count: usize,
+    /// Map tiles a host supplied directly, parallel to `zones`. A pack read
+    /// from an archive has no directory for `resolve_map_path` to join, so
+    /// the host hands the bytes over instead; see `set_zone_map_bytes`.
+    zone_maps: [Option<Vec<u8>>; RES_MAX_ZONES],
     castles: [ResCastle; RES_MAX_CASTLES],
     castle_count: usize,
     classes: [ClassDef; CAT_CLASSES_MAX],
@@ -1124,6 +1128,7 @@ impl Default for Resources {
             town_count: 0,
             zones: std::array::from_fn(|_| ResZone::default()),
             zone_count: 0,
+            zone_maps: Default::default(),
             castles: [ResCastle::default(); RES_MAX_CASTLES],
             castle_count: 0,
             classes: [ClassDef::default(); CAT_CLASSES_MAX],
@@ -1288,6 +1293,28 @@ impl Resources {
 
     pub fn resolve_map_path(&self, zone: &ResZone) -> Option<std::path::PathBuf> {
         self.resolve_path(zone.map_path.as_str())
+    }
+
+    /// Supply a zone's map tiles directly. Returns false for an unknown zone.
+    ///
+    /// C reads every map through the pack stack, which reaches into an
+    /// archive as readily as a directory. This engine has no pack reader --
+    /// that stays in the host -- so a host that opened an archive reads each
+    /// zone's `map_path` itself and hands the bytes over once. Every map load
+    /// then prefers them, including the ones the engine makes on its own
+    /// (scepter burial, zone switching from a gate or a defeat), which no
+    /// byte-taking call site could have reached.
+    pub fn set_zone_map_bytes(&mut self, zone_id: &str, bytes: Vec<u8>) -> bool {
+        let Some(index) = self.zone_index_by_id(zone_id) else {
+            return false;
+        };
+        self.zone_maps[index] = Some(bytes);
+        true
+    }
+
+    /// The tiles [`Resources::set_zone_map_bytes`] supplied for a zone.
+    pub fn zone_map_bytes(&self, zone_id: &str) -> Option<&[u8]> {
+        self.zone_maps[self.zone_index_by_id(zone_id)?].as_deref()
     }
 
     /// Turn a pack-relative path into one that can be opened, porting

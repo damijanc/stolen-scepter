@@ -23,12 +23,20 @@ will be selected only after headless engine parity is solid.
   sidebar panels (`hud.c`), `banner.rs` pack text and its `%VAR%`
   substitution, `startup.rs` the pre-game wizard,
   `savepath.rs` the save-slot locations, `cheats.rs` the F10 debug menu,
-  `audio.rs` the audio policy (`audio.c`'s decisions, no library), and
-  `input.rs` the key bindings.
+  `audio.rs` the audio policy (`audio.c`'s decisions, no library),
+  `pack.rs` the pack reader and discovery (`pack.c`), `pack_select.rs` the
+  pre-game pack picker (`pack_select.c`), and `input.rs` the key bindings.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
-  way. Its sibling rule: `audio_backend.rs` is the ONLY module that knows
-  `kira` exists, and `kira` is a `shell` dependency only. Run it with
-  `cargo run -p openbounty-shell -- [--seed <n>] [--save-dir <dir>] <path to game.json>`.
+  way. The one stated exception is `pack_select.rs`: the picker runs before
+  any pack is open, so the DrawList pipeline (built on pack art) has nothing
+  to draw with, and it uses macroquad's built-in `draw_text` exactly as C
+  uses raylib's `DrawText`. It draws only text and rectangles and exits
+  before the real shell starts; no other module may follow it. The audio
+  sibling rule: `audio_backend.rs` is the ONLY module that knows `kira`
+  exists, and `kira` is a `shell` dependency only. Run it with
+  `cargo run -p openbounty-shell -- [--seed <n>] [--save-dir <dir>] [--pack <name | dir | file.openbounty>]`.
+  With no `--pack`, one discovered pack loads silently and two or more open
+  the picker.
 - `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
   decision and what was rejected, the legacy geometry, and the work order.
   READ THIS before touching the shell.
@@ -220,6 +228,25 @@ Implemented and tested:
   with no key queue, the menu skips the whole input chain on any frame it
   owns, where C's `GetKeyPressed` drain leaves `IsKeyPressed` handlers able to
   see the same key.
+- Game packs (`shell/src/pack.rs`, porting `engine/pack.c`'s reader and
+  discovery, and `shell/src/pack_select.rs`, porting `src/pack_select.c`).
+  `Pack::open` auto-detects a loose directory or a `.openbounty` ZIP, which
+  it decompresses whole at open, as C does; `zip` is a `shell` dependency
+  only, deflate-only to match what miniz reads. `pack::load_resources` is
+  the single loading path for both modes: it parses `game.json` with
+  `Resources::from_json_str` and hands the engine every zone's tiles through
+  `Resources::set_zone_map_bytes`, which `Map::load_zone` prefers over the
+  filesystem. That seam is NOT optional: the engine loads maps itself --
+  `bury_scepter` at init, and the zone switch inside `gate_teleport` and
+  `temp_death` -- so routing bytes through shell call sites alone would
+  leave an archive game with no scepter. The launch policy is C's: an
+  explicit `--pack` must resolve, otherwise zero discovered packs is fatal,
+  one loads silently, and two or more open the picker. DIVERGENCE:
+  discovery also lists a directory holding a `game.json` (C's scan matched
+  only `*.openbounty`, though `pack_open` accepts both), and a closed picker
+  window ends the process rather than reporting a cancel, since macroquad
+  cannot revoke `prevent_quit`. `Pack::hash` computes C's FNV1a-64, and the
+  save path still never writes it.
 
 - Audio (`shell/src/audio.rs` + `audio_backend.rs`, see
   `specs/audio-design.md`): the engine stays audio-free, and the shell derives
@@ -229,7 +256,7 @@ Implemented and tested:
   walk tune (C plays both); a step C bounces plays no walk tune; the defeat
   tune is a combat LOSS, not `temp_death`; and music off then on restarts.
 
-Test coverage is 355 engine unit tests, 378 shell unit tests, 25 combat digest
+Test coverage is 359 engine unit tests, 401 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

@@ -209,8 +209,9 @@ it in `shell/src/audio.rs`.
 Three shape changes, none a C divergence:
 
 - `KiraAudio::new` takes a loader (`Fn(&str) -> Option<Vec<u8>>`), C's
-  `LoadAssetBytes`, not a root path, so a zipped pack works unchanged. Nothing
-  is loaded when no device opened, as in C.
+  `LoadAssetBytes`, not a root path. `main.rs` passes `Pack::read`, so a
+  `.openbounty` archive plays exactly as a directory does. Nothing is loaded
+  when no device opened, as in C.
 - Device availability is stored on `Views` (`set_audio_available`) rather than
   threaded through `Views::draw`, because `controls_advance` needs it too.
 - Ducking is a per-frame `KiraAudio::tick`, driven by `audio::Duck`; the plan

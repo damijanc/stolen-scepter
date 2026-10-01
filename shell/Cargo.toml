@@ -8,3 +8,4 @@ license.workspace = true
 kira = "0.12"
 macroquad = { version = "0.4.16", default-features = false }
 openbounty-engine = { path = "../engine" }
+zip = { version = "8.6", default-features = false, features = ["deflate"] }

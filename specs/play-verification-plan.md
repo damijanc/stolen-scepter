@@ -142,7 +142,7 @@ not playable yet, so they skip them rather than report them.
 - [ ] **Step 2: Give the user the launch command**
 
 ```bash
-cargo run -p openbounty-shell --release -- --seed 1 reference/assets/kings-bounty/game.json
+cargo run -p openbounty-shell --release -- --seed 1 --pack reference/assets/kings-bounty
 ```
 
 A fixed `--seed` makes any finding reproducible. Record the seed in every row.
