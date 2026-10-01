@@ -177,7 +177,44 @@ Differences:
 
 ## Field audit
 
-(Task 3)
+Scope: the `pub` fields of `Game` and every struct it embeds (`ScepterState`,
+`Character`, `ClassState`, `Stats`, `Position`, `BoatState`, `ArmyStack`,
+`Spellbook`, `Contract`, `ArtifactState`, `TownRecord`, `CastleRecord`,
+`TileMutation`, `SaltedPlacement`, `DwellingState`, `FoeState`, `Unit`,
+`WorldProgress`) plus `Fog::seen`: 121 struct-field pairs. Reads and writes were counted
+over a copy of `engine/src` and `shell/src` with every `#[cfg(test)] mod tests`
+cut off and `savegame.rs` / `state_serialize.rs` removed. Writer FUNCTIONS
+were then listed per field on both sides (C over `reference/engine` and
+`reference/src`, minus `savegame.c` / `state_serialize.c`) and compared by
+hand, which catches a writer one side has and the other lacks -- the shape
+of GAP 6 (`castles[].known`).
+
+Generic names (`x`, `y`, `id`, `zone`, `count`, `name`, `kind`, `cls`) were
+not counted per field; they are read and written by every system.
+
+| Field | Shape | Class | Evidence |
+|---|---|---|---|
+| `Stats.followers_killed` | read, never written | GAP | C adds the player's losses on every hit, `c->heroes[t_side]->stats.followers_killed += kills;` (`combat.c:486`, "Step 10"). Rust's `combat_deal_damage` goes from the stack-death branch straight to the ABSORB/LEECH effects (`engine/src/combat.rs:1323`-`1332`). `compute_score` subtracts `kill_penalty * followers_killed` (`game.rs:1752`, C `game.c:1536`) and the Character view shows it (`shell/src/views.rs:2558`), so both always read 0. GAP 15. |
+| `CastleRecord.known` | extra writer | GAP | Already GAP 6: C's only gameplay writer is `GameCastFindVillain` (`game.c:438`); Rust adds `step.rs:311`. |
+| `Contract.villains_prefought` | written, never read | C-SAME | C writes it at `flow_resolve.c:181` and reads it nowhere outside persistence; Rust `game.rs:3120`, same. |
+| `Game.seed_from_catalog` | written, never read | C-SAME | C `game.c:122`/`126`/`140`; Rust `game.rs:768`-`776`. Persisted only. |
+| `Stats.last_commission` | written, never read | C-SAME | C `game.c:191`, `:1050` (header: "for UI", but no UI reads it); Rust `game.rs:3408`, `:3702`. |
+| `Position.facing_left` | written, never read | C-SAME | C `step.c:94`; only its unit test reads it. Both renderers mirror from `facing`. |
+| `Stats.score` | never written | C-SAME | Neither port writes it; both compute the score on demand (`GameComputeScore` / `Game::compute_score`) and only persist the stale field. |
+| `Game.oracle_mode` | read, never set | DIVERGENCE | C sets it only under `--autoplay` (`reference/src/main.c:933`); autoplay is OUT OF SCOPE (`specs/play-verification.md:436`). Real play leaves it false in both. |
+| `ScepterState.continent` | Rust-only | -- | C keeps the scepter continent in a local (`game.c:150`); Rust stores it but never serializes it. No parity effect. |
+| `hud_visible` | C-only | C-SAME | DEAD in C, recorded at `specs/play-verification.md:435`. The Rust snapshot also omits it. Do not wire it up. |
+| `anim_frame`, `anim_moving` | C-only | HOST | Presentation clocks read only by `reference/src/map_render.c:69`, `:133`; the shell owns them (`shell/src/anim.rs`). |
+| `player_io`, `version` | C-only | HOST | The text queue (unported by design, `AGENTS.md`) and the save version constant the v11 guard already checks. |
+
+All other fields had matching writer sets once multi-line `.copy_from_str`
+chains and `snprintf` writes were accounted for. Checked by hand because the
+counts looked thin: `own_castle` (C also sets it on a siege win,
+`flow_resolve.c:113`, `:159`), the weekly astrology garrison growth
+(`game.c:1092`-`1104`, Rust `game.rs:3445`, `:3455`), combat spell charges
+(`combat.rs:2828`), `spell_for_sale` (C's extra `GameTouchTown` writer is the
+unreachable fresh-slot path), and `game_over` (C's extra writers are a
+`player_io_answer` local and autoplay's win hand-off, `main.c:1271`).
 
 ## Proposed slices
 
@@ -190,6 +227,7 @@ Only `GAP` rows. Ordered by how often normal play reaches them.
 | 3 | `feat: ask before attacking a hostile foe` | `start_foe_hostile_flow`, `flows.c:228` | None in the engine (`attack_hostile_foe` already takes the resolved yes); the shell prompt and a decline path |
 | 4 | `feat: start the encounter when a foe walks onto the hero` | `GameStep`, `step.c:604` | None in the engine (`StepResult::Moved.collision` already reported); shell routing to the friendly or hostile flow |
 | 5 | `fix: reveal fog at the telecave destination` | `GameStep`, `step.c:487` | `Fog` of the active zone |
+| 15 | `fix: count the player's combat losses in followers_killed` | `combat_deal_damage` Step 10, `combat.c:486` | `Stats.followers_killed` (read by `compute_score` and the Character view); needs a per-fight tally in `Combat` written back to the `Game`, since the Rust combat holds no `&mut Game` |
 | 6 | `fix: stop marking castles known on a gate visit` | `GameStep`, `step.c:184`; sole C writer `GameCastFindVillain`, `game.c:438` | `castles[].known` (saved, snapshotted, read by the contract view `shell/src/views.rs:3112`) |
 | 7 | `fix: stamp zone towns from the zone's town list` | `resources_zone_town`, `map.c:141`; the zone-town index loop in `parse_zones`, `resources.c:353` | `Resources` zone town index list; tile stamping order. Unreachable with the three local packs: their zone lists and catalog `zone` fields agree in set and order |
 
