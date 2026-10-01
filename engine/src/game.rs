@@ -1722,6 +1722,13 @@ impl Game {
         owned
     }
 
+    /// Ports `GameIsOver`: the flag, or a calendar that has run out.
+    /// `step::end_day` sets the flag at zero days, so in live play the two
+    /// agree; they can differ on a loaded save.
+    pub fn is_over(&self) -> bool {
+        self.stats.game_over || self.stats.days_left == 0
+    }
+
     /// The final score. Ports `GameComputeScore`.
     ///
     /// Note the difficulty branch: `easy_halves` HALVES the easy score rather
@@ -7506,5 +7513,24 @@ mod tests {
             &destination,
             "no_such_spell"
         ));
+    }
+
+    #[test]
+    fn is_over_on_the_flag_alone() {
+        let mut game = Game::default();
+        game.stats.days_left = 5;
+        assert!(!game.is_over());
+        game.stats.game_over = true;
+        assert!(game.is_over());
+    }
+
+    /// `GameIsOver` ORs in `days_left == 0`, so a game whose calendar has run
+    /// out is over even when nothing has set the flag (a loaded save, say).
+    #[test]
+    fn is_over_when_the_days_run_out_without_the_flag() {
+        let mut game = Game::default();
+        game.stats.days_left = 0;
+        assert!(!game.stats.game_over);
+        assert!(game.is_over());
     }
 }
