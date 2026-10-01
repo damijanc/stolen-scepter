@@ -158,6 +158,8 @@ Implemented and tested:
   `step::spend_days` ports `GameSpendDays` (it lives beside `end_day`, as in
   C, which puts it in `step.rs` rather than with the rest of `game.c`).
   `Game::compute_score` ports `GameComputeScore` with its counters.
+  `Game::is_over` ports `GameIsOver` (the flag OR `days_left == 0`), and the
+  shell quits on any key once it holds and nothing modal is up.
 - Zone switching (`Game::switch_zone`): stashes the outgoing continent's fog,
   loads the destination, re-applies consumed tiles, spawns the hero, and
   matches travel mode to the spawn terrain (a water spawn puts the hero
@@ -205,7 +207,7 @@ Implemented and tested:
   pumped one at a time while nothing modal is up. `pending_week`
   (`WeekEnd`) is the shell counterpart of C's `pending_week_phase`.
 
-Test coverage is 352 engine unit tests, 326 shell unit tests, 25 combat digest
+Test coverage is 352 engine unit tests, 325 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

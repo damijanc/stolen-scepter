@@ -318,6 +318,14 @@ fn show_lose_game(views: &mut Views, resources: &Resources, game: &Game) {
 }
 
 /// Show the next pending week-end screen when nothing modal is up, porting
+/// Ports `main.c`'s game-over branch: with nothing modal up, a finished game
+/// ends the session on any key. It sits after the view branch in the input
+/// chain, so the key that dismisses the Win or Lose screen is not also the
+/// key that quits.
+fn game_over_quits(game: &Game, keys: &dyn KeySource) -> bool {
+    game.is_over() && keys.any_pressed()
+}
+
 /// `pump_week_end_dialog`. Astrology queues the budget behind it.
 fn pump_week_end(
     pending: &mut Option<WeekEnd>,
@@ -1156,7 +1164,11 @@ async fn main() {
             if keys.pressed(Key::N) || keys.pressed(Key::Escape) {
                 fast_quit = false;
             }
-        } else if !game.stats.game_over {
+        } else if game.is_over() {
+            if game_over_quits(&game, &keys) {
+                return;
+            }
+        } else {
             let input = input::poll(&keys);
             match input.action {
                 // Legality lives in the engine, and both are silent on
@@ -1587,5 +1599,54 @@ async fn main() {
 
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::game_over_quits;
+    use crate::input::{Key, Keys};
+    use openbounty_engine::game::Game;
+
+    fn finished() -> Game {
+        let mut game = Game::default();
+        game.stats.days_left = 3;
+        game.stats.game_over = true;
+        game
+    }
+
+    #[test]
+    fn a_finished_game_quits_on_any_key() {
+        assert!(game_over_quits(&finished(), &Keys::pressed(&[Key::A])));
+        assert!(game_over_quits(&finished(), &Keys::pressed(&[Key::Enter])));
+    }
+
+    #[test]
+    fn a_finished_game_waits_for_a_key() {
+        assert!(!game_over_quits(&finished(), &Keys::default()));
+    }
+
+    /// `ui_any_key_pressed` skips modifiers; `any_pressed` already does.
+    #[test]
+    fn a_modifier_alone_does_not_quit() {
+        assert!(!game_over_quits(
+            &finished(),
+            &Keys::pressed(&[Key::LeftControl])
+        ));
+    }
+
+    #[test]
+    fn a_live_game_never_quits_here() {
+        let mut game = Game::default();
+        game.stats.days_left = 3;
+        assert!(!game_over_quits(&game, &Keys::pressed(&[Key::A])));
+    }
+
+    /// The `days_left == 0` half of `GameIsOver` quits too.
+    #[test]
+    fn an_empty_calendar_quits_without_the_flag() {
+        let mut game = Game::default();
+        game.stats.days_left = 0;
+        assert!(game_over_quits(&game, &Keys::pressed(&[Key::A])));
     }
 }

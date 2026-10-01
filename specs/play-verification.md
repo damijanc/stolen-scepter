@@ -415,6 +415,8 @@ the peasants for leadership [C].
 2. Dig on a wrong tile and confirm exactly 10 days are spent.
 3. Confirm the victory banner names the **villain**, not the castle
    (`interact::capture_message`).
+4. After the win or lose screen is dismissed, confirm the next key closes the
+   game [C] (`main.c:1336`, `GameIsOver`).
 
 ---
 
