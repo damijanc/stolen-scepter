@@ -118,6 +118,22 @@ pub struct ResSprites {
     pub hud_bar_strip: FixedStr<RES_PATH_LEN>,
 }
 
+/// The pack's audio manifest: two music tracks and four one-shot tunes,
+/// porting C's `res->audio`.
+///
+/// Nothing in the engine reads any of this; it is recorded here because
+/// `Resources` is the pack reader, exactly as C's `resources.c` is. The shell
+/// decides what to play and when.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ResAudio {
+    pub track_openworld: FixedStr<RES_PATH_LEN>,
+    pub track_combat: FixedStr<RES_PATH_LEN>,
+    pub tune_walk: FixedStr<RES_PATH_LEN>,
+    pub tune_bump: FixedStr<RES_PATH_LEN>,
+    pub tune_chest: FixedStr<RES_PATH_LEN>,
+    pub tune_defeat: FixedStr<RES_PATH_LEN>,
+}
+
 impl Default for ResSprites {
     /// Everything empty, matching the zeroed struct C starts a load with. The
     /// defaults below are installed by the parser, not by this, because C
@@ -1036,6 +1052,7 @@ pub struct Resources {
     /// plus the path tables. `Resources` is built inline, so an unboxed one
     /// overflows the stack.
     pub sprites: Box<ResSprites>,
+    pub audio: ResAudio,
     pub ending: ResEnding,
     pub credits: ResCredits,
     pub colors: ResColors,
@@ -1093,6 +1110,7 @@ impl Default for Resources {
             economy: ResEconomy::default(),
             render: ResRender::default(),
             sprites: Box::new(ResSprites::default()),
+            audio: ResAudio::default(),
             ending: ResEnding::default(),
             credits: ResCredits::default(),
             colors: ResColors::default(),
@@ -1156,6 +1174,7 @@ impl Resources {
         resources.parse_economy(&root)?;
         resources.parse_render(&root)?;
         resources.parse_sprites(&root);
+        resources.parse_audio(&root);
         resources.parse_ending(&root);
         resources.parse_credits(&root);
         resources.parse_colors(&root);
@@ -1769,6 +1788,33 @@ impl Resources {
                     self.credits.copyright[index].copy_from_str(line);
                     self.credits.copyright_count += 1;
                 }
+            }
+        }
+    }
+
+    /// Read the audio manifest, porting `parse_audio`. Absent keys leave
+    /// empty slots; a pack that ships no audio is legal, as is one that ships
+    /// only some of it.
+    fn parse_audio(&mut self, root: &serde_json::Value) {
+        let Some(audio) = root.get("audio").filter(|v| v.is_object()) else {
+            return;
+        };
+        if let Some(tracks) = audio.get("tracks").filter(|v| v.is_object()) {
+            for (key, slot) in [
+                ("openworld", &mut self.audio.track_openworld),
+                ("combat", &mut self.audio.track_combat),
+            ] {
+                slot.copy_from_str(json_str_or(tracks, key, ""));
+            }
+        }
+        if let Some(tunes) = audio.get("tunes").filter(|v| v.is_object()) {
+            for (key, slot) in [
+                ("walk", &mut self.audio.tune_walk),
+                ("bump", &mut self.audio.tune_bump),
+                ("chest", &mut self.audio.tune_chest),
+                ("defeat", &mut self.audio.tune_defeat),
+            ] {
+                slot.copy_from_str(json_str_or(tunes, key, ""));
             }
         }
     }
@@ -3104,6 +3150,52 @@ mod tests {
         parse_troop_abilities, Facing, ANIM_FRAMES_MAX, TROOP_ABIL_ABSORB, TROOP_ABIL_FLY,
         TROOP_ABIL_LEECH, TROOP_ABIL_UNDEAD,
     };
+
+    #[test]
+    fn the_audio_block_parses_tracks_and_tunes() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "audio": {
+                  "tracks": {"openworld": "audio/open.ogg", "combat": "audio/fight.ogg"},
+                  "tunes": {"walk": "audio/walk.wav", "bump": "audio/bump.wav",
+                            "chest": "audio/chest.wav", "defeat": "audio/defeat.wav"}
+                }}"#,
+        )
+        .expect("fixture parses");
+
+        let audio = &resources.audio;
+        assert_eq!(audio.track_openworld.as_str(), "audio/open.ogg");
+        assert_eq!(audio.track_combat.as_str(), "audio/fight.ogg");
+        assert_eq!(audio.tune_walk.as_str(), "audio/walk.wav");
+        assert_eq!(audio.tune_bump.as_str(), "audio/bump.wav");
+        assert_eq!(audio.tune_chest.as_str(), "audio/chest.wav");
+        assert_eq!(audio.tune_defeat.as_str(), "audio/defeat.wav");
+    }
+
+    /// A pack that declares no audio leaves every slot empty rather than
+    /// failing, exactly as the sprite manifest does.
+    #[test]
+    fn a_pack_without_audio_leaves_every_slot_empty() {
+        let resources = Resources::from_json_str(r#"{"render": {"mode": "legacy"}, "troops": []}"#)
+            .expect("fixture parses");
+
+        assert!(resources.audio.track_openworld.is_empty());
+        assert!(resources.audio.tune_walk.is_empty());
+    }
+
+    /// Half a block is not an error either; the declared half is kept.
+    #[test]
+    fn a_partial_audio_block_keeps_what_it_declares() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "audio": {"tunes": {"walk": "audio/walk.wav"}}}"#,
+        )
+        .expect("fixture parses");
+
+        assert_eq!(resources.audio.tune_walk.as_str(), "audio/walk.wav");
+        assert!(resources.audio.tune_bump.is_empty());
+        assert!(resources.audio.track_combat.is_empty());
+    }
 
     #[test]
     fn legacy_render_mode_forces_the_dos_geometry() {
