@@ -139,6 +139,116 @@ pub fn load_resources(pack: &Pack) -> Result<openbounty_engine::resources::Resou
     Ok(resources)
 }
 
+/// C's `PACK_DISCOVER_MAX`.
+pub const DISCOVER_MAX: usize = 16;
+
+pub struct PackEntry {
+    pub path: PathBuf,
+    /// Filename without extension, C's `PackEntry.name`.
+    pub name: String,
+}
+
+const PACK_EXT: &str = ".openbounty";
+
+/// The roots C scans, in order (`pack.h:62`): the working directory, the
+/// user-data directory, then `<exe-dir>/assets`. A root that does not exist
+/// is harmless -- it scans as empty -- so unlike C this does not stat
+/// `assets` before listing it.
+pub fn discover_roots(saves: &crate::savepath::SavePaths) -> Vec<PathBuf> {
+    let mut roots = vec![PathBuf::from(".")];
+    if let Some(base) = saves.base_dir() {
+        roots.push(base);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            roots.push(dir.join("assets"));
+        }
+    }
+    roots
+}
+
+pub fn discover(saves: &crate::savepath::SavePaths) -> Vec<PackEntry> {
+    discover_in(&discover_roots(saves))
+}
+
+/// Scan `roots` in order, porting `pack_discover`/`scan_one_dir`. An earlier
+/// root wins a duplicate name, and the scan stops at `DISCOVER_MAX`.
+///
+/// Two deliberate differences from C. It also lists a directory holding a
+/// `game.json`, because `pack_open` accepts one and this shell's packs ship
+/// loose; C's scan only ever matched `*.openbounty`. And each root is listed
+/// in sorted order, where C takes `readdir`'s, which is filesystem-dependent.
+pub fn discover_in(roots: &[PathBuf]) -> Vec<PackEntry> {
+    let mut found: Vec<PackEntry> = Vec::new();
+    for root in roots {
+        let Ok(dir) = std::fs::read_dir(root) else {
+            continue;
+        };
+        let mut paths: Vec<PathBuf> = dir.flatten().map(|entry| entry.path()).collect();
+        paths.sort();
+        for path in paths {
+            if found.len() >= DISCOVER_MAX {
+                return found;
+            }
+            let Some(name) = pack_name(&path) else {
+                continue;
+            };
+            if found.iter().any(|entry| entry.name == name) {
+                continue;
+            }
+            found.push(PackEntry { path, name });
+        }
+    }
+    found
+}
+
+/// The pack name for a path, or `None` when it is not a pack: a
+/// `*.openbounty` file (matched case-sensitively, as C's `ends_with` does)
+/// named without its extension, or a directory holding a `game.json` named
+/// as it stands.
+fn pack_name(path: &Path) -> Option<String> {
+    let file_name = path.file_name()?.to_str()?;
+    if path.is_dir() {
+        return path
+            .join("game.json")
+            .is_file()
+            .then(|| file_name.to_owned());
+    }
+    let stem = file_name.strip_suffix(PACK_EXT)?;
+    Some(stem.to_owned())
+}
+
+/// Resolve a `--pack` value, porting `pack_resolve_arg`.
+pub fn resolve_arg(arg: &str, saves: &crate::savepath::SavePaths) -> Option<PathBuf> {
+    resolve_arg_in(arg, &discover_roots(saves))
+}
+
+/// A value containing a separator or ending in `.openbounty` is a path and
+/// must exist. Anything else is a bare name: each root in turn is tried for
+/// `<arg>.openbounty`, then `<arg>`, and the first that exists wins. Like C,
+/// this stats candidates directly rather than searching the capped discovery
+/// list, and does not check that a bare directory holds a `game.json` -- a
+/// wrong one fails at open, with the open's own message.
+pub fn resolve_arg_in(arg: &str, roots: &[PathBuf]) -> Option<PathBuf> {
+    if arg.is_empty() {
+        return None;
+    }
+    let has_sep = arg.contains('/') || arg.contains('\\');
+    if has_sep || arg.ends_with(PACK_EXT) {
+        let path = PathBuf::from(arg);
+        return path.exists().then_some(path);
+    }
+    for root in roots {
+        for suffix in [PACK_EXT, ""] {
+            let candidate = root.join(format!("{arg}{suffix}"));
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,5 +418,105 @@ mod tests {
         zip.finish().expect("finish");
         let c = Pack::open(&other).expect("c");
         assert_ne!(a.hash(), c.hash(), "different content, different hash");
+    }
+
+    fn write_archive_named(dir: &Path, name: &str) -> PathBuf {
+        let path = dir.join(name);
+        let file = std::fs::File::create(&path).expect("create archive");
+        let mut zip = zip::ZipWriter::new(file);
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.start_file("game.json", opts).expect("start");
+        zip.write_all(b"{}").expect("write");
+        zip.finish().expect("finish");
+        path
+    }
+
+    #[test]
+    fn discovery_finds_archives_and_loose_directories() {
+        let root = temp_dir("disc");
+        write_archive_named(&root, "alpha.openbounty");
+        let loose = root.join("beta");
+        std::fs::create_dir_all(&loose).expect("dir");
+        std::fs::write(loose.join("game.json"), b"{}").expect("write");
+        // A directory with no game.json is not a pack.
+        std::fs::create_dir_all(root.join("notapack")).expect("dir");
+        // Nor is a stray file.
+        std::fs::write(root.join("readme.txt"), b"hi").expect("write");
+
+        let found = discover_in(&[root.clone()]);
+        let mut names: Vec<&str> = found.iter().map(|e| e.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, vec!["alpha", "beta"]);
+    }
+
+    /// C: "Earlier source wins on duplicate names."
+    #[test]
+    fn an_earlier_root_wins_a_duplicate_name() {
+        let first = temp_dir("dup1");
+        let second = temp_dir("dup2");
+        write_archive_named(&first, "same.openbounty");
+        write_archive_named(&second, "same.openbounty");
+
+        let found = discover_in(&[first.clone(), second]);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.starts_with(&first));
+    }
+
+    #[test]
+    fn discovery_stops_at_the_cap() {
+        let root = temp_dir("cap");
+        for index in 0..(DISCOVER_MAX + 4) {
+            write_archive_named(&root, &format!("pack{index:02}.openbounty"));
+        }
+        assert_eq!(discover_in(&[root]).len(), DISCOVER_MAX);
+    }
+
+    /// C's `ends_with(".openbounty")` is case-sensitive.
+    #[test]
+    fn discovery_matches_the_extension_case_sensitively() {
+        let root = temp_dir("case");
+        write_archive_named(&root, "shout.OPENBOUNTY");
+        assert!(discover_in(&[root]).is_empty());
+    }
+
+    #[test]
+    fn a_bare_name_resolves_against_the_roots_and_a_path_does_not() {
+        let root = temp_dir("resolve");
+        write_archive_named(&root, "named.openbounty");
+
+        assert!(resolve_arg_in("named", &[root.clone()]).is_some());
+        assert!(resolve_arg_in("nosuch", &[root.clone()]).is_none());
+        // An explicit path is taken as-is and must exist.
+        let direct = root.join("named.openbounty");
+        assert_eq!(resolve_arg_in(&direct.to_string_lossy(), &[]), Some(direct));
+        assert!(resolve_arg_in("/no/such/pack", &[root]).is_none());
+    }
+
+    /// C tries `<root>/<arg>.openbounty` before `<root>/<arg>` in each root,
+    /// and only then moves to the next root.
+    #[test]
+    fn a_bare_name_prefers_the_archive_then_the_earlier_root() {
+        let first = temp_dir("pref1");
+        let second = temp_dir("pref2");
+        std::fs::create_dir_all(first.join("kb")).expect("dir");
+        write_archive_named(&first, "kb.openbounty");
+        write_archive_named(&second, "kb.openbounty");
+
+        assert_eq!(
+            resolve_arg_in("kb", &[first.clone(), second]),
+            Some(first.join("kb.openbounty"))
+        );
+    }
+
+    /// C's bare-name lookup stats candidates directly; it is not a search of
+    /// the capped discovery list, so a pack past the cap still resolves.
+    #[test]
+    fn a_bare_name_resolves_past_the_discovery_cap() {
+        let root = temp_dir("past_cap");
+        for index in 0..(DISCOVER_MAX + 4) {
+            write_archive_named(&root, &format!("pack{index:02}.openbounty"));
+        }
+        let last = format!("pack{:02}", DISCOVER_MAX + 3);
+        assert!(resolve_arg_in(&last, &[root]).is_some());
     }
 }
