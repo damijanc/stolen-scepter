@@ -9,6 +9,7 @@
 
 pub mod anim;
 pub mod audio;
+pub mod audio_backend;
 pub mod backend;
 pub mod banner;
 pub mod cheats;
