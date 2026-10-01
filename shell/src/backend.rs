@@ -430,6 +430,7 @@ impl MacroquadKeys {
             Key::Z => KeyCode::Z,
             Key::LeftControl => KeyCode::LeftControl,
             Key::RightControl => KeyCode::RightControl,
+            Key::F10 => KeyCode::F10,
         }
     }
 }

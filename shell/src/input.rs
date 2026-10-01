@@ -84,6 +84,9 @@ pub enum Key {
     Z,
     LeftControl,
     RightControl,
+    /// Opens and closes the debug cheat menu (`crate::cheats`). Not an
+    /// overworld binding, so [`poll`] ignores it.
+    F10,
 }
 
 /// The top-row digit keys, 0..9, in order.
@@ -408,6 +411,13 @@ mod tests {
     fn an_unbound_key_does_nothing() {
         let state = poll_keys(&[Key::Escape]);
         assert_eq!(state, InputState::default());
+    }
+
+    #[test]
+    fn f10_is_not_an_overworld_binding() {
+        // The cheat menu reads F10 before the overworld chain runs; `poll`
+        // must not turn it into an action or a step.
+        assert_eq!(poll_keys(&[Key::F10]), InputState::default());
     }
 
     #[test]
