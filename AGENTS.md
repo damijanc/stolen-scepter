@@ -205,7 +205,7 @@ Implemented and tested:
   pumped one at a time while nothing modal is up. `pending_week`
   (`WeekEnd`) is the shell counterpart of C's `pending_week_phase`.
 
-Test coverage is 350 engine unit tests, 315 shell unit tests, 25 combat digest
+Test coverage is 352 engine unit tests, 326 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

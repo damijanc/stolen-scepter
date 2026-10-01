@@ -31,12 +31,14 @@ use openbounty_engine::tables::TROOP_ABIL_FLY;
 use crate::banner;
 use crate::draw::{DrawList, Dst, Rect, Sprite};
 use crate::font;
-use crate::input::{Key, KeySource};
-use crate::layout::{MAP_X, MAP_Y};
+use crate::input::{Key, KeySource, DIGITS};
+use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
+use crate::pointer::HitTarget;
+use crate::present::Present;
 use crate::prompt::{Prompt, PromptResult};
 use crate::sprites::SpriteCatalog;
-use crate::views::{troop_sprite, ViewKind};
+use crate::views::{controls_visible, troop_sprite, ViewKind, Views};
 
 /// The A-G keys the cast menu reads, in order.
 const COMBAT_SPELL_KEYS: [Key; 7] = [Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G];
@@ -996,6 +998,68 @@ fn combat_read_dir(keys: &dyn KeySource) -> Option<(i32, i32)> {
     None
 }
 
+/// One frame of input while a view is open over the battlefield. Combat is
+/// paused: nothing here steps the fight. Ports `RunCombat`'s ESC branch
+/// (`combat_loop.c:489-493`) and its paused-view branch (`:502-519`).
+///
+/// ESC is the ONLY key that closes a view here. C's paused branch reads no
+/// other dismiss key, so Army and Character do not close on any key as they do
+/// on the overworld. `C` on Options swaps to Controls and `O` on Controls swaps
+/// back. A digit on Controls cycles the control at CATALOG row `digit - 1`, not
+/// the visible row the panel labels with that digit: C passes its loop index
+/// straight to `views_controls_advance`, skipping the `vis_map` the overworld
+/// branch goes through (`main.c:1138-1142`), and moves no cursor. With a hidden
+/// row ahead of it the digit and the label disagree -- ported as written.
+///
+/// A click is shell-side (C has no pointer) and keeps the meaning its region
+/// has on the overworld: a click on a read-only view closes it, and a click on
+/// a Controls row selects and cycles the row drawn under the pointer, the
+/// modern Scale row included.
+pub fn combat_view_input(
+    views: &mut Views,
+    keys: &dyn KeySource,
+    clicked: Option<HitTarget>,
+    game: &mut Game,
+    resources: &Resources,
+    layout: &Layout,
+    present: &mut Present,
+) {
+    if let Some(target) = clicked {
+        if target == HitTarget::ViewDismiss {
+            views.dismiss();
+        } else if let Some(row) = views.controls_click(target) {
+            let vis = controls_visible(resources);
+            if layout.is_modern && row == vis.len() {
+                views.controls_set_cursor(row as i32);
+                present.advance_scale();
+            } else if let Some(&index) = vis.get(row) {
+                views.controls_set_cursor(row as i32);
+                views.controls_advance(game, resources, index);
+            }
+        }
+        return;
+    }
+
+    if keys.pressed(Key::Escape) {
+        views.dismiss();
+        return;
+    }
+
+    let active = views.active();
+    if active == Some(ViewKind::Options) && keys.pressed(Key::C) {
+        views.set(ViewKind::Controls);
+    } else if active == Some(ViewKind::Controls) && keys.pressed(Key::O) {
+        views.set(ViewKind::Options);
+    } else if active == Some(ViewKind::Controls) {
+        for i in 0..9 {
+            if keys.pressed(DIGITS[1 + i]) {
+                views.controls_advance(game, resources, i);
+                break;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1485,5 +1549,160 @@ mod tests {
             loop_.picker_active,
             "a refused confirm leaves the picker armed"
         );
+    }
+
+    /// A legacy pack with a hidden control AHEAD of a visible one, so the
+    /// visible row a digit labels and the catalog row C's combat branch
+    /// cycles are different rows. Visible rows: Delay (0), Animation (2).
+    fn view_fixture() -> (Resources, Layout, Game) {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "controls": {"settings": [
+                  {"id":"delay","label":"Delay","type":"numeric","range":10,"default":5},
+                  {"id":"cga","label":"CGA","type":"numeric","range":8,"hidden":true},
+                  {"id":"animation","label":"Animation","type":"bool"}
+                ]}}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        (resources, layout, Game::default())
+    }
+
+    fn press(
+        views: &mut Views,
+        keys: &[Key],
+        game: &mut Game,
+        resources: &Resources,
+        layout: &Layout,
+    ) {
+        combat_view_input(
+            views,
+            &Keys::pressed(keys),
+            None,
+            game,
+            resources,
+            layout,
+            &mut Present::new(),
+        );
+    }
+
+    #[test]
+    fn only_escape_closes_a_view_over_the_battlefield() {
+        // combat_loop.c:489-493 is the only dismiss; the paused branch
+        // (:502-519) reads no other key for it.
+        let (resources, layout, mut game) = view_fixture();
+        let mut views = Views::new();
+        views.set(ViewKind::Army);
+        for key in [Key::Space, Key::A, Key::Enter, Key::Digit1] {
+            press(&mut views, &[key], &mut game, &resources, &layout);
+            assert_eq!(
+                views.active(),
+                Some(ViewKind::Army),
+                "{key:?} must not close it"
+            );
+        }
+        press(&mut views, &[Key::Escape], &mut game, &resources, &layout);
+        assert_eq!(views.active(), None);
+    }
+
+    #[test]
+    fn c_and_o_swap_options_and_controls_in_place() {
+        let (resources, layout, mut game) = view_fixture();
+        let mut views = Views::new();
+        views.set(ViewKind::Options);
+
+        press(&mut views, &[Key::C], &mut game, &resources, &layout);
+        assert_eq!(views.active(), Some(ViewKind::Controls));
+        // Unlike the overworld (main.c:1132-1135), C does not close Controls.
+        press(&mut views, &[Key::C], &mut game, &resources, &layout);
+        assert_eq!(views.active(), Some(ViewKind::Controls));
+
+        press(&mut views, &[Key::O], &mut game, &resources, &layout);
+        assert_eq!(views.active(), Some(ViewKind::Options));
+        press(&mut views, &[Key::O], &mut game, &resources, &layout);
+        assert_eq!(views.active(), Some(ViewKind::Options));
+
+        // Digits cycle only on Controls.
+        let before = game.stats.options;
+        press(&mut views, &[Key::Digit1], &mut game, &resources, &layout);
+        assert_eq!(game.stats.options, before);
+    }
+
+    #[test]
+    fn a_combat_digit_cycles_the_catalog_row_not_the_labelled_row() {
+        // The panel labels Animation "2" because CGA is hidden, but
+        // combat_loop.c:511-513 hands the raw loop index to
+        // views_controls_advance, skipping the overworld's vis_map.
+        let (resources, layout, mut game) = view_fixture();
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+
+        press(&mut views, &[Key::Digit2], &mut game, &resources, &layout);
+        assert_eq!(game.stats.options[1], 2, "hidden CGA 1 -> 2");
+        assert_eq!(game.stats.options[2], 1, "Animation untouched");
+        assert_eq!(
+            views.controls_cursor(),
+            0,
+            "the combat branch moves no cursor"
+        );
+
+        press(&mut views, &[Key::Digit1], &mut game, &resources, &layout);
+        assert_eq!(game.stats.options[0], 2, "Delay 1 -> 2");
+    }
+
+    #[test]
+    fn the_overworld_controls_keys_are_inert_in_combat() {
+        let (resources, layout, mut game) = view_fixture();
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+        let before = game.stats.options;
+
+        // combat_loop.c:509-517 reads digits only: no Up/Down, no
+        // Enter/Space, and a digit past the catalog is views_controls_advance's
+        // own out-of-range no-op (views.c:945).
+        for key in [Key::Down, Key::Up, Key::Enter, Key::Space, Key::Digit9] {
+            press(&mut views, &[key], &mut game, &resources, &layout);
+        }
+        assert_eq!(game.stats.options, before);
+        assert_eq!(views.controls_cursor(), 0);
+        assert_eq!(views.active(), Some(ViewKind::Controls));
+    }
+
+    #[test]
+    fn a_click_on_a_controls_row_cycles_the_row_drawn_under_it() {
+        // Shell-side: C has no pointer. A click names the drawn row, so the
+        // second VISIBLE row is Animation, not the hidden CGA a digit reaches.
+        let (resources, layout, mut game) = view_fixture();
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+        combat_view_input(
+            &mut views,
+            &Keys::pressed(&[]),
+            Some(HitTarget::ControlsRow(1)),
+            &mut game,
+            &resources,
+            &layout,
+            &mut Present::new(),
+        );
+        assert_eq!(game.stats.options[2], 0, "Animation 1 -> 0");
+        assert_eq!(game.stats.options[1], 1, "CGA untouched");
+        assert_eq!(views.controls_cursor(), 1);
+    }
+
+    #[test]
+    fn a_click_closes_a_read_only_view_over_the_battlefield() {
+        let (resources, layout, mut game) = view_fixture();
+        let mut views = Views::new();
+        views.set(ViewKind::Character);
+        combat_view_input(
+            &mut views,
+            &Keys::pressed(&[]),
+            Some(HitTarget::ViewDismiss),
+            &mut game,
+            &resources,
+            &layout,
+            &mut Present::new(),
+        );
+        assert_eq!(views.active(), None);
     }
 }

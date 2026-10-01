@@ -42,8 +42,8 @@ Every behavioral claim carries the layer it came from:
 - **BY DESIGN** -- C does it and this port deliberately does not.
 - **OUT OF SCOPE** -- C shell tooling that is not part of playing.
 
-Last refreshed 2026-10-01, against the commit that wires the sidebar HUD
-(parent `f84bbe0`). Several §13 entries had gone stale by 2026-09-22 -- the
+Last refreshed 2026-10-01, against the commit that pauses combat under the
+Options and Controls views (parent `8b58705`). Several §13 entries had gone stale by 2026-09-22 -- the
 startup wizard, the defeat message and the villain capture banner were all
 listed as missing after they shipped. Re-check a status against the code
 before trusting it.
@@ -314,15 +314,21 @@ Other quirks:
   sidebar [C].
 - Keys: arrows move, `S` shoot, `F` fly, space/`W` wait, `A`-`G` pick a spell
   while casting, `G` give up (outside spell selection), ESC.
-- `A` opens the Army view and `V` the Character view, over the still-visible
-  battlefield. **Opening a view pauses the fight** -- no AI advancement and no
-  animation ticks while it is up [C]. Both are read-only and close on any key.
-  Both openers are suppressed while a spell cast or a target picker is
-  mid-flight, because `A` is also the picker's confirm key [C].
-- C also opens an Options menu from combat with `O`. **GAP** -- the Options view
-  exists and `O` opens it on the overworld (`main.rs` `Action::OptionsMenu`),
-  but the combat key handler only emits `CombatStatus::OpenView` for Army and
-  Character (`combat.rs:482`), so `O` does nothing during a fight.
+- `A` opens the Army view, `V` the Character view and `O` the Options reference,
+  over the still-visible battlefield, on either side's turn. `C` opens the
+  Controls panel, but only on your own turn, because it is a player action
+  [C]. **Opening a view pauses the fight** -- no AI advancement and no
+  animation ticks while it is up [C]. All four openers are suppressed while a
+  spell cast or a target picker is mid-flight, because `A` and `C` are also the
+  picker's confirm keys [C].
+- **Only ESC closes a view during combat** [C]. Unlike the overworld, other keys
+  do not dismiss Army or Character. While a view is up, `C` on Options switches
+  to Controls and `O` on Controls switches back.
+- In combat, digit `N` on Controls cycles the pack's `N`th control counting
+  HIDDEN rows, not the row the panel labels `N`, and moves no cursor [C]. With
+  the stock pack's hidden CGA row, `5` cycles CGA and `6` cycles Music, which
+  is labelled `5`. The overworld maps digits to visible rows. A click cycles the
+  row under the pointer in both places [PORT].
 - The AI acts **once per completed 4-frame animation cycle** (150ms per frame)
   so its units visibly walk [C].
 - Retaliation is melee-only, once per round per defender, and ranged attacks
@@ -348,7 +354,10 @@ Other quirks:
 5. Open the Army view mid-fight with `A` and confirm the AI stops moving behind
    it. Then arm a shoot picker with `S` and press `A` -- expect it to confirm
    the pick, **not** open the Army view.
-5. Check the title bar during combat: before the first kill it should read
+6. Open Options mid-fight with `O` on the enemy's turn and confirm the enemy
+   stops moving. Press `C` and `O` to swap between Options and Controls, and
+   confirm neither swap closes the view. ESC closes it.
+7. Check the title bar during combat: before the first kill it should read
    `Options / <troop> M<moves>` (plus `,S<shots>` only when shots remain);
    after the first kill it switches to a "X vs Y killing N" summary.
 
@@ -418,13 +427,12 @@ Do not file these as findings; they are already tracked.
 | Sidebar HUD | OK | The 48px right column carries `reference/src/hud.c`'s five panels, ported in `shell/src/hud.rs`: the contract silhouette with the active villain's face over it, the siege and magic panels (silhouette until owned/known, then animated at ~2Hz), the mini puzzle grid with a 9x6 cover over each unrevealed cell, and the **gold purse** with the gold figure right-aligned [C]. Drawn after the map and before the views, so the Character view paints over it; absent during combat, as in C. Still deliberately unported: the dead `game.hud_visible` flag (DEAD in C) |
 | In-game menu | GAP | `reference/src/shell_menu.c` and C's `VIEW_MENU` are unported. `Q` saves to slot 0 **and quits**; there is no save-and-continue, no mid-session load, and no New Game. Loading is possible only from the startup wizard's `L` |
 | Audio | GAP | Silent. `reference/src/audio.c` has no Rust counterpart. The Controls panel already draws the pack's Sounds / Music / Volume / Walk Beep rows and cycles `stats.options[]`, so those rows toggle a value nothing reads. C also grays the three audio rows out when no device is present, which this shell cannot decide |
-| Combat `O` | GAP | See §9 -- the Options view exists but combat does not route the key |
 | Pack picker | GAP | `reference/src/pack_select.c` unported; the pack path is a required command-line argument |
 | Open content pack | GAP | `packs/open` covers 267/311 art slots (missing: the 43 `ui/` slots and the bitmap font), and there is no open `game.json` or maps -- `tools/open_pack.py build` overlays art onto the gitignored reference clone. Playing still requires a local OpenBounty checkout |
 | Cheat menu (F10) | GAP | `reference/src/shell_cheats.c` unported. Only affects how fast the scenarios in this document can be set up |
 | `game.hud_visible` | DEAD | C writes it when an overlay opens and closes, and `draw_frame` never reads it. Do not wire it up |
 | Recorder, autoplay, demo | OUT OF SCOPE | `--movie`, `--autoplay`, `--demo`, `--headless`, `--validate-pack` and `--fullscreen` are dev tooling, not play |
-| Mouse: overworld & combat | BY DESIGN | Click-to-move and click-in-combat are design non-goals |
+| Mouse: overworld & combat | BY DESIGN | Click-to-move and clicks on the combat field are design non-goals. A view opened over the battlefield takes clicks as it does on the overworld |
 | Mouse: count entry | BY DESIGN | Recruit/dwelling "how many" is keyboard-only |
 
 ---

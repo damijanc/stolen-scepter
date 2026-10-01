@@ -34,7 +34,7 @@ use macroquad::prelude::{get_time, next_frame, request_new_screen_size, Conf};
 use anim::HeroAnimator;
 use backend::{Backend, MacroquadKeys, MacroquadPointer};
 use chrome::{Chrome, StatusMode};
-use combat::{combat_render, CombatLoop, CombatStatus};
+use combat::{combat_render, combat_view_input, CombatLoop, CombatStatus};
 use dialog::Dialog;
 use draw::DrawList;
 use hud::Hud;
@@ -847,11 +847,18 @@ async fn main() {
         // prompt, then the overworld.
         if let Some(session) = &mut combat {
             if views.is_active() {
-                // A view is open over the battlefield; the read-only Army and
-                // Character views dismiss on any key, pausing the fight.
-                if keys.any_pressed() {
-                    views.dismiss();
-                }
+                // A view is open over the battlefield and the fight is paused:
+                // no step, so no AI and no animation tick. ESC closes it, C/O
+                // swap Options and Controls, digits cycle Controls rows.
+                combat_view_input(
+                    &mut views,
+                    &keys,
+                    clicked,
+                    &mut game,
+                    &resources,
+                    &layout,
+                    &mut present,
+                );
             } else {
                 let status =
                     session
@@ -1488,6 +1495,23 @@ async fn main() {
                 &session.combat.combat,
                 backend.palette(),
                 &catalog,
+            );
+            // An open view draws over the still-visible field, porting
+            // combat_present (combat_loop.c:321-327). C passes NULL map and
+            // fog because no view combat can open reads them; the overworld's
+            // are passed only to satisfy the signature.
+            views.draw(
+                &mut list,
+                &mut hits,
+                &layout,
+                backend.palette(),
+                &resources,
+                &catalog,
+                &map,
+                &fog,
+                &game,
+                &present,
+                get_time(),
             );
         } else {
             Chrome {
