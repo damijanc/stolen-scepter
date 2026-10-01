@@ -53,7 +53,7 @@ use hud::Hud;
 use input::{Action, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
-use menu::{Menu, MenuAction};
+use menu::{Menu, MenuAction, PickerPurpose};
 use openbounty_engine::combat::{
     CombatMode, CombatResult, CombatTarget, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER, COMBAT_SLOTS,
 };
@@ -75,8 +75,8 @@ use openbounty_engine::step::{
 use pointer::{Button, HitList, HitTarget, PointerSource};
 use present::Present;
 use prompt::{Prompt, PromptResult};
-use savepath::SavePaths;
-use slot_picker::load_slot;
+use savepath::{scan_slots, SavePaths};
+use slot_picker::{load_slot, SlotChoice, SlotPicker};
 use sprites::SpriteCatalog;
 use startup::{Startup, StartupAction};
 use views::{
@@ -344,6 +344,53 @@ fn push_audio_options(audio: &mut KiraAudio, game: &Game) {
     audio.set_sounds_enabled(options[audio::OPTION_SOUNDS] != 0);
     audio.set_music_enabled(options[audio::OPTION_MUSIC] != 0);
     audio.set_master_volume(options[audio::OPTION_VOLUME]);
+}
+
+/// C's post-init message: a new game is being created, or a loaded one is
+/// being prepared. The in-game menu shows the loaded form after a load too.
+fn post_init_message(game: &Game, loaded: bool) -> String {
+    let name = game.character.name.as_str();
+    let rank = game.character.cls.rank_title.as_str();
+    if loaded {
+        format!(
+            "{name} the {rank},\n\nPlease wait while I prepare a suitable environment for your bountying enjoyment!"
+        )
+    } else {
+        format!(
+            "{name} the {rank},\n\nA new game is being created. Please wait while I perform godlike actions to make this game playable."
+        )
+    }
+}
+
+/// Write the live game to `slot` from the Game Menu and report it. A success
+/// closes the picker and the menu and returns to play; a failure reports and
+/// steps back to the menu, leaving play untouched.
+fn menu_save(
+    save_paths: &SavePaths,
+    resources: &Resources,
+    game: &Game,
+    map: &Map,
+    fog: &Fog,
+    slot: usize,
+    menu_picker: &mut Option<(SlotPicker, PickerPurpose)>,
+    views: &mut Views,
+    dialog: &mut Dialog,
+) {
+    *menu_picker = None;
+    let (header, body) = match save_paths.slot(resources.pack_id.as_str(), slot) {
+        Some(path) => match save_write(&path, game, resources, map, fog) {
+            Ok(()) => {
+                views.dismiss();
+                menu::saved_message(resources, slot)
+            }
+            Err(err) => {
+                eprintln!("save slot {slot} failed: {err:?}");
+                menu::save_failed_message(resources, false)
+            }
+        },
+        None => menu::save_failed_message(resources, true),
+    };
+    dialog.open(&header, &body);
 }
 
 /// Ports `main.c`'s game-over branch: with nothing modal up, a finished game
@@ -873,20 +920,10 @@ async fn main() {
     // C queues a post-init message: a new game is being created, or a loaded
     // one is being prepared. It follows the startup intro rather than
     // replacing it.
-    {
-        let name = game.character.name.as_str();
-        let rank = game.character.cls.rank_title.as_str();
-        let body = if choice.action == StartupAction::Load {
-            format!(
-                "{name} the {rank},\n\nPlease wait while I prepare a suitable environment for your bountying enjoyment!"
-            )
-        } else {
-            format!(
-                "{name} the {rank},\n\nA new game is being created. Please wait while I perform godlike actions to make this game playable."
-            )
-        };
-        dialog.open("", &body);
-    }
+    dialog.open(
+        "",
+        &post_init_message(&game, choice.action == StartupAction::Load),
+    );
     let mut pending = PendingFlow::None;
     let mut pending_week: Option<WeekEnd> = None;
     let mut views = Views::new();
@@ -910,6 +947,13 @@ async fn main() {
     audio.set_track(audio::Track::Openworld);
     // The ESC Game Menu's cursor; on the view stack as `ViewKind::Menu`.
     let mut menu = Menu::new();
+    // The menu's slot picker while Save or Load is choosing a slot; it draws
+    // in place of the menu, and ESC steps back to the menu.
+    let mut menu_picker: Option<(SlotPicker, PickerPurpose)> = None;
+    // An occupied slot awaiting the overwrite yes/no. Held apart from
+    // `PendingFlow`, which ports C's `pending_flow`; this answer needs the
+    // save paths, which `dispatch_answer` does not have.
+    let mut pending_overwrite: Option<usize> = None;
 
     loop {
         // C pushes the toggles every frame because the Controls panel changes
@@ -1086,7 +1130,24 @@ async fn main() {
                 Some(target) => prompt.click(target),
                 None => prompt.update(&keys),
             };
-            if answer != PromptResult::None {
+            if let Some(slot) = pending_overwrite.filter(|_| answer != PromptResult::None) {
+                // The Game Menu's overwrite confirm. Yes writes; any other
+                // answer leaves the picker open to choose again.
+                pending_overwrite = None;
+                if answer == PromptResult::Yes {
+                    menu_save(
+                        &save_paths,
+                        &resources,
+                        &game,
+                        &map,
+                        &fog,
+                        slot,
+                        &mut menu_picker,
+                        &mut views,
+                        &mut dialog,
+                    );
+                }
+            } else if answer != PromptResult::None {
                 let combat_flow = dispatch_answer(
                     &mut game,
                     &mut map,
@@ -1277,10 +1338,117 @@ async fn main() {
             // The Game Menu owns its arrows, digits, Enter and ESC. It is only
             // ever opened from the overworld branch below, so combat never
             // reaches it: the save format carries no combat state.
-            match menu.update(&keys) {
-                Some(MenuAction::Close) => views.dismiss(),
-                // Wired in the next slice.
-                Some(MenuAction::Save | MenuAction::Load | MenuAction::Quit) | None => {}
+            if let Some((picker, purpose)) = menu_picker.as_mut() {
+                let purpose = *purpose;
+                match picker.update(&keys) {
+                    None | Some(SlotChoice::Extra) => {}
+                    Some(SlotChoice::Cancel) => menu_picker = None,
+                    Some(SlotChoice::Slot(slot)) => {
+                        let header = picker.slots().headers[slot];
+                        match (purpose, header) {
+                            (PickerPurpose::Save, Some(header)) => {
+                                let (title, body) =
+                                    menu::overwrite_prompt(&resources, slot, header.name.as_str());
+                                prompt.yes_no(&title, &body);
+                                pending_overwrite = Some(slot);
+                            }
+                            (PickerPurpose::Save, None) => menu_save(
+                                &save_paths,
+                                &resources,
+                                &game,
+                                &map,
+                                &fog,
+                                slot,
+                                &mut menu_picker,
+                                &mut views,
+                                &mut dialog,
+                            ),
+                            (PickerPurpose::Load, None) => {
+                                let (title, body) = menu::empty_slot_message(&resources);
+                                dialog.open(&title, &body);
+                            }
+                            (PickerPurpose::Load, Some(_)) => {
+                                match load_slot(
+                                    &save_paths,
+                                    &resources,
+                                    resources.pack_id.as_str(),
+                                    slot,
+                                ) {
+                                    Ok((new_game, new_map, new_fog)) => {
+                                        // Swap only on success: a failed load
+                                        // must not disturb play.
+                                        game = new_game;
+                                        map = new_map;
+                                        fog = new_fog;
+                                        // Settle the hero on the loaded tile,
+                                        // as startup does.
+                                        game.position.last_x = game.position.x;
+                                        game.position.last_y = game.position.y;
+                                        // Everything else main holds was
+                                        // derived from the old session. Reset
+                                        // it all: a stale week phase would
+                                        // fire the old game's week-end screen.
+                                        last_step = None;
+                                        hero_anim = HeroAnimator::new();
+                                        fast_quit = false;
+                                        bridge_waiting = false;
+                                        pending_audience_message = None;
+                                        pending_capture = None;
+                                        prompt = Prompt::default();
+                                        dialog = Dialog::default();
+                                        pending = PendingFlow::None;
+                                        pending_week = None;
+                                        views = Views::new();
+                                        // The audio device stays open; what
+                                        // it derived from the old game is
+                                        // re-applied, as startup does: the
+                                        // grayed rows, the no-device pin of
+                                        // the loaded save's options, and the
+                                        // options themselves.
+                                        views.set_audio_available(audio.is_available());
+                                        if !audio.is_available() {
+                                            audio::pin_options_without_device(
+                                                &mut game.stats.options,
+                                            );
+                                        }
+                                        push_audio_options(&mut audio, &game);
+                                        combat = None;
+                                        cheat_menu = CheatMenu::default();
+                                        menu = Menu::new();
+                                        menu_picker = None;
+                                        pending_overwrite = None;
+                                        dialog.open("", &post_init_message(&game, true));
+                                    }
+                                    Err(err) => {
+                                        eprintln!("load slot {slot} failed: {err:?}");
+                                        menu_picker = None;
+                                        let (title, body) =
+                                            menu::load_failed_message(&resources, &err);
+                                        dialog.open(&title, &body);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                match menu.update(&keys) {
+                    Some(MenuAction::Close) => views.dismiss(),
+                    Some(MenuAction::Save) => {
+                        let slots = scan_slots(&save_paths, resources.pack_id.as_str());
+                        menu_picker = Some((SlotPicker::new(slots, false), PickerPurpose::Save));
+                    }
+                    Some(MenuAction::Load) => {
+                        let slots = scan_slots(&save_paths, resources.pack_id.as_str());
+                        menu_picker = Some((SlotPicker::new(slots, false), PickerPurpose::Load));
+                    }
+                    Some(MenuAction::Quit) => {
+                        // Reuse the ported Ctrl+Q confirm; no second one.
+                        views.dismiss();
+                        fast_quit = true;
+                    }
+                    None => {}
+                }
             }
         } else if views.active() == Some(ViewKind::WinCartoon) {
             // Any key skips the win cutscene; the frame clock's own end is
@@ -1752,7 +1920,18 @@ async fn main() {
                 get_time(),
             );
             if views.active() == Some(ViewKind::Menu) {
-                menu.draw(&mut list, &layout, backend.palette(), &resources);
+                match &menu_picker {
+                    Some((picker, purpose)) => picker.draw(
+                        &mut list,
+                        &layout,
+                        backend.palette(),
+                        &resources,
+                        menu::picker_title(&resources, *purpose),
+                        "",
+                        menu::picker_hint(&resources),
+                    ),
+                    None => menu.draw(&mut list, &layout, backend.palette(), &resources),
+                }
             }
         }
 

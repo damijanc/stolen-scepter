@@ -22,10 +22,12 @@ will be selected only after headless engine parity is solid.
   animation clock, `chrome.rs` the frame and status bar, `hud.rs` the five
   sidebar panels (`hud.c`), `banner.rs` pack text and its `%VAR%`
   substitution, `startup.rs` the pre-game wizard,
-  `savepath.rs` the save-slot locations, `cheats.rs` the F10 debug menu,
-  `audio.rs` the audio policy (`audio.c`'s decisions, no library),
-  `pack.rs` the pack reader and discovery (`pack.c`), `pack_select.rs` the
-  pre-game pack picker (`pack_select.c`), and `input.rs` the key bindings.
+  `savepath.rs` the save-slot locations, `slot_picker.rs` the shared save
+  slot picker and load recipe, `menu.rs` the ESC Game Menu, `cheats.rs` the
+  F10 debug menu, `audio.rs` the audio policy (`audio.c`'s decisions, no
+  library), `pack.rs` the pack reader and discovery (`pack.c`),
+  `pack_select.rs` the pre-game pack picker (`pack_select.c`), and
+  `input.rs` the key bindings.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. The one stated exception is `pack_select.rs`: the picker runs before
   any pack is open, so the DrawList pipeline (built on pack art) has nothing
@@ -247,7 +249,6 @@ Implemented and tested:
   window ends the process rather than reporting a cancel, since macroquad
   cannot revoke `prevent_quit`. `Pack::hash` computes C's FNV1a-64, and the
   save path still never writes it.
-
 - Audio (`shell/src/audio.rs` + `audio_backend.rs`, see
   `specs/audio-design.md`): the engine stays audio-free, and the shell derives
   every tune from what the engine returns. Read the design's "As built"
@@ -255,8 +256,21 @@ Implemented and tested:
   places, all caught by reading the C. The chest tune does NOT replace the
   walk tune (C plays both); a step C bounces plays no walk tune; the defeat
   tune is a combat LOSS, not `temp_death`; and music off then on restarts.
+- The ESC Game Menu (`shell/src/menu.rs`), a deliberate DIVERGENCE rather
+  than a port: C's `VIEW_MENU` exists but nothing ever opens it
+  (`specs/ingame-menu-design.md`). Bare ESC on the overworld -- checked
+  LAST, after every view, dialog, prompt and quit-confirm consumer -- opens
+  Save / Load / Quit. Save and Load share startup's picker
+  (`shell/src/slot_picker.rs`), and `load_slot` is the one load recipe both
+  callers use: it returns a whole `(Game, Map, Fog)` or an error, so a failed
+  mid-game load installs nothing. A successful one resets every piece of
+  `main`'s session state, not just those three, and re-applies what audio
+  derived from the game (the grayed rows, the no-device option pin) while
+  keeping the device open. Never reachable in combat:
+  the save format carries no combat state, and fixing that means serializing
+  combat, not opening the menu there.
 
-Test coverage is 359 engine unit tests, 401 shell unit tests, 25 combat digest
+Test coverage is 359 engine unit tests, 424 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

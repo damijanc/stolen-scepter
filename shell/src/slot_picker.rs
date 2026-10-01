@@ -26,7 +26,6 @@ use crate::savepath::{SavePaths, SlotSet, SAVE_SLOT_COUNT};
 /// Text C compiles in for the picker; the pack overrides it under
 /// `strings.startup`.
 const DEFAULT_SAVE_PICKER_EMPTY: &str = "(empty)";
-const DEFAULT_CONTROLS_HINT: &str = "UP/DN move  ENTER pick  ESC quit";
 
 /// Which row the player confirmed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -89,7 +88,9 @@ impl SlotPicker {
     }
 
     /// Emit the picker panel. `extra_label` is drawn as the trailing row only
-    /// when the picker was built with one.
+    /// when the picker was built with one. `hint` is the key line at the
+    /// bottom, which differs because ESC quits at startup but steps back
+    /// in-game.
     pub fn draw(
         &self,
         list: &mut DrawList,
@@ -98,6 +99,7 @@ impl SlotPicker {
         resources: &Resources,
         title: &str,
         extra_label: &str,
+        hint: &str,
     ) {
         let row_count = self.row_count();
         let pad = 6;
@@ -151,7 +153,6 @@ impl SlotPicker {
             list.text(&format!("    {extra_label}"), x + pad, ty, extra_fg);
         }
 
-        let hint = banner::text(resources, "startup", "controls_hint", DEFAULT_CONTROLS_HINT);
         list.text(hint, x + pad, y + h - pad - instr_h, palette.clr(Pal::Grey));
     }
 }
@@ -347,7 +348,7 @@ mod tests {
             let picker = SlotPicker::new(slots_with(&[1]), extra_row);
             let mut list = DrawList::new();
             picker.draw(
-                &mut list, &layout, &palette, &resources, "Title", "New game",
+                &mut list, &layout, &palette, &resources, "Title", "New game", "Hint",
             );
             let texts = list.texts();
             assert_eq!(
@@ -356,6 +357,7 @@ mod tests {
                 "extra_row = {extra_row}"
             );
             assert!(texts.iter().any(|(_, _, text)| *text == "Title"));
+            assert!(texts.iter().any(|(_, _, text)| *text == "Hint"));
             assert!(texts
                 .iter()
                 .any(|(_, _, text)| text.contains("Sir Rust") && text.contains("400d")));

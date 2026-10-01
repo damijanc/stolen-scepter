@@ -8,6 +8,7 @@
 //! the hero home, which its label does not admit.
 
 use openbounty_engine::resources::Resources;
+use openbounty_engine::savegame::SaveError;
 
 use crate::banner;
 use crate::draw::{DrawList, Rect};
@@ -15,6 +16,7 @@ use crate::font::{GLYPH_H, GLYPH_W};
 use crate::input::{Key, KeySource, DIGITS};
 use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
+use crate::slot_picker::LoadError;
 
 pub const ENTRY_COUNT: usize = 3;
 
@@ -137,6 +139,131 @@ impl Menu {
     }
 }
 
+// The menu's messages. Each returns `(header, body)` for a dialog or prompt,
+// as `crate::interact` does, with the slot shown 1-based like the picker.
+
+fn slot_label(slot: usize) -> String {
+    (slot + 1).to_string()
+}
+
+/// The picker title for each job.
+pub fn picker_title(resources: &Resources, purpose: PickerPurpose) -> &str {
+    match purpose {
+        PickerPurpose::Save => {
+            banner::text(resources, "menu", "save_title", " Save to which slot?")
+        }
+        PickerPurpose::Load => banner::text(resources, "menu", "load_title", " Load which game?"),
+    }
+}
+
+/// The picker's key hint in-game, where ESC steps back to the menu.
+pub fn picker_hint(resources: &Resources) -> &str {
+    banner::text(
+        resources,
+        "menu",
+        "picker_hint",
+        "UP/DN move  ENTER pick  ESC back",
+    )
+}
+
+/// Confirm overwriting an occupied slot; `name` is the hero saved there.
+pub fn overwrite_prompt(resources: &Resources, slot: usize, name: &str) -> (String, String) {
+    let header = banner::text(resources, "menu", "overwrite_title", "Overwrite Save");
+    let body = banner::formatted(
+        resources,
+        "menu",
+        "overwrite_body",
+        "Save slot %SLOT% holds\n%NAME%'s game.\nOverwrite it?",
+        &[("SLOT", &slot_label(slot)), ("NAME", name)],
+    );
+    (header.to_owned(), body)
+}
+
+pub fn saved_message(resources: &Resources, slot: usize) -> (String, String) {
+    let header = banner::text(resources, "menu", "saved_title", "Game Saved");
+    let body = banner::formatted(
+        resources,
+        "menu",
+        "saved_body",
+        "Your game was saved\nto slot %SLOT%.",
+        &[("SLOT", &slot_label(slot))],
+    );
+    (header.to_owned(), body)
+}
+
+/// `no_dir` is true when there was no usable save directory at all.
+pub fn save_failed_message(resources: &Resources, no_dir: bool) -> (String, String) {
+    let header = banner::text(resources, "menu", "save_failed_title", "Save Failed");
+    let body = if no_dir {
+        banner::text(
+            resources,
+            "menu",
+            "no_save_dir",
+            "There is no usable save folder\non this computer.",
+        )
+    } else {
+        banner::text(
+            resources,
+            "menu",
+            "save_io_error",
+            "The save could not be written.",
+        )
+    };
+    (header.to_owned(), body.to_owned())
+}
+
+/// Choosing an empty slot to load is a no-op with a message, not an error.
+pub fn empty_slot_message(resources: &Resources) -> (String, String) {
+    let header = banner::text(resources, "menu", "load_title_short", "Load Game");
+    let body = banner::text(resources, "menu", "empty_slot", "That slot is empty.");
+    (header.to_owned(), body.to_owned())
+}
+
+pub fn load_failed_message(resources: &Resources, err: &LoadError) -> (String, String) {
+    let header = banner::text(resources, "menu", "load_failed_title", "Load Failed");
+    let body = match err {
+        LoadError::NoPath => banner::text(
+            resources,
+            "menu",
+            "no_save_dir",
+            "There is no usable save folder\non this computer.",
+        )
+        .to_owned(),
+        LoadError::Read(SaveError::Io) => banner::text(
+            resources,
+            "menu",
+            "load_io_error",
+            "The save could not be read.",
+        )
+        .to_owned(),
+        LoadError::Read(SaveError::Parse | SaveError::Mismatch) => {
+            banner::text(resources, "menu", "load_damaged", "The save is damaged.").to_owned()
+        }
+        LoadError::Read(SaveError::Version) => banner::text(
+            resources,
+            "menu",
+            "load_wrong_version",
+            "The save was written by a\ndifferent version.",
+        )
+        .to_owned(),
+        LoadError::Read(SaveError::Pack) => banner::text(
+            resources,
+            "menu",
+            "load_wrong_pack",
+            "The save belongs to a\ndifferent game pack.",
+        )
+        .to_owned(),
+        LoadError::Zone(detail) => banner::formatted(
+            resources,
+            "menu",
+            "load_bad_zone",
+            "The save names a map this\npack cannot load:\n%ZONE%",
+            &[("ZONE", detail)],
+        ),
+    };
+    (header.to_owned(), body)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,5 +352,52 @@ mod tests {
         };
         assert_eq!(colour_of("2. Load game"), Some(palette.clr(Pal::Yellow)));
         assert_eq!(colour_of("1. Save game"), Some(palette.clr(Pal::White)));
+    }
+
+    fn resources() -> Resources {
+        Resources::from_json_str(r#"{"render": {"mode": "legacy"}, "troops": []}"#)
+            .expect("fixture parses")
+    }
+
+    /// Slots are 0-based inside the shell and 1-based on screen, matching the
+    /// picker's own numbering.
+    #[test]
+    fn slot_messages_number_slots_from_one() {
+        let resources = resources();
+        let (_, body) = overwrite_prompt(&resources, 0, "Murray");
+        assert!(body.contains("slot 1") && body.contains("Murray"), "{body}");
+        let (_, body) = saved_message(&resources, 9);
+        assert!(body.contains("slot 10"), "{body}");
+    }
+
+    /// Every load failure gets a sentence, not a Debug dump; the foreign-pack
+    /// refusal in particular must say why, since the picker lists that save.
+    #[test]
+    fn each_load_failure_reads_as_a_sentence() {
+        let resources = resources();
+        let cases = [
+            (LoadError::NoPath, "save folder"),
+            (LoadError::Read(SaveError::Io), "could not be read"),
+            (LoadError::Read(SaveError::Parse), "damaged"),
+            (LoadError::Read(SaveError::Mismatch), "damaged"),
+            (LoadError::Read(SaveError::Version), "different version"),
+            (LoadError::Read(SaveError::Pack), "different game pack"),
+            (LoadError::Zone("atlantis: missing".to_owned()), "atlantis"),
+        ];
+        for (err, needle) in cases {
+            let (header, body) = load_failed_message(&resources, &err);
+            assert_eq!(header, "Load Failed");
+            assert!(body.contains(needle), "{err:?}: {body}");
+            assert!(!body.contains("Read("), "no Debug text: {body}");
+        }
+    }
+
+    #[test]
+    fn a_save_failure_says_whether_there_was_anywhere_to_write() {
+        let resources = resources();
+        let (_, no_dir) = save_failed_message(&resources, true);
+        let (_, io) = save_failed_message(&resources, false);
+        assert!(no_dir.contains("save folder"), "{no_dir}");
+        assert!(io.contains("could not be written"), "{io}");
     }
 }

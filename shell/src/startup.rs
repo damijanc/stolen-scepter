@@ -27,6 +27,7 @@ use crate::slot_picker::{SlotChoice, SlotPicker};
 const DEFAULT_CLASS_SELECT_HINT: &str = "Select Char A-D or L-Load saved game";
 const DEFAULT_SAVE_PICKER_TITLE: &str = " Select game:";
 const DEFAULT_SAVE_PICKER_NEW_GAME: &str = "New game";
+const DEFAULT_CONTROLS_HINT: &str = "UP/DN move  ENTER pick  ESC quit";
 const DEFAULT_NEW_GAME_TABLE_HEADER: &str = "   Difficulty   Days  Score";
 const DEFAULT_NEW_GAME_SELECT_HINT: &str = "^v to select   Ent to Accept";
 const DEFAULT_DIFFICULTY_LABELS: [&str; 4] = ["Easy", "Normal", "Hard", "Impossible?"];
@@ -434,8 +435,14 @@ impl Startup {
                             "save_picker_new_game",
                             DEFAULT_SAVE_PICKER_NEW_GAME,
                         );
+                        let hint = banner::text(
+                            resources,
+                            "startup",
+                            "controls_hint",
+                            DEFAULT_CONTROLS_HINT,
+                        );
                         self.picker
-                            .draw(list, layout, palette, resources, title, new_label)
+                            .draw(list, layout, palette, resources, title, new_label, hint)
                     }
                     Screen::CreateGame => {
                         self.draw_create_game(list, layout, palette, resources, time)
