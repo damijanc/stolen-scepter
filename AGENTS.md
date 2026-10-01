@@ -289,10 +289,13 @@ with its spot-check of the largest HITs and the stored-but-unread field audit,
 is `specs/engine-sweep-findings.md`; start from its "Proposed slices" table,
 which lists open GAPs, and re-run the script rather than trusting its totals.
 
-The sweep now reports no unported engine core. Given that three previous
-"nothing left" claims were wrong, treat that as "re-run the sweep", not as a
-finished state -- and note the sweep is a name-matching heuristic, so it
-cannot see a core whose Rust counterpart is named similarly but does less.
+The name sweep alone looked clean, and it was not: the 2026-10-01 run found
+fifteen GAPs, almost all inside cores the script counts as HITs (flying
+fires tile interactions, the hero never bounces off towns and castles,
+`followers_killed` is never incremented). The sweep is a name-matching
+heuristic, so it cannot see a core whose Rust counterpart is named similarly
+but does less; the branch-by-branch HIT spot-check and the field audit are
+what caught those. Treat any "nothing left" claim as "re-run all three".
 
 Three slices running, the gap had the same tell, which is worth looking for
 directly: state the engine STORES and SAVES but never reads or writes.
