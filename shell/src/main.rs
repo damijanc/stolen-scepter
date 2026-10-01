@@ -34,6 +34,7 @@ use macroquad::prelude::{get_time, next_frame, request_new_screen_size, Conf};
 
 use anim::HeroAnimator;
 use backend::{Backend, MacroquadKeys, MacroquadPointer};
+use cheats::{CheatMenu, CheatOutcome, CheatResult};
 use chrome::{Chrome, StatusMode};
 use combat::{combat_render, combat_view_input, CombatLoop, CombatStatus};
 use dialog::Dialog;
@@ -812,8 +813,32 @@ async fn main() {
     // A running interactive battle; while Some, combat owns the screen and
     // the keys.
     let mut combat: Option<CombatSession> = None;
+    // The F10 debug menu, C's `s_cheat_menu_active`.
+    let mut cheat_menu = CheatMenu::default();
 
     loop {
+        // F10 -> debug cheat menu, first thing in the frame as in `main.c`.
+        // C cannot reach it during combat or the win cartoon because both run
+        // their own loops there; this shell runs them in this one, so they are
+        // excluded here instead.
+        let cheat = if combat.is_none() && views.active() != Some(ViewKind::WinCartoon) {
+            cheat_menu.tick(&keys, &mut game, &resources, &map, &mut fog, &mut dialog)
+        } else {
+            CheatResult::Idle
+        };
+        match &cheat {
+            CheatResult::Terminal(CheatOutcome::Win) => {
+                show_win_game(&mut views, &resources, &mut game)
+            }
+            CheatResult::Terminal(CheatOutcome::Lose) => {
+                show_lose_game(&mut views, &resources, &game)
+            }
+            _ => {}
+        }
+        // The menu owns the keys while it is open and on the frame it handled
+        // one; see the DIVERGENCE note in `cheats.rs`.
+        let cheat_owns_frame = cheat != CheatResult::Idle || cheat_menu.is_active();
+
         // Pop pending week-end screens (astrology -> budget) before input, as
         // C does, but only when nothing modal is up.
         if pending_week.is_some()
@@ -854,7 +879,9 @@ async fn main() {
         // while it is open (C's issue #19 gate), then the prompt, then the
         // fast-quit status
         // prompt, then the overworld.
-        if let Some(session) = &mut combat {
+        if cheat_owns_frame {
+            // Nothing else reads input this frame.
+        } else if let Some(session) = &mut combat {
             if views.is_active() {
                 // A view is open over the battlefield and the fight is paused:
                 // no step, so no AI and no animation tick. ESC closes it, C/O
