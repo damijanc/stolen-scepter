@@ -10,6 +10,7 @@
 pub mod anim;
 pub mod backend;
 pub mod banner;
+pub mod cheats;
 pub mod chrome;
 pub mod combat;
 pub mod dialog;
