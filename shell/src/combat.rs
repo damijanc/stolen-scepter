@@ -302,6 +302,10 @@ pub struct CombatLoop {
     /// A turn advanced on the previous step; the banner is cleared at the top
     /// of the next step so the action that ended the turn is still shown once.
     pending_banner_clear: bool,
+    /// A view the player action asked for this step. C's `views_set` from
+    /// inside `combat_player_action_full` (`combat_loop.c:306-312`); the
+    /// action returns "not acted" and `step` reports the view.
+    requested_view: Option<ViewKind>,
     /// When the next SYN tick fires, pacing the damage burst and the AI to
     /// C's 150ms cadence.
     next_tick: f64,
@@ -347,6 +351,7 @@ impl CombatLoop {
             cast_dest_y: 0,
             banner: String::new(),
             pending_banner_clear: false,
+            requested_view: None,
             next_tick: 0.0,
         }
     }
@@ -476,8 +481,12 @@ impl CombatLoop {
         let rolled_over = self.tick_anim(time);
 
         // View openers work even on the AI's turn, but not while a cast or a
-        // target picker is mid-flight.
+        // target picker is mid-flight. C's order is O, A, V
+        // (combat_loop.c:549-561).
         if self.cast_phase == CastPhase::None && !self.picker_active {
+            if keys.pressed(Key::O) {
+                return CombatStatus::OpenView(ViewKind::Options);
+            }
             if keys.pressed(Key::A) {
                 return CombatStatus::OpenView(ViewKind::Army);
             }
@@ -510,6 +519,12 @@ impl CombatLoop {
             if let Some(event) = self.combat.log.last() {
                 self.banner = format_event(resources, *event);
             }
+        }
+
+        // The player action opened a view (C's KEY_C). It spent no action, so
+        // nothing below would run anyway.
+        if let Some(view) = self.requested_view.take() {
+            return CombatStatus::OpenView(view);
         }
 
         if !acted {
@@ -681,6 +696,12 @@ impl CombatLoop {
                 DEFAULT_GIVE_UP_BODY,
             );
             prompt.yes_no(header, body);
+            return false;
+        }
+        if keys.pressed(Key::C) {
+            // Opening a view pauses combat in the outer loop; the C<->O swap
+            // lives there too (combat_loop.c:306-312). Not an action.
+            self.requested_view = Some(ViewKind::Controls);
             return false;
         }
         false
@@ -1119,6 +1140,7 @@ mod tests {
             cast_dest_y: 0,
             banner: String::new(),
             pending_banner_clear: false,
+            requested_view: None,
             next_tick: 0.0,
         };
         (loop_, resources, game)
@@ -1365,5 +1387,103 @@ mod tests {
             &mut prompt,
         );
         assert_eq!(status, CombatStatus::OpenView(ViewKind::Character));
+    }
+
+    #[test]
+    fn o_opens_the_options_view_on_either_sides_turn() {
+        // combat_loop.c:549-553: the top-level opener runs before the
+        // player_turn dispatch, so the AI's turn does not gate it.
+        let (mut loop_, resources, mut game) = loop_fixture();
+        let status = loop_.step(
+            &Keys::pressed(&[Key::O]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
+        assert_eq!(status, CombatStatus::OpenView(ViewKind::Options));
+
+        // Reuse the one fixture: a second `loop_fixture()` in the same test
+        // frame overflows the default test-thread stack in a debug build.
+        loop_.combat.side = COMBAT_SIDE_AI;
+        let status = loop_.step(
+            &Keys::pressed(&[Key::O]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
+        assert_eq!(status, CombatStatus::OpenView(ViewKind::Options));
+    }
+
+    #[test]
+    fn c_opens_the_controls_view_on_the_players_turn_without_spending_it() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        let status = loop_.step(
+            &Keys::pressed(&[Key::C]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
+        assert_eq!(status, CombatStatus::OpenView(ViewKind::Controls));
+        // combat_loop.c:310-311 returns 0: no action, the same unit still acts.
+        assert!(!loop_.combat.units[COMBAT_SIDE_PLAYER][0].acted);
+        assert_eq!(loop_.combat.side, COMBAT_SIDE_PLAYER);
+        assert_eq!(loop_.combat.unit_id, 0);
+    }
+
+    #[test]
+    fn c_is_a_player_action_so_the_ai_turn_ignores_it() {
+        // combat_loop.c:306-312 lives in combat_player_action_full, reached
+        // only from the player_turn arm (:612-613).
+        let (mut loop_, resources, mut game) = loop_fixture();
+        loop_.combat.side = COMBAT_SIDE_AI;
+        let status = loop_.step(
+            &Keys::pressed(&[Key::C]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut Prompt::default(),
+        );
+        assert_eq!(status, CombatStatus::Running);
+    }
+
+    #[test]
+    fn an_armed_picker_keeps_o_and_c_from_opening_a_view() {
+        // O is gated on !picker_active (combat_loop.c:549); C is the picker's
+        // confirm key (combat_pick_step), and the cursor sits on our own
+        // stack, which the Enemy filter refuses.
+        let (mut loop_, resources, mut game) = loop_fixture();
+        let mut prompt = Prompt::default();
+        loop_.step(
+            &Keys::pressed(&[Key::S]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert!(loop_.picker_active);
+
+        let status = loop_.step(
+            &Keys::pressed(&[Key::O]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(status, CombatStatus::Running);
+        let status = loop_.step(
+            &Keys::pressed(&[Key::C]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(status, CombatStatus::Running);
+        assert!(
+            loop_.picker_active,
+            "a refused confirm leaves the picker armed"
+        );
     }
 }
