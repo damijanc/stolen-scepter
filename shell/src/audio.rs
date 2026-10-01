@@ -46,6 +46,23 @@ pub const DUCK_FACTOR_DB: f32 = -13.98;
 pub const DUCK_ATTACK_MS: u64 = 80;
 pub const DUCK_RELEASE_MS: u64 = 370;
 
+/// `stats.options` slots this reads. The pack's `controls.settings` declares
+/// them in this order, so the order is load-bearing -- C indexes them the same
+/// way at `main.c:904-906`.
+pub const OPTION_SOUNDS: usize = 1;
+pub const OPTION_MUSIC: usize = 5;
+pub const OPTION_VOLUME: usize = 6;
+
+/// With no playback device, C pins Sounds / Music / Volume to 0 so the
+/// Controls panel and the live audio push agree (`main.c:896-902`).
+pub fn pin_options_without_device(options: &mut [i32]) {
+    for slot in [OPTION_SOUNDS, OPTION_MUSIC, OPTION_VOLUME] {
+        if let Some(value) = options.get_mut(slot) {
+            *value = 0;
+        }
+    }
+}
+
 /// The tunes one engine step produces, in C's firing order.
 ///
 /// C raises these from inside the engine (`step.c:43`, `step.c:88`,
@@ -325,6 +342,13 @@ mod tests {
             roll: ChestRoll::default(),
         });
         assert_eq!(tunes_for_step(&chest, true), [Some(Tune::Chest), None]);
+    }
+
+    #[test]
+    fn no_device_pins_only_the_three_audio_options_to_zero() {
+        let mut options = [1, 1, 1, 1, 1, 1, 9];
+        pin_options_without_device(&mut options);
+        assert_eq!(options, [1, 0, 1, 1, 1, 0, 0]);
     }
 
     /// Zero must be silence, not unity gain. This is the boundary that would

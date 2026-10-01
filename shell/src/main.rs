@@ -35,6 +35,7 @@ pub mod views;
 use macroquad::prelude::{get_time, next_frame, request_new_screen_size, Conf};
 
 use anim::HeroAnimator;
+use audio_backend::KiraAudio;
 use backend::{Backend, MacroquadKeys, MacroquadPointer};
 use cheats::{CheatMenu, CheatOutcome, CheatResult};
 use chrome::{Chrome, StatusMode};
@@ -319,6 +320,14 @@ fn show_win_game(views: &mut Views, resources: &Resources, game: &mut Game) {
 fn show_lose_game(views: &mut Views, resources: &Resources, game: &Game) {
     let body = interact::end_message(resources, game, false);
     views.open_end_game(false, &body);
+}
+
+/// Hand the three audio options to the backend, `main.c:904-906`.
+fn push_audio_options(audio: &mut KiraAudio, game: &Game) {
+    let options = &game.stats.options;
+    audio.set_sounds_enabled(options[audio::OPTION_SOUNDS] != 0);
+    audio.set_music_enabled(options[audio::OPTION_MUSIC] != 0);
+    audio.set_master_volume(options[audio::OPTION_VOLUME]);
 }
 
 /// Show the next pending week-end screen when nothing modal is up, porting
@@ -817,8 +826,29 @@ async fn main() {
     let mut combat: Option<CombatSession> = None;
     // The F10 debug menu, C's `s_cheat_menu_active`.
     let mut cheat_menu = CheatMenu::default();
+    // Open the device and load the pack's audio, porting `main.c`'s
+    // `audio_init` block. A machine with no device plays nothing and grays
+    // the audio rows.
+    let mut audio = KiraAudio::new(&resources.audio, |path| {
+        resources
+            .resolve_path(path)
+            .and_then(|path| std::fs::read(path).ok())
+    });
+    views.set_audio_available(audio.is_available());
+    if !audio.is_available() {
+        audio::pin_options_without_device(&mut game.stats.options);
+    }
+    push_audio_options(&mut audio, &game);
 
     loop {
+        // C pushes the toggles every frame because the Controls panel changes
+        // them under the player's hands (`main.c:955-958`). Its combat loop
+        // only ticks, so a change made mid-battle lands when the battle ends.
+        if combat.is_none() {
+            push_audio_options(&mut audio, &game);
+        }
+        audio.tick();
+
         // F10 -> debug cheat menu, first thing in the frame as in `main.c`.
         // C cannot reach it during combat or the win cartoon because both run
         // their own loops there; this shell runs them in this one, so they are

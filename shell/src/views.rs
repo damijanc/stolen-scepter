@@ -292,11 +292,20 @@ pub struct Views {
     /// was active the previous frame.
     cartoon_started: f64,
     cartoon_was_active: bool,
+    /// Whether an audio device opened, C's `audio_is_available`. False until
+    /// the shell reports otherwise, so the audio rows gray out by default.
+    audio_available: bool,
 }
 
 impl Views {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Record whether an audio device opened. The Controls panel grays the
+    /// Sounds / Music / Volume rows on this.
+    pub fn set_audio_available(&mut self, available: bool) {
+        self.audio_available = available;
     }
 
     pub fn active(&self) -> Option<ViewKind> {
@@ -569,7 +578,7 @@ impl Views {
         let Some(control) = resources.control_by_index(row) else {
             return;
         };
-        if controls_row_disabled(resources, row) {
+        if controls_row_disabled(resources, row, self.audio_available) {
             return;
         }
         if row >= game.stats.options.len() {
@@ -1572,7 +1581,7 @@ impl Views {
                 continue;
             }
             let is_selected = k as i32 == cursor;
-            let disabled = controls_row_disabled(resources, index);
+            let disabled = controls_row_disabled(resources, index, self.audio_available);
             let fg = if disabled {
                 palette.clr(Pal::DGrey)
             } else if is_selected {
@@ -2396,12 +2405,6 @@ fn draw_options(
     }
 }
 
-/// The shell ships no audio, so the three audio-dependent rows are always
-/// grayed out, exactly as C grays them when its audio init fails.
-fn audio_available() -> bool {
-    false
-}
-
 /// True for the rows labelled Sounds / Music / Volume, C's
 /// `controls_row_is_audio`.
 fn controls_row_is_audio(resources: &Resources, row: usize) -> bool {
@@ -2412,8 +2415,8 @@ fn controls_row_is_audio(resources: &Resources, row: usize) -> bool {
 }
 
 /// True when a row cannot be changed, C's `views_controls_row_disabled`.
-fn controls_row_disabled(resources: &Resources, row: usize) -> bool {
-    controls_row_is_audio(resources, row) && !audio_available()
+fn controls_row_disabled(resources: &Resources, row: usize, audio_available: bool) -> bool {
+    controls_row_is_audio(resources, row) && !audio_available
 }
 
 fn stat_label<'a>(resources: &'a Resources, key: &str, default: &'a str) -> &'a str {
@@ -3754,14 +3757,52 @@ mod tests {
         assert_eq!(controls_visible(&resources), vec![0, 1, 2]);
     }
 
+    /// The three audio rows gray out on DEVICE state, not on whether the pack
+    /// ships audio -- C's `controls_row_is_audio(g, row) && !audio_is_available()`.
     #[test]
-    fn audio_rows_are_disabled_without_audio() {
+    fn the_audio_rows_follow_device_availability() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "controls": {"settings": [
+                  {"id":"delay","label":"Delay","type":"numeric","range":10},
+                  {"id":"sounds","label":"Sounds","type":"bool"},
+                  {"id":"music","label":"Music","type":"bool"},
+                  {"id":"volume","label":"Volume","type":"numeric","range":10}
+                ]}}"#,
+        )
+        .expect("fixture parses");
+
+        assert!(
+            !controls_row_disabled(&resources, 0, true),
+            "Delay never grays"
+        );
+        assert!(
+            !controls_row_disabled(&resources, 1, true),
+            "device present"
+        );
+        assert!(controls_row_disabled(&resources, 1, false), "no device");
+        assert!(controls_row_disabled(&resources, 2, false), "no device");
+        assert!(controls_row_disabled(&resources, 3, false), "no device");
+        assert!(
+            !controls_row_disabled(&resources, 0, false),
+            "Delay still never grays"
+        );
+    }
+
+    /// A fresh `Views` assumes no device until the shell says otherwise, so a
+    /// shell that never opens audio grays the rows exactly as before.
+    #[test]
+    fn the_sounds_row_toggles_once_a_device_is_reported() {
         let (resources, _, _) = controls_fixtures();
-        // The shell ships no audio, so Sounds/Music/Volume gray out, as C does
-        // when its audio init fails.
-        assert!(controls_row_disabled(&resources, 1));
-        assert!(!controls_row_disabled(&resources, 0));
-        assert!(!controls_row_disabled(&resources, 2));
+        let mut game = Game::default();
+        let mut views = Views::new();
+
+        views.controls_advance(&mut game, &resources, 1);
+        assert_eq!(game.stats.options[1], 1, "no device: Sounds is a no-op");
+
+        views.set_audio_available(true);
+        views.controls_advance(&mut game, &resources, 1);
+        assert_eq!(game.stats.options[1], 0, "device: Sounds 1 -> 0");
     }
 
     #[test]
