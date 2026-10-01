@@ -1,9 +1,12 @@
 //! OpenBounty Rust shell. See `specs/shell-renderer-plan.md` for the agreed
 //! architecture and work order.
 //!
-//! Run it against a pack:
+//! Run it with no argument to use the installed pack (a picker appears when
+//! there is more than one), or name one:
 //!
 //! ```text
+//! cargo run -p openbounty-shell
+//! cargo run -p openbounty-shell -- --pack <name | path to .openbounty | pack dir>
 //! cargo run -p openbounty-shell -- path/to/game.json
 //! ```
 
@@ -631,7 +634,9 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut pack_path: Option<String> = None;
+    // `--pack <arg>` is C's flag; a bare positional is the older spelling of
+    // the same thing, kept so every `.../game.json` invocation still runs.
+    let mut explicit_pack: Option<String> = None;
     let mut seed_index: i32 = -1;
     let mut save_dir: Option<String> = None;
     let mut args = std::env::args().skip(1);
@@ -643,14 +648,56 @@ async fn main() {
                 .unwrap_or(-1);
         } else if arg == "--save-dir" {
             save_dir = args.next();
-        } else if pack_path.is_none() {
-            pack_path = Some(arg);
+        } else if arg == "--pack" {
+            explicit_pack = args.next();
+        } else if explicit_pack.is_none() {
+            explicit_pack = Some(arg);
         }
     }
-    let Some(pack_path) = pack_path else {
-        eprintln!("usage: openbounty-shell [--seed <n>] [--save-dir <dir>] <path to game.json>");
-        return;
+    let save_paths = match &save_dir {
+        Some(dir) => SavePaths::with_override(dir),
+        None => SavePaths::new(),
     };
+
+    // C's launch policy (`main.c`): an explicit pack must resolve; otherwise
+    // none found is fatal, one loads silently, and two or more get a picker.
+    let pack_path = match explicit_pack {
+        Some(arg) => match pack::resolve_arg(&arg, &save_paths) {
+            Some(path) => path,
+            None => {
+                eprintln!("Could not find a game pack at:\n\n    {arg}\n");
+                eprintln!(
+                    "Pass a path to a *.openbounty file, or to a directory containing game.json."
+                );
+                std::process::exit(1);
+            }
+        },
+        None => {
+            let entries = pack::discover(&save_paths);
+            match entries.len() {
+                0 => {
+                    eprintln!("OpenBounty cannot start because no game pack was found. Looked in:");
+                    for root in pack::discover_roots(&save_paths) {
+                        // Scanning uses C's "."; the message names it.
+                        let shown = std::fs::canonicalize(&root).unwrap_or(root);
+                        eprintln!("    {}", shown.display());
+                    }
+                    eprintln!(
+                        "Place a *.openbounty file, or a directory containing game.json, in one of \
+                         them, or pass --pack <path>."
+                    );
+                    std::process::exit(1);
+                }
+                1 => entries.into_iter().next().expect("one entry").path,
+                _ => match pack_select::run(&entries).await {
+                    Some(index) => entries.into_iter().nth(index).expect("in range").path,
+                    // ESC: load nothing. C returns 0 here.
+                    None => return,
+                },
+            }
+        }
+    };
+    let pack_path = pack_path.display().to_string();
 
     let pack_location = pack::pack_location(std::path::Path::new(&pack_path));
     let pack = match pack::Pack::open(&pack_location) {
@@ -710,10 +757,6 @@ async fn main() {
 
     // Pre-game wizard: class select, then name/difficulty. It blocks on the
     // player, exactly as C's `startup_flow` does before the game exists.
-    let save_paths = match &save_dir {
-        Some(dir) => SavePaths::with_override(dir),
-        None => SavePaths::new(),
-    };
     let mut startup = Startup::new(&resources);
     let choice = loop {
         if let Some(choice) = startup.update(&keys, &resources, &save_paths, get_time()) {

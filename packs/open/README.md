@@ -60,7 +60,7 @@ permissive asset id). `method` might be `hand-drawn`, `procedural`,
 
 ```sh
 python3 tools/open_pack.py build --scale 1
-cargo run -p openbounty-shell -- game-assets/open-pack/game.json
+cargo run -p openbounty-shell -- --pack game-assets/open-pack
 ```
 
 `build` overlays this pack's art onto the locally-cloned reference pack (which

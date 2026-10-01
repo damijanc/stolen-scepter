@@ -42,7 +42,7 @@ Every behavioral claim carries the layer it came from:
 - **BY DESIGN** -- C does it and this port deliberately does not.
 - **OUT OF SCOPE** -- C shell tooling that is not part of playing.
 
-Last refreshed 2026-10-01, against `cbedaf5`. Several §13 entries had gone stale by 2026-09-22 -- the
+Last refreshed 2026-10-01, against `db97840` plus the pack picker launch policy. Several §13 entries had gone stale by 2026-09-22 -- the
 startup wizard, the defeat message and the villain capture banner were all
 listed as missing after they shipped. Re-check a status against the code
 before trusting it.
@@ -50,11 +50,15 @@ before trusting it.
 ## How to run
 
 ```sh
-cargo run -p openbounty-shell -- reference/assets/kings-bounty/game.json
+cargo run -p openbounty-shell -- --pack reference/assets/kings-bounty
 ```
 
-The pack lives in the gitignored `reference/` clone. The shell resolves art and
-map paths relative to it.
+The pack lives in the gitignored `reference/` clone, and `--pack` takes its
+directory, a `*.openbounty` archive, or a bare pack name. With no `--pack` the
+shell discovers packs in the working directory, the user-data directory and
+`<exe-dir>/assets`: one loads silently, two or more open the picker (`UP`/`DN`
+or `1`-`9`, `ENTER` loads, `ESC` quits), none is a fatal message naming where
+it looked. The old `.../game.json` positional still works.
 
 To set a scenario up quickly, press **F10** on the overworld for the debug
 menu (`shell/src/cheats.rs`, porting `shell_cheats.c` [C]): `G` +50000 gold,
@@ -438,7 +442,7 @@ Do not file these as findings; they are already tracked.
 | Sidebar HUD | OK | The 48px right column carries `reference/src/hud.c`'s five panels, ported in `shell/src/hud.rs`: the contract silhouette with the active villain's face over it, the siege and magic panels (silhouette until owned/known, then animated at ~2Hz), the mini puzzle grid with a 9x6 cover over each unrevealed cell, and the **gold purse** with the gold figure right-aligned [C]. Drawn after the map and before the views, so the Character view paints over it; absent during combat, as in C. Still deliberately unported: the dead `game.hud_visible` flag (DEAD in C) |
 | In-game menu | GAP | `reference/src/shell_menu.c` and C's `VIEW_MENU` are unported. `Q` saves to slot 0 **and quits**; there is no save-and-continue, no mid-session load, and no New Game. Loading is possible only from the startup wizard's `L` |
 | Audio | GAP | Silent. `reference/src/audio.c` has no Rust counterpart. The Controls panel already draws the pack's Sounds / Music / Volume / Walk Beep rows and cycles `stats.options[]`, so those rows toggle a value nothing reads. C also grays the three audio rows out when no device is present, which this shell cannot decide |
-| Pack picker | GAP | `reference/src/pack_select.c` unported; the pack path is a required command-line argument |
+| Pack picker | OK | `reference/src/pack_select.c` is ported in `shell/src/pack_select.rs`, and `engine/pack.c`'s reader and discovery in `shell/src/pack.rs` [C]. A pack is a loose directory or a `.openbounty` ZIP; with no `--pack`, one discovered pack loads silently, two or more open the picker, and none is fatal. ESC loads nothing. [PORT]: discovery also lists directories holding a `game.json`, which C's scan never matched; closing the picker window exits the process rather than reporting a cancel, with the same result. Not ported: KB.EXE first-run extraction (`tools/` owns that) and the layered pack stack |
 | Open content pack | GAP | `packs/open` covers 267/311 art slots (missing: the 43 `ui/` slots and the bitmap font), and there is no open `game.json` or maps -- `tools/open_pack.py build` overlays art onto the gitignored reference clone. Playing still requires a local OpenBounty checkout |
 | `game.hud_visible` | DEAD | C writes it when an overlay opens and closes, and `draw_frame` never reads it. Do not wire it up |
 | Recorder, autoplay, demo | OUT OF SCOPE | `--movie`, `--autoplay`, `--demo`, `--headless`, `--validate-pack` and `--fullscreen` are dev tooling, not play |
