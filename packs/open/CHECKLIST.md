@@ -149,3 +149,16 @@ Native sizes are the base; multiply by the pack scale if you author HD.
 - [x] `art/villains/urthrax_00.._03.png` - 4 frame(s), 48x34, color_key, villain_portrait_or_anim
 
 Total: 311 slots.
+
+## audio (0/6 present)
+
+Drop each file at the listed path under `packs/open/` and add a
+`provenance.json` entry. Tunes must be newly written or independently
+licensed -- never a re-render of the original game's melodies.
+
+- [ ] `audio/openworld.ogg` - music_loop, ogg vorbis, 22050/32000/44100/48000 Hz, 10-600s, <= 6144 KiB
+- [ ] `audio/combat.ogg` - music_loop, ogg vorbis, 22050/32000/44100/48000 Hz, 10-600s, <= 6144 KiB
+- [ ] `audio/tune_walk.wav` - sfx_oneshot, wav pcm, 11025/22050/44100/48000 Hz, 0.005-0.5s, <= 1024 KiB
+- [ ] `audio/tune_bump.wav` - sfx_oneshot, wav pcm, 11025/22050/44100/48000 Hz, 0.005-0.5s, <= 1024 KiB
+- [ ] `audio/tune_chest.wav` - sfx_oneshot, wav pcm, 11025/22050/44100/48000 Hz, 0.005-6s, <= 1024 KiB
+- [ ] `audio/tune_defeat.wav` - sfx_oneshot, wav pcm, 11025/22050/44100/48000 Hz, 0.005-6s, <= 1024 KiB

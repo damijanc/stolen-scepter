@@ -13,13 +13,22 @@ an artist supplies:
 patches `render.scale`; the result is a local playtest pack, never committed.
 `verify` also flags any file that is byte-identical to, or a near match for,
 the original or an upscale of it, so a derivative cannot slip in.
+
+The six AUDIO slots are declared here in `AUDIO_SLOTS`, not in
+`tools/hd_assets.json`: that manifest describes art extracted from the original
+game, and pack audio has no original to be extracted from. `verify` checks
+audio for format, sample rate, channels, duration, size and provenance. It has
+NO near-match check -- nothing here can tell an original composition from a
+rip, so an audio file's licence rests on human review at the point of sourcing.
 """
 import argparse
 import json
 import os
 import re
 import shutil
+import struct
 import sys
+import wave
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from upscale import read_png  # noqa: E402
@@ -30,12 +39,31 @@ PACK = os.path.join(ROOT, "packs", "open")
 ART = os.path.join(PACK, "art")
 PROVENANCE = os.path.join(PACK, "provenance.json")
 CHECKLIST = os.path.join(PACK, "CHECKLIST.md")
+AUDIO = os.path.join(PACK, "audio")
 REFERENCE = os.path.join(ROOT, "reference", "assets", "kings-bounty")
 EXTRACTED = os.path.join(ROOT, "game-assets", "extracted")
 GENERATED = os.path.join(ROOT, "game-assets", "generated")
 BUILD_OUT = os.path.join(ROOT, "game-assets", "open-pack")
 
 FRAME_RE = re.compile(r"^(.*)_(\d{2})\.png$")
+
+# The pack's audio slots, matching the `audio` block the engine reads
+# (`tracks.openworld`, `tracks.combat`, `tunes.{walk,bump,chest,defeat}`).
+# `max_s` is per slot: walk and bump fire on every step and bump, so they must
+# stay short.
+MUSIC_RULES = {"format": "ogg", "rates": (22050, 32000, 44100, 48000),
+               "channels": (1, 2), "min_s": 10.0, "max_s": 600.0,
+               "max_bytes": 6 * 1024 * 1024}
+SFX_RULES = {"format": "wav", "rates": (11025, 22050, 44100, 48000),
+             "channels": (1, 2), "min_s": 0.005, "max_bytes": 1024 * 1024}
+AUDIO_SLOTS = [
+    {"path": "audio/openworld.ogg", "role": "music_loop", **MUSIC_RULES},
+    {"path": "audio/combat.ogg", "role": "music_loop", **MUSIC_RULES},
+    {"path": "audio/tune_walk.wav", "role": "sfx_oneshot", "max_s": 0.5, **SFX_RULES},
+    {"path": "audio/tune_bump.wav", "role": "sfx_oneshot", "max_s": 0.5, **SFX_RULES},
+    {"path": "audio/tune_chest.wav", "role": "sfx_oneshot", "max_s": 6.0, **SFX_RULES},
+    {"path": "audio/tune_defeat.wav", "role": "sfx_oneshot", "max_s": 6.0, **SFX_RULES},
+]
 
 
 def required_assets():
@@ -48,6 +76,11 @@ def pack_file(rel):
     """Map a pack-relative art path (`art/tiles/x.png`) to the open-pack file."""
     sub = rel[len("art/"):] if rel.startswith("art/") else rel
     return os.path.join(ART, sub)
+
+
+def audio_file(rel):
+    """Map a pack-relative audio path (`audio/x.ogg`) to the open-pack file."""
+    return os.path.join(PACK, rel)
 
 
 def group_of(path):
@@ -105,10 +138,31 @@ def cmd_checklist(_args):
         lines.append("")
     lines.append(f"Total: {total} slots.")
     lines.append("")
+
+    # Audio is listed apart from the art: it is not in hd_assets.json, and
+    # every slot must be newly written or independently licensed.
+    audio_present = sum(1 for a in AUDIO_SLOTS if os.path.exists(audio_file(a["path"])))
+    lines += [
+        f"## audio ({audio_present}/{len(AUDIO_SLOTS)} present)",
+        "",
+        "Drop each file at the listed path under `packs/open/` and add a",
+        "`provenance.json` entry. Tunes must be newly written or independently",
+        "licensed -- never a re-render of the original game's melodies.",
+        "",
+    ]
+    for a in AUDIO_SLOTS:
+        tick = "x" if os.path.exists(audio_file(a["path"])) else " "
+        fmt = "ogg vorbis" if a["format"] == "ogg" else "wav pcm"
+        rates = "/".join(str(r) for r in a["rates"])
+        lines.append(f"- [{tick}] `{a['path']}` - {a['role']}, {fmt}, {rates} Hz, "
+                     f"{a['min_s']:g}-{a['max_s']:g}s, <= {a['max_bytes'] // 1024} KiB")
+    lines.append("")
+
     os.makedirs(PACK, exist_ok=True)
     with open(CHECKLIST, "w") as fh:
         fh.write("\n".join(lines))
-    print(f"{os.path.relpath(CHECKLIST, ROOT)}: {total} slots")
+    print(f"{os.path.relpath(CHECKLIST, ROOT)}: {total} art slots, "
+          f"{audio_present}/{len(AUDIO_SLOTS)} audio slots present")
     return 0
 
 
@@ -140,6 +194,92 @@ def _dist(a, b):
     return sum(abs(p - q) for pa, pb in zip(a, b) for p, q in zip(pa, pb)) / (len(a) * 4)
 
 
+def _check_provenance(rel, prov, pack_license):
+    """Print and count the provenance / licence errors for one present file."""
+    entry = prov.get(rel)
+    if entry is None:
+        print(f"  PROVENANCE {rel}: no provenance.json entry", file=sys.stderr)
+        return 1
+    if pack_license and entry.get("license") != pack_license:
+        print(f"  LICENSE  {rel}: entry license {entry.get('license')!r} != "
+              f"pack license {pack_license!r}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _probe_wav(path):
+    """(rate, channels, seconds) for a PCM WAV; raises on anything else."""
+    with wave.open(path, "rb") as w:
+        if w.getcomptype() != "NONE":
+            raise ValueError(f"compressed WAV ({w.getcomptype()})")
+        return w.getframerate(), w.getnchannels(), w.getnframes() / w.getframerate()
+
+
+def _probe_ogg(path):
+    """(rate, channels, seconds) for an Ogg Vorbis file; raises on anything else.
+
+    Reads the identification header from the first page and the granule
+    position of the last. It does not decode the audio -- the shell's kira
+    load is the real decode -- so a corrupt body past the headers passes here.
+    """
+    with open(path, "rb") as fh:
+        data = fh.read()
+    if data[:4] != b"OggS":
+        raise ValueError("not an Ogg container")
+    body = 27 + data[26]
+    ident = data[body:body + 30]
+    if ident[:7] != b"\x01vorbis":
+        raise ValueError("Ogg stream is not Vorbis")
+    channels = ident[11]
+    rate = struct.unpack("<I", ident[12:16])[0]
+    last = data.rfind(b"OggS")
+    granule = struct.unpack("<q", data[last + 6:last + 14])[0]
+    if rate <= 0 or granule <= 0:
+        raise ValueError("no audio frames")
+    return rate, channels, granule / rate
+
+
+def _verify_audio(prov, pack_license, verbose):
+    """(present, errors) over AUDIO_SLOTS. An absent slot is not an error."""
+    present = errors = 0
+    for a in AUDIO_SLOTS:
+        rel = a["path"]
+        src = audio_file(rel)
+        if not os.path.exists(src):
+            if verbose:
+                print(f"  missing  {rel}")
+            continue
+        present += 1
+        if not rel.endswith("." + a["format"]):
+            print(f"  FORMAT   {rel}: slot wants .{a['format']}", file=sys.stderr)
+            errors += 1
+            continue
+        try:
+            probe = _probe_ogg if a["format"] == "ogg" else _probe_wav
+            rate, channels, seconds = probe(src)
+        except (ValueError, EOFError, struct.error, wave.Error) as err:
+            print(f"  DECODE   {rel}: {str(err) or type(err).__name__}", file=sys.stderr)
+            errors += 1
+            continue
+        if rate not in a["rates"]:
+            print(f"  RATE     {rel}: {rate} Hz, want one of {a['rates']}", file=sys.stderr)
+            errors += 1
+        if channels not in a["channels"]:
+            print(f"  CHANNELS {rel}: {channels}, want one of {a['channels']}",
+                  file=sys.stderr)
+            errors += 1
+        if not a["min_s"] <= seconds <= a["max_s"]:
+            print(f"  DURATION {rel}: {seconds:.3f}s, want {a['min_s']:g}-{a['max_s']:g}s",
+                  file=sys.stderr)
+            errors += 1
+        size = os.path.getsize(src)
+        if size > a["max_bytes"]:
+            print(f"  BUDGET   {rel}: {size} bytes, budget {a['max_bytes']}", file=sys.stderr)
+            errors += 1
+        errors += _check_provenance(rel, prov, pack_license)
+    return present, errors
+
+
 def cmd_verify(args):
     assets = required_assets()
     with open(PROVENANCE) as fh:
@@ -169,14 +309,7 @@ def cmd_verify(args):
         elif a["alpha"] == "color_key" and not alphas <= {0, 255}:
             print(f"  ALPHA    {rel}: colour-key art needs hard 0/255 alpha", file=sys.stderr)
             errors += 1
-        entry = prov.get(rel)
-        if entry is None:
-            print(f"  PROVENANCE {rel}: no provenance.json entry", file=sys.stderr)
-            errors += 1
-        elif pack_license and entry.get("license") != pack_license:
-            print(f"  LICENSE  {rel}: entry license {entry.get('license')!r} != "
-                  f"pack license {pack_license!r}", file=sys.stderr)
-            errors += 1
+        errors += _check_provenance(rel, prov, pack_license)
 
         sig = _sig_from(w, h, rgba)
         for label, base in (("reference", REFERENCE), ("extracted", EXTRACTED),
@@ -199,7 +332,9 @@ def cmd_verify(args):
 
     print(f"verify: {present}/{len(assets)} present, {errors} errors, {warnings} warnings "
           f"(scale {args.scale})")
-    return 1 if errors else 0
+    audio_present, audio_errors = _verify_audio(prov, pack_license, args.verbose)
+    print(f"verify audio: {audio_present}/{len(AUDIO_SLOTS)} present, {audio_errors} errors")
+    return 1 if errors or audio_errors else 0
 
 
 def cmd_build(args):
@@ -221,6 +356,15 @@ def cmd_build(args):
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 shutil.copy2(src, dst)
                 overlaid += 1
+    # The audio overlays the same way, onto the paths the pack's `audio`
+    # block already names.
+    for a in AUDIO_SLOTS:
+        src = audio_file(a["path"])
+        if os.path.exists(src):
+            dst = os.path.join(BUILD_OUT, a["path"])
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+            overlaid += 1
 
     game_json = os.path.join(BUILD_OUT, "game.json")
     with open(game_json) as fh:

@@ -16,6 +16,23 @@ full slot list to `CHECKLIST.md`.
 Keep character and place names original too. Do not ship the original game's
 title, logo, or character names in a public pack.
 
+The near-match check that rejects traced or upscaled art has no audio
+equivalent. Nothing automated can tell an original composition from a rip of
+the original soundtrack, so every audio file's licence rests on human review
+at the point of sourcing. The clean-room rule covers melodies: re-rendering
+the original game's PC-speaker tunes with a better synth produces a
+derivative of the original composition, not original work.
+
+## Adding audio
+
+The six audio slots (two OGG Vorbis music loops, four WAV one-shot tunes) are
+listed at the end of `CHECKLIST.md` with their sample rate, duration and size
+bounds. They live under `packs/open/audio/`, at the same pack-relative path the
+engine's `audio` block names, and need a `provenance.json` entry like any art.
+Third-party CC0 audio is fine: give its asset id as `source`. `verify` checks
+format, sample rate, channels, duration, size and provenance; `build` overlays
+the audio onto the playtest pack alongside the art.
+
 ## Adding art
 
 1. Read `CHECKLIST.md` for the slots. Paths are pack-relative, so a listed
