@@ -37,6 +37,7 @@ use chrome::{Chrome, StatusMode};
 use combat::{combat_render, CombatLoop, CombatStatus};
 use dialog::Dialog;
 use draw::DrawList;
+use hud::Hud;
 use input::{Action, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
@@ -1517,6 +1518,18 @@ async fn main() {
                 fog: &fog,
                 tick: hero_anim.tick(),
                 moving: hero_anim.moving(),
+            }
+            .draw(&mut list);
+            // The sidebar panels, drawn over the map and under the views --
+            // `shell_frame.c`'s chrome -> map -> hud -> overlay order. A view
+            // that covers the sidebar must paint over these.
+            Hud {
+                layout: &layout,
+                palette: backend.palette(),
+                catalog: &catalog,
+                resources: &resources,
+                game: &game,
+                time: get_time(),
             }
             .draw(&mut list);
 

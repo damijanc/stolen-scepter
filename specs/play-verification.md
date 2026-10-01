@@ -42,10 +42,11 @@ Every behavioral claim carries the layer it came from:
 - **BY DESIGN** -- C does it and this port deliberately does not.
 - **OUT OF SCOPE** -- C shell tooling that is not part of playing.
 
-Last refreshed 2026-09-22, against `06db5cb`. Several §13 entries had gone
-stale by then -- the startup wizard, the defeat message and the villain
-capture banner were all listed as missing after they shipped. Re-check a
-status against the code before trusting it.
+Last refreshed 2026-10-01, against the commit that wires the sidebar HUD
+(parent `f84bbe0`). Several §13 entries had gone stale by 2026-09-22 -- the
+startup wizard, the defeat message and the villain capture banner were all
+listed as missing after they shipped. Re-check a status against the code
+before trusting it.
 
 ## How to run
 
@@ -414,7 +415,7 @@ Do not file these as findings; they are already tracked.
 
 | Area | Status | Effect in play |
 |---|---|---|
-| Sidebar HUD | GAP | The 48px right column is reserved by `layout.rs` and never painted. No contract portrait, siege or magic indicator, mini puzzle grid, or **gold purse** -- so the gold figure is only visible in the Character view. `reference/src/hud.c` has no Rust counterpart; everything below the draw layer (the `Sprite::Hud*` variants, `ResSprites`'s `hud_*` paths, `SpriteCatalog` resolution) is already in place |
+| Sidebar HUD | OK | The 48px right column carries `reference/src/hud.c`'s five panels, ported in `shell/src/hud.rs`: the contract silhouette with the active villain's face over it, the siege and magic panels (silhouette until owned/known, then animated at ~2Hz), the mini puzzle grid with a 9x6 cover over each unrevealed cell, and the **gold purse** with the gold figure right-aligned [C]. Drawn after the map and before the views, so the Character view paints over it; absent during combat, as in C. Still deliberately unported: the dead `game.hud_visible` flag (DEAD in C) |
 | In-game menu | GAP | `reference/src/shell_menu.c` and C's `VIEW_MENU` are unported. `Q` saves to slot 0 **and quits**; there is no save-and-continue, no mid-session load, and no New Game. Loading is possible only from the startup wizard's `L` |
 | Audio | GAP | Silent. `reference/src/audio.c` has no Rust counterpart. The Controls panel already draws the pack's Sounds / Music / Volume / Walk Beep rows and cycles `stats.options[]`, so those rows toggle a value nothing reads. C also grays the three audio rows out when no device is present, which this shell cannot decide |
 | Combat `O` | GAP | See §9 -- the Options view exists but combat does not route the key |
