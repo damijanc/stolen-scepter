@@ -42,8 +42,7 @@ Every behavioral claim carries the layer it came from:
 - **BY DESIGN** -- C does it and this port deliberately does not.
 - **OUT OF SCOPE** -- C shell tooling that is not part of playing.
 
-Last refreshed 2026-10-01, against the commit that pauses combat under the
-Options and Controls views (parent `8b58705`). Several §13 entries had gone stale by 2026-09-22 -- the
+Last refreshed 2026-10-01, against `cbedaf5`. Several §13 entries had gone stale by 2026-09-22 -- the
 startup wizard, the defeat message and the villain capture banner were all
 listed as missing after they shipped. Re-check a status against the code
 before trusting it.
@@ -56,6 +55,16 @@ cargo run -p openbounty-shell -- reference/assets/kings-bounty/game.json
 
 The pack lives in the gitignored `reference/` clone. The shell resolves art and
 map paths relative to it.
+
+To set a scenario up quickly, press **F10** on the overworld for the debug
+menu (`shell/src/cheats.rs`, porting `shell_cheats.c` [C]): `G` +50000 gold,
+`V` +100 leadership, `M` +1 spell power and max spells, `U` +1 of every spell,
+`S` siege weapons, `F` flight, `N` discover the next continent, `O` clear this
+map's fog, `W` win, `L` lose screen; ESC or F10 closes it. It is ungated, as in
+C, and unavailable during combat and the win cartoon, as in C. Note that `L`
+only shows the lose screen -- C's `show_lose_game` does not end the game -- and
+`W` sets `game_over` but not `won`. [PORT]: while the menu is open it owns
+every key, where C lets the key also reach a view's own `IsKeyPressed` handler.
 
 ## Reporting a mismatch
 
@@ -431,7 +440,6 @@ Do not file these as findings; they are already tracked.
 | Audio | GAP | Silent. `reference/src/audio.c` has no Rust counterpart. The Controls panel already draws the pack's Sounds / Music / Volume / Walk Beep rows and cycles `stats.options[]`, so those rows toggle a value nothing reads. C also grays the three audio rows out when no device is present, which this shell cannot decide |
 | Pack picker | GAP | `reference/src/pack_select.c` unported; the pack path is a required command-line argument |
 | Open content pack | GAP | `packs/open` covers 267/311 art slots (missing: the 43 `ui/` slots and the bitmap font), and there is no open `game.json` or maps -- `tools/open_pack.py build` overlays art onto the gitignored reference clone. Playing still requires a local OpenBounty checkout |
-| Cheat menu (F10) | GAP | `reference/src/shell_cheats.c` unported. Only affects how fast the scenarios in this document can be set up |
 | `game.hud_visible` | DEAD | C writes it when an overlay opens and closes, and `draw_frame` never reads it. Do not wire it up |
 | Recorder, autoplay, demo | OUT OF SCOPE | `--movie`, `--autoplay`, `--demo`, `--headless`, `--validate-pack` and `--fullscreen` are dev tooling, not play |
 | Mouse: overworld & combat | BY DESIGN | Click-to-move and clicks on the combat field are design non-goals. A view opened over the battlefield takes clicks as it does on the overworld |

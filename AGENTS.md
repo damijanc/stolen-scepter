@@ -22,7 +22,8 @@ will be selected only after headless engine parity is solid.
   animation clock, `chrome.rs` the frame and status bar, `hud.rs` the five
   sidebar panels (`hud.c`), `banner.rs` pack text and its `%VAR%`
   substitution, `startup.rs` the pre-game wizard,
-  `savepath.rs` the save-slot locations, and `input.rs` the key bindings.
+  `savepath.rs` the save-slot locations, `cheats.rs` the F10 debug menu, and
+  `input.rs` the key bindings.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. Run it with
   `cargo run -p openbounty-shell -- [--seed <n>] [--save-dir <dir>] <path to game.json>`.
@@ -206,6 +207,17 @@ Implemented and tested:
   whenever a step, rest, `W`, search or sail crosses a week boundary and
   pumped one at a time while nothing modal is up. `pending_week`
   (`WeekEnd`) is the shell counterpart of C's `pending_week_phase`.
+- The F10 debug menu (`shell/src/cheats.rs`, porting `shell_cheats.c`):
+  `apply_cheat` is the letter switch and `CheatMenu::tick` the key routing,
+  called first in every `main.rs` frame. It writes public `Game` fields and
+  the LIVE `Fog` directly, as C does; no engine method exists for it and none
+  should. Ungated, as in C -- there is no `--cheats` flag -- but excluded
+  during combat and the win cartoon, which C runs in their own loops. `W`
+  reuses `show_win_game` (sets `game_over`, never `won`); `L` reuses
+  `show_lose_game`, which writes nothing, so the game continues. DIVERGENCE:
+  with no key queue, the menu skips the whole input chain on any frame it
+  owns, where C's `GetKeyPressed` drain leaves `IsKeyPressed` handlers able to
+  see the same key.
 
 Test coverage is 352 engine unit tests, 354 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
