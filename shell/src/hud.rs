@@ -13,8 +13,9 @@ use openbounty_engine::game::Game;
 use openbounty_engine::resources::Resources;
 
 use crate::draw::{DrawList, Dst, Rect, Sprite};
+use crate::font;
 use crate::layout::Layout;
-use crate::palette::Palette;
+use crate::palette::{Pal, Palette};
 use crate::sprites::{frame_index, SpriteCatalog};
 use crate::views::villain_sprite;
 
@@ -73,6 +74,7 @@ impl Hud<'_> {
         self.draw_siege(list);
         self.draw_magic(list);
         self.draw_puzzle(list);
+        self.draw_gold(list);
     }
 
     /// Panel 0: the silhouette always, with the active contract's animated
@@ -147,6 +149,21 @@ impl Hud<'_> {
                 );
             }
         }
+    }
+
+    /// Panel 4: the purse, with the gold figure right-aligned 2px off the
+    /// panel's right edge and 2px up from its bottom.
+    fn draw_gold(&self, list: &mut DrawList) {
+        let rect = self.panel(4);
+        list.blit(Sprite::HudGoldPurse, Dst::Stretch(rect));
+
+        let gold = self.game.stats.gold.to_string();
+        list.text(
+            &gold,
+            rect.x + self.layout.sidebar_w - font::measure_width(&gold) - 2,
+            rect.y + self.layout.tile_h - font::GLYPH_H - 2,
+            self.palette.clr(Pal::Yellow),
+        );
     }
 }
 
@@ -399,5 +416,54 @@ mod tests {
                 COVER_H
             ))
         );
+    }
+
+    #[test]
+    fn the_gold_panel_draws_the_purse_and_the_figure() {
+        let (resources, layout, catalog) = fixtures();
+        let mut game = Game::default();
+        game.stats.gold = 7500;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        let purse = list.blits_of(Sprite::HudGoldPurse);
+        assert_eq!(purse.len(), 1);
+        assert_eq!(purse[0], Dst::Stretch(Hud::panel_rect(&layout, 4)));
+        assert!(list.has_text_containing("7500"));
+    }
+
+    /// C right-aligns the figure 2px off the panel's right edge and sits it
+    /// 2px up from the bottom, so a wider number grows leftward.
+    #[test]
+    fn the_gold_figure_is_right_aligned_in_the_panel() {
+        let (resources, layout, catalog) = fixtures();
+        let panel = Hud::panel_rect(&layout, 4);
+
+        let mut game = Game::default();
+        game.stats.gold = 7500;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+        let (x, y, text) = list.texts().pop().expect("a gold figure");
+        assert_eq!(text, "7500");
+        assert_eq!(
+            x,
+            panel.x + layout.sidebar_w - font::measure_width("7500") - 2
+        );
+        assert_eq!(y, panel.y + layout.tile_h - font::GLYPH_H - 2);
+
+        // One more digit starts one glyph further left, same baseline.
+        game.stats.gold = 17500;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+        let (wide_x, wide_y, _) = list.texts().pop().expect("a gold figure");
+        assert_eq!(wide_x, x - font::GLYPH_W);
+        assert_eq!(wide_y, y);
+    }
+
+    /// Zero gold still draws; C formats the int unconditionally.
+    #[test]
+    fn zero_gold_still_draws_the_figure() {
+        let (resources, layout, catalog) = fixtures();
+        let game = Game::default();
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        assert!(list.has_text_containing("0"));
     }
 }
