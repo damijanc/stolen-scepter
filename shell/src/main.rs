@@ -62,7 +62,7 @@ use openbounty_engine::game::{
 };
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
-use openbounty_engine::savegame::{save_read, save_write};
+use openbounty_engine::savegame::save_write;
 use openbounty_engine::spells_adventure::{
     spell_index_by_adventure_effect, try_build_bridge, AdventureCast, AdventureEffect, SpellCast,
 };
@@ -74,6 +74,7 @@ use pointer::{Button, HitList, HitTarget, PointerSource};
 use present::Present;
 use prompt::{Prompt, PromptResult};
 use savepath::SavePaths;
+use slot_picker::load_slot;
 use sprites::SpriteCatalog;
 use startup::{Startup, StartupAction};
 use views::{
@@ -798,29 +799,31 @@ async fn main() {
 
     let (mut game, mut map, mut fog) = if choice.action == StartupAction::Load {
         // Hydrate from the chosen slot. C pre-initializes a default game so a
-        // failed load still leaves something playable.
-        let mut game = Game::default();
-        game.init_seeded_with_resources(&resources, Some("Hero"), 0, 1, -1);
-        let mut fog = Fog::new();
-        match save_paths.slot(resources.pack_id.as_str(), choice.slot) {
-            Some(path) => {
-                if let Err(err) = save_read(&path, &mut game, &resources, &Map::new(1, 1), &mut fog)
-                {
-                    eprintln!("load slot {} failed: {err:?}", choice.slot);
-                }
-            }
-            None => eprintln!("load slot {} has no path", choice.slot),
-        }
-        let zone = game.position.zone.as_str().to_owned();
-        let mut map = match Map::load_zone_with_placements(&resources, &zone, &game) {
-            Ok(map) => map,
+        // failed load still leaves something playable; the recipe is shared
+        // with the in-game menu, and only this fallback is startup's own.
+        match load_slot(
+            &save_paths,
+            &resources,
+            resources.pack_id.as_str(),
+            choice.slot,
+        ) {
+            Ok(loaded) => loaded,
             Err(err) => {
-                eprintln!("could not load zone {zone}: {err}");
-                return;
+                eprintln!("load slot {} failed: {err:?}", choice.slot);
+                let mut game = Game::default();
+                game.init_seeded_with_resources(&resources, Some("Hero"), 0, 1, -1);
+                let zone = game.position.zone.as_str().to_owned();
+                let mut map = match Map::load_zone_with_placements(&resources, &zone, &game) {
+                    Ok(map) => map,
+                    Err(err) => {
+                        eprintln!("could not load zone {zone}: {err}");
+                        return;
+                    }
+                };
+                map.apply_consumed(&game, &zone);
+                (game, map, Fog::new())
             }
-        };
-        map.apply_consumed(&game, &zone);
-        (game, map, fog)
+        }
     } else {
         let player_class = resources
             .class_by_id(choice.class_id.as_str())
