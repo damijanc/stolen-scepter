@@ -24,6 +24,15 @@ pub const PANEL_COUNT: i32 = 5;
 /// The sidebar animations tick at ~2Hz, C's `(int)(GetTime() * 2.0)`.
 const ANIM_HZ: f64 = 2.0;
 
+/// The puzzle cover's native pixel size. C reads it off the loaded texture;
+/// the draw vocabulary is headless and never learns a texture's size, so the
+/// legacy native 9x6 is fixed here -- the same trade `views.rs` makes for
+/// `FACE_W`/`FACE_H`.
+const COVER_W: i32 = 9;
+const COVER_H: i32 = 6;
+/// C insets the 5x5 cover block 2px inside the 48x34 panel.
+const COVER_INSET: i32 = 2;
+
 pub struct Hud<'a> {
     pub layout: &'a Layout,
     pub palette: &'a Palette,
@@ -63,6 +72,7 @@ impl Hud<'_> {
         self.draw_contract(list);
         self.draw_siege(list);
         self.draw_magic(list);
+        self.draw_puzzle(list);
     }
 
     /// Panel 0: the silhouette always, with the active contract's animated
@@ -107,6 +117,35 @@ impl Hud<'_> {
             list.blit(Sprite::HudMagicAnim { frame }, Dst::Stretch(rect));
         } else {
             list.blit(Sprite::HudMagicSilhouette, Dst::Stretch(rect));
+        }
+    }
+
+    /// Panel 3: the empty grid, with a cover stamped over every cell whose
+    /// villain is still free or whose artifact is still lost. Covers vanish
+    /// as the player progresses, so the grid fills in toward the scepter.
+    ///
+    /// C re-declares `tables.c`'s `PUZZLE_GRID` here as `PUZZLE_MAP` and
+    /// re-tests caught/found inline; the engine already ports both as
+    /// `Game::puzzle_cell_revealed`, so the table is not copied again.
+    fn draw_puzzle(&self, list: &mut DrawList) {
+        let rect = self.panel(3);
+        list.blit(Sprite::HudPuzzleGrid, Dst::Stretch(rect));
+
+        for row in 0..5 {
+            for col in 0..5 {
+                if self.game.puzzle_cell_revealed(row, col) {
+                    continue;
+                }
+                list.blit(
+                    Sprite::PuzzleCover,
+                    Dst::rect(
+                        rect.x + COVER_INSET + col * COVER_W,
+                        rect.y + COVER_INSET + row * COVER_H,
+                        COVER_W,
+                        COVER_H,
+                    ),
+                );
+            }
         }
     }
 }
@@ -296,5 +335,69 @@ mod tests {
         let list = render(&resources, &layout, &catalog, &game, 0.0);
 
         assert_eq!(list.blits_of(Sprite::HudSiegeAnim { frame: 0 }).len(), 1);
+    }
+
+    #[test]
+    fn the_puzzle_panel_covers_all_twenty_five_cells_at_the_start() {
+        let (resources, layout, catalog) = fixtures();
+        let game = Game::default();
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        let grid = list.blits_of(Sprite::HudPuzzleGrid);
+        assert_eq!(grid.len(), 1);
+        assert_eq!(grid[0], Dst::Stretch(Hud::panel_rect(&layout, 3)));
+        // Nothing caught or found yet, so every cell is still covered.
+        assert_eq!(list.blits_of(Sprite::PuzzleCover).len(), 25);
+    }
+
+    #[test]
+    fn catching_a_villain_lifts_exactly_one_cover() {
+        let (resources, layout, catalog) = fixtures();
+        let mut game = Game::default();
+        game.contract.villains_caught[0] = true;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        assert_eq!(list.blits_of(Sprite::PuzzleCover).len(), 24);
+    }
+
+    #[test]
+    fn finding_an_artifact_lifts_exactly_one_cover() {
+        let (resources, layout, catalog) = fixtures();
+        let mut game = Game::default();
+        game.artifacts.found[0] = true;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        assert_eq!(list.blits_of(Sprite::PuzzleCover).len(), 24);
+    }
+
+    /// The covers tile the panel from a 2px inset, 9x6 each, row-major.
+    #[test]
+    fn the_covers_tile_the_panel_from_the_inset() {
+        let (resources, layout, catalog) = fixtures();
+        let game = Game::default();
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+        let panel = Hud::panel_rect(&layout, 3);
+
+        let covers = list.blits_of(Sprite::PuzzleCover);
+        // First cell: top-left, inset by 2 on both axes.
+        assert_eq!(
+            covers[0],
+            Dst::Stretch(Rect::new(
+                panel.x + COVER_INSET,
+                panel.y + COVER_INSET,
+                COVER_W,
+                COVER_H
+            ))
+        );
+        // Last cell: row 4, col 4.
+        assert_eq!(
+            covers[24],
+            Dst::Stretch(Rect::new(
+                panel.x + COVER_INSET + 4 * COVER_W,
+                panel.y + COVER_INSET + 4 * COVER_H,
+                COVER_W,
+                COVER_H
+            ))
+        );
     }
 }
