@@ -42,7 +42,7 @@ Every behavioral claim carries the layer it came from:
 - **BY DESIGN** -- C does it and this port deliberately does not.
 - **OUT OF SCOPE** -- C shell tooling that is not part of playing.
 
-Last refreshed 2026-10-01, against `cbedaf5`. Several §13 entries had gone stale by 2026-09-22 -- the
+Last refreshed 2026-10-01, against `96da117`. Several §13 entries had gone stale by 2026-09-22 -- the
 startup wizard, the defeat message and the villain capture banner were all
 listed as missing after they shipped. Re-check a status against the code
 before trusting it.
@@ -437,7 +437,7 @@ Do not file these as findings; they are already tracked.
 |---|---|---|
 | Sidebar HUD | OK | The 48px right column carries `reference/src/hud.c`'s five panels, ported in `shell/src/hud.rs`: the contract silhouette with the active villain's face over it, the siege and magic panels (silhouette until owned/known, then animated at ~2Hz), the mini puzzle grid with a 9x6 cover over each unrevealed cell, and the **gold purse** with the gold figure right-aligned [C]. Drawn after the map and before the views, so the Character view paints over it; absent during combat, as in C. Still deliberately unported: the dead `game.hud_visible` flag (DEAD in C) |
 | In-game menu | GAP | `reference/src/shell_menu.c` and C's `VIEW_MENU` are unported. `Q` saves to slot 0 **and quits**; there is no save-and-continue, no mid-session load, and no New Game. Loading is possible only from the startup wizard's `L` |
-| Audio | GAP | Silent. `reference/src/audio.c` has no Rust counterpart. The Controls panel already draws the pack's Sounds / Music / Volume / Walk Beep rows and cycles `stats.options[]`, so those rows toggle a value nothing reads. C also grays the three audio rows out when no device is present, which this shell cannot decide |
+| Audio | OK (code); content GAP | `reference/src/audio.c` is ported as `shell/src/audio.rs` (policy) and `shell/src/audio_backend.rs` (kira): the four tunes (walk, bump, chest, defeat), the openworld and combat tracks with a hard cut, ducking while a tune plays, and the Sounds / Music / Volume rows, which gray out and pin to 0 when no device opens [C]. Music off then on RESTARTS the track, following `audio.c`'s `StopMusicStream` rather than `audio.h`'s "resumes" comment. Playing with sound still needs the reference pack's audio: `packs/open` declares the six audio slots and `verify` checks them, but ships 0/6. Walk Beep and CGA stay DEAD |
 | Pack picker | GAP | `reference/src/pack_select.c` unported; the pack path is a required command-line argument |
 | Open content pack | GAP | `packs/open` covers 267/311 art slots (missing: the 43 `ui/` slots and the bitmap font), and there is no open `game.json` or maps -- `tools/open_pack.py build` overlays art onto the gitignored reference clone. Playing still requires a local OpenBounty checkout |
 | `game.hud_visible` | DEAD | C writes it when an overlay opens and closes, and `draw_frame` never reads it. Do not wire it up |

@@ -22,10 +22,12 @@ will be selected only after headless engine parity is solid.
   animation clock, `chrome.rs` the frame and status bar, `hud.rs` the five
   sidebar panels (`hud.c`), `banner.rs` pack text and its `%VAR%`
   substitution, `startup.rs` the pre-game wizard,
-  `savepath.rs` the save-slot locations, `cheats.rs` the F10 debug menu, and
+  `savepath.rs` the save-slot locations, `cheats.rs` the F10 debug menu,
+  `audio.rs` the audio policy (`audio.c`'s decisions, no library), and
   `input.rs` the key bindings.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
-  way. Run it with
+  way. Its sibling rule: `audio_backend.rs` is the ONLY module that knows
+  `kira` exists, and `kira` is a `shell` dependency only. Run it with
   `cargo run -p openbounty-shell -- [--seed <n>] [--save-dir <dir>] <path to game.json>`.
 - `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
   decision and what was rejected, the legacy geometry, and the work order.
@@ -219,7 +221,15 @@ Implemented and tested:
   owns, where C's `GetKeyPressed` drain leaves `IsKeyPressed` handlers able to
   see the same key.
 
-Test coverage is 352 engine unit tests, 354 shell unit tests, 25 combat digest
+- Audio (`shell/src/audio.rs` + `audio_backend.rs`, see
+  `specs/audio-design.md`): the engine stays audio-free, and the shell derives
+  every tune from what the engine returns. Read the design's "As built"
+  section before touching it -- the plan it shipped from was wrong in eight
+  places, all caught by reading the C. The chest tune does NOT replace the
+  walk tune (C plays both); a step C bounces plays no walk tune; the defeat
+  tune is a combat LOSS, not `temp_death`; and music off then on restarts.
+
+Test coverage is 355 engine unit tests, 378 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

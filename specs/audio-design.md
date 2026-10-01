@@ -4,6 +4,11 @@ Status: agreed 2026-09-22. Covers sound in the shell: the four one-shot tunes,
 the two music tracks, and the Controls rows that drive them. Authoring the
 actual audio files is explicitly out of scope and is listed under Non-Goals.
 
+**Built 2026-10-01** (`54c2526`..`96da117`). The C code disagreed with this
+design and with `specs/audio-plan.md` in the places listed under "As built"
+below; the code follows C, as `AGENTS.md` requires. Where the body of this
+document says otherwise, "As built" wins.
+
 Read `AGENTS.md` and `specs/shell-renderer-plan.md` first. Everything there
 still applies -- parity-first translation, one-line commit messages, approval
 before every commit.
@@ -167,6 +172,50 @@ coefficients, which kira's tweens replace. At 60fps a 0.40 coefficient reaches
 ~80ms attack and ~370ms release. **This is an approximation, not a port** --
 the envelope shape differs (exponential vs kira's easing) even though the
 timing matches. Recorded here so it is not mistaken for parity.
+
+## As built: where C overrode this design
+
+Each was found by reading `reference/src/audio.c`, `reference/engine/step.c`
+and `reference/src/combat_loop.c` while porting, and each has a test named for
+it in `shell/src/audio.rs`.
+
+1. **The chest tune does not replace the walk tune.** `step.c:424` plays the
+   chest, the step is not bounced, and `GameOnStep` then reaches
+   `game.c:1149`. Both play, chest first. `tunes_for_step` returns two slots.
+2. **A bounced step plays no walk tune.** Town, castle gate, dwelling, alcove
+   and a hostile foe set `bounce_back`, and a bounced step never calls
+   `GameOnStep`. This engine does not bounce yet, but the tune follows C.
+3. **An absorbed step plays no walk tune.** `GameOnStep` returns before
+   `game.c:1149` while a time stop is banked or the game is over. The shell
+   samples that before the step, which spends the time stop.
+4. **Resting plays the walk tune.** Rest reaches `GameOnStep` directly
+   (`shell_actions.c:212`).
+5. **The defeat tune is a combat loss, not `temp_death`.** C plays it in the
+   combat loop (`combat_loop.c:454`, `705`). Dismissing the last stack also
+   reaches `GameTempDeath`, through `perform_temp_death`, which plays nothing.
+6. **Music off then on RESTARTS.** `audio.h` says it resumes; `audio.c` calls
+   `StopMusicStream`, which rewinds, and later `PlayMusicStream` from the top.
+   Decision 1's resume-at-position rationale therefore does not apply: kira's
+   real advantages here are streaming, the clean device `Err`, and buses.
+   A track chosen while music is off is recorded and started when it comes
+   back on, as `audio_set_track` does.
+7. **Sounds off gates future tunes only.** A tune already playing finishes,
+   as `audio.h` says and `audio_play_tune` does; the backend never mutes the
+   sfx bus. A replayed tune restarts its own instance, as raylib's `PlaySound`
+   does, rather than layering a copy.
+8. **No device pins the three options to 0** (`main.c:896-902`), so the panel
+   and the live push agree.
+
+Three shape changes, none a C divergence:
+
+- `KiraAudio::new` takes a loader (`Fn(&str) -> Option<Vec<u8>>`), C's
+  `LoadAssetBytes`, not a root path, so a zipped pack works unchanged. Nothing
+  is loaded when no device opened, as in C.
+- Device availability is stored on `Views` (`set_audio_available`) rather than
+  threaded through `Views::draw`, because `controls_advance` needs it too.
+- Ducking is a per-frame `KiraAudio::tick`, driven by `audio::Duck`; the plan
+  had omitted it. During combat the shell only ticks and does not push the
+  options, as C's combat loop does.
 
 ## Components
 
