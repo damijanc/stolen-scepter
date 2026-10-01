@@ -224,6 +224,16 @@ impl SpriteCatalog {
         self.villain_anim.get(villain).map_or(0, Vec::len)
     }
 
+    /// Frames in the sidebar siege-weapon cycle.
+    pub fn hud_siege_anim_len(&self) -> usize {
+        self.sprites.hud_siege_animation_count
+    }
+
+    /// Frames in the sidebar magic-star cycle.
+    pub fn hud_magic_anim_len(&self) -> usize {
+        self.sprites.hud_magic_animation_count
+    }
+
     /// The animated troop frame for `tick`, falling back to the still sprite
     /// when the pack ships no animation or the frame is blank. Ports what
     /// `map_render` and `combat_render` both open with.

@@ -15,7 +15,7 @@ use openbounty_engine::resources::Resources;
 use crate::draw::{DrawList, Dst, Rect, Sprite};
 use crate::layout::Layout;
 use crate::palette::Palette;
-use crate::sprites::SpriteCatalog;
+use crate::sprites::{frame_index, SpriteCatalog};
 use crate::views::villain_sprite;
 
 /// Panels stacked down the sidebar, from C's five `blit_panel` calls.
@@ -61,6 +61,8 @@ impl Hud<'_> {
 
     pub fn draw(&self, list: &mut DrawList) {
         self.draw_contract(list);
+        self.draw_siege(list);
+        self.draw_magic(list);
     }
 
     /// Panel 0: the silhouette always, with the active contract's animated
@@ -82,6 +84,29 @@ impl Hud<'_> {
         // `villain_sprite` answers None out of range, which is the same guard.
         if let Some(sprite) = villain_sprite(self.catalog, villain.index, self.tick()) {
             list.blit(sprite, Dst::Stretch(rect));
+        }
+    }
+
+    /// Panel 1: silhouette when no siege weapon is owned, the animated cart
+    /// when one is. C tests the int count, so any non-zero lights it.
+    fn draw_siege(&self, list: &mut DrawList) {
+        let rect = self.panel(1);
+        if self.game.stats.siege_weapons != 0 {
+            let frame = frame_index(self.tick(), self.catalog.hud_siege_anim_len()) as i32;
+            list.blit(Sprite::HudSiegeAnim { frame }, Dst::Stretch(rect));
+        } else {
+            list.blit(Sprite::HudSiegeSilhouette, Dst::Stretch(rect));
+        }
+    }
+
+    /// Panel 2: silhouette until the hero knows magic, then the animated star.
+    fn draw_magic(&self, list: &mut DrawList) {
+        let rect = self.panel(2);
+        if self.game.stats.knows_magic {
+            let frame = frame_index(self.tick(), self.catalog.hud_magic_anim_len()) as i32;
+            list.blit(Sprite::HudMagicAnim { frame }, Dst::Stretch(rect));
+        } else {
+            list.blit(Sprite::HudMagicSilhouette, Dst::Stretch(rect));
         }
     }
 }
@@ -201,5 +226,75 @@ mod tests {
 
         assert_eq!(list.blits_of(Sprite::HudContractSilhouette).len(), 1);
         assert!(list.blits_of(MURRAY_FACE).is_empty());
+    }
+
+    #[test]
+    fn the_siege_panel_shows_the_silhouette_until_a_weapon_is_owned() {
+        let (resources, layout, catalog) = fixtures();
+        let game = Game::default();
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        let blits = list.blits_of(Sprite::HudSiegeSilhouette);
+        assert_eq!(blits.len(), 1);
+        assert_eq!(blits[0], Dst::Stretch(Hud::panel_rect(&layout, 1)));
+        assert!(list.blits_of(Sprite::HudSiegeAnim { frame: 0 }).is_empty());
+    }
+
+    #[test]
+    fn the_siege_panel_animates_once_a_weapon_is_owned() {
+        let (resources, layout, catalog) = fixtures();
+        let mut game = Game::default();
+        game.stats.siege_weapons = 1;
+
+        // Two frames declared, ~2Hz: t=0.0 is frame 0, t=0.5 is frame 1.
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+        assert_eq!(
+            list.blits_of(Sprite::HudSiegeAnim { frame: 0 }),
+            vec![Dst::Stretch(Hud::panel_rect(&layout, 1))]
+        );
+        assert!(list.blits_of(Sprite::HudSiegeSilhouette).is_empty());
+
+        let list = render(&resources, &layout, &catalog, &game, 0.5);
+        assert_eq!(
+            list.blits_of(Sprite::HudSiegeAnim { frame: 1 }),
+            vec![Dst::Stretch(Hud::panel_rect(&layout, 1))]
+        );
+    }
+
+    #[test]
+    fn the_magic_panel_shows_the_silhouette_until_the_hero_knows_magic() {
+        let (resources, layout, catalog) = fixtures();
+        let game = Game::default();
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        let blits = list.blits_of(Sprite::HudMagicSilhouette);
+        assert_eq!(blits.len(), 1);
+        assert_eq!(blits[0], Dst::Stretch(Hud::panel_rect(&layout, 2)));
+    }
+
+    #[test]
+    fn the_magic_panel_animates_once_the_hero_knows_magic() {
+        let (resources, layout, catalog) = fixtures();
+        let mut game = Game::default();
+        game.stats.knows_magic = true;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        assert_eq!(
+            list.blits_of(Sprite::HudMagicAnim { frame: 0 }),
+            vec![Dst::Stretch(Hud::panel_rect(&layout, 2))]
+        );
+        assert!(list.blits_of(Sprite::HudMagicSilhouette).is_empty());
+    }
+
+    /// C tests `if (g->stats.siege_weapons)`, an int, so any non-zero count
+    /// lights the panel -- not just 1.
+    #[test]
+    fn several_siege_weapons_still_light_the_panel_once() {
+        let (resources, layout, catalog) = fixtures();
+        let mut game = Game::default();
+        game.stats.siege_weapons = 3;
+        let list = render(&resources, &layout, &catalog, &game, 0.0);
+
+        assert_eq!(list.blits_of(Sprite::HudSiegeAnim { frame: 0 }).len(), 1);
     }
 }
