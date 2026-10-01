@@ -20,14 +20,13 @@ use crate::input::{Key, KeySource};
 use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
 use crate::savepath::{scan_slots, SavePaths, SlotSet, SAVE_SLOT_COUNT};
+use crate::slot_picker::{SlotChoice, SlotPicker};
 
 /// Text C compiles in for the startup screens; the pack overrides it under
 /// `strings.startup` and `strings.difficulty`.
 const DEFAULT_CLASS_SELECT_HINT: &str = "Select Char A-D or L-Load saved game";
 const DEFAULT_SAVE_PICKER_TITLE: &str = " Select game:";
-const DEFAULT_SAVE_PICKER_EMPTY: &str = "(empty)";
 const DEFAULT_SAVE_PICKER_NEW_GAME: &str = "New game";
-const DEFAULT_CONTROLS_HINT: &str = "UP/DN move  ENTER pick  ESC quit";
 const DEFAULT_NEW_GAME_TABLE_HEADER: &str = "   Difficulty   Days  Score";
 const DEFAULT_NEW_GAME_SELECT_HINT: &str = "^v to select   Ent to Accept";
 const DEFAULT_DIFFICULTY_LABELS: [&str; 4] = ["Easy", "Normal", "Hard", "Impossible?"];
@@ -121,10 +120,8 @@ pub struct Startup {
     intro_started: f64,
     /// Chosen save slot: 0 for a plain new game, the picked slot otherwise.
     slot: usize,
-    /// The picker's scanned slots.
-    slots: SlotSet,
-    /// The picker's highlighted row, 0..=SAVE_SLOT_COUNT.
-    cursor: usize,
+    /// The save picker, with startup's trailing "New game" row.
+    picker: SlotPicker,
 }
 
 impl Default for Startup {
@@ -139,8 +136,7 @@ impl Default for Startup {
             difficulty: 1,
             intro_started: 0.0,
             slot: 0,
-            slots: SlotSet::default(),
-            cursor: SAVE_SLOT_COUNT,
+            picker: SlotPicker::new(SlotSet::default(), true),
         }
     }
 }
@@ -238,11 +234,11 @@ impl Startup {
         // L opens the save picker; the cursor lands on the first existing slot
         // (or "New game" when there are none).
         if keys.pressed(Key::L) {
-            self.slots = scan_slots(paths, resources.pack_id.as_str());
-            self.cursor = SAVE_SLOT_COUNT;
-            for (slot, header) in self.slots.headers.iter().enumerate() {
+            self.picker = SlotPicker::new(scan_slots(paths, resources.pack_id.as_str()), true);
+            self.picker.cursor = SAVE_SLOT_COUNT;
+            for (slot, header) in self.picker.slots().headers.iter().enumerate() {
                 if header.is_some() {
-                    self.cursor = slot;
+                    self.picker.cursor = slot;
                     break;
                 }
             }
@@ -268,23 +264,18 @@ impl Startup {
         None
     }
 
+    /// The shared picker reports a row; what each row means here is
+    /// startup's own rule.
     fn update_save_picker(&mut self, keys: &dyn KeySource) -> Option<StartupChoice> {
-        let row_count = SAVE_SLOT_COUNT + 1;
-        if keys.pressed(Key::Escape) {
-            self.screen = Screen::ClassSelect;
-            return None;
-        }
-        if keys.pressed(Key::Up) || keys.pressed(Key::Kp8) {
-            self.cursor = (self.cursor + row_count - 1) % row_count;
-        }
-        if keys.pressed(Key::Down) || keys.pressed(Key::Kp2) {
-            self.cursor = (self.cursor + 1) % row_count;
-        }
-        if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) || keys.pressed(Key::Space) {
-            if self.cursor == SAVE_SLOT_COUNT {
+        match self.picker.update(keys)? {
+            SlotChoice::Cancel => {
+                self.screen = Screen::ClassSelect;
+                None
+            }
+            SlotChoice::Extra => {
                 // The "New game" row targets the first empty slot.
                 let mut target = 0;
-                for (slot, header) in self.slots.headers.iter().enumerate() {
+                for (slot, header) in self.picker.slots().headers.iter().enumerate() {
                     if header.is_none() {
                         target = slot;
                         break;
@@ -292,16 +283,18 @@ impl Startup {
                 }
                 self.slot = target;
                 self.screen = Screen::CreateGame;
-                return None;
+                None
             }
-            self.slot = self.cursor;
-            if self.slots.headers[self.cursor].is_some() {
-                return Some(self.choice(StartupAction::Load));
+            SlotChoice::Slot(slot) => {
+                self.slot = slot;
+                if self.picker.slots().headers[slot].is_some() {
+                    return Some(self.choice(StartupAction::Load));
+                }
+                // An empty slot chosen directly starts a new game into it.
+                self.screen = Screen::CreateGame;
+                None
             }
-            // An empty slot chosen directly starts a new game into it.
-            self.screen = Screen::CreateGame;
         }
-        None
     }
 
     fn update_create_game(
@@ -428,7 +421,22 @@ impl Startup {
                 self.draw_class_picker(list, layout);
                 self.draw_status_hint(list, layout, palette, resources);
                 match self.screen {
-                    Screen::SavePicker => self.draw_save_picker(list, layout, palette, resources),
+                    Screen::SavePicker => {
+                        let title = banner::text(
+                            resources,
+                            "startup",
+                            "save_picker_title",
+                            DEFAULT_SAVE_PICKER_TITLE,
+                        );
+                        let new_label = banner::text(
+                            resources,
+                            "startup",
+                            "save_picker_new_game",
+                            DEFAULT_SAVE_PICKER_NEW_GAME,
+                        );
+                        self.picker
+                            .draw(list, layout, palette, resources, title, new_label)
+                    }
                     Screen::CreateGame => {
                         self.draw_create_game(list, layout, palette, resources, time)
                     }
@@ -594,79 +602,6 @@ impl Startup {
         );
         let x = (layout.screen_w - hint.chars().count() as i32 * GLYPH_W) / 2;
         list.text(hint, x.max(0), 1, palette.clr(Pal::White));
-    }
-
-    fn draw_save_picker(
-        &self,
-        list: &mut DrawList,
-        layout: &Layout,
-        palette: &Palette,
-        resources: &Resources,
-    ) {
-        let row_count = SAVE_SLOT_COUNT + 1;
-        let pad = 6;
-        let row_h = GLYPH_H + 2;
-        let header_h = GLYPH_H + 4;
-        let gap_h = 4;
-        let instr_h = GLYPH_H;
-        let body_h = row_count as i32 * row_h;
-        let w = 280;
-        let h = pad + header_h + body_h + gap_h + instr_h + pad;
-        let x = (layout.screen_w - w) / 2;
-        let y = (layout.screen_h - h) / 2;
-        list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
-        list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
-
-        let title = banner::text(
-            resources,
-            "startup",
-            "save_picker_title",
-            DEFAULT_SAVE_PICKER_TITLE,
-        );
-        list.text(title, x + pad, y + pad, palette.clr(Pal::Yellow));
-
-        let empty = banner::text(
-            resources,
-            "startup",
-            "save_picker_empty",
-            DEFAULT_SAVE_PICKER_EMPTY,
-        );
-        let mut ty = y + pad + header_h;
-        for slot in 0..SAVE_SLOT_COUNT {
-            let fg = if slot == self.cursor {
-                palette.clr(Pal::Yellow)
-            } else {
-                palette.clr(Pal::White)
-            };
-            let line = match &self.slots.headers[slot] {
-                Some(header) => format!(
-                    "{:>2}. {:<10}  {:<9}  {:>3}d",
-                    slot + 1,
-                    header.name.as_str(),
-                    header.rank_title.as_str(),
-                    header.days_left
-                ),
-                None => format!("{:>2}. {}", slot + 1, empty),
-            };
-            list.text(&line, x + pad, ty, fg);
-            ty += row_h;
-        }
-
-        let new_fg = if self.cursor == SAVE_SLOT_COUNT {
-            palette.clr(Pal::Yellow)
-        } else {
-            palette.clr(Pal::White)
-        };
-        let new_label = banner::text(
-            resources,
-            "startup",
-            "save_picker_new_game",
-            DEFAULT_SAVE_PICKER_NEW_GAME,
-        );
-        list.text(&format!("    {new_label}"), x + pad, ty, new_fg);
-
-        let hint = banner::text(resources, "startup", "controls_hint", DEFAULT_CONTROLS_HINT);
-        list.text(hint, x + pad, y + h - pad - instr_h, palette.clr(Pal::Grey));
     }
 
     fn draw_create_game(

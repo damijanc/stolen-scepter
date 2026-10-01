@@ -33,6 +33,7 @@ pub mod pointer;
 pub mod present;
 pub mod prompt;
 pub mod savepath;
+pub mod slot_picker;
 pub mod sprites;
 pub mod startup;
 pub mod views;
