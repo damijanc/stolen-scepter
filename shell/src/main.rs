@@ -322,6 +322,13 @@ fn show_lose_game(views: &mut Views, resources: &Resources, game: &Game) {
     views.open_end_game(false, &body);
 }
 
+/// Whether `GameOnStep` will return before playing the walk tune: a banked
+/// time stop or a finished game. Sampled before the step, which spends the
+/// time stop.
+fn step_absorbed(game: &Game) -> bool {
+    game.stats.game_over || game.stats.time_stop > 0
+}
+
 /// Hand the three audio options to the backend, `main.c:904-906`.
 fn push_audio_options(audio: &mut KiraAudio, game: &Game) {
     let options = &game.stats.options;
@@ -839,6 +846,7 @@ async fn main() {
         audio::pin_options_without_device(&mut game.stats.options);
     }
     push_audio_options(&mut audio, &game);
+    audio.set_track(audio::Track::Openworld);
 
     loop {
         // C pushes the toggles every frame because the Controls panel changes
@@ -942,6 +950,12 @@ async fn main() {
                             CombatResult::Loss
                         };
                         let session = combat.take().expect("combat was Some");
+                        // `combat_loop.c:696` / `705`: a loss plays the
+                        // defeat tune, and either way the openworld returns.
+                        if result == CombatResult::Loss {
+                            audio.play_tune(audio::Tune::Defeat);
+                        }
+                        audio.set_track(audio::Track::Openworld);
                         if let Some((header, body)) = finish_combat(
                             &mut game,
                             &mut map,
@@ -1024,6 +1038,7 @@ async fn main() {
                 );
                 if let Some(flow) = combat_flow {
                     combat = Some(start_combat(&game, &resources, flow));
+                    audio.set_track(audio::Track::Combat);
                 }
             }
         } else if views.active() == Some(ViewKind::Controls) {
@@ -1249,7 +1264,11 @@ async fn main() {
                     }
                 }
                 Action::Rest => {
+                    let absorbed = step_absorbed(&game);
                     let advance = consume_step(&mut game, &resources, false);
+                    if let Some(tune) = audio::on_step_tune(absorbed) {
+                        audio.play_tune(tune);
+                    }
                     if advance.week_ended {
                         schedule_week_end(
                             &mut pending_week,
@@ -1352,9 +1371,16 @@ async fn main() {
             }
 
             if input.is_move() {
+                let absorbed = step_absorbed(&game);
                 let result = game_step_basic(
                     &mut game, &mut map, &mut fog, &resources, input.dx, input.dy,
                 );
+                for tune in audio::tunes_for_step(&result, absorbed)
+                    .into_iter()
+                    .flatten()
+                {
+                    audio.play_tune(tune);
+                }
                 if let StepResult::Moved {
                     interaction,
                     advance,
@@ -1468,6 +1494,7 @@ async fn main() {
                                         foe_y,
                                     },
                                 ));
+                                audio.set_track(audio::Track::Combat);
                             } else if let Some(offer) = game.begin_friendly_encounter(
                                 &mut map,
                                 &resources,

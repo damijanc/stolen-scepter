@@ -92,10 +92,21 @@ pub fn tunes_for_step(result: &StepResult, absorbed: bool) -> [Option<Tune>; 2] 
             };
             [
                 chest.then_some(Tune::Chest),
-                (!bounced && !absorbed).then_some(Tune::Walk),
+                if bounced {
+                    None
+                } else {
+                    on_step_tune(absorbed)
+                },
             ]
         }
     }
+}
+
+/// The tune `GameOnStep` itself plays, `game.c:1149`: the walk tune, unless
+/// the step was absorbed. Resting reaches `GameOnStep` directly
+/// (`shell_actions.c:212`), so a rest plays it too.
+pub fn on_step_tune(absorbed: bool) -> Option<Tune> {
+    (!absorbed).then_some(Tune::Walk)
 }
 
 /// C's 0..9 master slider as decibels. 0 is silence, 9 is unity; out-of-range
@@ -349,6 +360,12 @@ mod tests {
         let mut options = [1, 1, 1, 1, 1, 1, 9];
         pin_options_without_device(&mut options);
         assert_eq!(options, [1, 0, 1, 1, 1, 0, 0]);
+    }
+
+    #[test]
+    fn resting_plays_the_walk_tune_unless_absorbed() {
+        assert_eq!(on_step_tune(false), Some(Tune::Walk));
+        assert_eq!(on_step_tune(true), None);
     }
 
     /// Zero must be silence, not unity gain. This is the boundary that would
