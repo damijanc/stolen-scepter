@@ -19,8 +19,9 @@ will be selected only after headless engine parity is solid.
   emits, `font.rs` the bitmap-font metrics, `palette.rs` the VGA table,
   `present.rs` the integer-scale blit, `sprites.rs` the pack art a `Sprite`
   resolves to, `map_render.rs` the overworld viewport, `anim.rs` the hero's
-  animation clock, `chrome.rs` the frame and status bar, `banner.rs` pack text
-  and its `%VAR%` substitution, `startup.rs` the pre-game wizard,
+  animation clock, `chrome.rs` the frame and status bar, `hud.rs` the five
+  sidebar panels (`hud.c`), `banner.rs` pack text and its `%VAR%`
+  substitution, `startup.rs` the pre-game wizard,
   `savepath.rs` the save-slot locations, and `input.rs` the key bindings.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. Run it with
