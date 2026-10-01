@@ -5864,6 +5864,43 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    /// An archive pack has no directory to resolve against, so the shell
+    /// supplies every zone's tiles up front. Init's scepter burial reads the
+    /// map itself, and must land exactly where the file-loaded twin above does.
+    #[test]
+    fn init_with_supplied_map_bytes_buries_scepter_like_the_file_pack() {
+        let mut resources = Resources::from_json_str(
+            r#"{
+              "world": {"starting_zone": "home"},
+              "tile_codes": {
+                ".": {"art":"grass","terrain":"grass"},
+                "F": {"art":"forest","terrain":"forest"}
+              },
+              "zones": [{
+                "id":"home",
+                "is_home":true,
+                "map":"maps/home.dat",
+                "width":4,
+                "height":2,
+                "chests":[{"x":0,"y":1,"id":"chest0"}],
+                "dwellings":[{"x":1,"y":1,"id":"dw0","kind":"hills"}],
+                "magic_alcove":{"x":2,"y":1}
+              }],
+              "towns": [{"index":0,"id":"town0","zone":"home","x":2,"y":0}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        assert!(resources.set_zone_map_bytes("home", b".F..\n....\n".to_vec()));
+        let mut game = Game::default();
+
+        game.init_seeded_with_resources(&resources, Some("Hero"), 0, 0, 0);
+
+        assert_eq!(game.scepter.zone.as_str(), "home");
+        assert_eq!((game.scepter.x, game.scepter.y), (3, 0));
+        assert_eq!(game.rng_snapshot(), 0xacdd_9880_3ce6_d167);
+    }
+
     #[test]
     fn bury_scepter_in_fixture_map_uses_row_major_plain_grass_target() {
         let mut game = Game::default();

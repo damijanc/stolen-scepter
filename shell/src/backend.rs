@@ -20,9 +20,9 @@ use std::collections::HashMap;
 use macroquad::prelude::{
     clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
     get_char_pressed, get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed,
-    is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, load_file,
-    load_texture, mouse_position, screen_height, screen_width, Color as MqColor, DrawTextureParams,
-    FilterMode, KeyCode, MouseButton, Rect as MqRect, Texture2D, Vec2,
+    is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
+    screen_height, screen_width, Color as MqColor, DrawTextureParams, FilterMode, Image, KeyCode,
+    MouseButton, Rect as MqRect, Texture2D, Vec2,
 };
 use openbounty_engine::resources::Resources;
 
@@ -30,6 +30,7 @@ use crate::draw::{Color, DrawCmd, DrawList, Rect, Sprite};
 use crate::font;
 use crate::input::{Key, KeySource};
 use crate::layout::Layout;
+use crate::pack::Pack;
 use crate::palette::Palette;
 use crate::pointer::{Button, PointerSource};
 use crate::present::{Present, Target};
@@ -53,7 +54,11 @@ pub struct Backend {
 
 impl Backend {
     /// Load the font, the palette, and every art file the pack names.
-    pub async fn load(resources: &Resources, catalog: &SpriteCatalog) -> Self {
+    ///
+    /// Everything is read through the [`Pack`], so a directory and an archive
+    /// load identically. Nothing here awaits any more: the pack already holds
+    /// or re-reads the bytes, and decoding them is synchronous.
+    pub fn load(resources: &Resources, catalog: &SpriteCatalog, pack: &Pack) -> Self {
         let mut backend = Self {
             textures: HashMap::new(),
             font: None,
@@ -62,48 +67,52 @@ impl Backend {
         };
 
         for relative in catalog.all_paths() {
-            backend.load_texture_at(resources, relative).await;
+            backend.load_texture_at(pack, relative);
         }
-        // Tile art is named by the map rather than the manifest, and loading
-        // it lazily would mean an await in the middle of a frame. The set is
-        // small and knowable up front, so it is loaded with everything else.
+        // Tile art is named by the map rather than the manifest. The set is
+        // small and knowable up front, so it is loaded with everything else
+        // rather than lazily in the middle of a frame.
         for art in tile_art_names(resources) {
-            backend
-                .load_texture_at(resources, &tile_art_path(&art))
-                .await;
+            backend.load_texture_at(pack, &tile_art_path(&art));
         }
 
-        backend.font = backend.fetch(resources, catalog.font_path()).await;
-        backend.palette = match resources.resolve_path(catalog.palette_path()) {
-            Some(path) => {
-                let bytes = load_file(&path.to_string_lossy()).await.ok();
-                Palette::from_bin_or_fallback(bytes.as_deref())
-            }
-            None => Palette::fallback(),
+        backend.font = backend.fetch(pack, catalog.font_path());
+        backend.palette = match catalog.palette_path() {
+            "" => Palette::fallback(),
+            relative => Palette::from_bin_or_fallback(pack.read(relative).as_deref()),
         };
 
         backend
     }
 
-    async fn load_texture_at(&mut self, resources: &Resources, relative: &str) {
+    fn load_texture_at(&mut self, pack: &Pack, relative: &str) {
         if self.textures.contains_key(relative) {
             return;
         }
-        if let Some(texture) = self.fetch(resources, relative).await {
+        if let Some(texture) = self.fetch(pack, relative) {
             self.textures.insert(relative.to_owned(), texture);
         }
     }
 
-    async fn fetch(&mut self, resources: &Resources, relative: &str) -> Option<Texture2D> {
-        let path = resources.resolve_path(relative)?;
-        match load_texture(&path.to_string_lossy()).await {
-            Ok(texture) => {
+    fn fetch(&mut self, pack: &Pack, relative: &str) -> Option<Texture2D> {
+        // An empty path names nothing, so it is not a missing file either.
+        if relative.is_empty() {
+            return None;
+        }
+        // A file the pack lacks and one that will not decode are the same
+        // hole: C installs a zero texture for both.
+        let image = pack
+            .read(relative)
+            .and_then(|bytes| Image::from_file_with_format(&bytes, None).ok());
+        match image {
+            Some(image) => {
+                let texture = Texture2D::from_image(&image);
                 // Every asset is pixel art. Anything but nearest-neighbour
                 // turns an 8x8 glyph into a smear at 3x.
                 texture.set_filter(FilterMode::Nearest);
                 Some(texture)
             }
-            Err(_) => {
+            None => {
                 self.missing.push(relative.to_owned());
                 None
             }

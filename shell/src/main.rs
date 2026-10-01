@@ -651,10 +651,21 @@ async fn main() {
         return;
     };
 
-    let resources = match Resources::from_json_file(std::path::Path::new(&pack_path)) {
+    let pack_location = pack::pack_location(std::path::Path::new(&pack_path));
+    let pack = match pack::Pack::open(&pack_location) {
+        Ok(pack) => pack,
+        Err(err) => {
+            eprintln!(
+                "cannot open game pack at {}: {err}",
+                pack_location.display()
+            );
+            return;
+        }
+    };
+    let resources = match pack::load_resources(&pack) {
         Ok(resources) => resources,
         Err(err) => {
-            eprintln!("could not load pack {pack_path}: {err:?}");
+            eprintln!("could not load pack {pack_path}: {err}");
             return;
         }
     };
@@ -672,7 +683,7 @@ async fn main() {
     request_new_screen_size(layout.window_w() as f32, layout.window_h() as f32);
 
     let catalog = SpriteCatalog::from_resources(&resources);
-    let backend = Backend::load(&resources, &catalog).await;
+    let backend = Backend::load(&resources, &catalog, &pack);
     let mut present = Present::for_layout(&layout);
 
     println!(

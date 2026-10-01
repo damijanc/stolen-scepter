@@ -106,11 +106,25 @@ impl Map {
         let zone = resources
             .zone_by_id(zone_id)
             .ok_or_else(|| MapLoadError::UnknownZone(zone_id.to_owned()))?;
+        let bytes = Self::zone_bytes(resources, zone)?;
+        Self::load_zone_bytes(resources, zone, &bytes)
+    }
+
+    /// A zone's tiles: the host-supplied bytes when there are any, else the
+    /// file at its resolved `map_path`.
+    fn zone_bytes<'a>(
+        resources: &'a Resources,
+        zone: &ResZone,
+    ) -> Result<std::borrow::Cow<'a, [u8]>, MapLoadError> {
+        if let Some(bytes) = resources.zone_map_bytes(zone.id.as_str()) {
+            return Ok(std::borrow::Cow::Borrowed(bytes));
+        }
         let path = resources
             .resolve_map_path(zone)
-            .ok_or_else(|| MapLoadError::MissingMapPath(zone_id.to_owned()))?;
-        let bytes = std::fs::read(&path).map_err(MapLoadError::Io)?;
-        Self::load_zone_bytes(resources, zone, &bytes)
+            .ok_or_else(|| MapLoadError::MissingMapPath(zone.id.as_str().to_owned()))?;
+        Ok(std::borrow::Cow::Owned(
+            std::fs::read(&path).map_err(MapLoadError::Io)?,
+        ))
     }
 
     pub fn load_zone_with_placements(
@@ -121,10 +135,7 @@ impl Map {
         let zone = resources
             .zone_by_id(zone_id)
             .ok_or_else(|| MapLoadError::UnknownZone(zone_id.to_owned()))?;
-        let path = resources
-            .resolve_map_path(zone)
-            .ok_or_else(|| MapLoadError::MissingMapPath(zone_id.to_owned()))?;
-        let bytes = std::fs::read(&path).map_err(MapLoadError::Io)?;
+        let bytes = Self::zone_bytes(resources, zone)?;
         Self::load_zone_bytes_with_placements(resources, zone, &bytes, game)
     }
 
@@ -600,7 +611,7 @@ impl Map {
 
 #[cfg(test)]
 mod tests {
-    use super::{Map, Tile};
+    use super::{Map, MapLoadError, Tile};
     use crate::game::Game;
     use crate::resources::Resources;
     use crate::tile::{Interact, Terrain};
@@ -653,6 +664,55 @@ mod tests {
         assert!(!map.walkable(-1, 0));
         assert!(!map.walkable(5, 0));
         assert!(!map.walkable(0, 1));
+    }
+
+    fn supplied_map_fixture() -> Resources {
+        Resources::from_json_str(
+            r#"{
+              "tile_codes": {
+                ".": {"art":"grass","terrain":"grass"},
+                "F": {"art":"forest","terrain":"forest"}
+              },
+              "zones": [{"id":"home","map":"maps/home.dat","width":4,"height":2}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses")
+    }
+
+    /// The path `maps/home.dat` does not exist anywhere; the supplied bytes
+    /// are the only way this zone can load.
+    #[test]
+    fn load_zone_prefers_supplied_bytes_over_the_filesystem() {
+        let mut resources = supplied_map_fixture();
+        assert!(resources.set_zone_map_bytes("home", b".F..\n....\n".to_vec()));
+
+        let map = Map::load_zone(&resources, "home").expect("supplied bytes load");
+        assert_eq!(map.tile(1, 0).expect("in bounds").terrain, Terrain::Forest);
+
+        let game = Game::default();
+        let map = Map::load_zone_with_placements(&resources, "home", &game)
+            .expect("supplied bytes load with placements");
+        assert_eq!(map.tile(1, 0).expect("in bounds").terrain, Terrain::Forest);
+    }
+
+    #[test]
+    fn load_zone_without_supplied_bytes_still_reads_the_path() {
+        let resources = supplied_map_fixture();
+        assert!(matches!(
+            Map::load_zone(&resources, "home"),
+            Err(MapLoadError::Io(_))
+        ));
+    }
+
+    #[test]
+    fn supplying_bytes_for_an_unknown_zone_is_refused() {
+        let mut resources = supplied_map_fixture();
+        assert!(!resources.set_zone_map_bytes("atlantis", b"....\n".to_vec()));
+        assert!(matches!(
+            Map::load_zone(&resources, "atlantis"),
+            Err(MapLoadError::UnknownZone(_))
+        ));
     }
 
     #[test]

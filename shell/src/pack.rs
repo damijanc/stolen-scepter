@@ -9,11 +9,11 @@
 //! valid until close, and the whole asset manifest is read during startup
 //! anyway.
 //!
-//! This lives in the shell, not the engine. The engine already exposes a
-//! byte-based entry point beside every path-based loader
-//! (`Resources::from_json_str`, `Map::load_zone_bytes`,
-//! `Game::switch_zone_bytes`), so the shell reads the bytes and feeds those.
-//! The engine never learns what an archive is.
+//! This lives in the shell, not the engine. The engine takes bytes:
+//! `Resources::from_json_str` for the manifest and
+//! `Resources::set_zone_map_bytes` for every zone's tiles, which
+//! [`load_resources`] supplies up front. The engine never learns what an
+//! archive is.
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -99,6 +99,46 @@ impl Pack {
     }
 }
 
+/// Where a command-line path points. A file named `game.json` is the old
+/// spelling of a directory pack, so it names its parent; anything else is
+/// the pack itself.
+pub fn pack_location(path: &Path) -> PathBuf {
+    if path.file_name().is_some_and(|name| name == "game.json") && path.is_file() {
+        if let Some(parent) = path.parent() {
+            return parent.to_path_buf();
+        }
+    }
+    path.to_path_buf()
+}
+
+/// Parse the pack's `game.json` and hand the engine every zone's map bytes.
+///
+/// Both pack modes go through here, so a directory and an archive cannot
+/// drift. The maps are supplied up front because the engine loads some of
+/// them itself -- scepter burial at init, the zone switch behind a gate or a
+/// defeat -- where no shell call site could pass bytes in.
+pub fn load_resources(pack: &Pack) -> Result<openbounty_engine::resources::Resources, String> {
+    let json = pack
+        .read("game.json")
+        .ok_or_else(|| "pack has no game.json".to_owned())?;
+    let json = std::str::from_utf8(&json).map_err(|err| format!("game.json: {err}"))?;
+    let mut resources = openbounty_engine::resources::Resources::from_json_str(json)
+        .map_err(|err| format!("game.json: {err:?}"))?;
+
+    for index in 0..resources.zone_count() {
+        let Some(zone) = resources.zone_by_index(index) else {
+            continue;
+        };
+        let id = zone.id;
+        // A map the pack lacks stays unsupplied; the zone then fails to load
+        // when something asks for it, as it would in C.
+        if let Some(bytes) = pack.read(zone.map_path.as_str()) {
+            resources.set_zone_map_bytes(id.as_str(), bytes.into_owned());
+        }
+    }
+    Ok(resources)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,6 +164,81 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         dir
+    }
+
+    const ZONE_PACK: &str = r#"{
+      "pack_id": "zoned",
+      "tile_codes": {
+        ".": {"art":"grass","terrain":"grass"},
+        "F": {"art":"forest","terrain":"forest"}
+      },
+      "zones": [{"id":"home","map":"maps/home.dat","width":4,"height":2}],
+      "troops": []
+    }"#;
+    const HOME_TILES: &[u8] = b".F..\n....\n";
+
+    /// Load the resources, then a zone map BY ID -- the way the engine's own
+    /// callers (scepter burial, gates, defeat) reach it.
+    fn second_tile_terrain(pack: &Pack) -> openbounty_engine::tile::Terrain {
+        let resources = load_resources(pack).expect("resources load");
+        assert_eq!(resources.pack_id.as_str(), "zoned");
+        let map = openbounty_engine::map::Map::load_zone(&resources, "home").expect("zone loads");
+        map.tile(1, 0).expect("in bounds").terrain
+    }
+
+    #[test]
+    fn a_directory_pack_feeds_the_engine_its_zone_maps() {
+        let dir = temp_dir("zoned_dir");
+        std::fs::create_dir_all(dir.join("maps")).expect("maps dir");
+        std::fs::write(dir.join("game.json"), ZONE_PACK).expect("write");
+        std::fs::write(dir.join("maps/home.dat"), HOME_TILES).expect("write");
+
+        let pack = Pack::open(&dir).expect("dir pack");
+        assert_eq!(
+            second_tile_terrain(&pack),
+            openbounty_engine::tile::Terrain::Forest
+        );
+    }
+
+    /// The archive has no directory the engine could resolve `maps/home.dat`
+    /// against, so this passes only if the bytes were handed over.
+    #[test]
+    fn an_archive_pack_feeds_the_engine_its_zone_maps() {
+        let path = temp_dir("zoned_zip").join("zoned.openbounty");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).expect("create"));
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.start_file("game.json", opts).expect("start");
+        zip.write_all(ZONE_PACK.as_bytes()).expect("write");
+        zip.start_file("maps/home.dat", opts).expect("start");
+        zip.write_all(HOME_TILES).expect("write");
+        zip.finish().expect("finish");
+
+        let pack = Pack::open(&path).expect("archive pack");
+        assert_eq!(
+            second_tile_terrain(&pack),
+            openbounty_engine::tile::Terrain::Forest
+        );
+    }
+
+    #[test]
+    fn a_pack_without_game_json_does_not_load() {
+        let dir = temp_dir("no_json");
+        let pack = Pack::open(&dir).expect("dir pack");
+        assert!(load_resources(&pack).is_err());
+    }
+
+    /// Every documented invocation passes `.../game.json`; that names the
+    /// directory pack holding it.
+    #[test]
+    fn a_game_json_path_names_its_directory_pack() {
+        let dir = temp_dir("legacy_arg");
+        let json = dir.join("game.json");
+        std::fs::write(&json, b"{}").expect("write");
+        assert_eq!(pack_location(&json), dir);
+
+        let archive = dir.join("x.openbounty");
+        assert_eq!(pack_location(&archive), archive);
+        assert_eq!(pack_location(&dir), dir);
     }
 
     #[test]
