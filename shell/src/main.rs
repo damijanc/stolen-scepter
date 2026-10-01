@@ -342,7 +342,6 @@ fn push_audio_options(audio: &mut KiraAudio, game: &Game) {
     audio.set_master_volume(options[audio::OPTION_VOLUME]);
 }
 
-/// Show the next pending week-end screen when nothing modal is up, porting
 /// Ports `main.c`'s game-over branch: with nothing modal up, a finished game
 /// ends the session on any key. It sits after the view branch in the input
 /// chain, so the key that dismisses the Win or Lose screen is not also the
@@ -351,6 +350,7 @@ fn game_over_quits(game: &Game, keys: &dyn KeySource) -> bool {
     game.is_over() && keys.any_pressed()
 }
 
+/// Show the next pending week-end screen when nothing modal is up, porting
 /// `pump_week_end_dialog`. Astrology queues the budget behind it.
 fn pump_week_end(
     pending: &mut Option<WeekEnd>,
