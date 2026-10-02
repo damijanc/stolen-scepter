@@ -1041,6 +1041,10 @@ async fn main() {
             None
         };
         views.set_hover(hovered);
+        menu.set_hover(hovered);
+        if let Some((picker, _)) = menu_picker.as_mut() {
+            picker.set_hover(hovered);
+        }
 
         // Input priority: combat first, then the message dialog owns the keys
         // while it is open (C's issue #19 gate), then the prompt, then the
@@ -1358,9 +1362,14 @@ async fn main() {
             // The Game Menu owns its arrows, digits, Enter and ESC. It is only
             // ever opened from the overworld branch below, so combat never
             // reaches it: the save format carries no combat state.
+            // A click resolves to the same value as the matching key.
             if let Some((picker, purpose)) = menu_picker.as_mut() {
                 let purpose = *purpose;
-                match picker.update(&keys) {
+                let choice = match clicked {
+                    Some(target) => picker.click(target),
+                    None => picker.update(&keys),
+                };
+                match choice {
                     None | Some(SlotChoice::Extra) => {}
                     Some(SlotChoice::Cancel) => menu_picker = None,
                     Some(SlotChoice::Slot(slot)) => {
@@ -1452,7 +1461,11 @@ async fn main() {
                     }
                 }
             } else {
-                match menu.update(&keys) {
+                let action = match clicked {
+                    Some(target) => menu.click(target),
+                    None => menu.update(&keys),
+                };
+                match action {
                     Some(MenuAction::Close) => views.dismiss(),
                     Some(MenuAction::Save) => {
                         let slots = scan_slots(&save_paths, resources.pack_id.as_str());
@@ -1941,16 +1954,16 @@ async fn main() {
             );
             if views.active() == Some(ViewKind::Menu) {
                 match &menu_picker {
-                    Some((picker, purpose)) => picker.draw(
+                    Some((picker, purpose)) => menu::draw_picker(
+                        picker,
                         &mut list,
+                        &mut hits,
                         &layout,
                         backend.palette(),
                         &resources,
-                        menu::picker_title(&resources, *purpose),
-                        "",
-                        menu::picker_hint(&resources),
+                        *purpose,
                     ),
-                    None => menu.draw(&mut list, &layout, backend.palette(), &resources),
+                    None => menu.draw(&mut list, &mut hits, &layout, backend.palette(), &resources),
                 }
             }
         }

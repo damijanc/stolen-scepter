@@ -21,6 +21,7 @@ use crate::font::GLYPH_H;
 use crate::input::{Key, KeySource};
 use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
+use crate::pointer::{HitList, HitTarget};
 use crate::savepath::{SavePaths, SlotSet, SAVE_SLOT_COUNT};
 
 /// Text C compiles in for the picker; the pack overrides it under
@@ -46,6 +47,9 @@ pub struct SlotPicker {
     pub cursor: usize,
     slots: SlotSet,
     extra_row: bool,
+    /// What the pointer was over last frame, so `set_hover` can tell a new
+    /// row from a resting pointer.
+    hover: Option<HitTarget>,
 }
 
 impl SlotPicker {
@@ -54,6 +58,7 @@ impl SlotPicker {
             cursor: 0,
             slots,
             extra_row,
+            hover: None,
         }
     }
 
@@ -87,13 +92,55 @@ impl SlotPicker {
         None
     }
 
+    /// The pointer ENTERING a row moves the cursor to it, so there is one
+    /// highlight and it is what Enter or a click picks. A pointer resting on
+    /// the same row moves nothing, which leaves the arrow keys working.
+    pub fn set_hover(&mut self, target: Option<HitTarget>) {
+        if target != self.hover {
+            if let Some(HitTarget::SlotRow(row)) = target {
+                if row < self.row_count() {
+                    self.cursor = row;
+                }
+            }
+        }
+        self.hover = target;
+    }
+
+    /// The same choice Enter gives on that row, cursor move included.
+    /// `SlotCancel` is ESC; only a caller that publishes it can receive it.
+    pub fn click(&mut self, target: HitTarget) -> Option<SlotChoice> {
+        match target {
+            HitTarget::SlotRow(row) if row < self.row_count() => {
+                self.cursor = row;
+                if row == SAVE_SLOT_COUNT {
+                    Some(SlotChoice::Extra)
+                } else {
+                    Some(SlotChoice::Slot(row))
+                }
+            }
+            HitTarget::SlotCancel => Some(SlotChoice::Cancel),
+            _ => None,
+        }
+    }
+
+    fn row_fg(&self, row: usize, palette: &Palette) -> crate::draw::Color {
+        if row == self.cursor {
+            palette.clr(Pal::Yellow)
+        } else {
+            palette.clr(Pal::White)
+        }
+    }
+
     /// Emit the picker panel. `extra_label` is drawn as the trailing row only
     /// when the picker was built with one. `hint` is the key line at the
     /// bottom, which differs because ESC quits at startup but steps back
-    /// in-game.
+    /// in-game. Each row publishes its own region; a backdrop region, if the
+    /// caller wants one, is the caller's to push first.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -125,11 +172,7 @@ impl SlotPicker {
         );
         let mut ty = y + pad + header_h;
         for slot in 0..SAVE_SLOT_COUNT {
-            let fg = if slot == self.cursor {
-                palette.clr(Pal::Yellow)
-            } else {
-                palette.clr(Pal::White)
-            };
+            let fg = self.row_fg(slot, palette);
             let line = match &self.slots.headers[slot] {
                 Some(header) => format!(
                     "{:>2}. {:<10}  {:<9}  {:>3}d",
@@ -141,16 +184,17 @@ impl SlotPicker {
                 None => format!("{:>2}. {}", slot + 1, empty),
             };
             list.text(&line, x + pad, ty, fg);
+            hits.push(Rect::new(x, ty, w, row_h), HitTarget::SlotRow(slot));
             ty += row_h;
         }
 
         if self.extra_row {
-            let extra_fg = if self.cursor == SAVE_SLOT_COUNT {
-                palette.clr(Pal::Yellow)
-            } else {
-                palette.clr(Pal::White)
-            };
+            let extra_fg = self.row_fg(SAVE_SLOT_COUNT, palette);
             list.text(&format!("    {extra_label}"), x + pad, ty, extra_fg);
+            hits.push(
+                Rect::new(x, ty, w, row_h),
+                HitTarget::SlotRow(SAVE_SLOT_COUNT),
+            );
         }
 
         list.text(hint, x + pad, y + h - pad - instr_h, palette.clr(Pal::Grey));
@@ -348,7 +392,14 @@ mod tests {
             let picker = SlotPicker::new(slots_with(&[1]), extra_row);
             let mut list = DrawList::new();
             picker.draw(
-                &mut list, &layout, &palette, &resources, "Title", "New game", "Hint",
+                &mut list,
+                &mut HitList::new(),
+                &layout,
+                &palette,
+                &resources,
+                "Title",
+                "New game",
+                "Hint",
             );
             let texts = list.texts();
             assert_eq!(
@@ -362,5 +413,127 @@ mod tests {
                 .iter()
                 .any(|(_, _, text)| text.contains("Sir Rust") && text.contains("400d")));
         }
+    }
+
+    fn drawn(picker: &SlotPicker) -> (DrawList, HitList) {
+        let resources = resources();
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        picker.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            "Title",
+            "New game",
+            "Hint",
+        );
+        (list, hits)
+    }
+
+    /// The anti-drift test: every row's region holds the text drawn for that
+    /// row, and its centre hits that row alone.
+    #[test]
+    fn the_picker_hit_regions_line_up_with_the_drawn_rows() {
+        let picker = SlotPicker::new(slots_with(&[2]), true);
+        let (list, hits) = drawn(&picker);
+        let texts = list.texts();
+        for row in 0..=SAVE_SLOT_COUNT {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::SlotRow(row))
+                .unwrap_or_else(|| panic!("row {row} published no region"));
+            let needle = if row == SAVE_SLOT_COUNT {
+                "New game".to_owned()
+            } else {
+                format!("{:>2}. ", row + 1)
+            };
+            let (tx, ty, _) = texts
+                .iter()
+                .find(|(_, _, text)| text.contains(&needle))
+                .copied()
+                .unwrap_or_else(|| panic!("row {row} not drawn"));
+            let r = region.rect;
+            assert!(tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h);
+            assert_eq!(
+                hits.hit(r.x + r.w / 2, r.y + r.h / 2),
+                Some(HitTarget::SlotRow(row))
+            );
+        }
+    }
+
+    /// Without an extra row there is no region for it, and the picker
+    /// itself never publishes a cancel backdrop.
+    #[test]
+    fn no_extra_row_means_no_extra_region_and_no_backdrop() {
+        let (_, hits) = drawn(&SlotPicker::new(slots_with(&[]), false));
+        assert!(hits
+            .regions()
+            .iter()
+            .all(|r| matches!(r.target, HitTarget::SlotRow(row) if row < SAVE_SLOT_COUNT)));
+        assert_eq!(hits.regions().len(), SAVE_SLOT_COUNT);
+    }
+
+    /// A click gives what Enter on that row gives, cursor included.
+    #[test]
+    fn clicking_a_row_matches_enter_on_it() {
+        for (extra_row, row) in [(false, 0), (false, 5), (true, SAVE_SLOT_COUNT)] {
+            let mut by_key = SlotPicker::new(slots_with(&[5]), extra_row);
+            by_key.cursor = row;
+            let keyed = by_key.update(&Keys::pressed(&[Key::Enter]));
+            let mut by_click = SlotPicker::new(slots_with(&[5]), extra_row);
+            assert_eq!(by_click.click(HitTarget::SlotRow(row)), keyed);
+            assert_eq!(by_click.cursor, row);
+        }
+        // The extra row does not exist without one.
+        let mut picker = SlotPicker::new(slots_with(&[]), false);
+        assert_eq!(picker.click(HitTarget::SlotRow(SAVE_SLOT_COUNT)), None);
+        assert_eq!(
+            picker.click(HitTarget::SlotCancel),
+            Some(SlotChoice::Cancel)
+        );
+        assert_eq!(picker.click(HitTarget::MenuClose), None);
+    }
+
+    /// One highlight: entering a row moves the cursor there.
+    #[test]
+    fn hovering_a_row_moves_the_single_highlight_to_it() {
+        let mut picker = SlotPicker::new(slots_with(&[]), false);
+        picker.set_hover(Some(HitTarget::SlotRow(4)));
+        assert_eq!(picker.cursor, 4);
+        let (list, _) = drawn(&picker);
+        let palette = Palette::fallback();
+        let colour_of = |prefix: &str| {
+            list.as_slice().iter().find_map(|cmd| match cmd {
+                crate::draw::DrawCmd::Text { text, color, .. } if text.starts_with(prefix) => {
+                    Some(*color)
+                }
+                _ => None,
+            })
+        };
+        assert_eq!(colour_of(" 5. "), Some(palette.clr(Pal::Yellow)));
+        assert_eq!(colour_of(" 1. "), Some(palette.clr(Pal::White)));
+        assert_eq!(
+            picker.update(&Keys::pressed(&[Key::Enter])),
+            Some(SlotChoice::Slot(4))
+        );
+    }
+
+    #[test]
+    fn a_resting_pointer_does_not_pin_the_picker_cursor() {
+        let mut picker = SlotPicker::new(slots_with(&[]), true);
+        picker.set_hover(Some(HitTarget::SlotRow(2)));
+        picker.update(&Keys::pressed(&[Key::Down]));
+        picker.set_hover(Some(HitTarget::SlotRow(2)));
+        assert_eq!(picker.cursor, 3);
+        // The extra row is a row like any other; a row past the end is not.
+        picker.set_hover(Some(HitTarget::SlotRow(SAVE_SLOT_COUNT)));
+        assert_eq!(picker.cursor, SAVE_SLOT_COUNT);
+        let mut plain = SlotPicker::new(slots_with(&[]), false);
+        plain.set_hover(Some(HitTarget::SlotRow(SAVE_SLOT_COUNT)));
+        assert_eq!(plain.cursor, 0);
     }
 }

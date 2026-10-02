@@ -441,8 +441,17 @@ impl Startup {
                             "controls_hint",
                             DEFAULT_CONTROLS_HINT,
                         );
-                        self.picker
-                            .draw(list, layout, palette, resources, title, new_label, hint)
+                        // Startup publishes no click regions yet.
+                        self.picker.draw(
+                            list,
+                            &mut crate::pointer::HitList::new(),
+                            layout,
+                            palette,
+                            resources,
+                            title,
+                            new_label,
+                            hint,
+                        )
                     }
                     Screen::CreateGame => {
                         self.draw_create_game(list, layout, palette, resources, time)

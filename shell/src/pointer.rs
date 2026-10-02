@@ -34,6 +34,15 @@ pub enum HitTarget {
     DialogDismiss,
     PromptYes,
     PromptNo,
+    /// A Game Menu entry, by drawn index.
+    MenuEntry(usize),
+    /// The screen around the Game Menu panel: a click there is ESC.
+    MenuClose,
+    /// A save-slot picker row. `SAVE_SLOT_COUNT` is the extra row.
+    SlotRow(usize),
+    /// The screen around the in-game picker: a click there is ESC. Only the
+    /// in-game caller publishes it -- at startup ESC quits the game.
+    SlotCancel,
 }
 
 /// One actionable rectangle, in logical coordinates.

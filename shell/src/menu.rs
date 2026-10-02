@@ -16,7 +16,8 @@ use crate::font::{GLYPH_H, GLYPH_W};
 use crate::input::{Key, KeySource, DIGITS};
 use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
-use crate::slot_picker::LoadError;
+use crate::pointer::{HitList, HitTarget};
+use crate::slot_picker::{LoadError, SlotPicker};
 
 pub const ENTRY_COUNT: usize = 3;
 
@@ -52,6 +53,9 @@ pub enum PickerPurpose {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Menu {
     pub cursor: usize,
+    /// What the pointer was over last frame, so `set_hover` can tell a new
+    /// entry from a resting pointer.
+    hover: Option<HitTarget>,
 }
 
 impl Menu {
@@ -83,11 +87,39 @@ impl Menu {
         None
     }
 
+    /// The pointer ENTERING an entry moves the cursor to it, so there is one
+    /// highlight and it is what Enter or a click picks. A pointer resting on
+    /// the same entry moves nothing, which leaves the arrow keys working.
+    pub fn set_hover(&mut self, target: Option<HitTarget>) {
+        if target != self.hover {
+            if let Some(HitTarget::MenuEntry(index)) = target {
+                if index < ENTRY_COUNT {
+                    self.cursor = index;
+                }
+            }
+        }
+        self.hover = target;
+    }
+
+    /// The same outcome a key gives: an entry click is its digit (it moves
+    /// the cursor and confirms), a click off the panel is ESC.
+    pub fn click(&mut self, target: HitTarget) -> Option<MenuAction> {
+        match target {
+            HitTarget::MenuEntry(index) if index < ENTRY_COUNT => {
+                self.cursor = index;
+                Some(ACTIONS[index])
+            }
+            HitTarget::MenuClose => Some(MenuAction::Close),
+            _ => None,
+        }
+    }
+
     /// A rounded panel with a title, the numbered entries (the cursor row in
     /// yellow) and its own key hint, centred on the screen.
     pub fn draw(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -118,6 +150,11 @@ impl Menu {
         let h = pad + (GLYPH_H + 4) + ENTRY_COUNT as i32 * row_h + 4 + GLYPH_H + pad;
         let x = (layout.screen_w - w) / 2;
         let y = (layout.screen_h - h) / 2;
+        // The backdrop first: a later region wins, so the entries cover it.
+        hits.push(
+            Rect::new(0, 0, layout.screen_w, layout.screen_h),
+            HitTarget::MenuClose,
+        );
         list.rounded_panel(
             Rect::new(x, y, w, h),
             palette.clr(Pal::DBlue),
@@ -133,6 +170,9 @@ impl Menu {
                 palette.clr(Pal::White)
             };
             list.text(label, x + pad, ty, fg);
+            // The whole panel width, so the gap between label and border
+            // still hits the row.
+            hits.push(Rect::new(x, ty, w, row_h), HitTarget::MenuEntry(index));
             ty += row_h;
         }
         list.text(hint, x + pad, y + h - pad - GLYPH_H, palette.clr(Pal::Grey));
@@ -164,6 +204,34 @@ pub fn picker_hint(resources: &Resources) -> &str {
         "picker_hint",
         "UP/DN move  ENTER pick  ESC back",
     )
+}
+
+/// Draw the in-game picker for `purpose`. Unlike startup, a click off the
+/// panel steps back to the menu, as ESC does here, so the backdrop region is
+/// published first and the picker's rows cover it.
+pub fn draw_picker(
+    picker: &SlotPicker,
+    list: &mut DrawList,
+    hits: &mut HitList,
+    layout: &Layout,
+    palette: &Palette,
+    resources: &Resources,
+    purpose: PickerPurpose,
+) {
+    hits.push(
+        Rect::new(0, 0, layout.screen_w, layout.screen_h),
+        HitTarget::SlotCancel,
+    );
+    picker.draw(
+        list,
+        hits,
+        layout,
+        palette,
+        resources,
+        picker_title(resources, purpose),
+        "",
+        picker_hint(resources),
+    );
 }
 
 /// Confirm overwriting an occupied slot; `name` is the hero saved there.
@@ -329,7 +397,13 @@ mod tests {
         let mut menu = Menu::new();
         menu.cursor = 1;
         let mut list = DrawList::new();
-        menu.draw(&mut list, &layout, &palette, &resources);
+        menu.draw(
+            &mut list,
+            &mut HitList::new(),
+            &layout,
+            &palette,
+            &resources,
+        );
 
         let texts = list.texts();
         for expected in [
@@ -357,6 +431,147 @@ mod tests {
     fn resources() -> Resources {
         Resources::from_json_str(r#"{"render": {"mode": "legacy"}, "troops": []}"#)
             .expect("fixture parses")
+    }
+
+    fn drawn_hits(menu: &Menu) -> (DrawList, HitList) {
+        let resources = resources();
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        menu.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+        );
+        (list, hits)
+    }
+
+    /// The anti-drift test: each entry's region holds the text drawn for it,
+    /// and its centre hits that entry and no other.
+    #[test]
+    fn the_menu_hit_regions_line_up_with_the_drawn_entries() {
+        let (list, hits) = drawn_hits(&Menu::new());
+        for (index, label) in ["1. Save game", "2. Load game", "3. Quit"]
+            .iter()
+            .enumerate()
+        {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::MenuEntry(index))
+                .unwrap_or_else(|| panic!("entry {index} published no region"));
+            let (tx, ty, _) = list
+                .texts()
+                .into_iter()
+                .find(|(_, _, text)| text == label)
+                .expect("entry drawn");
+            let r = region.rect;
+            assert!(tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h);
+            assert_eq!(
+                hits.hit(r.x + r.w / 2, r.y + r.h / 2),
+                Some(HitTarget::MenuEntry(index))
+            );
+        }
+    }
+
+    #[test]
+    fn a_click_off_the_panel_closes_the_menu() {
+        let (_, hits) = drawn_hits(&Menu::new());
+        assert_eq!(hits.hit(0, 0), Some(HitTarget::MenuClose));
+        assert_eq!(
+            Menu::new().click(HitTarget::MenuClose),
+            Some(MenuAction::Close)
+        );
+    }
+
+    /// A click gives what the entry's digit gives, cursor move included.
+    #[test]
+    fn clicking_an_entry_matches_its_digit_key() {
+        for (index, digit) in [Key::Digit1, Key::Digit2, Key::Digit3].iter().enumerate() {
+            let mut by_key = Menu::new();
+            let mut by_click = Menu::new();
+            let keyed = by_key.update(&Keys::pressed(&[*digit]));
+            let clicked = by_click.click(HitTarget::MenuEntry(index));
+            assert_eq!(clicked, keyed);
+            assert_eq!(by_click.cursor, by_key.cursor);
+        }
+        assert_eq!(Menu::new().click(HitTarget::MenuEntry(ENTRY_COUNT)), None);
+        assert_eq!(Menu::new().click(HitTarget::SlotCancel), None);
+    }
+
+    /// One highlight, not two: entering an entry with the pointer moves the
+    /// cursor there, so the yellow row is what Enter or a click will pick.
+    #[test]
+    fn hovering_an_entry_moves_the_single_highlight_to_it() {
+        let mut menu = Menu::new();
+        menu.set_hover(Some(HitTarget::MenuEntry(2)));
+        assert_eq!(menu.cursor, 2);
+        let (list, _) = drawn_hits(&menu);
+        let colour_of = |label: &str| {
+            list.as_slice().iter().find_map(|cmd| match cmd {
+                DrawCmd::Text { text, color, .. } if text == label => Some(*color),
+                _ => None,
+            })
+        };
+        let palette = Palette::fallback();
+        assert_eq!(colour_of("3. Quit"), Some(palette.clr(Pal::Yellow)));
+        assert_eq!(colour_of("1. Save game"), Some(palette.clr(Pal::White)));
+        assert_eq!(colour_of("2. Load game"), Some(palette.clr(Pal::White)));
+        assert_eq!(
+            menu.update(&Keys::pressed(&[Key::Enter])),
+            Some(MenuAction::Quit)
+        );
+    }
+
+    /// The cursor moves only when the pointer ENTERS an entry, so the arrow
+    /// keys still work while the mouse rests on one.
+    #[test]
+    fn a_resting_pointer_does_not_pin_the_cursor() {
+        let mut menu = Menu::new();
+        menu.set_hover(Some(HitTarget::MenuEntry(0)));
+        menu.update(&Keys::pressed(&[Key::Down]));
+        menu.set_hover(Some(HitTarget::MenuEntry(0)));
+        assert_eq!(menu.cursor, 1, "the same hover again is not a new entry");
+        // Leaving the panel leaves the cursor where it is.
+        menu.set_hover(Some(HitTarget::MenuClose));
+        menu.set_hover(None);
+        assert_eq!(menu.cursor, 1);
+        // Re-entering the same entry does move it back.
+        menu.set_hover(Some(HitTarget::MenuEntry(0)));
+        assert_eq!(menu.cursor, 0);
+    }
+
+    /// In-game, a click off the picker steps back like ESC, and the rows
+    /// still win over that backdrop.
+    #[test]
+    fn the_in_game_picker_cancels_off_the_panel_and_rows_cover_it() {
+        let resources = resources();
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let picker = SlotPicker::new(crate::savepath::SlotSet::default(), false);
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        draw_picker(
+            &picker,
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            PickerPurpose::Load,
+        );
+        assert_eq!(hits.hit(0, 0), Some(HitTarget::SlotCancel));
+        let row = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::SlotRow(0))
+            .expect("slot 0 published");
+        assert_eq!(
+            hits.hit(row.rect.x + 1, row.rect.y + 1),
+            Some(HitTarget::SlotRow(0))
+        );
+        assert!(list.has_text_containing("Load which game?"));
     }
 
     /// Slots are 0-based inside the shell and 1-based on screen, matching the

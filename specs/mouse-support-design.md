@@ -60,6 +60,24 @@ else-if ordering and make the input path lie about where they came from.
 The pointer highlights the actionable row under it, reusing the styling the
 keyboard cursor already draws.
 
+### 3b. In the Game Menu and slot picker, hover MOVES the cursor (P10)
+
+Revised in play: there, a hover highlight beside the keyboard cursor showed two
+yellow rows and read as "the mouse does nothing". The menu and picker therefore
+keep ONE highlight -- the pointer ENTERING a row moves the cursor to it, so the
+yellow row is always what Enter or a click picks. A pointer resting on the same
+row moves nothing, so the arrow keys keep working under a still mouse. The
+earlier views (town, castles, recruit, spells, gate, controls) still follow
+decision 3 and highlight without moving.
+
+### 3a. A click off a menu panel is ESC (P10)
+
+The Game Menu and its in-game slot picker publish a full-screen backdrop region
+before their rows (`MenuClose`, `SlotCancel`), so a click off the panel gives
+the value ESC gives. At startup the picker publishes NO backdrop, because there
+ESC quits the game -- a stray click must not. The picker therefore leaves the
+backdrop to its caller (`menu::draw_picker`).
+
 ### 4. The shell draws its own pointer (revised 2026-10-02, P3)
 
 The first cut kept the OS arrow. In play (P3) the macOS arrow, black with a thin
