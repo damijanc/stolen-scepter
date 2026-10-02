@@ -27,7 +27,8 @@ will be selected only after headless engine parity is solid.
   F10 debug menu, `audio.rs` the audio policy (`audio.c`'s decisions, no
   library), `pack.rs` the pack reader and discovery (`pack.c`),
   `pack_select.rs` the pre-game pack picker (`pack_select.c`), and
-  `input.rs` the key bindings, and `cursor.rs` the shell-drawn mouse pointer.
+  `input.rs` the key bindings, `cursor.rs` the shell-drawn mouse pointer, and
+  `walk.rs` overworld click-to-move (routes over the engine's `step_preview`).
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. The one stated exception is `pack_select.rs`: the picker runs before
   any pack is open, so the DrawList pipeline (built on pack art) has nothing
@@ -270,7 +271,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 359 engine unit tests, 424 shell unit tests, 25 combat digest
+Test coverage is 365 engine unit tests, 493 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

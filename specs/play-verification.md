@@ -42,7 +42,7 @@ Every behavioral claim carries the layer it came from:
 - **BY DESIGN** -- C does it and this port deliberately does not.
 - **OUT OF SCOPE** -- C shell tooling that is not part of playing.
 
-Last refreshed 2026-10-01, against the audio merge into `main` (`a34868c`) plus the in-game menu slice. Several §13 entries had gone stale by 2026-09-22 -- the
+Last refreshed 2026-10-02, against the full mouse-support work (`70d82de`..`0d27e65`: the drawn pointer, the Game Menu and slot picker, the startup wizard, combat, and overworld click-to-move). Before that, 2026-10-01, against the audio merge into `main` (`a34868c`) plus the in-game menu slice. Several §13 entries had gone stale by 2026-09-22 -- the
 startup wizard, the defeat message and the villain capture banner were all
 listed as missing after they shipped. Re-check a status against the code
 before trusting it.
@@ -118,6 +118,14 @@ What the flow offers:
 2. That choosing a difficulty actually changes the starting day count.
 3. Start two runs with no `--seed` and confirm the worlds differ; then pass the
    same `--seed` twice and confirm they match.
+4. **Mouse** [PORT]: a white arrow follows the pointer over the game (the OS
+   arrow returns over the letterbox). A click skips each splash, the credits
+   and the intro. Hovering a figure on class select outlines it in yellow and
+   a click picks that class, as its letter does. A click on the red hint bar
+   opens the save picker, as `L` does; a click on a slot loads it, and a click
+   off the panel steps back to class select (never quits). Name entry is
+   keyboard-only; after Enter, hovering a difficulty moves the `>` and a click
+   accepts it.
 
 ---
 
@@ -188,8 +196,16 @@ Interactions, all **OK** unless marked:
 2. Pick up the Anchor of Admiralty and confirm boat rental drops 500 -> 100 (§5).
 3. Confirm a telecave's destination is stable across repeated uses.
 4. **Mouse:** click a read-only view (army, character, contract, puzzle,
-   worldmap, options) to dismiss it, as any key does. The overworld itself is
-   keyboard-only -- click-to-move is a design non-goal.
+   worldmap, options) to dismiss it, as any key does.
+5. **Mouse, click-to-move** [PORT] (`specs/overworld-click-to-move-design.md`):
+   a click on a tile next to the hero is that direction key, foes included. A
+   click on a revealed tile further away walks there, one visible step every
+   0.12 s, taking the fewest days (it goes round desert when that is cheaper).
+   The route never passes through a town, castle, chest, dwelling, sign or foe,
+   but a town, castle, chest or dwelling can be its end, and stepping on fires
+   it. Clicking into fog or onto a far foe does nothing. The walk stops at the
+   first interaction, a foe walking onto the hero, a week end, any key, any
+   click, or anything modal.
 
 ---
 
@@ -373,6 +389,17 @@ Other quirks:
 7. Check the title bar during combat: before the first kill it should read
    `Options / <troop> M<moves>` (plus `,S<shots>` only when shots remain);
    after the first kill it switches to a "X vs Y killing N" summary.
+8. Press `S`, `F` (with a flyer) or `U` then a letter: the target ring [C]
+   shows on the acting unit and follows the arrows. `U` shows the "Spells /
+   Combat" menu with your counts and A-G [C].
+9. **Mouse** [PORT] (`specs/combat-mouse-design.md`): on your turn, a click on
+   a neighbouring cell is that direction key (move or attack); a click on a
+   far enemy shoots it (S, aim, Enter), with the same "No ammo" refusal; a
+   click on the acting unit opens an action menu whose entries are exactly
+   their keys. While aiming, the ring follows the pointer and a click
+   confirms; a spell menu row is its letter; the give-up prompt takes Yes/No
+   clicks. Right-click, or a click off a menu, is ESC. Clicks do nothing on
+   the enemy's turn.
 
 ---
 
@@ -446,7 +473,11 @@ Do not file these as findings; they are already tracked.
 | Open content pack | GAP | `packs/open` covers 267/311 art slots (missing: the 43 `ui/` slots and the bitmap font), and there is no open `game.json` or maps -- `tools/open_pack.py build` overlays art onto the gitignored reference clone. Playing still requires a local OpenBounty checkout |
 | `game.hud_visible` | DEAD | C writes it when an overlay opens and closes, and `draw_frame` never reads it. Do not wire it up |
 | Recorder, autoplay, demo | OUT OF SCOPE | `--movie`, `--autoplay`, `--demo`, `--headless`, `--validate-pack` and `--fullscreen` are dev tooling, not play |
-| Mouse: overworld & combat | BY DESIGN | Click-to-move and clicks on the combat field are design non-goals. A view opened over the battlefield takes clicks as it does on the overworld |
+| Mouse pointer | OK | [PORT] The shell draws its own white arrow (`shell/src/cursor.rs`) in logical pixels, so it scales with the game; the OS arrow is hidden only over the game area. Fixes P3, where the black macOS arrow vanished over the black frame |
+| Mouse: menus, views, dialogs, prompts | OK | [PORT] Every row clicks as its key does (`specs/mouse-support-design.md`). The Game Menu and slot picker: hover moves the single highlight, and a click off the panel is ESC |
+| Mouse: startup wizard | OK | [PORT] Click to skip, click a figure, the hint bar, a slot or a difficulty; name entry stays keyboard (§1) |
+| Mouse: combat | OK | [PORT] Cell clicks, far-enemy shooting, the action menu on the acting unit, aiming and the spell menu, right-click as ESC (§9, `specs/combat-mouse-design.md`). A view opened over the battlefield takes clicks as it does on the overworld |
+| Mouse: overworld click-to-move | OK | [PORT] Fewest-days routes over revealed tiles, every tile one ordinary step (§4, `specs/overworld-click-to-move-design.md`). Engine GAPs 1-4 are not fixed by it: a foe is never a route's goal (GAP 3), and a foe collision stops the walk but still shows nothing (GAP 4) |
 | Mouse: count entry | BY DESIGN | Recruit/dwelling "how many" is keyboard-only |
 
 ---

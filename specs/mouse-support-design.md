@@ -1,8 +1,12 @@
 # Mouse Support Design
 
-Status: agreed 2026-09-20. Covers the first cut of pointer input in the shell:
-menus, views, dialogs and prompts. Combat and the overworld are explicitly out
-of scope here and are listed under Non-Goals.
+Status: agreed 2026-09-20 for menus, views, dialogs and prompts; WIDENED
+2026-10-02 by the user's decision P11 (`specs/play-verification-findings.md`) to
+full mouse support, Amiga-style: the drawn pointer, the Game Menu and slot
+picker, the startup wizard, combat (`specs/combat-mouse-design.md`) and
+overworld click-to-move (`specs/overworld-click-to-move-design.md`). All of it
+has shipped. The 2026-09-20 non-goals for combat, click-to-move and the wizard
+are reversed; the rest stand (see Non-goals).
 
 Read `AGENTS.md` and `specs/shell-renderer-plan.md` first. Everything there
 still applies -- parity-first translation, one-line commit messages, approval
@@ -20,7 +24,11 @@ in service of the eventual modernisation the shell plan already anticipates
 (modern render mode, higher resolution, an art overhaul). It is confined to the
 shell by construction:
 
-- The engine gains nothing. `engine/tests/render_free.rs` must still pass.
+- The engine gains no presentation code. `engine/tests/render_free.rs` must
+  still pass. The one engine addition for the mouse is the read-only
+  `step::step_preview` query, which `game_step_basic` itself uses for its
+  can-move decision, so click-to-move reads walkability from the engine
+  instead of re-deriving it.
 - The pointer cannot reach a transaction the keyboard cannot. Every click
   resolves to a value the keyboard path already produces, so all existing
   engine guards, ordering and tests remain the only authority on what is legal.
@@ -58,7 +66,10 @@ else-if ordering and make the input path lie about where they came from.
 ### 3. Hover highlights, nothing more
 
 The pointer highlights the actionable row under it, reusing the styling the
-keyboard cursor already draws.
+keyboard cursor already draws. This holds for the original views (town,
+castles, recruit, spells, gate, controls). The surfaces added since follow 3b
+instead -- the Game Menu, the slot picker, the difficulty table and the combat
+target ring move their single highlight when the pointer ENTERS a row or cell.
 
 ### 3b. In the Game Menu and slot picker, hover MOVES the cursor (P10)
 
@@ -120,18 +131,24 @@ pointer share. Only the scissor rect is in framebuffer pixels.
 
 | Concern | Location |
 | --- | --- |
-| `PointerSource` trait, `Button`, `HitRegion`, `HitList`, hit-test scan | `shell/src/pointer.rs` (new) |
-| `MacroquadPointer` -- the only mouse-aware code | `shell/src/backend.rs` |
+| `PointerSource` trait, `Button`, `HitTarget`, `HitRegion`, `HitList`, hit-test scan | `shell/src/pointer.rs` |
+| `MacroquadPointer`, `set_os_cursor_visible` -- the only mouse-aware code | `shell/src/backend.rs` |
 | `window_to_logical`, the inverse of `blit_rect` | `shell/src/present.rs` |
-| `HitList` population, `hover` state | `shell/src/views.rs`, `dialog.rs`, `prompt.rs` |
-| Poll, hit-test, merge with the keyboard result | `shell/src/main.rs` |
+| The drawn pointer | `shell/src/cursor.rs` |
+| Views, dialogs, prompts | `shell/src/views.rs`, `dialog.rs`, `prompt.rs` |
+| Game Menu, slot picker | `shell/src/menu.rs`, `slot_picker.rs` |
+| Startup wizard | `shell/src/startup.rs` |
+| Combat cells, action menu, spell menu, `PointerInput` | `shell/src/combat.rs` |
+| Map tile regions | `shell/src/map_render.rs` (`MapScene::publish_hits`) |
+| Route planning and the walk | `shell/src/walk.rs`, over `engine/src/step.rs::step_preview` |
+| `logical_pointer`, poll, hit-test, merge with the keyboard result | `shell/src/main.rs` |
 
 `PointerSource` mirrors `KeySource`'s shape and exists for the same reason --
 every hit-test and dispatch test runs headlessly, with no window:
 
 ```rust
 pub trait PointerSource {
-    fn position(&self) -> Option<(i32, i32)>;  // window pixels, None if outside
+    fn position(&self) -> Option<(i32, i32)>;  // window POINTS (see decision 4)
     fn pressed(&self, button: Button) -> bool; // went down this frame
     fn down(&self, button: Button) -> bool;    // held
     fn released(&self, button: Button) -> bool;
@@ -173,7 +190,7 @@ they are out of bounds -- the inversion itself must not clamp.
 
 Per frame, in `main.rs`:
 
-1. `MacroquadPointer` reads window pixels and button edges.
+1. `MacroquadPointer` reads window points and button edges.
 2. `present.window_to_logical(...)` -> `Option<(i32, i32)>`; `None` when the
    pointer is in the letterbox outside the blit rect.
 3. Hit-test the **previous** frame's `HitList` -> `Option<HitTarget>`.
@@ -190,9 +207,10 @@ disturb recently stabilised code.
 
 ## Hover rules
 
-- Hover is **purely visual**. It does NOT move the keyboard cursor. Moving the
-  mouse must not silently change what `Enter` does; that is the classic
-  mixed-input bug.
+- In the original views hover is **purely visual**: it does not move the
+  keyboard cursor. Where the two-highlight form confused play (P10), hover
+  moves the single highlight instead, but only on ENTERING a row, so a still
+  mouse never pins the cursor against the arrow keys (decision 3b).
 - Hover clears when the pointer leaves the window or sits in the letterbox, so
   nothing stays lit.
 
@@ -232,14 +250,17 @@ Five categories, all headless via a `Pointer` test builder mirroring `Keys`:
 
 ## Non-goals
 
-- **Overworld click-to-move.** Pathfinding is new behaviour with no C
-  counterpart, and every step runs the interaction and foe-follow pass.
-- **Combat.** It sits on the turn machinery and the SYN-tick AI pacing.
-- Drag, right-click, scroll wheel.
+Reversed 2026-10-02 (P11), and shipped: overworld click-to-move, combat, the
+startup wizard, and the right button (ESC in combat only).
+
+Still out of scope:
+
+- Drag and the scroll wheel.
+- Recruit/dwelling "how many" count entry, and hero name entry: keyboard-only.
 - Pack-supplied pointer art. The shell draws its own arrow (decision 4); a
   pack-declared pointer sprite waits for the asset update.
 - Touch input.
-- Any engine change. `render_free` must still pass.
+- Presentation code in the engine. `render_free` must still pass.
 
 ## Risks
 
@@ -253,7 +274,13 @@ Five categories, all headless via a `Pointer` test builder mirroring `Keys`:
 
 ## Work order
 
-Each step is a tested slice, reported and approved before committing.
+Done, 2026-09-20 to 2026-09-22. The P11 widening then shipped as:
+`70d82de` the drawn pointer (P3), `693ad41` the Game Menu and slot picker
+(P10), `f7da7b7` the startup wizard, `5c77b59` the combat target ring and spell
+menu (a parity fix, P12), `479a43b` combat clicks, `d2cf4c4` the engine's
+`step_preview`, and `0d27e65` overworld click-to-move.
+
+The original order, kept for reference:
 
 1. `PointerSource`, `Button`, `HitRegion`, `HitList` and the hit-test scan in
    `shell/src/pointer.rs`, with the test builder. No callers yet.
