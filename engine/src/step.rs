@@ -124,37 +124,22 @@ pub fn game_step_basic(
 
     let nx = game.position.x + dx;
     let ny = game.position.y + dy;
+    // The can-move decision is `step_preview`'s, so click-to-move's route
+    // planner and the real step cannot disagree.
+    match step_preview(game, map, nx, ny) {
+        StepPreview::BlockedEdge => return StepResult::BlockedEdge,
+        StepPreview::BlockedTerrain { terrain } => return StepResult::BlockedTerrain { terrain },
+        StepPreview::Open { .. } => {}
+    }
     let Some(tile) = map.tile_i32(nx, ny).copied() else {
         return StepResult::BlockedEdge;
     };
 
     let prev_x = game.position.x;
     let prev_y = game.position.y;
-    let walking = game.travel_mode == TravelMode::Walk;
     let in_boat = game.travel_mode == TravelMode::Boat;
     let flying = game.character.mount == Mount::Fly;
-    let will_board = !flying
-        && walking
-        && game.boat.has_boat
-        && nx == game.boat.x
-        && ny == game.boat.y
-        && (game.boat.zone.is_empty() || game.boat.zone.as_str() == game.position.zone.as_str());
-
-    let can_move = if flying {
-        true
-    } else if will_board {
-        true
-    } else if walking {
-        walkable_on_foot(&tile)
-    } else {
-        walkable_in_boat(&tile)
-    };
-
-    if !can_move {
-        return StepResult::BlockedTerrain {
-            terrain: tile.terrain,
-        };
-    }
+    let will_board = boards_boat(game, nx, ny);
 
     game.position.last_x = prev_x;
     game.position.last_y = prev_y;
@@ -249,6 +234,70 @@ fn step_move_cost(terrain: Terrain, flying: bool) -> i32 {
         40
     } else {
         1
+    }
+}
+
+/// What one step onto `(x, y)` would do, read without taking it.
+///
+/// Evaluated as if the hero stood next to the tile in their current travel
+/// mode: walkability depends on the mode and the boat, not on the tile being
+/// left. `game_step_basic` makes its own can-move decision through this, so
+/// the answer and the real step cannot drift. Shell-facing, for
+/// click-to-move; C has no counterpart because C has no pointer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StepPreview {
+    BlockedEdge,
+    BlockedTerrain {
+        terrain: Terrain,
+    },
+    Open {
+        /// `step_move_cost`: desert 40 unless flying, else 1.
+        cost: i32,
+        /// The tile has an interaction `resolve_interaction` will examine.
+        /// True while flying too, because `game_step_basic` resolves them
+        /// while flying (engine-sweep GAP 1); fixing GAP 1 changes this.
+        interacts: bool,
+        /// Boarding the owned boat, or a boat step onto land.
+        changes_mode: bool,
+    },
+}
+
+/// True when a step onto `(x, y)` boards the owned boat: on foot, not
+/// flying, onto the boat's tile in the boat's zone.
+fn boards_boat(game: &Game, x: i32, y: i32) -> bool {
+    game.character.mount != Mount::Fly
+        && game.travel_mode == TravelMode::Walk
+        && game.boat.has_boat
+        && x == game.boat.x
+        && y == game.boat.y
+        && (game.boat.zone.is_empty() || game.boat.zone.as_str() == game.position.zone.as_str())
+}
+
+pub fn step_preview(game: &Game, map: &Map, x: i32, y: i32) -> StepPreview {
+    let Some(tile) = map.tile_i32(x, y) else {
+        return StepPreview::BlockedEdge;
+    };
+    let flying = game.character.mount == Mount::Fly;
+    let walking = game.travel_mode == TravelMode::Walk;
+    let in_boat = game.travel_mode == TravelMode::Boat;
+    let will_board = boards_boat(game, x, y);
+    let can_move = if flying || will_board {
+        true
+    } else if walking {
+        walkable_on_foot(tile)
+    } else {
+        walkable_in_boat(tile)
+    };
+    if !can_move {
+        return StepPreview::BlockedTerrain {
+            terrain: tile.terrain,
+        };
+    }
+    let lands = in_boat && !flying && !(tile.terrain == Terrain::Water || tile.is_bridge);
+    StepPreview::Open {
+        cost: step_move_cost(tile.terrain, flying),
+        interacts: tile.interactive != Interact::None,
+        changes_mode: will_board || lands,
     }
 }
 
@@ -540,8 +589,8 @@ pub fn search_here(game: &mut Game, resources: &Resources) -> SearchOutcome {
 #[cfg(test)]
 mod tests {
     use super::{
-        consume_step, game_step_basic, search_here, spend_days, spend_week, FoeCollision,
-        SearchOutcome, StepInteraction, StepResult,
+        consume_step, game_step_basic, search_here, spend_days, spend_week, step_preview,
+        FoeCollision, SearchOutcome, StepInteraction, StepPreview, StepResult,
     };
     use crate::fog::Fog;
     use crate::game::{CastleOwnerKind, FoeState, Game, Mount, TravelMode};
@@ -1717,5 +1766,143 @@ mod tests {
         assert_eq!(game.stats.steps_left_today, 1, "the step is not spent");
         assert!(!advance.day_ended);
         assert_eq!(game.stats.days_left, 10);
+    }
+
+    // ---- step_preview: the query click-to-move plans with ----
+
+    /// A strip of every tile kind the can-move decision distinguishes.
+    fn preview_strip() -> Map {
+        let mut chest = Tile::interactive(Interact::TreasureChest);
+        chest.terrain = Terrain::Grass;
+        Map::from_tiles(
+            7,
+            1,
+            vec![
+                Tile::plain_grass(),
+                Tile::terrain(Terrain::Desert),
+                Tile::terrain(Terrain::Water),
+                Tile::terrain(Terrain::Mountain),
+                Tile::blocked_grass(),
+                chest,
+                Tile::plain_grass(),
+            ],
+        )
+        .expect("fixture dimensions match")
+    }
+
+    /// The preview of stepping onto `(x, 0)` from `(x - 1, 0)` must agree with
+    /// what `game_step_basic` then does.
+    fn assert_preview_matches_step(mut game: Game, map: &Map, x: i32) {
+        game.position.x = x - 1;
+        game.position.y = 0;
+        game.stats.steps_left_today = 40;
+        let preview = step_preview(&game, map, x, 0);
+        let mode_before = game.travel_mode;
+        let mut map = map.clone();
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &time_fixture(), 1, 0);
+        match (preview, &result) {
+            (
+                StepPreview::BlockedTerrain { terrain },
+                StepResult::BlockedTerrain { terrain: t },
+            ) => {
+                assert_eq!(terrain, *t, "x={x}")
+            }
+            (StepPreview::BlockedEdge, StepResult::BlockedEdge) => {}
+            (
+                StepPreview::Open {
+                    cost,
+                    interacts,
+                    changes_mode,
+                },
+                StepResult::Moved {
+                    move_cost,
+                    interaction,
+                    ..
+                },
+            ) => {
+                assert_eq!(cost, *move_cost, "x={x}");
+                if !interacts {
+                    assert_eq!(*interaction, StepInteraction::None, "x={x}");
+                }
+                assert_eq!(changes_mode, game.travel_mode != mode_before, "x={x}");
+            }
+            other => panic!("x={x}: preview and step disagree: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_step_preview_matches_the_step_on_foot() {
+        let map = preview_strip();
+        for x in 1..7 {
+            assert_preview_matches_step(Game::default(), &map, x);
+        }
+    }
+
+    #[test]
+    fn the_step_preview_matches_the_step_in_a_boat() {
+        let map = preview_strip();
+        for x in 1..7 {
+            let mut game = Game::default();
+            game.travel_mode = TravelMode::Boat;
+            game.boat.has_boat = true;
+            assert_preview_matches_step(game, &map, x);
+        }
+    }
+
+    #[test]
+    fn the_step_preview_matches_the_step_while_flying() {
+        let map = preview_strip();
+        for x in 1..7 {
+            let mut game = Game::default();
+            game.character.mount = Mount::Fly;
+            assert_preview_matches_step(game, &map, x);
+        }
+    }
+
+    /// Boarding the owned boat is a mode change, and the preview says so.
+    #[test]
+    fn the_step_preview_reports_boarding_the_boat() {
+        let map = preview_strip();
+        let mut game = Game::default();
+        game.boat.has_boat = true;
+        game.boat.x = 2;
+        game.boat.y = 0;
+        assert!(matches!(
+            step_preview(&game, &map, 2, 0),
+            StepPreview::Open {
+                changes_mode: true,
+                ..
+            }
+        ));
+        assert_preview_matches_step(game, &map, 2);
+    }
+
+    /// GAP 1 today: a flying hero still triggers the chest, so the preview
+    /// still reports `interacts` while flying. Fixing GAP 1 flips this test.
+    #[test]
+    fn the_step_preview_reports_interactions_while_flying_until_gap_1_is_fixed() {
+        let map = preview_strip();
+        let mut game = Game::default();
+        game.character.mount = Mount::Fly;
+        assert!(matches!(
+            step_preview(&game, &map, 5, 0),
+            StepPreview::Open {
+                interacts: true,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn the_step_preview_reports_the_edge() {
+        let map = preview_strip();
+        assert_eq!(
+            step_preview(&Game::default(), &map, 7, 0),
+            StepPreview::BlockedEdge
+        );
+        assert_eq!(
+            step_preview(&Game::default(), &map, 0, -1),
+            StepPreview::BlockedEdge
+        );
     }
 }
