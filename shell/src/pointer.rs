@@ -87,7 +87,11 @@ impl HitList {
 
 /// What the shell reads each frame.
 pub trait PointerSource {
-    /// Window pixels, or `None` when the pointer is outside the window.
+    /// Window POINTS -- the space `Backend::window_size` reports, not
+    /// framebuffer pixels (macroquad divides the DPI scale out of both).
+    /// `None` only when the position is unknown; a known one may lie outside
+    /// the window, because macOS keeps sending moves to the key window after
+    /// the pointer leaves it. `Present::window_to_logical` rejects those.
     fn position(&self) -> Option<(i32, i32)>;
     /// Went down this frame.
     fn pressed(&self, button: Button) -> bool;

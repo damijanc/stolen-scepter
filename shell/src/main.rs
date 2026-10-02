@@ -18,6 +18,7 @@ pub mod banner;
 pub mod cheats;
 pub mod chrome;
 pub mod combat;
+pub mod cursor;
 pub mod dialog;
 pub mod draw;
 pub mod font;
@@ -688,6 +689,28 @@ fn run_town_row(game: &mut Game, resources: &Resources, views: &mut Views, row: 
     views.town_show_info(&toast);
 }
 
+/// The pointer in LOGICAL coordinates (the `DrawList` space), or `None` over
+/// the letterbox or outside the window. The one place window points become
+/// logical pixels for both hit-testing and the drawn pointer.
+fn logical_pointer(
+    pointer: &impl PointerSource,
+    backend: &Backend,
+    present: &Present,
+    layout: &Layout,
+) -> Option<(i32, i32)> {
+    let (win_w, win_h) = backend.window_size();
+    pointer.position().and_then(|(px, py)| {
+        present.window_to_logical(layout, win_w, win_h, present::Target::Desktop, px, py)
+    })
+}
+
+/// Draw the shell's own pointer last, over everything, and hide the OS arrow
+/// exactly where it shows. See `cursor.rs` for why it exists.
+fn finish_pointer(list: &mut DrawList, backend: &Backend, at: Option<(i32, i32)>) {
+    cursor::push_pointer(list, at);
+    backend.set_os_cursor_visible(at.is_none());
+}
+
 fn window_conf() -> Conf {
     // The real size needs the pack's geometry, which is not loaded yet, so
     // this opens at the legacy default; the present layer centres whatever
@@ -839,6 +862,8 @@ async fn main() {
             &resources,
             get_time(),
         );
+        let at = logical_pointer(&pointer, &backend, &present, &layout);
+        finish_pointer(&mut list, &backend, at);
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;
     };
@@ -1008,13 +1033,8 @@ async fn main() {
 
         // Where the pointer is, in logical coordinates, and what it is over.
         // It hit-tests the PREVIOUS frame's HitList (one frame of latency).
-        let (win_w, win_h) = backend.window_size();
-        let hovered = pointer
-            .position()
-            .and_then(|(px, py)| {
-                present.window_to_logical(&layout, win_w, win_h, present::Target::Desktop, px, py)
-            })
-            .and_then(|(lx, ly)| hits.hit(lx, ly));
+        let pointer_at = logical_pointer(&pointer, &backend, &present, &layout);
+        let hovered = pointer_at.and_then(|(lx, ly)| hits.hit(lx, ly));
         let clicked = if pointer.pressed(Button::Left) {
             hovered
         } else {
@@ -1945,6 +1965,7 @@ async fn main() {
             dialog.draw(&mut list, &mut hits, &layout, backend.palette());
         }
 
+        finish_pointer(&mut list, &backend, pointer_at);
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;
     }

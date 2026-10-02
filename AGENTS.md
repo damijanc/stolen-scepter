@@ -27,7 +27,7 @@ will be selected only after headless engine parity is solid.
   F10 debug menu, `audio.rs` the audio policy (`audio.c`'s decisions, no
   library), `pack.rs` the pack reader and discovery (`pack.c`),
   `pack_select.rs` the pre-game pack picker (`pack_select.c`), and
-  `input.rs` the key bindings.
+  `input.rs` the key bindings, and `cursor.rs` the shell-drawn mouse pointer.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. The one stated exception is `pack_select.rs`: the picker runs before
   any pack is open, so the DrawList pipeline (built on pack art) has nothing

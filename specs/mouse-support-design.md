@@ -58,8 +58,29 @@ else-if ordering and make the input path lie about where they came from.
 ### 3. Hover highlights, nothing more
 
 The pointer highlights the actionable row under it, reusing the styling the
-keyboard cursor already draws. No cursor sprite -- the pack ships no cursor art,
-and that is revisited with the asset update.
+keyboard cursor already draws.
+
+### 4. The shell draws its own pointer (revised 2026-10-02, P3)
+
+The first cut kept the OS arrow. In play (P3) the macOS arrow, black with a thin
+white edge, all but vanished over the game's mostly black frame. Diagnosis
+ruled out a hidden cursor: in-process, `CGCursorIsVisible` was 1, the window was
+key and `NSCursor.currentCursor` was the arrow. It was a contrast problem.
+
+**DIVERGENCE, deliberate.** The DOS game and C have no pointer, and the pack's
+`combat/cursor_*` frames are the combat target ring, not a pointer. Like the
+Amiga edition's sprite pointer, `shell/src/cursor.rs` draws a shell-authored
+10x16 arrow (white fill, black outline, hotspot at the tip) as `DrawCmd::Rect`
+runs in LOGICAL pixels, last in every frame, so the integer-scale blit enlarges
+it with the game. The OS arrow is hidden only while the shell's arrow is
+drawn -- over the game's blit rect -- and shows over the letterbox and outside
+the window (`Backend::set_os_cursor_visible`).
+
+Coordinate spaces, since P1 was a points/pixels mix-up: `mouse_position` and
+`Backend::window_size` are both window POINTS (macroquad divides out the DPI
+scale); `Present::window_to_logical` turns points into logical pixels in
+`main.rs::logical_pointer`, the one conversion both hit-testing and the drawn
+pointer share. Only the scissor rect is in framebuffer pixels.
 
 ## Components
 
@@ -181,7 +202,8 @@ Five categories, all headless via a `Pointer` test builder mirroring `Keys`:
   counterpart, and every step runs the interaction and foe-follow pass.
 - **Combat.** It sits on the turn machinery and the SYN-tick AI pacing.
 - Drag, right-click, scroll wheel.
-- A cursor sprite. Deferred to the asset update.
+- Pack-supplied pointer art. The shell draws its own arrow (decision 4); a
+  pack-declared pointer sprite waits for the asset update.
 - Touch input.
 - Any engine change. `render_free` must still pass.
 

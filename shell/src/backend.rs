@@ -21,8 +21,8 @@ use macroquad::prelude::{
     clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
     get_char_pressed, get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed,
     is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
-    screen_dpi_scale, screen_height, screen_width, Color as MqColor, DrawTextureParams, FilterMode,
-    Image, KeyCode, MouseButton, Rect as MqRect, Texture2D, Vec2,
+    screen_dpi_scale, screen_height, screen_width, show_mouse, Color as MqColor, DrawTextureParams,
+    FilterMode, Image, KeyCode, MouseButton, Rect as MqRect, Texture2D, Vec2,
 };
 use openbounty_engine::resources::Resources;
 
@@ -134,10 +134,20 @@ impl Backend {
         self.textures.len()
     }
 
-    /// The window size in pixels. Here because `backend.rs` is the only
-    /// module that may name macroquad.
+    /// The window size in POINTS, not framebuffer pixels: macroquad divides
+    /// the DPI scale out, exactly as it does for `mouse_position`, so the two
+    /// share a space. Only the scissor rect needs pixels (`framebuffer_clip`).
+    /// Here because `backend.rs` is the only module that may name macroquad.
     pub fn window_size(&self) -> (i32, i32) {
         (screen_width() as i32, screen_height() as i32)
+    }
+
+    /// Show or hide the OS arrow. The shell hides it while its own pointer
+    /// (`cursor.rs`) is drawn over the game, and shows it over the letterbox
+    /// and outside the window. miniquad keeps the hide/unhide pair balanced,
+    /// so calling this every frame is safe.
+    pub fn set_os_cursor_visible(&self, visible: bool) {
+        show_mouse(visible);
     }
 
     fn texture(&self, catalog: &SpriteCatalog, sprite: &Sprite) -> Option<&Texture2D> {
