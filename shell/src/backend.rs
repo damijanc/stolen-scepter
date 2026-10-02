@@ -21,8 +21,8 @@ use macroquad::prelude::{
     clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
     get_char_pressed, get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed,
     is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
-    screen_height, screen_width, Color as MqColor, DrawTextureParams, FilterMode, Image, KeyCode,
-    MouseButton, Rect as MqRect, Texture2D, Vec2,
+    screen_dpi_scale, screen_height, screen_width, Color as MqColor, DrawTextureParams, FilterMode,
+    Image, KeyCode, MouseButton, Rect as MqRect, Texture2D, Vec2,
 };
 use openbounty_engine::resources::Resources;
 
@@ -238,8 +238,10 @@ impl Backend {
             }
             DrawCmd::Text { text, x, y, color } => self.text(text, *x, *y, *color, frame),
             DrawCmd::ClipBegin(rect) => {
-                let (cx, cy, cw, ch) = frame.rect(*rect);
-                set_clip(Some((cx as i32, cy as i32, cw as i32, ch as i32)));
+                set_clip(Some(framebuffer_clip(
+                    frame.rect(*rect),
+                    screen_dpi_scale(),
+                )));
             }
             DrawCmd::ClipEnd => set_clip(None),
         }
@@ -361,10 +363,24 @@ fn corners(x: f32, y: f32, w: f32, h: f32, radius: f32) -> [(f32, f32); 4] {
     ]
 }
 
-/// Clip everything drawn after this to a window-space rectangle, or clear the
-/// clip with `None`. macroquad exposes the scissor only through its internal
-/// GL handle, and converts to the GL origin itself, so this takes top-left
-/// window coordinates.
+/// A window-space rectangle in points, as every draw call takes, converted to
+/// the framebuffer pixels macroquad's scissor is applied in. The two differ by
+/// the DPI factor on a high-DPI display, where an unconverted clip covers only
+/// the top-left corner of what it should.
+fn framebuffer_clip(rect: (f32, f32, f32, f32), dpi: f32) -> (i32, i32, i32, i32) {
+    let (x, y, w, h) = rect;
+    (
+        (x * dpi).round() as i32,
+        (y * dpi).round() as i32,
+        (w * dpi).round() as i32,
+        (h * dpi).round() as i32,
+    )
+}
+
+/// Clip everything drawn after this to a window-space rectangle in
+/// framebuffer pixels, or clear the clip with `None`. macroquad exposes the
+/// scissor only through its internal GL handle, and converts to the GL origin
+/// itself, so this takes top-left window coordinates.
 fn set_clip(rect: Option<(i32, i32, i32, i32)>) {
     unsafe {
         get_internal_gl().quad_gl.scissor(rect);
@@ -510,5 +526,28 @@ impl PointerSource for MacroquadPointer {
 
     fn released(&self, button: Button) -> bool {
         is_mouse_button_released(Self::button(button))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn framebuffer_clip_is_unchanged_at_one_x() {
+        assert_eq!(
+            framebuffer_clip((56.0, 72.0, 720.0, 510.0), 1.0),
+            (56, 72, 720, 510)
+        );
+    }
+
+    #[test]
+    fn framebuffer_clip_scales_by_the_dpi_factor() {
+        // A Retina window: the draw calls are in points, and macroquad's
+        // scissor is in framebuffer pixels, twice as many each way.
+        assert_eq!(
+            framebuffer_clip((56.0, 72.0, 720.0, 510.0), 2.0),
+            (112, 144, 1440, 1020)
+        );
     }
 }
