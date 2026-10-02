@@ -172,12 +172,31 @@ pub fn combat_title(combat: &Combat, resources: &Resources) -> String {
     }
 }
 
+/// C's `Combat.cursor_frame`. The ring is drawn at `11 + (cursor_frame & 3)`,
+/// but nothing in C ever writes the field after the struct is zeroed, so the
+/// four-frame ring animation is dead and the ring is always frame 11.
+const CURSOR_FRAME: usize = 0;
+
+/// The stock combat spell names, hard-coded in C's spell menu
+/// (`combat_loop.c:339-342`) rather than read from the pack.
+const COMBAT_SPELL_NAMES: [&str; 7] = [
+    "Clone",
+    "Teleport",
+    "Fireball",
+    "Lightning",
+    "Freeze",
+    "Resurrect",
+    "Turn Undead",
+];
+
 /// Draw the combat field: the grass tiles, the obstacles, the units with their
-/// count badges, and the damage bursts. Ports `combat_render_frame` minus the
-/// cursor (which the interactive loop will own).
+/// count badges, the damage bursts, and -- while a picker is armed -- the
+/// target ring at `pick_cursor`. Ports `combat_render_frame`; the title bar
+/// it ends with is the chrome's.
 pub fn combat_render(
     list: &mut DrawList,
     combat: &Combat,
+    pick_cursor: Option<(i32, i32)>,
     palette: &Palette,
     catalog: &SpriteCatalog,
 ) {
@@ -249,6 +268,41 @@ pub fn combat_render(
             );
         }
     }
+
+    // Target cursor (`combat_render.c:191-200`): shown only while picking; in
+    // normal play the acting unit's own frame cycling marks whose turn it is.
+    if let Some((x, y)) = pick_cursor {
+        let (px, py) = cell_origin(x, y);
+        list.blit(
+            Sprite::CombatTile(11 + (CURSOR_FRAME & 3)),
+            Dst::rect(px, py, COMBAT_CELL_W, COMBAT_CELL_H),
+        );
+    }
+}
+
+/// The spell-pick menu, porting the overlay `combat_present` draws while the
+/// cast is in its pick-spell phase (`combat_loop.c:328-349`), at C's literal
+/// coordinates. `counts` is the caster's `spells.counts`, stock order.
+pub fn combat_spell_menu(
+    list: &mut DrawList,
+    palette: &Palette,
+    resources: &Resources,
+    counts: &[i32],
+) {
+    list.rect(Rect::new(40, 30, 240, 130), palette.clr(Pal::DBlue));
+    list.rect_lines(Rect::new(40, 30, 240, 130), palette.clr(Pal::Yellow));
+    let title = banner::text(resources, "ui", "combat_spells_title", "Spells");
+    list.text(title, 140, 36, palette.clr(Pal::Yellow));
+    let column = banner::text(resources, "ui", "combat_spells_col_combat", "Combat");
+    list.text(column, 60, 50, palette.clr(Pal::Yellow));
+    for (i, name) in COMBAT_SPELL_NAMES.iter().enumerate() {
+        let count = counts.get(i).copied().unwrap_or(0);
+        let letter = (b'A' + i as u8) as char;
+        let line = format!("{count} {name:<12} {letter}");
+        list.text(&line, 56, 64 + i as i32 * 10, palette.clr(Pal::White));
+    }
+    let prompt = banner::text(resources, "ui", "combat_spells_prompt", "Cast which (A-G)?");
+    list.text(prompt, 70, 144, palette.clr(Pal::White));
 }
 
 /// What a pick is for, porting `CombatPickReason`.
@@ -366,6 +420,17 @@ impl CombatLoop {
             return self.banner.clone();
         }
         combat_title(&self.combat, resources)
+    }
+
+    /// Where the target ring goes: the pick cursor, while a picker is armed.
+    pub fn pick_cursor(&self) -> Option<(i32, i32)> {
+        self.picker_active.then_some((self.cursor_x, self.cursor_y))
+    }
+
+    /// True while the cast waits for a spell letter, which is when the spell
+    /// menu is drawn.
+    pub fn picking_spell(&self) -> bool {
+        self.cast_phase == CastPhase::PickSpell
     }
 
     /// Replace the action banner from a `strings.combat_log` line.
@@ -1063,6 +1128,7 @@ pub fn combat_view_input(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::draw::DrawCmd;
     use openbounty_engine::combat::{
         CombatUnit, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER, COMBAT_SPELL_CLONE,
     };
@@ -1137,13 +1203,92 @@ mod tests {
     fn the_field_draws_grass_obstacles_and_count_badges() {
         let (_, catalog, palette, combat) = fixtures();
         let mut list = DrawList::new();
-        combat_render(&mut list, &combat, &palette, &catalog);
+        combat_render(&mut list, &combat, None, &palette, &catalog);
 
         // 6x5 grass tiles, one obstacle tile, and both count badges.
         assert_eq!(list.blits_of(Sprite::CombatTile(0)).len(), 30);
         assert!(!list.blits_of(Sprite::CombatTile(2)).is_empty());
         assert!(list.has_text_containing("10"));
         assert!(list.has_text_containing("8"));
+    }
+
+    /// `combat_render.c:191-200`: the target ring is drawn only while a
+    /// picker is armed, over the cursor cell, and after the units.
+    #[test]
+    fn the_target_ring_is_drawn_at_the_pick_cursor_only_while_picking() {
+        let (_, catalog, palette, combat) = fixtures();
+        let mut list = DrawList::new();
+        combat_render(&mut list, &combat, None, &palette, &catalog);
+        assert!(list.blits_of(Sprite::CombatTile(11)).is_empty());
+
+        let mut list = DrawList::new();
+        combat_render(&mut list, &combat, Some((2, 3)), &palette, &catalog);
+        let (px, py) = cell_origin(2, 3);
+        assert_eq!(
+            list.blits_of(Sprite::CombatTile(11)),
+            vec![Dst::rect(px, py, COMBAT_CELL_W, COMBAT_CELL_H)]
+        );
+    }
+
+    /// C indexes the ring with `cursor_frame & 3`, but nothing in C ever
+    /// writes `cursor_frame`, so the ring is always its first frame (11),
+    /// never 12-14. Ported as written: the four-frame animation is dead.
+    #[test]
+    fn the_target_ring_never_animates_because_c_never_advances_its_frame() {
+        let (_, catalog, palette, combat) = fixtures();
+        for _ in 0..8 {
+            let mut list = DrawList::new();
+            combat_render(&mut list, &combat, Some((0, 0)), &palette, &catalog);
+            for frame in 12..=14 {
+                assert!(list.blits_of(Sprite::CombatTile(frame)).is_empty());
+            }
+        }
+    }
+
+    /// `combat_loop.c:328-349`, at C's literal coordinates: the panel, the
+    /// yellow title and column header, one white "count name letter" row per
+    /// stock combat spell, and the prompt.
+    #[test]
+    fn the_spell_menu_matches_cs_panel() {
+        let (resources, _, palette, _) = fixtures();
+        let mut counts = [0i32; 7];
+        counts[2] = 3;
+        let mut list = DrawList::new();
+        combat_spell_menu(&mut list, &palette, &resources, &counts);
+        assert!(list.as_slice().contains(&DrawCmd::Rect {
+            rect: Rect::new(40, 30, 240, 130),
+            color: palette.clr(Pal::DBlue),
+        }));
+        assert!(list.as_slice().contains(&DrawCmd::RectLines {
+            rect: Rect::new(40, 30, 240, 130),
+            color: palette.clr(Pal::Yellow),
+        }));
+        let texts = list.texts();
+        assert!(texts.contains(&(140, 36, "Spells")));
+        assert!(texts.contains(&(60, 50, "Combat")));
+        assert!(texts.contains(&(56, 64, "0 Clone        A")));
+        assert!(texts.contains(&(56, 84, "3 Fireball     C")));
+        assert!(texts.contains(&(56, 124, "0 Turn Undead  G")));
+        assert!(texts.contains(&(70, 144, "Cast which (A-G)?")));
+    }
+
+    /// The three labels come from `strings.ui`; the spell names are
+    /// hard-coded in C, so a pack cannot rename them here.
+    #[test]
+    fn the_spell_menu_labels_come_from_the_pack() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [], "strings": {"ui": {
+                 "combat_spells_title": "Zauber", "combat_spells_col_combat": "Kampf",
+                 "combat_spells_prompt": "Welcher?"}}}"#,
+        )
+        .expect("fixture parses");
+        let mut list = DrawList::new();
+        combat_spell_menu(&mut list, &Palette::fallback(), &resources, &[1; 7]);
+        let texts = list.texts();
+        assert!(texts.contains(&(140, 36, "Zauber")));
+        assert!(texts.contains(&(60, 50, "Kampf")));
+        assert!(texts.contains(&(70, 144, "Welcher?")));
+        assert!(texts.contains(&(56, 64, "1 Clone        A")));
     }
 
     use crate::input::Keys;
@@ -1330,6 +1475,59 @@ mod tests {
         // are declared but never read.
         assert!(loop_.picker_active);
         assert!(!loop_.banner.contains("Select"));
+    }
+
+    /// The ring follows the real arming paths: `S` puts it on the acting
+    /// unit, ESC takes it away.
+    #[test]
+    fn shoot_shows_the_ring_on_the_acting_unit_until_cancelled() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        assert_eq!(loop_.pick_cursor(), None);
+        let mut prompt = Prompt::default();
+        loop_.step(
+            &Keys::pressed(&[Key::S]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(loop_.pick_cursor(), Some((0, 0)));
+        loop_.step(
+            &Keys::pressed(&[Key::Escape]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert_eq!(loop_.pick_cursor(), None);
+    }
+
+    /// `U` opens the spell menu; the letter closes it into the target picker,
+    /// whose ring then shows.
+    #[test]
+    fn the_spell_menu_shows_from_u_until_a_letter_is_picked() {
+        let (mut loop_, resources, mut game) = loop_fixture();
+        game.stats.knows_magic = true;
+        game.spells.counts[COMBAT_SPELL_CLONE as usize] = 1;
+        let mut prompt = Prompt::default();
+        assert!(!loop_.picking_spell());
+        loop_.step(
+            &Keys::pressed(&[Key::U]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert!(loop_.picking_spell());
+        loop_.step(
+            &Keys::pressed(&[Key::A]),
+            &mut game,
+            &resources,
+            100.0,
+            &mut prompt,
+        );
+        assert!(!loop_.picking_spell());
+        assert!(loop_.pick_cursor().is_some());
     }
 
     #[test]

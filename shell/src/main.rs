@@ -47,7 +47,7 @@ use audio_backend::KiraAudio;
 use backend::{Backend, MacroquadKeys, MacroquadPointer};
 use cheats::{CheatMenu, CheatOutcome, CheatResult};
 use chrome::{Chrome, StatusMode};
-use combat::{combat_render, combat_view_input, CombatLoop, CombatStatus};
+use combat::{combat_render, combat_spell_menu, combat_view_input, CombatLoop, CombatStatus};
 use dialog::Dialog;
 use draw::DrawList;
 use hud::Hud;
@@ -1885,6 +1885,7 @@ async fn main() {
             combat_render(
                 &mut list,
                 &session.combat.combat,
+                session.combat.pick_cursor(),
                 backend.palette(),
                 &catalog,
             );
@@ -1905,6 +1906,16 @@ async fn main() {
                 &present,
                 get_time(),
             );
+            // The spell-pick menu draws after any view and before the
+            // dialog and prompt, as in combat_present (combat_loop.c:328).
+            if session.combat.picking_spell() {
+                combat_spell_menu(
+                    &mut list,
+                    backend.palette(),
+                    &resources,
+                    &game.spells.counts,
+                );
+            }
         } else {
             Chrome {
                 layout: &layout,
