@@ -107,7 +107,7 @@ impl SlotPicker {
     }
 
     /// The same choice Enter gives on that row, cursor move included.
-    /// `SlotCancel` is ESC; only a caller that publishes it can receive it.
+    /// `SlotCancel` -- a click off the panel -- is ESC.
     pub fn click(&mut self, target: HitTarget) -> Option<SlotChoice> {
         match target {
             HitTarget::SlotRow(row) if row < self.row_count() => {
@@ -134,8 +134,9 @@ impl SlotPicker {
     /// Emit the picker panel. `extra_label` is drawn as the trailing row only
     /// when the picker was built with one. `hint` is the key line at the
     /// bottom, which differs because ESC quits at startup but steps back
-    /// in-game. Each row publishes its own region; a backdrop region, if the
-    /// caller wants one, is the caller's to push first.
+    /// in-game. Each row publishes its own region, over a full-screen
+    /// `SlotCancel` backdrop: a click off the panel is ESC, which both callers
+    /// treat as "step back" (to class select, or to the Game Menu).
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
@@ -159,6 +160,11 @@ impl SlotPicker {
         let h = pad + header_h + body_h + gap_h + instr_h + pad;
         let x = (layout.screen_w - w) / 2;
         let y = (layout.screen_h - h) / 2;
+        // The backdrop first: a later region wins, so the rows cover it.
+        hits.push(
+            Rect::new(0, 0, layout.screen_w, layout.screen_h),
+            HitTarget::SlotCancel,
+        );
         list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
         list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
 
@@ -465,16 +471,22 @@ mod tests {
         }
     }
 
-    /// Without an extra row there is no region for it, and the picker
-    /// itself never publishes a cancel backdrop.
+    /// Without an extra row there is no region for it; beyond the rows there
+    /// is only the cancel backdrop, which a click off the panel lands on.
     #[test]
-    fn no_extra_row_means_no_extra_region_and_no_backdrop() {
+    fn no_extra_row_means_no_extra_region_and_off_panel_cancels() {
         let (_, hits) = drawn(&SlotPicker::new(slots_with(&[]), false));
+        let rows = hits
+            .regions()
+            .iter()
+            .filter(|r| matches!(r.target, HitTarget::SlotRow(_)))
+            .count();
+        assert_eq!(rows, SAVE_SLOT_COUNT);
         assert!(hits
             .regions()
             .iter()
-            .all(|r| matches!(r.target, HitTarget::SlotRow(row) if row < SAVE_SLOT_COUNT)));
-        assert_eq!(hits.regions().len(), SAVE_SLOT_COUNT);
+            .all(|r| !matches!(r.target, HitTarget::SlotRow(row) if row >= SAVE_SLOT_COUNT)));
+        assert_eq!(hits.hit(0, 0), Some(HitTarget::SlotCancel));
     }
 
     /// A click gives what Enter on that row gives, cursor included.

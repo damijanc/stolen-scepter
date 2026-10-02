@@ -19,6 +19,7 @@ use crate::font::{GLYPH_H, GLYPH_W};
 use crate::input::{Key, KeySource};
 use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
+use crate::pointer::{HitList, HitTarget};
 use crate::savepath::{scan_slots, SavePaths, SlotSet, SAVE_SLOT_COUNT};
 use crate::slot_picker::{SlotChoice, SlotPicker};
 
@@ -43,6 +44,24 @@ const DEFAULT_NEW_GAME_INTRO: &str = "%NAME% the %CLASS%,\n\
 /// fallback), which are both 288x184.
 const CLASS_PICKER_W: i32 = 288;
 const CLASS_PICKER_H: i32 = 184;
+
+/// Where each class's figure stands on the stock class-select art, relative
+/// to the picker's top-left in its 288x184 placement, keyed by class index
+/// (the letter A-D printed on the art).
+///
+/// DIVERGENCE (mouse): C has no pointer, so nothing in C or the pack locates
+/// the figures. This geometry is authored by eye from the shipped art; the HD
+/// pack's picker is the same composition at 4x, and the shell always places
+/// it at 288x184 logical. Pushed in this order and a later region wins: the
+/// barbarian (D), in front, covers the paladin's legs, and his region is split
+/// so the sorceress keeps her own "C" label.
+const CLASS_FIGURES: [(usize, Rect); 5] = [
+    (0, Rect::new(0, 55, 112, 129)),
+    (1, Rect::new(112, 8, 113, 176)),
+    (2, Rect::new(225, 18, 63, 166)),
+    (3, Rect::new(165, 80, 60, 104)),
+    (3, Rect::new(225, 110, 37, 74)),
+];
 
 /// Longest accepted hero name, C's `char name_buf[11]`.
 const NAME_MAX: usize = 10;
@@ -123,6 +142,8 @@ pub struct Startup {
     slot: usize,
     /// The save picker, with startup's trailing "New game" row.
     picker: SlotPicker,
+    /// What the pointer was over last frame (see [`Startup::set_hover`]).
+    hover: Option<HitTarget>,
 }
 
 impl Default for Startup {
@@ -138,6 +159,7 @@ impl Default for Startup {
             intro_started: 0.0,
             slot: 0,
             picker: SlotPicker::new(SlotSet::default(), true),
+            hover: None,
         }
     }
 }
@@ -191,6 +213,85 @@ impl Startup {
         }
     }
 
+    /// The pointer moved. On class select it outlines the figure under it.
+    /// Entering a difficulty row (once the name is confirmed) or a picker row
+    /// moves the selection there, as the Game Menu does: one highlight, and it
+    /// is what Enter or a click picks.
+    pub fn set_hover(&mut self, target: Option<HitTarget>) {
+        if target != self.hover {
+            match (self.screen, target) {
+                (Screen::CreateGame, Some(HitTarget::Difficulty(row)))
+                    if self.has_name && row < DIFFICULTY_KEYS.len() =>
+                {
+                    self.difficulty = row as i32;
+                }
+                _ => {}
+            }
+        }
+        if self.screen == Screen::SavePicker {
+            self.picker.set_hover(target);
+        }
+        self.hover = target;
+    }
+
+    /// A click, resolved to what the matching key does on the current screen.
+    /// Name entry has no click affordance; it stays keyboard.
+    pub fn click(
+        &mut self,
+        target: HitTarget,
+        resources: &Resources,
+        paths: &SavePaths,
+        time: f64,
+    ) -> Option<StartupChoice> {
+        match (self.screen, target) {
+            // Any key skips a splash or the credits.
+            (Screen::SplashLogo, HitTarget::StartupSkip) => {
+                self.enter(Screen::SplashTitle, time);
+                None
+            }
+            (Screen::SplashTitle, HitTarget::StartupSkip) => {
+                self.enter(Screen::Credits, time);
+                None
+            }
+            (Screen::Credits, HitTarget::StartupSkip) => {
+                self.enter(Screen::ClassSelect, time);
+                None
+            }
+            // A figure is its letter; the hint bar is L.
+            (Screen::ClassSelect, HitTarget::StartupClass(index)) => {
+                if index < resources.classes_count().min(4) {
+                    self.pick_class(index, resources);
+                }
+                None
+            }
+            (Screen::ClassSelect, HitTarget::StartupLoad) => {
+                self.open_save_picker(resources, paths);
+                None
+            }
+            (Screen::SavePicker, target) => {
+                let choice = self.picker.click(target)?;
+                self.apply_slot_choice(choice)
+            }
+            // A difficulty row is "select it, then Enter".
+            (Screen::CreateGame, HitTarget::Difficulty(row))
+                if self.has_name && row < DIFFICULTY_KEYS.len() =>
+            {
+                self.difficulty = row as i32;
+                self.screen = Screen::Intro;
+                self.intro_started = time;
+                None
+            }
+            // Any key dismisses the intro.
+            (Screen::Intro, HitTarget::StartupSkip) => Some(self.choice(StartupAction::New)),
+            _ => None,
+        }
+    }
+
+    fn enter(&mut self, screen: Screen, time: f64) {
+        self.screen = screen;
+        self.screen_started = time;
+    }
+
     /// A timed, full-screen splash: advance on any key, or after the hold. An
     /// absent texture skips straight through, as C does.
     fn step_splash(
@@ -201,8 +302,7 @@ impl Startup {
         time: f64,
     ) -> Option<StartupChoice> {
         if absent || keys.any_pressed() || (time - self.screen_started) >= SPLASH_TIMEOUT {
-            self.screen = next;
-            self.screen_started = time;
+            self.enter(next, time);
         }
         None
     }
@@ -217,8 +317,7 @@ impl Startup {
     ) -> Option<StartupChoice> {
         let absent = resources.credits.group_count == 0 && resources.credits.copyright_count == 0;
         if absent || keys.any_pressed() || (time - self.screen_started) >= CREDITS_TIMEOUT {
-            self.screen = Screen::ClassSelect;
-            self.screen_started = time;
+            self.enter(Screen::ClassSelect, time);
         }
         None
     }
@@ -235,15 +334,7 @@ impl Startup {
         // L opens the save picker; the cursor lands on the first existing slot
         // (or "New game" when there are none).
         if keys.pressed(Key::L) {
-            self.picker = SlotPicker::new(scan_slots(paths, resources.pack_id.as_str()), true);
-            self.picker.cursor = SAVE_SLOT_COUNT;
-            for (slot, header) in self.picker.slots().headers.iter().enumerate() {
-                if header.is_some() {
-                    self.picker.cursor = slot;
-                    break;
-                }
-            }
-            self.screen = Screen::SavePicker;
+            self.open_save_picker(resources, paths);
             let _ = keys.chars_pressed();
             return None;
         }
@@ -252,11 +343,7 @@ impl Startup {
         for index in 0..count {
             let key = [Key::A, Key::B, Key::C, Key::D][index];
             if keys.pressed(key) {
-                self.class_id = resources
-                    .class_by_index(index as i32)
-                    .map(|class| class.id.as_str().to_owned())
-                    .unwrap_or_else(|| "knight".to_owned());
-                self.screen = Screen::CreateGame;
+                self.pick_class(index, resources);
                 // Do not leak the committing letter into name entry.
                 let _ = keys.chars_pressed();
                 return None;
@@ -265,10 +352,38 @@ impl Startup {
         None
     }
 
+    /// `L`, or a click on the hint bar.
+    fn open_save_picker(&mut self, resources: &Resources, paths: &SavePaths) {
+        self.picker = SlotPicker::new(scan_slots(paths, resources.pack_id.as_str()), true);
+        self.picker.cursor = SAVE_SLOT_COUNT;
+        for (slot, header) in self.picker.slots().headers.iter().enumerate() {
+            if header.is_some() {
+                self.picker.cursor = slot;
+                break;
+            }
+        }
+        self.screen = Screen::SavePicker;
+    }
+
+    /// A class letter, or a click on that figure.
+    fn pick_class(&mut self, index: usize, resources: &Resources) {
+        self.class_id = resources
+            .class_by_index(index as i32)
+            .map(|class| class.id.as_str().to_owned())
+            .unwrap_or_else(|| "knight".to_owned());
+        self.screen = Screen::CreateGame;
+    }
+
     /// The shared picker reports a row; what each row means here is
     /// startup's own rule.
     fn update_save_picker(&mut self, keys: &dyn KeySource) -> Option<StartupChoice> {
-        match self.picker.update(keys)? {
+        let choice = self.picker.update(keys)?;
+        self.apply_slot_choice(choice)
+    }
+
+    /// What a picker row means at startup, from a key or a click alike.
+    fn apply_slot_choice(&mut self, choice: SlotChoice) -> Option<StartupChoice> {
+        match choice {
             SlotChoice::Cancel => {
                 self.screen = Screen::ClassSelect;
                 None
@@ -389,11 +504,20 @@ impl Startup {
     pub fn draw(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
         time: f64,
     ) {
+        let whole = Rect::new(0, 0, layout.screen_w, layout.screen_h);
+        // A click anywhere is the "any key" that skips these.
+        if matches!(
+            self.screen,
+            Screen::SplashLogo | Screen::SplashTitle | Screen::Credits | Screen::Intro
+        ) {
+            hits.push(whole, HitTarget::StartupSkip);
+        }
         match self.screen {
             // The splashes and credits own the whole screen.
             Screen::SplashLogo => self.draw_splash(
@@ -422,6 +546,9 @@ impl Startup {
                 self.draw_class_picker(list, layout);
                 self.draw_status_hint(list, layout, palette, resources);
                 match self.screen {
+                    Screen::ClassSelect => {
+                        self.publish_class_select(list, hits, layout, palette, resources)
+                    }
                     Screen::SavePicker => {
                         let title = banner::text(
                             resources,
@@ -441,20 +568,12 @@ impl Startup {
                             "controls_hint",
                             DEFAULT_CONTROLS_HINT,
                         );
-                        // Startup publishes no click regions yet.
                         self.picker.draw(
-                            list,
-                            &mut crate::pointer::HitList::new(),
-                            layout,
-                            palette,
-                            resources,
-                            title,
-                            new_label,
-                            hint,
+                            list, hits, layout, palette, resources, title, new_label, hint,
                         )
                     }
                     Screen::CreateGame => {
-                        self.draw_create_game(list, layout, palette, resources, time)
+                        self.draw_create_game(list, hits, layout, palette, resources, time)
                     }
                     Screen::Intro => self.draw_intro(list, layout, palette, resources),
                     _ => {}
@@ -590,9 +709,56 @@ impl Startup {
         }
     }
 
+    /// The picker's top-left, shared by its blit and its click regions.
+    fn class_picker_origin(layout: &Layout) -> (i32, i32) {
+        (
+            (layout.screen_w - CLASS_PICKER_W) / 2,
+            (layout.screen_h - CLASS_PICKER_H) / 2,
+        )
+    }
+
+    /// Class select's click regions: the hint bar (it names `L`), then each
+    /// figure the pack has a class for. The hovered figure gets a yellow
+    /// outline around its whole region.
+    fn publish_class_select(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+    ) {
+        hits.push(
+            Rect::new(0, 0, layout.screen_w, GLYPH_H + 2),
+            HitTarget::StartupLoad,
+        );
+        let (px, py) = Self::class_picker_origin(layout);
+        let count = resources.classes_count().min(4);
+        for (index, rect) in CLASS_FIGURES {
+            if index < count {
+                hits.push(
+                    Rect::new(px + rect.x, py + rect.y, rect.w, rect.h),
+                    HitTarget::StartupClass(index),
+                );
+            }
+        }
+        if let Some(HitTarget::StartupClass(index)) = self.hover {
+            let parts = CLASS_FIGURES.iter().filter(|(i, _)| *i == index);
+            let x0 = parts.clone().map(|(_, r)| r.x).min();
+            let y0 = parts.clone().map(|(_, r)| r.y).min();
+            let x1 = parts.clone().map(|(_, r)| r.x + r.w).max();
+            let y1 = parts.map(|(_, r)| r.y + r.h).max();
+            if let (Some(x0), Some(y0), Some(x1), Some(y1)) = (x0, y0, x1, y1) {
+                list.rect_lines(
+                    Rect::new(px + x0, py + y0, x1 - x0, y1 - y0),
+                    palette.clr(Pal::Yellow),
+                );
+            }
+        }
+    }
+
     fn draw_class_picker(&self, list: &mut DrawList, layout: &Layout) {
-        let px = (layout.screen_w - CLASS_PICKER_W) / 2;
-        let py = (layout.screen_h - CLASS_PICKER_H) / 2;
+        let (px, py) = Self::class_picker_origin(layout);
         list.blit(
             Sprite::ClassPicker,
             Dst::rect(px, py, CLASS_PICKER_W, CLASS_PICKER_H),
@@ -623,6 +789,7 @@ impl Startup {
     fn draw_create_game(
         &self,
         list: &mut DrawList,
+        hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
@@ -681,12 +848,13 @@ impl Startup {
             );
             let days = resources.time.days_per_difficulty[i];
             let line = format!("   {label:<11} {days:>3}    {score}");
-            list.text(
-                &line,
-                x + GLYPH_W,
-                y + GLYPH_H * (5 + i as i32),
-                palette.clr(Pal::White),
-            );
+            let row_y = y + GLYPH_H * (5 + i as i32);
+            list.text(&line, x + GLYPH_W, row_y, palette.clr(Pal::White));
+            // Rows are clickable only once the name is confirmed, as the
+            // arrows and Enter are.
+            if self.has_name {
+                hits.push(Rect::new(x, row_y, w, GLYPH_H), HitTarget::Difficulty(i));
+            }
         }
 
         if self.has_name {
@@ -761,6 +929,7 @@ fn expand_version(src: &str, version: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::draw::DrawCmd;
     use crate::input::Keys;
     use openbounty_engine::state_serialize::SAVE_VERSION;
 
@@ -931,7 +1100,14 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+        startup.draw(
+            &mut list,
+            &mut HitList::new(),
+            &layout,
+            &palette,
+            &resources,
+            0.0,
+        );
 
         assert!(list
             .texts()
@@ -949,7 +1125,14 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+        startup.draw(
+            &mut list,
+            &mut HitList::new(),
+            &layout,
+            &palette,
+            &resources,
+            0.0,
+        );
 
         let texts = list.texts();
         assert!(texts.iter().any(|(_, _, text)| text.contains("Knight")));
@@ -1024,7 +1207,14 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+        startup.draw(
+            &mut list,
+            &mut HitList::new(),
+            &layout,
+            &palette,
+            &resources,
+            0.0,
+        );
 
         let texts = list.texts();
         assert!(texts
@@ -1094,7 +1284,14 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+        startup.draw(
+            &mut list,
+            &mut HitList::new(),
+            &layout,
+            &palette,
+            &resources,
+            0.0,
+        );
         assert_eq!(list.blits_of(Sprite::SplashLogo).len(), 1);
     }
 
@@ -1110,12 +1307,281 @@ mod tests {
         let layout = layout();
         let palette = Palette::fallback();
         let mut list = DrawList::new();
-        startup.draw(&mut list, &layout, &palette, &resources, 0.0);
+        startup.draw(
+            &mut list,
+            &mut HitList::new(),
+            &layout,
+            &palette,
+            &resources,
+            0.0,
+        );
 
         let texts = list.texts();
         assert!(texts.iter().any(|(_, _, text)| *text == "By:"));
         assert!(texts.iter().any(|(_, _, text)| *text == "A"));
         assert!(texts.iter().any(|(_, _, text)| *text == "v7"));
         assert_eq!(list.blits_of(Sprite::ClassHighlight).len(), 1);
+    }
+
+    // ---- Mouse (a deliberate DIVERGENCE: C has no pointer) ----
+
+    fn four_class_resources() -> Resources {
+        Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [], "pack_id": "openbounty",
+                "classes": [
+                  {"index":0,"id":"knight","name":"Knight","portrait":"k.png"},
+                  {"index":1,"id":"paladin","name":"Paladin","portrait":"p.png"},
+                  {"index":2,"id":"sorceress","name":"Sorceress","portrait":"s.png"},
+                  {"index":3,"id":"barbarian","name":"Barbarian","portrait":"b.png"}
+                ]}"#,
+        )
+        .expect("fixture parses")
+    }
+
+    fn drawn_hits(startup: &Startup, resources: &Resources) -> (DrawList, HitList) {
+        let layout = Layout::from_resources(resources).expect("lays out");
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        startup.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            resources,
+            0.0,
+        );
+        (list, hits)
+    }
+
+    /// Each letter printed on the stock art lands on its own class. The
+    /// letter positions are read off `class_select_picker.png`.
+    #[test]
+    fn each_printed_letter_on_the_art_hits_its_own_class() {
+        let resources = four_class_resources();
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let (px, py) = Startup::class_picker_origin(&layout);
+        let (_, hits) = drawn_hits(&Startup::default(), &resources);
+        for (index, (lx, ly)) in [(37, 77), (182, 22), (233, 78), (258, 172)]
+            .into_iter()
+            .enumerate()
+        {
+            assert_eq!(
+                hits.hit(px + lx, py + ly),
+                Some(HitTarget::StartupClass(index)),
+                "letter {}",
+                ['A', 'B', 'C', 'D'][index]
+            );
+        }
+    }
+
+    /// The sky above the knight is no figure, and class select publishes no
+    /// backdrop: a stray click there does nothing -- it certainly never quits.
+    #[test]
+    fn a_click_off_the_figures_on_class_select_does_nothing() {
+        let resources = four_class_resources();
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let (px, py) = Startup::class_picker_origin(&layout);
+        let (_, hits) = drawn_hits(&Startup::default(), &resources);
+        assert_eq!(hits.hit(px + 20, py + 30), None);
+    }
+
+    #[test]
+    fn clicking_a_figure_matches_its_letter() {
+        let resources = four_class_resources();
+        let paths = paths("click-class");
+        for (index, key) in [Key::A, Key::B, Key::C, Key::D].into_iter().enumerate() {
+            let mut by_key = Startup::default();
+            by_key.update(&Keys::pressed(&[key]), &resources, &paths, 0.0);
+            let mut by_click = Startup::default();
+            assert_eq!(
+                by_click.click(HitTarget::StartupClass(index), &resources, &paths, 0.0),
+                None
+            );
+            assert_eq!(by_click, by_key, "class {index}");
+            assert_eq!(by_click.screen, Screen::CreateGame);
+        }
+    }
+
+    /// A two-class pack has no C or D: no region, and a stray target is inert.
+    #[test]
+    fn only_the_classes_a_pack_has_are_clickable() {
+        let resources = resources();
+        let paths = paths("click-class-count");
+        let (_, hits) = drawn_hits(&Startup::default(), &resources);
+        assert!(hits.regions().iter().all(|r| !matches!(
+            r.target,
+            HitTarget::StartupClass(index) if index >= 2
+        )));
+        let mut startup = Startup::default();
+        startup.click(HitTarget::StartupClass(3), &resources, &paths, 0.0);
+        assert_eq!(startup.screen, Screen::ClassSelect);
+    }
+
+    #[test]
+    fn hovering_a_figure_outlines_it_and_picks_nothing() {
+        let resources = four_class_resources();
+        let mut startup = Startup::default();
+        startup.set_hover(Some(HitTarget::StartupClass(1)));
+        let (list, _) = drawn_hits(&startup, &resources);
+        let yellow = Palette::fallback().clr(Pal::Yellow);
+        assert!(list
+            .as_slice()
+            .iter()
+            .any(|cmd| matches!(cmd, DrawCmd::RectLines { color, .. } if *color == yellow)));
+        assert_eq!(startup.screen, Screen::ClassSelect);
+    }
+
+    /// The hint bar names `L`; a click on it is `L`, cursor placement and all.
+    #[test]
+    fn clicking_the_hint_bar_opens_the_picker_like_l() {
+        let resources = resources();
+        let paths = paths("click-load-bar");
+        write_save(&paths.slot("openbounty", 3).expect("slot"), "Murray", 9);
+        let (_, hits) = drawn_hits(&Startup::default(), &resources);
+        assert_eq!(hits.hit(1, 1), Some(HitTarget::StartupLoad));
+        let mut by_key = Startup::default();
+        by_key.update(&Keys::pressed(&[Key::L]), &resources, &paths, 0.0);
+        let mut by_click = Startup::default();
+        by_click.click(HitTarget::StartupLoad, &resources, &paths, 0.0);
+        assert_eq!(by_click, by_key);
+        assert_eq!(by_click.picker.cursor, 3);
+    }
+
+    #[test]
+    fn clicking_a_saved_slot_loads_it_and_off_the_panel_steps_back() {
+        let resources = resources();
+        let paths = paths("click-slot");
+        write_save(&paths.slot("openbounty", 2).expect("slot"), "Murray", 9);
+        let mut startup = Startup::default();
+        startup.click(HitTarget::StartupLoad, &resources, &paths, 0.0);
+        let (_, hits) = drawn_hits(&startup, &resources);
+        let row = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::SlotRow(2))
+            .expect("slot 2 is clickable at startup");
+        let target = hits.hit(row.rect.x + 1, row.rect.y + 1).expect("hit");
+        let choice = startup
+            .click(target, &resources, &paths, 0.0)
+            .expect("loads");
+        assert_eq!(choice.action, StartupAction::Load);
+        assert_eq!(choice.slot, 2);
+
+        // Off the panel is ESC: back to class select, never Quit.
+        let mut startup = Startup::default();
+        startup.click(HitTarget::StartupLoad, &resources, &paths, 0.0);
+        assert_eq!(
+            startup.click(HitTarget::SlotCancel, &resources, &paths, 0.0),
+            None
+        );
+        assert_eq!(startup.screen, Screen::ClassSelect);
+    }
+
+    /// A click anywhere skips each splash and the credits, as any key does.
+    #[test]
+    fn a_click_skips_the_splashes_and_credits() {
+        let resources = splash_resources();
+        let paths = paths("click-splash");
+        let mut startup = Startup::new(&resources);
+        for expected in [Screen::SplashTitle, Screen::Credits, Screen::ClassSelect] {
+            let (_, hits) = drawn_hits(&startup, &resources);
+            assert_eq!(hits.hit(0, 0), Some(HitTarget::StartupSkip));
+            startup.click(HitTarget::StartupSkip, &resources, &paths, 1.0);
+            assert_eq!(startup.screen, expected);
+            assert_eq!(startup.screen_started, 1.0, "the next hold starts now");
+        }
+        // Class select itself is not skippable.
+        startup.click(HitTarget::StartupSkip, &resources, &paths, 1.0);
+        assert_eq!(startup.screen, Screen::ClassSelect);
+    }
+
+    /// From the create-game screen with the name confirmed.
+    fn at_difficulty(resources: &Resources, paths: &SavePaths) -> Startup {
+        let mut startup = Startup::default();
+        startup.update(&Keys::pressed(&[Key::A]), resources, paths, 0.0);
+        startup.update(&Keys::pressed(&[Key::Enter]), resources, paths, 0.0);
+        assert!(startup.has_name);
+        startup
+    }
+
+    /// The anti-drift test for the difficulty table: each row's region holds
+    /// the line drawn for it and hits that row alone.
+    #[test]
+    fn the_difficulty_hit_regions_line_up_with_the_drawn_rows() {
+        let resources = resources();
+        let paths = paths("click-difficulty-drift");
+        let startup = at_difficulty(&resources, &paths);
+        let (list, hits) = drawn_hits(&startup, &resources);
+        let texts = list.texts();
+        for (row, days) in ["900", "600", "400", "200"].iter().enumerate() {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::Difficulty(row))
+                .unwrap_or_else(|| panic!("row {row} published no region"));
+            let (tx, ty, _) = texts
+                .iter()
+                .find(|(_, _, text)| text.contains(days))
+                .copied()
+                .expect("row drawn");
+            let r = region.rect;
+            assert!(tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h);
+            assert_eq!(
+                hits.hit(r.x + r.w / 2, r.y + r.h / 2),
+                Some(HitTarget::Difficulty(row))
+            );
+        }
+    }
+
+    /// While the name is being typed the table is not live, by key or click.
+    #[test]
+    fn the_difficulty_rows_are_inert_during_name_entry() {
+        let resources = resources();
+        let paths = paths("click-difficulty-name");
+        let mut startup = Startup::default();
+        startup.update(&Keys::pressed(&[Key::A]), &resources, &paths, 0.0);
+        let (_, hits) = drawn_hits(&startup, &resources);
+        assert!(hits
+            .regions()
+            .iter()
+            .all(|r| !matches!(r.target, HitTarget::Difficulty(_))));
+        startup.set_hover(Some(HitTarget::Difficulty(3)));
+        startup.click(HitTarget::Difficulty(3), &resources, &paths, 0.0);
+        assert_eq!(startup.difficulty, 1);
+        assert_eq!(startup.screen, Screen::CreateGame);
+    }
+
+    /// A row click is "select it, then Enter".
+    #[test]
+    fn clicking_a_difficulty_matches_selecting_it_and_pressing_enter() {
+        let resources = resources();
+        let paths = paths("click-difficulty");
+        let mut by_key = at_difficulty(&resources, &paths);
+        by_key.update(&Keys::pressed(&[Key::Down]), &resources, &paths, 0.0);
+        by_key.update(&Keys::pressed(&[Key::Enter]), &resources, &paths, 5.0);
+        let mut by_click = at_difficulty(&resources, &paths);
+        by_click.click(HitTarget::Difficulty(2), &resources, &paths, 5.0);
+        assert_eq!(by_click, by_key);
+        assert_eq!(by_click.screen, Screen::Intro);
+        // And a click dismisses the intro like any key.
+        let choice = by_click
+            .click(HitTarget::StartupSkip, &resources, &paths, 5.0)
+            .expect("intro dismisses");
+        assert_eq!(choice.action, StartupAction::New);
+        assert_eq!(choice.difficulty, 2);
+    }
+
+    /// Entering a row moves the ">" marker there; a resting pointer does not
+    /// pin it, so the arrows still work.
+    #[test]
+    fn hovering_a_difficulty_moves_the_marker_without_pinning_it() {
+        let resources = resources();
+        let paths = paths("hover-difficulty");
+        let mut startup = at_difficulty(&resources, &paths);
+        startup.set_hover(Some(HitTarget::Difficulty(3)));
+        assert_eq!(startup.difficulty, 3);
+        startup.update(&Keys::pressed(&[Key::Up]), &resources, &paths, 0.0);
+        startup.set_hover(Some(HitTarget::Difficulty(3)));
+        assert_eq!(startup.difficulty, 2);
     }
 }

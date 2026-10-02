@@ -206,9 +206,7 @@ pub fn picker_hint(resources: &Resources) -> &str {
     )
 }
 
-/// Draw the in-game picker for `purpose`. Unlike startup, a click off the
-/// panel steps back to the menu, as ESC does here, so the backdrop region is
-/// published first and the picker's rows cover it.
+/// Draw the in-game picker for `purpose`, with the in-game title and hint.
 pub fn draw_picker(
     picker: &SlotPicker,
     list: &mut DrawList,
@@ -218,10 +216,6 @@ pub fn draw_picker(
     resources: &Resources,
     purpose: PickerPurpose,
 ) {
-    hits.push(
-        Rect::new(0, 0, layout.screen_w, layout.screen_h),
-        HitTarget::SlotCancel,
-    );
     picker.draw(
         list,
         hits,

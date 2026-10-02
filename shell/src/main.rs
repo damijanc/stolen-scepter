@@ -851,22 +851,35 @@ async fn main() {
     // player, exactly as C's `startup_flow` does before the game exists.
     let mut startup = Startup::new(&resources);
     let choice = loop {
-        if let Some(choice) = startup.update(&keys, &resources, &save_paths, get_time()) {
+        // Same shape as the main loop: hit-test the previous frame's regions,
+        // and a click resolves to what the matching key does.
+        let at = logical_pointer(&pointer, &backend, &present, &layout);
+        let hovered = at.and_then(|(lx, ly)| hits.hit(lx, ly));
+        startup.set_hover(hovered);
+        let clicked = hovered.filter(|_| pointer.pressed(Button::Left));
+        let outcome = match clicked {
+            Some(target) => startup.click(target, &resources, &save_paths, get_time()),
+            None => startup.update(&keys, &resources, &save_paths, get_time()),
+        };
+        if let Some(choice) = outcome {
             break choice;
         }
         list.clear();
+        hits.clear();
         startup.draw(
             &mut list,
+            &mut hits,
             &layout,
             backend.palette(),
             &resources,
             get_time(),
         );
-        let at = logical_pointer(&pointer, &backend, &present, &layout);
         finish_pointer(&mut list, &backend, at);
         backend.execute(&list, &catalog, &layout, &present);
         next_frame().await;
     };
+    // The wizard's regions must not be hit-tested by the game's first frame.
+    hits.clear();
     if choice.action == StartupAction::Quit {
         return;
     }

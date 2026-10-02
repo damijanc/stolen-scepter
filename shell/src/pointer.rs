@@ -40,9 +40,18 @@ pub enum HitTarget {
     MenuClose,
     /// A save-slot picker row. `SAVE_SLOT_COUNT` is the extra row.
     SlotRow(usize),
-    /// The screen around the in-game picker: a click there is ESC. Only the
-    /// in-game caller publishes it -- at startup ESC quits the game.
+    /// The screen around the picker: a click there is ESC, which steps back
+    /// (to class select at startup, to the Game Menu in-game).
     SlotCancel,
+    /// A splash, the credits or the new-game intro: a click anywhere is the
+    /// "any key" that skips it.
+    StartupSkip,
+    /// A class's figure on the class-select art, by class index (letter A-D).
+    StartupClass(usize),
+    /// The class-select hint bar, which names `L`: a click there is `L`.
+    StartupLoad,
+    /// A difficulty row on the create-game screen, in `Difficulty` order.
+    Difficulty(usize),
 }
 
 /// One actionable rectangle, in logical coordinates.

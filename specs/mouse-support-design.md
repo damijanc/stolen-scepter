@@ -72,11 +72,27 @@ decision 3 and highlight without moving.
 
 ### 3a. A click off a menu panel is ESC (P10)
 
-The Game Menu and its in-game slot picker publish a full-screen backdrop region
-before their rows (`MenuClose`, `SlotCancel`), so a click off the panel gives
-the value ESC gives. At startup the picker publishes NO backdrop, because there
-ESC quits the game -- a stray click must not. The picker therefore leaves the
-backdrop to its caller (`menu::draw_picker`).
+The Game Menu and the slot picker publish a full-screen backdrop region before
+their rows (`MenuClose`, `SlotCancel`), so a click off the panel gives the value
+ESC gives. That is always a step BACK: the menu closes, and the picker returns
+to the Game Menu in-game or to class select at startup. Only ESC on class
+select itself quits, and class select publishes no backdrop, so no stray click
+can quit the game.
+
+### 3c. The startup wizard (reverses a 2026-09-20 non-goal, per P11)
+
+A click is the key it stands for: anywhere on a splash, the credits or the
+intro is "any key"; a figure on class select is its letter; the class-select
+hint bar, which names `L`, is `L`; a picker row is Enter on it; a difficulty row
+is "select, then Enter" and, like the menu, the pointer entering a row moves the
+`>` marker. Name entry stays keyboard, and the difficulty rows are inert until
+the name is confirmed, exactly as the arrows are.
+
+The figure rectangles (`startup::CLASS_FIGURES`) are authored by eye from the
+stock art -- nothing in C or the pack locates them. They are relative to the
+picker's 288x184 placement, which the HD pack's 4x art shares. A pack with a
+different composition would need its own geometry; that waits for the asset
+update. Class select publishes no backdrop, so no stray click can quit.
 
 ### 4. The shell draws its own pointer (revised 2026-10-02, P3)
 
