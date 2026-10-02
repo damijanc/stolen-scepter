@@ -47,7 +47,7 @@ use audio_backend::KiraAudio;
 use backend::{Backend, MacroquadKeys, MacroquadPointer};
 use cheats::{CheatMenu, CheatOutcome, CheatResult};
 use chrome::{Chrome, StatusMode};
-use combat::{combat_render, combat_spell_menu, combat_view_input, CombatLoop, CombatStatus};
+use combat::{combat_render, combat_view_input, CombatLoop, CombatStatus, PointerInput};
 use dialog::Dialog;
 use draw::DrawList;
 use hud::Hud;
@@ -1055,6 +1055,9 @@ async fn main() {
         };
         views.set_hover(hovered);
         menu.set_hover(hovered);
+        if let Some(session) = combat.as_mut() {
+            session.combat.set_hover(hovered);
+        }
         if let Some((picker, _)) = menu_picker.as_mut() {
             picker.set_hover(hovered);
         }
@@ -1080,10 +1083,20 @@ async fn main() {
                     &mut present,
                 );
             } else {
-                let status =
-                    session
-                        .combat
-                        .step(&keys, &mut game, &resources, get_time(), &mut prompt);
+                // A click reaches the fight only through `step_input`,
+                // behind the same gates as the keys; right-click is ESC.
+                let input = PointerInput {
+                    click: clicked,
+                    cancel: pointer.pressed(Button::Right),
+                };
+                let status = session.combat.step_input(
+                    &keys,
+                    input,
+                    &mut game,
+                    &resources,
+                    get_time(),
+                    &mut prompt,
+                );
                 match status {
                     CombatStatus::Running => {}
                     CombatStatus::OpenView(view) => views.set(view),
@@ -1884,6 +1897,7 @@ async fn main() {
             .draw(&mut list);
             combat_render(
                 &mut list,
+                &mut hits,
                 &session.combat.combat,
                 session.combat.pick_cursor(),
                 backend.palette(),
@@ -1906,16 +1920,12 @@ async fn main() {
                 &present,
                 get_time(),
             );
-            // The spell-pick menu draws after any view and before the
-            // dialog and prompt, as in combat_present (combat_loop.c:328).
-            if session.combat.picking_spell() {
-                combat_spell_menu(
-                    &mut list,
-                    backend.palette(),
-                    &resources,
-                    &game.spells.counts,
-                );
-            }
+            // The spell-pick menu (and the mouse's action menu) draw after any
+            // view and before the dialog and prompt, as in combat_present
+            // (combat_loop.c:328).
+            session
+                .combat
+                .draw_menus(&mut list, &mut hits, backend.palette(), &resources, &game);
         } else {
             Chrome {
                 layout: &layout,

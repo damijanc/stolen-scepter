@@ -34,7 +34,7 @@ use crate::font;
 use crate::input::{Key, KeySource, DIGITS};
 use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
-use crate::pointer::HitTarget;
+use crate::pointer::{HitList, HitTarget};
 use crate::present::Present;
 use crate::prompt::{Prompt, PromptResult};
 use crate::sprites::SpriteCatalog;
@@ -195,18 +195,24 @@ const COMBAT_SPELL_NAMES: [&str; 7] = [
 /// it ends with is the chrome's.
 pub fn combat_render(
     list: &mut DrawList,
+    hits: &mut HitList,
     combat: &Combat,
     pick_cursor: Option<(i32, i32)>,
     palette: &Palette,
     catalog: &SpriteCatalog,
 ) {
-    // Grass field, one tile per cell.
+    // Grass field, one tile per cell. Each cell is also a click region, on
+    // the same rect it is drawn on.
     for y in 0..COMBAT_H as i32 {
         for x in 0..COMBAT_W as i32 {
             let (px, py) = cell_origin(x, y);
             list.blit(
                 Sprite::CombatTile(0),
                 Dst::rect(px, py, COMBAT_CELL_W, COMBAT_CELL_H),
+            );
+            hits.push(
+                Rect::new(px, py, COMBAT_CELL_W, COMBAT_CELL_H),
+                HitTarget::CombatCell(x, y),
             );
         }
     }
@@ -283,12 +289,18 @@ pub fn combat_render(
 /// The spell-pick menu, porting the overlay `combat_present` draws while the
 /// cast is in its pick-spell phase (`combat_loop.c:328-349`), at C's literal
 /// coordinates. `counts` is the caster's `spells.counts`, stock order.
+///
+/// Shell additions for the mouse: each row is a click region (its letter),
+/// over a field-wide ESC backdrop, and the `hover` row draws yellow.
 pub fn combat_spell_menu(
     list: &mut DrawList,
+    hits: &mut HitList,
     palette: &Palette,
     resources: &Resources,
     counts: &[i32],
+    hover: Option<usize>,
 ) {
+    hits.push(field_rect(), HitTarget::CombatBack);
     list.rect(Rect::new(40, 30, 240, 130), palette.clr(Pal::DBlue));
     list.rect_lines(Rect::new(40, 30, 240, 130), palette.clr(Pal::Yellow));
     let title = banner::text(resources, "ui", "combat_spells_title", "Spells");
@@ -299,10 +311,65 @@ pub fn combat_spell_menu(
         let count = counts.get(i).copied().unwrap_or(0);
         let letter = (b'A' + i as u8) as char;
         let line = format!("{count} {name:<12} {letter}");
-        list.text(&line, 56, 64 + i as i32 * 10, palette.clr(Pal::White));
+        let row_y = 64 + i as i32 * 10;
+        let fg = if hover == Some(i) {
+            palette.clr(Pal::Yellow)
+        } else {
+            palette.clr(Pal::White)
+        };
+        list.text(&line, 56, row_y, fg);
+        hits.push(Rect::new(40, row_y, 240, 10), HitTarget::CombatSpell(i));
     }
     let prompt = banner::text(resources, "ui", "combat_spells_prompt", "Cast which (A-G)?");
     list.text(prompt, 70, 144, palette.clr(Pal::White));
+}
+
+/// The mouse's action menu beside the acting unit at grid `unit`: one row
+/// per key, over a field-wide ESC backdrop. Shell UI that C does not have.
+/// It sits right of the unit, or left when that would leave the field, and is
+/// clamped vertically to the field.
+pub fn combat_action_menu(
+    list: &mut DrawList,
+    hits: &mut HitList,
+    palette: &Palette,
+    resources: &Resources,
+    unit: (i32, i32),
+    hover: Option<CombatAction>,
+) {
+    let pad = 4;
+    let row_h = font::GLYPH_H + 2;
+    let labels: Vec<&str> = COMBAT_ACTIONS
+        .iter()
+        .map(|(_, key, default)| banner::text(resources, "combat_menu", key, default))
+        .collect();
+    let widest = labels.iter().map(|l| l.chars().count()).max().unwrap_or(0) as i32;
+    let w = widest * font::GLYPH_W + 2 * pad;
+    let h = COMBAT_ACTIONS.len() as i32 * row_h + 2 * pad;
+    let field = field_rect();
+    let (cx, cy) = cell_origin(unit.0, unit.1);
+    let mut x = cx + COMBAT_CELL_W;
+    if x + w > field.x + field.w {
+        x = cx - w;
+    }
+    let x = x.max(field.x);
+    let y = cy.min(field.y + field.h - h).max(field.y);
+
+    hits.push(field, HitTarget::CombatBack);
+    list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
+    list.rect_lines(Rect::new(x, y, w, h), palette.clr(Pal::Yellow));
+    for (i, ((action, _, _), label)) in COMBAT_ACTIONS.iter().zip(&labels).enumerate() {
+        let row_y = y + pad + i as i32 * row_h;
+        let fg = if hover == Some(*action) {
+            palette.clr(Pal::Yellow)
+        } else {
+            palette.clr(Pal::White)
+        };
+        list.text(label, x + pad, row_y + 1, fg);
+        hits.push(
+            Rect::new(x, row_y, w, row_h),
+            HitTarget::CombatAction(*action),
+        );
+    }
 }
 
 /// What a pick is for, porting `CombatPickReason`.
@@ -335,6 +402,56 @@ pub enum CombatStatus {
     OpenView(ViewKind),
 }
 
+/// One frame of pointer input for combat. Shell-side: C's combat has no
+/// pointer (a deliberate DIVERGENCE, `specs/combat-mouse-design.md`). Every
+/// click is routed to the same `CombatLoop` method the matching key calls.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PointerInput {
+    /// What a left click landed on this frame, if anything.
+    pub click: Option<HitTarget>,
+    /// A right click: ESC, wherever ESC backs out of something.
+    pub cancel: bool,
+}
+
+/// The combat action menu's entries. Each is exactly one key.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CombatAction {
+    Wait,
+    Shoot,
+    Fly,
+    Cast,
+    GiveUp,
+    Army,
+    Character,
+    Options,
+    Controls,
+}
+
+/// The menu in drawn order, with its `strings.combat_menu` key and default
+/// label. The label leads with the key it stands for.
+const COMBAT_ACTIONS: [(CombatAction, &str, &str); 9] = [
+    (CombatAction::Wait, "wait", "W Wait"),
+    (CombatAction::Shoot, "shoot", "S Shoot"),
+    (CombatAction::Fly, "fly", "F Fly"),
+    (CombatAction::Cast, "cast", "U Cast spell"),
+    (CombatAction::GiveUp, "give_up", "G Give up"),
+    (CombatAction::Army, "army", "A Army"),
+    (CombatAction::Character, "character", "V Character"),
+    (CombatAction::Options, "options", "O Options"),
+    (CombatAction::Controls, "controls", "C Controls"),
+];
+
+/// The whole 6x5 field, in logical pixels: the backdrop a combat menu
+/// publishes, so a click off its panel is ESC.
+fn field_rect() -> Rect {
+    Rect::new(
+        COMBAT_X,
+        COMBAT_Y,
+        COMBAT_W as i32 * COMBAT_CELL_W,
+        COMBAT_H as i32 * COMBAT_CELL_H,
+    )
+}
+
 /// The shell-side combat loop: the engine's [`Combat`] plus the cursor, picker
 /// and cast state C keeps on the same struct. Ports `RunCombat`'s per-frame
 /// input dispatch, minus the animation tick, the give-up prompt and the
@@ -365,6 +482,10 @@ pub struct CombatLoop {
     /// When the next SYN tick fires, pacing the damage burst and the AI to
     /// C's 150ms cadence.
     next_tick: f64,
+    /// The mouse's action menu is open over the acting unit. Shell UI.
+    action_menu: bool,
+    /// What the pointer was over last frame (see [`CombatLoop::set_hover`]).
+    hover: Option<HitTarget>,
 }
 
 impl CombatLoop {
@@ -409,6 +530,8 @@ impl CombatLoop {
             pending_banner_clear: false,
             requested_view: None,
             next_tick: 0.0,
+            action_menu: false,
+            hover: None,
         }
     }
 
@@ -431,6 +554,47 @@ impl CombatLoop {
     /// menu is drawn.
     pub fn picking_spell(&self) -> bool {
         self.cast_phase == CastPhase::PickSpell
+    }
+
+    /// The pointer moved. While a picker is armed, ENTERING a cell moves the
+    /// target ring there -- one highlight, and it is where a click or Enter
+    /// lands. A pointer resting on a cell moves nothing, so the arrows still
+    /// steer the ring under a still mouse.
+    pub fn set_hover(&mut self, target: Option<HitTarget>) {
+        if target != self.hover && self.picker_active {
+            if let Some(HitTarget::CombatCell(x, y)) = target {
+                self.cursor_x = x;
+                self.cursor_y = y;
+            }
+        }
+        self.hover = target;
+    }
+
+    /// The combat menus, over the field and any view: the spell menu in the
+    /// pick-spell phase, the action menu while it is open.
+    pub fn draw_menus(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        palette: &Palette,
+        resources: &Resources,
+        game: &Game,
+    ) {
+        if self.picking_spell() {
+            let hover = match self.hover {
+                Some(HitTarget::CombatSpell(i)) => Some(i),
+                _ => None,
+            };
+            combat_spell_menu(list, hits, palette, resources, &game.spells.counts, hover);
+        }
+        if self.action_menu && self.combat.unit_id >= 0 {
+            let unit = &self.combat.units[self.combat.side][self.combat.unit_id as usize];
+            let hover = match self.hover {
+                Some(HitTarget::CombatAction(action)) => Some(action),
+                _ => None,
+            };
+            combat_action_menu(list, hits, palette, resources, (unit.x, unit.y), hover);
+        }
     }
 
     /// Replace the action banner from a `strings.combat_log` line.
@@ -512,12 +676,26 @@ impl CombatLoop {
         }
     }
 
-    /// Drive one frame of combat input. The player's actions dispatch through
-    /// the engine's move/hit/fly/cast cores; the AI is paced to the SYN-tick
-    /// rollover so units visibly walk between tiles.
+    /// Drive one frame of combat input from the keys alone.
     pub fn step(
         &mut self,
         keys: &dyn KeySource,
+        game: &mut Game,
+        resources: &Resources,
+        time: f64,
+        prompt: &mut Prompt,
+    ) -> CombatStatus {
+        self.step_input(keys, PointerInput::default(), game, resources, time, prompt)
+    }
+
+    /// Drive one frame of combat input. The player's actions dispatch through
+    /// the engine's move/hit/fly/cast cores; the AI is paced to the SYN-tick
+    /// rollover so units visibly walk between tiles. `pointer` is read at the
+    /// same points, behind the same gates, as the keys it stands in for.
+    pub fn step_input(
+        &mut self,
+        keys: &dyn KeySource,
+        pointer: PointerInput,
         game: &mut Game,
         resources: &Resources,
         time: f64,
@@ -528,9 +706,13 @@ impl CombatLoop {
         }
 
         // The give-up confirm is modal over the battlefield: it owns the keys
-        // until answered. A yes forfeits the fight.
+        // (and its own Yes/No regions) until answered. A yes forfeits.
         if prompt.is_active() {
-            if prompt.update(keys) == PromptResult::Yes {
+            let answer = match pointer.click {
+                Some(target) => prompt.click(target),
+                None => prompt.update(keys),
+            };
+            if answer == PromptResult::Yes {
                 self.combat.result = 2;
             }
             return self.status();
@@ -564,16 +746,16 @@ impl CombatLoop {
 
         let log_len_before = self.combat.log.len();
         let acted = if self.cast_phase != CastPhase::None {
-            self.cast_step(keys, game, resources)
+            self.cast_step(keys, pointer, game, resources)
         } else if self.picker_active {
-            self.pick_dispatch(keys, game, resources)
+            self.pick_dispatch(keys, pointer, game, resources)
         } else {
             let player_turn = self.combat.side == COMBAT_SIDE_PLAYER
                 && self.combat.unit_id >= 0
                 && !self.combat.units[self.combat.side][self.combat.unit_id as usize]
                     .out_of_control;
             if player_turn {
-                self.player_action(keys, game, resources, prompt)
+                self.player_action(keys, pointer, game, resources, prompt)
             } else if rolled_over {
                 combat_ai_action(&mut self.combat, resources) != 0
             } else {
@@ -679,10 +861,34 @@ impl CombatLoop {
     fn player_action(
         &mut self,
         keys: &dyn KeySource,
+        pointer: PointerInput,
         game: &mut Game,
         resources: &Resources,
         prompt: &mut Prompt,
     ) -> bool {
+        // The action menu (shell UI) takes the pointer first. ESC, a
+        // right-click or a click off it closes it; any other key closes it and
+        // then does what it always does.
+        if self.action_menu {
+            if pointer.cancel
+                || keys.pressed(Key::Escape)
+                || pointer.click == Some(HitTarget::CombatBack)
+            {
+                self.action_menu = false;
+                return false;
+            }
+            if let Some(HitTarget::CombatAction(action)) = pointer.click {
+                self.action_menu = false;
+                return self.run_action(action, game, resources, prompt);
+            }
+            if keys.any_pressed() {
+                self.action_menu = false;
+            }
+        }
+        if let Some(HitTarget::CombatCell(x, y)) = pointer.click {
+            return self.click_cell(x, y, game, resources);
+        }
+
         if let Some((dx, dy)) = combat_read_dir(keys) {
             if self.combat.unit_id < 0 {
                 return false;
@@ -690,79 +896,22 @@ impl CombatLoop {
             return self.player_move(resources, dx, dy);
         }
         if keys.pressed(Key::Space) || keys.pressed(Key::W) {
-            if self.combat.unit_id >= 0 {
-                let side = self.combat.side;
-                self.combat.units[side][self.combat.unit_id as usize].acted = true;
-            }
-            return true;
+            return self.wait();
         }
         if keys.pressed(Key::S) {
-            if self.combat.unit_id < 0 {
-                return false;
-            }
-            let (side, id) = (self.combat.side, self.combat.unit_id as usize);
-            let unit = &self.combat.units[side][id];
-            if unit.shots <= 0 {
-                self.log(resources, "no_ammo", DEFAULT_CL_NO_AMMO);
-                return false;
-            }
-            if combat_unit_surrounded(&self.combat, side, id) {
-                self.log(resources, "cant_shoot", DEFAULT_CL_CANT_SHOOT);
-                return false;
-            }
-            self.cursor_x = unit.x;
-            self.cursor_y = unit.y;
-            self.pick_filter = PickFilter::Enemy;
-            self.pick_reason = PickReason::Shoot;
-            self.picker_active = true;
+            self.arm_shoot(resources);
             return false;
         }
         if keys.pressed(Key::F) {
-            if self.combat.unit_id < 0 {
-                return false;
-            }
-            let (side, id) = (self.combat.side, self.combat.unit_id as usize);
-            let unit = &self.combat.units[side][id];
-            let flies = resources
-                .troop_by_index(unit.troop_idx)
-                .is_some_and(|troop| troop.abilities & TROOP_ABIL_FLY != 0);
-            if !flies || unit.flights <= 0 {
-                self.log(resources, "cant_fly", DEFAULT_CL_CANT_FLY);
-                return false;
-            }
-            self.cursor_x = unit.x;
-            self.cursor_y = unit.y;
-            self.pick_filter = PickFilter::Empty;
-            self.pick_reason = PickReason::Fly;
-            self.picker_active = true;
+            self.arm_fly(resources);
             return false;
         }
         if keys.pressed(Key::U) {
-            if self.combat.spells_this_round >= 1 {
-                self.log(resources, "only_one_spell", DEFAULT_CL_ONLY_ONE_SPELL);
-                return false;
-            }
-            if !game.stats.knows_magic {
-                self.log(resources, "cannot_cast", DEFAULT_CL_CANNOT_CAST);
-                return false;
-            }
-            self.cast_phase = CastPhase::PickSpell;
+            self.open_cast(game, resources);
             return false;
         }
         if keys.pressed(Key::G) {
-            let header = banner::text(
-                resources,
-                "banners",
-                "combat_give_up_header",
-                DEFAULT_GIVE_UP_HEADER,
-            );
-            let body = banner::text(
-                resources,
-                "banners",
-                "combat_give_up_body",
-                DEFAULT_GIVE_UP_BODY,
-            );
-            prompt.yes_no(header, body);
+            self.give_up(resources, prompt);
             return false;
         }
         if keys.pressed(Key::C) {
@@ -770,6 +919,145 @@ impl CombatLoop {
             // lives there too (combat_loop.c:306-312). Not an action.
             self.requested_view = Some(ViewKind::Controls);
             return false;
+        }
+        false
+    }
+
+    /// Space / W: the acting unit is done for this turn.
+    fn wait(&mut self) -> bool {
+        if self.combat.unit_id >= 0 {
+            let side = self.combat.side;
+            self.combat.units[side][self.combat.unit_id as usize].acted = true;
+        }
+        true
+    }
+
+    /// S: arm the shoot picker on the acting unit, or log why not.
+    fn arm_shoot(&mut self, resources: &Resources) {
+        if self.combat.unit_id < 0 {
+            return;
+        }
+        let (side, id) = (self.combat.side, self.combat.unit_id as usize);
+        let unit = &self.combat.units[side][id];
+        if unit.shots <= 0 {
+            self.log(resources, "no_ammo", DEFAULT_CL_NO_AMMO);
+            return;
+        }
+        if combat_unit_surrounded(&self.combat, side, id) {
+            self.log(resources, "cant_shoot", DEFAULT_CL_CANT_SHOOT);
+            return;
+        }
+        self.cursor_x = unit.x;
+        self.cursor_y = unit.y;
+        self.pick_filter = PickFilter::Enemy;
+        self.pick_reason = PickReason::Shoot;
+        self.picker_active = true;
+    }
+
+    /// F: arm the fly picker on the acting unit, or log why not.
+    fn arm_fly(&mut self, resources: &Resources) {
+        if self.combat.unit_id < 0 {
+            return;
+        }
+        let (side, id) = (self.combat.side, self.combat.unit_id as usize);
+        let unit = &self.combat.units[side][id];
+        let flies = resources
+            .troop_by_index(unit.troop_idx)
+            .is_some_and(|troop| troop.abilities & TROOP_ABIL_FLY != 0);
+        if !flies || unit.flights <= 0 {
+            self.log(resources, "cant_fly", DEFAULT_CL_CANT_FLY);
+            return;
+        }
+        self.cursor_x = unit.x;
+        self.cursor_y = unit.y;
+        self.pick_filter = PickFilter::Empty;
+        self.pick_reason = PickReason::Fly;
+        self.picker_active = true;
+    }
+
+    /// U: open the spell menu, or log why not.
+    fn open_cast(&mut self, game: &Game, resources: &Resources) {
+        if self.combat.spells_this_round >= 1 {
+            self.log(resources, "only_one_spell", DEFAULT_CL_ONLY_ONE_SPELL);
+            return;
+        }
+        if !game.stats.knows_magic {
+            self.log(resources, "cannot_cast", DEFAULT_CL_CANNOT_CAST);
+            return;
+        }
+        self.cast_phase = CastPhase::PickSpell;
+    }
+
+    /// G: ask whether to forfeit.
+    fn give_up(&mut self, resources: &Resources, prompt: &mut Prompt) {
+        let header = banner::text(
+            resources,
+            "banners",
+            "combat_give_up_header",
+            DEFAULT_GIVE_UP_HEADER,
+        );
+        let body = banner::text(
+            resources,
+            "banners",
+            "combat_give_up_body",
+            DEFAULT_GIVE_UP_BODY,
+        );
+        prompt.yes_no(header, body);
+    }
+
+    /// An action-menu entry: exactly its key. The view entries go through
+    /// `requested_view` as `C` does; O/A/V reach the same views from `step`.
+    fn run_action(
+        &mut self,
+        action: CombatAction,
+        game: &mut Game,
+        resources: &Resources,
+        prompt: &mut Prompt,
+    ) -> bool {
+        match action {
+            CombatAction::Wait => return self.wait(),
+            CombatAction::Shoot => self.arm_shoot(resources),
+            CombatAction::Fly => self.arm_fly(resources),
+            CombatAction::Cast => self.open_cast(game, resources),
+            CombatAction::GiveUp => self.give_up(resources, prompt),
+            CombatAction::Army => self.requested_view = Some(ViewKind::Army),
+            CombatAction::Character => self.requested_view = Some(ViewKind::Character),
+            CombatAction::Options => self.requested_view = Some(ViewKind::Options),
+            CombatAction::Controls => self.requested_view = Some(ViewKind::Controls),
+        }
+        false
+    }
+
+    /// A click on a field cell on the player's turn: the acting unit opens
+    /// the action menu; a neighbour is that direction key; a far enemy is `S`,
+    /// the ring on it, then Enter. Anything else does nothing -- walking more
+    /// than one step would need pathfinding, which combat does not have.
+    fn click_cell(&mut self, x: i32, y: i32, game: &mut Game, resources: &Resources) -> bool {
+        if self.combat.unit_id < 0 || !combat_in_bounds(x, y) {
+            return false;
+        }
+        let (side, id) = (self.combat.side, self.combat.unit_id as usize);
+        let (ux, uy) = (self.combat.units[side][id].x, self.combat.units[side][id].y);
+        if (x, y) == (ux, uy) {
+            self.action_menu = true;
+            return false;
+        }
+        let (dx, dy) = (x - ux, y - uy);
+        if dx.abs() <= 1 && dy.abs() <= 1 {
+            return self.player_move(resources, dx, dy);
+        }
+        let uid = self.combat.umap[y as usize][x as usize];
+        if uid != 0 && (uid - 1) as usize / COMBAT_SLOTS != side {
+            self.arm_shoot(resources);
+            if self.picker_active {
+                self.cursor_x = x;
+                self.cursor_y = y;
+                let mut tx = 0usize;
+                let mut ty = 0usize;
+                if self.cursor_passes(resources, &mut tx, &mut ty) {
+                    return self.resolve_pick(tx, ty, game, resources);
+                }
+            }
         }
         false
     }
@@ -809,20 +1097,31 @@ impl CombatLoop {
     fn pick_dispatch(
         &mut self,
         keys: &dyn KeySource,
+        pointer: PointerInput,
         game: &mut Game,
         resources: &Resources,
     ) -> bool {
         let mut tx = 0usize;
         let mut ty = 0usize;
         let mut cancelled = false;
-        if !self.pick_step(keys, resources, &mut tx, &mut ty, &mut cancelled) {
+        if !self.pick_step(keys, pointer, resources, &mut tx, &mut ty, &mut cancelled) {
             if cancelled {
                 self.picker_active = false;
                 self.pick_reason = PickReason::None;
             }
             return false;
         }
+        self.resolve_pick(tx, ty, game, resources)
+    }
 
+    /// Carry out the armed shoot or fly at a confirmed cell.
+    fn resolve_pick(
+        &mut self,
+        tx: usize,
+        ty: usize,
+        game: &mut Game,
+        resources: &Resources,
+    ) -> bool {
         let (side, id) = (self.combat.side, self.combat.unit_id as usize);
         let reason = self.pick_reason;
         let acted = match reason {
@@ -864,16 +1163,30 @@ impl CombatLoop {
         acted
     }
 
-    /// One target-picker step, porting `combat_pick_step`.
+    /// One target-picker step, porting `combat_pick_step`. A click on a cell
+    /// is the arrows to it and then Enter; a right-click is ESC.
     fn pick_step(
         &mut self,
         keys: &dyn KeySource,
+        pointer: PointerInput,
         resources: &Resources,
         out_x: &mut usize,
         out_y: &mut usize,
         out_cancelled: &mut bool,
     ) -> bool {
         *out_cancelled = false;
+        if pointer.cancel {
+            *out_cancelled = true;
+            return false;
+        }
+        if let Some(HitTarget::CombatCell(x, y)) = pointer.click {
+            if combat_in_bounds(x, y) {
+                self.cursor_x = x;
+                self.cursor_y = y;
+                return self.cursor_passes(resources, out_x, out_y);
+            }
+            return false;
+        }
         let mut dx = 0;
         let mut dy = 0;
         if keys.pressed(Key::Up) || keys.pressed(Key::Kp8) {
@@ -915,16 +1228,7 @@ impl CombatLoop {
             || keys.pressed(Key::A)
             || keys.pressed(Key::C)
         {
-            if combat_cell_passes_filter(
-                &self.combat,
-                resources,
-                self.cursor_x as usize,
-                self.cursor_y as usize,
-                self.combat.side,
-                self.pick_filter,
-            ) {
-                *out_x = self.cursor_x as usize;
-                *out_y = self.cursor_y as usize;
+            if self.cursor_passes(resources, out_x, out_y) {
                 return true;
             }
         }
@@ -934,19 +1238,52 @@ impl CombatLoop {
         false
     }
 
+    /// The confirm half of `combat_pick_step`: the cursor cell, if it passes
+    /// the armed filter. A failing cell leaves the picker armed.
+    fn cursor_passes(&self, resources: &Resources, out_x: &mut usize, out_y: &mut usize) -> bool {
+        if combat_cell_passes_filter(
+            &self.combat,
+            resources,
+            self.cursor_x as usize,
+            self.cursor_y as usize,
+            self.combat.side,
+            self.pick_filter,
+        ) {
+            *out_x = self.cursor_x as usize;
+            *out_y = self.cursor_y as usize;
+            return true;
+        }
+        false
+    }
+
     /// The cast state machine, porting `combat_cast_step`.
-    fn cast_step(&mut self, keys: &dyn KeySource, game: &mut Game, resources: &Resources) -> bool {
+    fn cast_step(
+        &mut self,
+        keys: &dyn KeySource,
+        pointer: PointerInput,
+        game: &mut Game,
+        resources: &Resources,
+    ) -> bool {
         match self.cast_phase {
             CastPhase::PickSpell => {
-                if keys.pressed(Key::Escape) {
+                if keys.pressed(Key::Escape)
+                    || pointer.cancel
+                    || pointer.click == Some(HitTarget::CombatBack)
+                {
                     self.cast_phase = CastPhase::None;
                     return false;
                 }
                 let mut picked = -1;
-                for (i, key) in COMBAT_SPELL_KEYS.iter().enumerate() {
-                    if keys.pressed(*key) {
+                if let Some(HitTarget::CombatSpell(i)) = pointer.click {
+                    if i < COMBAT_SPELL_KEYS.len() {
                         picked = i as i32;
-                        break;
+                    }
+                } else {
+                    for (i, key) in COMBAT_SPELL_KEYS.iter().enumerate() {
+                        if keys.pressed(*key) {
+                            picked = i as i32;
+                            break;
+                        }
                     }
                 }
                 if picked < 0 {
@@ -973,7 +1310,7 @@ impl CombatLoop {
                 let mut tx = 0usize;
                 let mut ty = 0usize;
                 let mut cancelled = false;
-                if !self.pick_step(keys, resources, &mut tx, &mut ty, &mut cancelled) {
+                if !self.pick_step(keys, pointer, resources, &mut tx, &mut ty, &mut cancelled) {
                     if cancelled {
                         self.cast_phase = CastPhase::None;
                         self.pick_reason = PickReason::None;
@@ -1203,7 +1540,14 @@ mod tests {
     fn the_field_draws_grass_obstacles_and_count_badges() {
         let (_, catalog, palette, combat) = fixtures();
         let mut list = DrawList::new();
-        combat_render(&mut list, &combat, None, &palette, &catalog);
+        combat_render(
+            &mut list,
+            &mut HitList::new(),
+            &combat,
+            None,
+            &palette,
+            &catalog,
+        );
 
         // 6x5 grass tiles, one obstacle tile, and both count badges.
         assert_eq!(list.blits_of(Sprite::CombatTile(0)).len(), 30);
@@ -1218,11 +1562,25 @@ mod tests {
     fn the_target_ring_is_drawn_at_the_pick_cursor_only_while_picking() {
         let (_, catalog, palette, combat) = fixtures();
         let mut list = DrawList::new();
-        combat_render(&mut list, &combat, None, &palette, &catalog);
+        combat_render(
+            &mut list,
+            &mut HitList::new(),
+            &combat,
+            None,
+            &palette,
+            &catalog,
+        );
         assert!(list.blits_of(Sprite::CombatTile(11)).is_empty());
 
         let mut list = DrawList::new();
-        combat_render(&mut list, &combat, Some((2, 3)), &palette, &catalog);
+        combat_render(
+            &mut list,
+            &mut HitList::new(),
+            &combat,
+            Some((2, 3)),
+            &palette,
+            &catalog,
+        );
         let (px, py) = cell_origin(2, 3);
         assert_eq!(
             list.blits_of(Sprite::CombatTile(11)),
@@ -1238,7 +1596,14 @@ mod tests {
         let (_, catalog, palette, combat) = fixtures();
         for _ in 0..8 {
             let mut list = DrawList::new();
-            combat_render(&mut list, &combat, Some((0, 0)), &palette, &catalog);
+            combat_render(
+                &mut list,
+                &mut HitList::new(),
+                &combat,
+                Some((0, 0)),
+                &palette,
+                &catalog,
+            );
             for frame in 12..=14 {
                 assert!(list.blits_of(Sprite::CombatTile(frame)).is_empty());
             }
@@ -1254,7 +1619,14 @@ mod tests {
         let mut counts = [0i32; 7];
         counts[2] = 3;
         let mut list = DrawList::new();
-        combat_spell_menu(&mut list, &palette, &resources, &counts);
+        combat_spell_menu(
+            &mut list,
+            &mut HitList::new(),
+            &palette,
+            &resources,
+            &counts,
+            None,
+        );
         assert!(list.as_slice().contains(&DrawCmd::Rect {
             rect: Rect::new(40, 30, 240, 130),
             color: palette.clr(Pal::DBlue),
@@ -1283,7 +1655,14 @@ mod tests {
         )
         .expect("fixture parses");
         let mut list = DrawList::new();
-        combat_spell_menu(&mut list, &Palette::fallback(), &resources, &[1; 7]);
+        combat_spell_menu(
+            &mut list,
+            &mut HitList::new(),
+            &Palette::fallback(),
+            &resources,
+            &[1; 7],
+            None,
+        );
         let texts = list.texts();
         assert!(texts.contains(&(140, 36, "Zauber")));
         assert!(texts.contains(&(60, 50, "Kampf")));
@@ -1351,6 +1730,8 @@ mod tests {
             pending_banner_clear: false,
             requested_view: None,
             next_tick: 0.0,
+            action_menu: false,
+            hover: None,
         };
         (loop_, resources, game)
     }
@@ -1902,5 +2283,515 @@ mod tests {
             &mut Present::new(),
         );
         assert_eq!(views.active(), None);
+    }
+
+    // ---- Mouse (DIVERGENCE: C's combat has no pointer) ----
+    // Every click is checked against the key path it stands for by comparing
+    // the whole engine `Combat` (RNG state included) and the loop state.
+
+    type Snap = (Combat, bool, i32, i32, PickReason, CastPhase, String, bool);
+
+    fn snap(l: &CombatLoop) -> Snap {
+        (
+            l.combat.clone(),
+            l.picker_active,
+            l.cursor_x,
+            l.cursor_y,
+            l.pick_reason,
+            l.cast_phase,
+            l.banner.clone(),
+            l.action_menu,
+        )
+    }
+
+    fn by_keys(
+        l: &mut CombatLoop,
+        game: &mut Game,
+        resources: &Resources,
+        prompt: &mut Prompt,
+        presses: &[Key],
+    ) -> CombatStatus {
+        // No keys is still one frame, so it runs the same animation tick a
+        // click's frame does.
+        if presses.is_empty() {
+            return l.step(&Keys::pressed(&[]), game, resources, 100.0, prompt);
+        }
+        let mut status = CombatStatus::Running;
+        for key in presses {
+            status = l.step(&Keys::pressed(&[*key]), game, resources, 100.0, prompt);
+        }
+        status
+    }
+
+    fn by_pointer(
+        l: &mut CombatLoop,
+        game: &mut Game,
+        resources: &Resources,
+        prompt: &mut Prompt,
+        input: PointerInput,
+    ) -> CombatStatus {
+        l.step_input(&Keys::pressed(&[]), input, game, resources, 100.0, prompt)
+    }
+
+    fn click(target: HitTarget) -> PointerInput {
+        PointerInput {
+            click: Some(target),
+            cancel: false,
+        }
+    }
+
+    const RIGHT_CLICK: PointerInput = PointerInput {
+        click: None,
+        cancel: true,
+    };
+
+    /// Run `f` on a thread with room for two whole fights: `Combat` and
+    /// `Game` are large fixed-size structs, and a comparison holds two of
+    /// each plus their snapshots, which overflows a test thread's default
+    /// stack in a debug build.
+    fn big_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(64 << 20)
+            .spawn(f)
+            .expect("spawns")
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+    }
+
+    /// Run `presses` on one fixture and `clicks` on another, then compare.
+    fn assert_same(
+        setup: fn(&mut CombatLoop, &mut Game),
+        presses: &[Key],
+        clicks: &[PointerInput],
+    ) {
+        let presses = presses.to_vec();
+        let clicks = clicks.to_vec();
+        big_stack(move || {
+            let (mut keyed, resources, mut game_k) = loop_fixture();
+            setup(&mut keyed, &mut game_k);
+            let mut prompt_k = Prompt::default();
+            let status_k = by_keys(&mut keyed, &mut game_k, &resources, &mut prompt_k, &presses);
+
+            let (mut clicked, resources, mut game_c) = loop_fixture();
+            setup(&mut clicked, &mut game_c);
+            let mut prompt_c = Prompt::default();
+            let mut status_c = CombatStatus::Running;
+            for input in &clicks {
+                status_c = by_pointer(&mut clicked, &mut game_c, &resources, &mut prompt_c, *input);
+            }
+            assert_eq!(snap(&clicked), snap(&keyed));
+            assert_eq!(status_c, status_k);
+            assert_eq!(prompt_c.is_active(), prompt_k.is_active());
+            assert_eq!(game_c.spells.counts, game_k.spells.counts);
+        });
+    }
+
+    fn no_setup(_: &mut CombatLoop, _: &mut Game) {}
+
+    /// Put the AI archer next to the player militia, at (1,1).
+    fn foe_adjacent(l: &mut CombatLoop, _: &mut Game) {
+        l.combat.umap[4][4] = 0;
+        l.combat.units[COMBAT_SIDE_AI][0].x = 1;
+        l.combat.units[COMBAT_SIDE_AI][0].y = 1;
+        l.combat.umap[1][1] = 6;
+    }
+
+    fn mage(_: &mut CombatLoop, game: &mut Game) {
+        game.stats.knows_magic = true;
+        game.spells.counts[COMBAT_SPELL_CLONE as usize] = 1;
+    }
+
+    /// The anti-drift test for the field: every cell publishes the rect it is
+    /// drawn on, and its centre hits that cell.
+    #[test]
+    fn the_cell_hit_regions_are_the_drawn_cells() {
+        let (_, catalog, palette, combat) = fixtures();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        combat_render(&mut list, &mut hits, &combat, None, &palette, &catalog);
+        for y in 0..COMBAT_H as i32 {
+            for x in 0..COMBAT_W as i32 {
+                let (px, py) = cell_origin(x, y);
+                let region = hits
+                    .regions()
+                    .iter()
+                    .find(|r| r.target == HitTarget::CombatCell(x, y))
+                    .expect("cell published");
+                assert_eq!(region.rect, Rect::new(px, py, COMBAT_CELL_W, COMBAT_CELL_H));
+                assert!(list.blits_of(Sprite::CombatTile(0)).contains(&Dst::rect(
+                    px,
+                    py,
+                    COMBAT_CELL_W,
+                    COMBAT_CELL_H
+                )));
+                assert_eq!(
+                    hits.hit(px + COMBAT_CELL_W / 2, py + COMBAT_CELL_H / 2),
+                    Some(HitTarget::CombatCell(x, y))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn clicking_a_neighbouring_empty_cell_is_that_direction_key() {
+        assert_same(
+            no_setup,
+            &[Key::Right],
+            &[click(HitTarget::CombatCell(1, 0))],
+        );
+        assert_same(
+            no_setup,
+            &[Key::Down],
+            &[click(HitTarget::CombatCell(0, 1))],
+        );
+        assert_same(
+            no_setup,
+            &[Key::PageDown],
+            &[click(HitTarget::CombatCell(1, 1))],
+        );
+    }
+
+    #[test]
+    fn clicking_a_neighbouring_enemy_attacks_it_like_the_direction_key() {
+        assert_same(
+            foe_adjacent,
+            &[Key::PageDown],
+            &[click(HitTarget::CombatCell(1, 1))],
+        );
+    }
+
+    /// A far enemy is S, the ring onto it, then Enter -- one click.
+    #[test]
+    fn clicking_a_far_enemy_shoots_it_like_s_aim_enter() {
+        assert_same(
+            no_setup,
+            &[
+                Key::S,
+                Key::PageDown,
+                Key::PageDown,
+                Key::PageDown,
+                Key::PageDown,
+                Key::Enter,
+            ],
+            &[click(HitTarget::CombatCell(4, 4))],
+        );
+    }
+
+    /// The refusals are S's own: no ammo stays "No ammo", nothing armed.
+    #[test]
+    fn a_far_enemy_click_without_ammo_logs_what_s_logs() {
+        fn out_of_ammo(l: &mut CombatLoop, _: &mut Game) {
+            l.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
+        }
+        assert_same(
+            out_of_ammo,
+            &[Key::S],
+            &[click(HitTarget::CombatCell(4, 4))],
+        );
+    }
+
+    /// No pathfinding in combat, and no smart fly: a far empty cell is inert.
+    #[test]
+    fn clicking_a_far_empty_cell_does_nothing() {
+        assert_same(no_setup, &[], &[click(HitTarget::CombatCell(3, 0))]);
+    }
+
+    /// The AI's turn reads no clicks, and a click cannot hurry its pacing.
+    #[test]
+    fn a_click_on_the_ai_turn_changes_nothing() {
+        fn ai_turn(l: &mut CombatLoop, _: &mut Game) {
+            l.combat.side = COMBAT_SIDE_AI;
+            l.next_tick = 1000.0;
+        }
+        assert_same(ai_turn, &[], &[click(HitTarget::CombatCell(4, 3))]);
+        assert_same(ai_turn, &[], &[click(HitTarget::CombatCell(4, 4))]);
+    }
+
+    /// While a picker is armed a click is the arrows to that cell, then
+    /// Enter; a cell the filter refuses only moves the ring, as Enter does.
+    #[test]
+    fn an_armed_picker_takes_a_click_as_aim_and_enter() {
+        assert_same(
+            no_setup,
+            &[Key::S, Key::Right, Key::Right, Key::Enter],
+            &[
+                click(HitTarget::CombatCell(0, 0)),
+                click(HitTarget::CombatAction(CombatAction::Shoot)),
+                click(HitTarget::CombatCell(2, 0)),
+            ],
+        );
+        // And a cell that passes: the shot resolves.
+        assert_same(
+            no_setup,
+            &[
+                Key::S,
+                Key::PageDown,
+                Key::PageDown,
+                Key::PageDown,
+                Key::PageDown,
+                Key::Enter,
+            ],
+            &[
+                click(HitTarget::CombatCell(0, 0)),
+                click(HitTarget::CombatAction(CombatAction::Shoot)),
+                click(HitTarget::CombatCell(4, 4)),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_right_click_cancels_an_armed_picker_like_escape() {
+        fn armed(l: &mut CombatLoop, _: &mut Game) {
+            l.arm_shoot(&loop_fixture().1);
+        }
+        assert_same(armed, &[Key::Escape], &[RIGHT_CLICK]);
+    }
+
+    /// Clicking the acting unit opens the menu; each entry is exactly its
+    /// key, refusal banners and views included.
+    #[test]
+    fn each_action_menu_entry_is_its_key() {
+        let open = click(HitTarget::CombatCell(0, 0));
+        for (action, key) in [
+            (CombatAction::Wait, Key::W),
+            (CombatAction::Shoot, Key::S),
+            (CombatAction::Fly, Key::F),
+            (CombatAction::Cast, Key::U),
+            (CombatAction::GiveUp, Key::G),
+            (CombatAction::Army, Key::A),
+            (CombatAction::Character, Key::V),
+            (CombatAction::Options, Key::O),
+            (CombatAction::Controls, Key::C),
+        ] {
+            assert_same(
+                no_setup,
+                &[key],
+                &[open, click(HitTarget::CombatAction(action))],
+            );
+            assert_same(
+                mage,
+                &[key],
+                &[open, click(HitTarget::CombatAction(action))],
+            );
+        }
+    }
+
+    #[test]
+    fn the_action_menu_opens_on_the_acting_unit_and_backs_out() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatCell(0, 0)),
+            );
+            assert!(l.action_menu);
+            by_pointer(&mut l, &mut game, &resources, &mut prompt, RIGHT_CLICK);
+            assert!(!l.action_menu);
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatCell(0, 0)),
+            );
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatBack),
+            );
+            assert!(!l.action_menu);
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatCell(0, 0)),
+            );
+            l.step(
+                &Keys::pressed(&[Key::Escape]),
+                &mut game,
+                &resources,
+                100.0,
+                &mut prompt,
+            );
+            assert!(!l.action_menu);
+        });
+    }
+
+    /// A key while the menu is open closes it and does what it always does.
+    #[test]
+    fn a_key_over_the_action_menu_closes_it_and_acts() {
+        big_stack(|| {
+            let (mut keyed, resources, mut game_k) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_keys(
+                &mut keyed,
+                &mut game_k,
+                &resources,
+                &mut prompt,
+                &[Key::Right],
+            );
+
+            let (mut l, resources, mut game) = loop_fixture();
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatCell(0, 0)),
+            );
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::Right]);
+            assert_eq!(snap(&l), snap(&keyed));
+        });
+    }
+
+    /// Anti-drift for the action menu: every entry's region holds its label,
+    /// and the panel stays on the field wherever the acting unit stands.
+    #[test]
+    fn the_action_menu_regions_hold_their_labels_and_stay_on_the_field() {
+        let (resources, _, palette, _) = fixtures();
+        let field = field_rect();
+        for unit in [(0, 0), (5, 0), (0, 4), (5, 4), (2, 2)] {
+            let mut list = DrawList::new();
+            let mut hits = HitList::new();
+            combat_action_menu(&mut list, &mut hits, &palette, &resources, unit, None);
+            assert_eq!(hits.regions()[0].target, HitTarget::CombatBack);
+            for (action, _, label) in COMBAT_ACTIONS {
+                let region = hits
+                    .regions()
+                    .iter()
+                    .find(|r| r.target == HitTarget::CombatAction(action))
+                    .expect("entry published");
+                let r = region.rect;
+                let (tx, ty, _) = list
+                    .texts()
+                    .into_iter()
+                    .find(|(_, _, t)| *t == label)
+                    .expect("entry drawn");
+                assert!(tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h);
+                assert!(r.x >= field.x && r.x + r.w <= field.x + field.w, "{unit:?}");
+                assert!(r.y >= field.y && r.y + r.h <= field.y + field.h, "{unit:?}");
+                assert_eq!(
+                    hits.hit(r.x + r.w / 2, r.y + r.h / 2),
+                    Some(HitTarget::CombatAction(action))
+                );
+            }
+        }
+    }
+
+    /// The spell menu: a row is its letter; off the panel or a right-click is
+    /// ESC.
+    #[test]
+    fn a_spell_menu_row_is_its_letter_and_backing_out_is_escape() {
+        let open = click(HitTarget::CombatCell(0, 0));
+        let cast = click(HitTarget::CombatAction(CombatAction::Cast));
+        assert_same(
+            mage,
+            &[Key::U, Key::A],
+            &[open, cast, click(HitTarget::CombatSpell(0))],
+        );
+        // An empty row refuses exactly as its letter does.
+        assert_same(
+            mage,
+            &[Key::U, Key::C],
+            &[open, cast, click(HitTarget::CombatSpell(2))],
+        );
+        assert_same(
+            mage,
+            &[Key::U, Key::Escape],
+            &[open, cast, click(HitTarget::CombatBack)],
+        );
+        assert_same(mage, &[Key::U, Key::Escape], &[open, cast, RIGHT_CLICK]);
+    }
+
+    /// Anti-drift for the spell menu: each row's region holds its line.
+    #[test]
+    fn the_spell_menu_regions_hold_their_rows() {
+        let (resources, _, palette, _) = fixtures();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        combat_spell_menu(&mut list, &mut hits, &palette, &resources, &[0; 7], Some(3));
+        for (i, name) in COMBAT_SPELL_NAMES.iter().enumerate() {
+            let region = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::CombatSpell(i))
+                .expect("row published");
+            let (tx, ty, _) = list
+                .texts()
+                .into_iter()
+                .find(|(_, _, t)| t.contains(name))
+                .expect("row drawn");
+            let r = region.rect;
+            assert!(tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h);
+        }
+        let yellow = palette.clr(Pal::Yellow);
+        assert!(list.as_slice().iter().any(|cmd| matches!(
+            cmd,
+            DrawCmd::Text { text, color, .. } if text.contains("Lightning") && *color == yellow
+        )));
+    }
+
+    /// The give-up prompt in combat takes its own Yes/No clicks.
+    #[test]
+    fn the_give_up_prompt_answers_a_click_like_its_key() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::G]);
+            assert!(prompt.is_active());
+            let status = by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::PromptYes),
+            );
+            assert_eq!(status, CombatStatus::Loss);
+
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::G]);
+            let status = by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::PromptNo),
+            );
+            assert_eq!(status, CombatStatus::Running);
+            assert!(!prompt.is_active());
+        });
+    }
+
+    /// Entering a cell moves the ring while a picker is armed. A pointer that
+    /// was already resting somewhere when `S` armed it leaves the ring on the
+    /// acting unit, where `S` puts it; with nothing armed hover moves nothing.
+    #[test]
+    fn hover_steers_the_ring_only_while_picking_and_only_on_entering() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            l.set_hover(Some(HitTarget::CombatCell(3, 2)));
+            assert_eq!((l.cursor_x, l.cursor_y), (0, 0), "nothing armed");
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::S]);
+            l.set_hover(Some(HitTarget::CombatCell(3, 2)));
+            assert_eq!(l.pick_cursor(), Some((0, 0)), "a resting pointer stays put");
+            l.set_hover(Some(HitTarget::CombatCell(4, 2)));
+            assert_eq!(
+                l.pick_cursor(),
+                Some((4, 2)),
+                "entering a cell moves the ring"
+            );
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::Left]);
+            l.set_hover(Some(HitTarget::CombatCell(4, 2)));
+            assert_eq!(l.pick_cursor(), Some((3, 2)), "the arrows still steer it");
+        });
     }
 }

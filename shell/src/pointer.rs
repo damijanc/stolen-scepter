@@ -7,11 +7,12 @@
 //! Regions are in LOGICAL coordinates -- the same space `DrawList` uses -- so
 //! nothing here ever sees a window pixel. See `specs/mouse-support-design.md`.
 
+use crate::combat::CombatAction;
 use crate::draw::Rect;
 use crate::views::TownRow;
 
-/// The buttons the shell reads. Right is carried so a backend can report it;
-/// no surface binds it yet.
+/// The buttons the shell reads. Right is ESC in combat (it backs out of a
+/// picker or a combat menu); no other surface binds it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Button {
     Left,
@@ -52,6 +53,14 @@ pub enum HitTarget {
     StartupLoad,
     /// A difficulty row on the create-game screen, in `Difficulty` order.
     Difficulty(usize),
+    /// A combat field cell, by grid position.
+    CombatCell(i32, i32),
+    /// A row of the combat spell menu, in stock order (letter A-G).
+    CombatSpell(usize),
+    /// An entry of the combat action menu.
+    CombatAction(CombatAction),
+    /// The field around a combat menu: a click there is ESC.
+    CombatBack,
 }
 
 /// One actionable rectangle, in logical coordinates.
