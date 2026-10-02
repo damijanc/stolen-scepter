@@ -13,6 +13,7 @@ use openbounty_engine::tile::Interact;
 use crate::draw::{Color, DrawList, Dst, HeroAnim, Rect, Sprite};
 use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
+use crate::pointer::{HitList, HitTarget};
 use crate::sprites::SpriteCatalog;
 
 /// Fog-edge darkening: three two-pixel strips, each half as opaque as the
@@ -77,12 +78,35 @@ impl MapScene<'_> {
 
     /// Where a viewport cell lands, in logical pixels.
     fn cell(&self, tx: i32, ty: i32) -> Dst {
-        Dst::rect(
+        Dst::Stretch(self.cell_rect(tx, ty))
+    }
+
+    /// Viewport cell `(tx, ty)` in logical pixels: what `cell` draws on and
+    /// what `publish_hits` publishes, so the two cannot drift.
+    fn cell_rect(&self, tx: i32, ty: i32) -> Rect {
+        Rect::new(
             MAP_X + tx * self.layout.tile_w,
             MAP_Y + ty * self.layout.tile_h,
             self.layout.tile_w,
             self.layout.tile_h,
         )
+    }
+
+    /// The viewport's click regions, for click-to-move (`walk.rs`): one per
+    /// in-map cell, labelled with MAP coordinates. Unseen tiles are published
+    /// too: an adjacent click into fog is a plain step, as its key is, and the
+    /// route planner refuses unseen goals itself.
+    pub fn publish_hits(&self, hits: &mut HitList) {
+        let (cam_x, cam_y) = self.camera();
+        for ty in 0..self.layout.tiles_h {
+            for tx in 0..self.layout.tiles_w {
+                let (mx, my) = (cam_x + tx, cam_y + ty);
+                if self.map.tile_i32(mx, my).is_none() {
+                    continue;
+                }
+                hits.push(self.cell_rect(tx, ty), HitTarget::MapTile(mx, my));
+            }
+        }
     }
 
     pub fn draw(&self, list: &mut DrawList) {
@@ -427,6 +451,41 @@ mod tests {
             }
         );
         assert_eq!(list.clip_balance(), 0, "the clip must always be closed");
+    }
+
+    /// The anti-drift test: each viewport cell publishes the rect `cell`
+    /// draws it on, labelled with its MAP coordinates.
+    #[test]
+    fn each_viewport_tile_publishes_its_drawn_cell() {
+        let (layout, catalog, palette, resources, game, map, fog) = scene_parts();
+        let scene = scene!(layout, catalog, palette, resources, game, map, fog);
+        let (cam_x, cam_y) = scene.camera();
+        let mut hits = HitList::new();
+        scene.publish_hits(&mut hits);
+        let mut published = 0;
+        for ty in 0..scene.layout.tiles_h {
+            for tx in 0..scene.layout.tiles_w {
+                let (mx, my) = (cam_x + tx, cam_y + ty);
+                if scene.map.tile_i32(mx, my).is_none() {
+                    continue;
+                }
+                published += 1;
+                let Dst::Stretch(drawn) = scene.cell(tx, ty) else {
+                    panic!("cells are stretched rects");
+                };
+                let region = hits
+                    .regions()
+                    .iter()
+                    .find(|r| r.target == HitTarget::MapTile(mx, my))
+                    .expect("tile published");
+                assert_eq!(region.rect, drawn);
+                assert_eq!(
+                    hits.hit(drawn.x + drawn.w / 2, drawn.y + drawn.h / 2),
+                    Some(HitTarget::MapTile(mx, my))
+                );
+            }
+        }
+        assert_eq!(hits.regions().len(), published);
     }
 
     #[test]

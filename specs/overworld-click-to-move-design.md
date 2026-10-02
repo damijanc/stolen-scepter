@@ -120,3 +120,16 @@ No route preview is drawn on hover (YAGNI).
 - Walk, headless through `PointerSource`: each stop condition. And
   equivalence: a walk leaves the whole `Game`, `Map` and `Fog` exactly as the
   same arrow presses do.
+
+## As built (2026-10-02)
+
+Shipped as designed (engine `d2cf4c4`, then the shell slice). Details settled
+in code:
+
+- "Any click cancels" reads the mouse buttons, not the hit-tested target: a
+  click on the HUD sidebar, which publishes no region, stops the hero too.
+- `MapScene::cell_rect` is the one source of a viewport cell's rect; `cell`
+  draws on it and `publish_hits` publishes it.
+- The walk's per-step re-check reuses the planner's own tile rule
+  (`walk::step_cost`), so "still usable" means exactly what "usable" meant at
+  planning time.

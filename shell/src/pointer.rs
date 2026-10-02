@@ -61,6 +61,8 @@ pub enum HitTarget {
     CombatAction(CombatAction),
     /// The field around a combat menu: a click there is ESC.
     CombatBack,
+    /// An overworld map tile in the viewport, by MAP coordinates.
+    MapTile(i32, i32),
 }
 
 /// One actionable rectangle, in logical coordinates.

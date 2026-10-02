@@ -39,6 +39,7 @@ pub mod slot_picker;
 pub mod sprites;
 pub mod startup;
 pub mod views;
+pub mod walk;
 
 use macroquad::prelude::{get_time, next_frame, request_new_screen_size, Conf};
 
@@ -51,7 +52,7 @@ use combat::{combat_render, combat_view_input, CombatLoop, CombatStatus, Pointer
 use dialog::Dialog;
 use draw::DrawList;
 use hud::Hud;
-use input::{Action, Key, KeySource, DIGITS};
+use input::{Action, InputState, Key, KeySource, DIGITS};
 use layout::Layout;
 use map_render::MapScene;
 use menu::{Menu, MenuAction, PickerPurpose};
@@ -988,6 +989,8 @@ async fn main() {
     // The menu's slot picker while Save or Load is choosing a slot; it draws
     // in place of the menu, and ESC steps back to the menu.
     let mut menu_picker: Option<(SlotPicker, PickerPurpose)> = None;
+    // Overworld click-to-move: the route being walked, if any. See walk.rs.
+    let mut walk: Option<walk::Walk> = None;
     // An occupied slot awaiting the overwrite yes/no. Held apart from
     // `PendingFlow`, which ports C's `pending_flow`; this answer needs the
     // save paths, which `dispatch_answer` does not have.
@@ -1471,6 +1474,7 @@ async fn main() {
                                         cheat_menu = CheatMenu::default();
                                         menu = Menu::new();
                                         menu_picker = None;
+                                        walk = None;
                                         pending_overwrite = None;
                                         dialog.open("", &post_init_message(&game, true));
                                     }
@@ -1543,7 +1547,38 @@ async fn main() {
                 return;
             }
         } else {
-            let input = input::poll(&keys);
+            let mut input = input::poll(&keys);
+            // Click-to-move (walk.rs). Any key or click ends a walk; a map
+            // click may start a new one. A walked step is fed in as the same
+            // move value an arrow key produces, never as a fake key.
+            // Read the buttons, not `clicked`: a click on the sidebar, which
+            // publishes no region, must stop the hero too.
+            if keys.any_pressed() || pointer.pressed(Button::Left) || pointer.pressed(Button::Right)
+            {
+                walk = None;
+            }
+            if let Some(HitTarget::MapTile(x, y)) = clicked {
+                match walk::click(&game, &map, &fog, (x, y), get_time()) {
+                    walk::ClickMove::Step(dx, dy) => {
+                        input.dx = dx;
+                        input.dy = dy;
+                    }
+                    walk::ClickMove::Route(route) => walk = Some(route),
+                    walk::ClickMove::Nothing => {}
+                }
+            }
+            if input == InputState::default() {
+                if let Some(route) = walk.as_mut() {
+                    match route.next(&game, &map, &fog, get_time()) {
+                        walk::WalkTick::Step(dx, dy) => {
+                            input.dx = dx;
+                            input.dy = dy;
+                        }
+                        walk::WalkTick::Wait => {}
+                        walk::WalkTick::Done => walk = None,
+                    }
+                }
+            }
             match input.action {
                 // Legality lives in the engine, and both are silent on
                 // failure exactly as C is.
@@ -1681,6 +1716,9 @@ async fn main() {
                 let result = game_step_basic(
                     &mut game, &mut map, &mut fog, &resources, input.dx, input.dy,
                 );
+                if walk::stops_walk(&result) {
+                    walk = None;
+                }
                 for tune in audio::tunes_for_step(&result, absorbed)
                     .into_iter()
                     .flatten()
@@ -1882,6 +1920,17 @@ async fn main() {
             }
         }
 
+        // A walk never runs under anything modal, nor past the game's end.
+        if dialog.is_active()
+            || prompt.is_active()
+            || views.is_active()
+            || combat.is_some()
+            || fast_quit
+            || game.is_over()
+        {
+            walk = None;
+        }
+
         list.clear();
         hits.clear();
         if let Some(session) = &combat {
@@ -1945,7 +1994,7 @@ async fn main() {
                 },
             }
             .draw(&mut list);
-            MapScene {
+            let scene = MapScene {
                 layout: &layout,
                 catalog: &catalog,
                 palette: backend.palette(),
@@ -1955,8 +2004,9 @@ async fn main() {
                 fog: &fog,
                 tick: hero_anim.tick(),
                 moving: hero_anim.moving(),
-            }
-            .draw(&mut list);
+            };
+            scene.draw(&mut list);
+            scene.publish_hits(&mut hits);
             // The sidebar panels, drawn over the map and under the views --
             // `shell_frame.c`'s chrome -> map -> hud -> overlay order. A view
             // that covers the sidebar must paint over these.
