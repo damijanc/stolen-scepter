@@ -117,7 +117,15 @@ POSES = {
     "bow_draw": P(WIDE, front_arm=(90, 90), back_arm=(-95, 80)),
     "bow_loosed": P(WIDE, front_arm=(90, 90), back_arm=(-100, -135)),
     "bow_down": P(WIDE, front_arm=(30, 38), back_arm=(-8, 8)),
-    "bow_nock": P(WIDE, front_arm=(70, 80), back_arm=(45, 105)),
+    # both hands out front at chest height, bow hand and string hand a hand's
+    # width apart: nocked but not drawn (a back hand near the face reads as a
+    # full draw, which is what the first version produced)
+    "bow_nock": P(WIDE, front_arm=(60, 95), back_arm=(75, 90)),
+    # reloading: bow held low in front, the back hand reaching up over the
+    # shoulder to the quiver. Replaces the "nocked, not drawn" beat for the
+    # archers -- with any SDXL checkpoint a bow held at chest height is drawn
+    # as a full draw, so that beat cannot be told apart from frame 0.
+    "bow_reach_quiver": P(WIDE, front_arm=(35, 50), back_arm=(165, 215)),
     "bow_forward": P(WIDE, front_arm=(88, 88), back_arm=(-5, 10)),
     # kneeling archer
     "kneel_bow_low": P(KNEEL, front_arm=(40, 60), back_arm=(10, 40)),
@@ -190,8 +198,8 @@ STOCKY = {"dwarves": 0.72, "gnomes": 0.72}
 # Frame order matches TROOP_POSES in gen_ai.py. Units missing here (horses,
 # wolves, dragons) are not humanoid; they stay prompt-driven.
 UNIT_POSES = {
-    "archers": ["bow_draw", "bow_loosed", "bow_down", "bow_nock"],
-    "orcs": ["bow_draw", "bow_loosed", "bow_forward", "bow_nock"],
+    "archers": ["bow_draw", "bow_loosed", "bow_down", "bow_reach_quiver"],
+    "orcs": ["bow_draw", "bow_loosed", "bow_forward", "bow_reach_quiver"],
     "elves": ["kneel_bow_low", "kneel_bow_raise", "kneel_bow_aim_up", "kneel_bow_loosed"],
     "archmages": ["cast_out", "cast_up", "cast_hurl", "cast_up"],
     "barbarians": ["blade_low", "blade_back", "blade_strike", "blade_back"],

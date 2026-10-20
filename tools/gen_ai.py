@@ -35,8 +35,11 @@ PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
 LAYOUT = os.path.join(ROOT, "tools", "asset_layout.json")
 OUT = os.path.join(ROOT, "game-assets", "ai-out")
 
-CKPT = "sd_xl_base_1.0.safetensors"
-VERSION = "1.16"
+# DreamShaper XL (an SDXL fine-tune): same poses as base SDXL 1.0 in a
+# side-by-side archer run, cleaner lines. Pass --ckpt sd_xl_base_1.0.safetensors
+# for the base model.
+CKPT = "DreamShaperXL1.0Alpha2_fixedVae_half_00001_.safetensors"
+VERSION = "1.19"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -46,7 +49,9 @@ NEG = ("text, watermark, ui, border, frame, perspective, horizon, buildings, "
        "multiple figures, two characters, three characters, several, group, crowd, army, "
        "squad, party, lineup, concept art, character sheet, turnaround, reference sheet, "
        "collage, grid, split image, panel, clone, duplicate, mirror, reflection, "
-       "signature, blurry, low quality, deformed")
+       "signature, blurry, low quality, deformed, 3d render, cgi, octane, "
+       "ground patch, grass base, pedestal, platform, miniature figures, "
+       "multiple views")
 
 # Each unit's kit is what its combat animation acts out (TROOP_POSES), so a
 # giant throws boulders and a troll fights bare-fisted -- a club would fight
@@ -55,11 +60,11 @@ TROOP = {
     "peasants": "peasant villager with a pitchfork",
     "militia": "militia soldier with a short sword and a wooden shield",
     "pikemen": "pikeman soldier with a long pike",
-    "archers": "archer with a longbow and a quiver",
+    "archers": "archer in a leather tunic and hood, with a longbow and a quiver on the back",
     "knights": "armoured knight with a spiked flail and a shield",
     "barbarians": "barbarian warrior with a battle axe and a round shield",
     "nomads": "desert nomad riding a horse, with a scimitar",
-    "orcs": "orc archer with a bow",
+    "orcs": "orc archer in leather armour, with a bow and a quiver on the back",
     "ogres": "ogre with a wooden club and a round shield",
     "giants": "huge bald giant who throws boulders",
     "trolls": "hulking bare-fisted troll",
@@ -941,13 +946,15 @@ TROOP_POSES = {
         "just loosed, bow arm held forward, bowstring snapped back straight, drawing "
         "hand open and flung back behind the head, empty hands",
         "bow lowered and pointing down toward the feet, bowstring straight",
-        "bow raised with an arrow nocked on the string, about to draw",
+        "reaching back over the shoulder to the quiver for the next arrow, bow held "
+        "low in front",
     ],
     "orcs": [
         "at full draw, bowstring pulled back with an arrow nocked",
         "just loosed the arrow, the arrow flying off to the right",
         "bow held forward, relaxed straight bowstring, empty drawing hand at the side",
-        "nocking a new arrow and starting to draw",
+        "reaching back over the shoulder to the quiver for the next arrow, bow held "
+        "low in front",
     ],
     "elves": [
         "kneeling on one knee, bow held low and diagonal across the body",
@@ -1107,8 +1114,10 @@ WALK_POSES = [
 # here instead. Frame order matches TROOP_POSES.
 TROOP_NEG = {
     "archers": ["", "arrow, nocked arrow, drawn bowstring, two bowstrings",
-                "aiming, raised bow, drawn bow, drawn bowstring, arrow", ""],
-    "orcs": ["", "", "arrow, nocked arrow, drawn bowstring, two bowstrings", ""],
+                "aiming, raised bow, drawn bow, drawn bowstring, arrow",
+                "full draw, drawn bowstring, aiming, arrow on the string"],
+    "orcs": ["", "", "arrow, nocked arrow, drawn bowstring, two bowstrings",
+             "full draw, drawn bowstring, aiming, arrow on the string"],
     "elves": ["", "", "", "nocked arrow, drawn bowstring, two bowstrings"],
 }
 
@@ -1132,9 +1141,9 @@ def frame_prompt(path, i):
     else:
         return None
     return (f"a single {desc}, {poses[i]}, full body, side view facing right, centered, "
-            f"large in frame, one character only, consistent character design, painterly "
-            f"fantasy strategy game unit, plain flat neutral background, crisp, high "
-            f"detail"), True
+            f"large in frame, one character only, consistent character design, flat 2d "
+            f"hand-painted illustration, painterly fantasy strategy game unit, plain flat "
+            f"neutral background, crisp, high detail"), True
 
 
 def idle_frames(tw, th, rgba):

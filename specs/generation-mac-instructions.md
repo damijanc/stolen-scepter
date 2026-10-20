@@ -72,6 +72,20 @@ ls -lh ~/dev/ai/ComfyUI/models/ipadapter
 
 ---
 
+## One-time: DreamShaper XL checkpoint (the default model)
+
+`gen_ai.py` defaults to DreamShaper XL, an SDXL fine-tune; base SDXL 1.0 stays
+available with `--ckpt sd_xl_base_1.0.safetensors`.
+
+- Source: Hugging Face repo `Lykon/DreamShaper`, file
+  `DreamShaperXL1.0Alpha2_fixedVae_half_00001_.safetensors` (6.94 GB). Not a
+  Turbo or Lightning variant: those need different sampler settings.
+- Put it in `~/dev/ai/ComfyUI/models/checkpoints/` under that exact name.
+
+`probe` lists it under `checkpoints:`.
+
+---
+
 ## One-time: ControlNet OpenPose (required for `--controlnet`)
 
 Troop poses and facing come from pose skeletons the script draws itself
@@ -111,7 +125,7 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-The log must print `gen_ai version 1.16` and `controlnet on`. A missing model
+The log must print `gen_ai version 1.19` and `controlnet on`. A missing model
 stops the run with the fix instead of quietly falling back.
 
 Look for: **one** archer per frame, **facing right**, same character through
