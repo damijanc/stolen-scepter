@@ -39,7 +39,7 @@ OUT = os.path.join(ROOT, "game-assets", "ai-out")
 # side-by-side archer run, cleaner lines. Pass --ckpt sd_xl_base_1.0.safetensors
 # for the base model.
 CKPT = "DreamShaperXL1.0Alpha2_fixedVae_half_00001_.safetensors"
-VERSION = "1.19"
+VERSION = "1.20"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -58,15 +58,15 @@ NEG = ("text, watermark, ui, border, frame, perspective, horizon, buildings, "
 # the pose prompts.
 TROOP = {
     "peasants": "peasant villager with a pitchfork",
-    "militia": "militia soldier with a short sword and a wooden shield",
+    "militia": "militia soldier with a short sword and a small round wooden shield",
     "pikemen": "pikeman soldier with a long pike",
-    "archers": "archer in a leather tunic and hood, with a longbow and a quiver on the back",
+    "archers": "archer in a leather tunic with the hood up, with a longbow and a quiver on the back",
     "knights": "armoured knight with a spiked flail and a shield",
     "barbarians": "barbarian warrior with a battle axe and a round shield",
     "nomads": "desert nomad riding a horse, with a scimitar",
     "orcs": "orc archer in leather armour, with a bow and a quiver on the back",
     "ogres": "ogre with a wooden club and a round shield",
-    "giants": "huge bald giant who throws boulders",
+    "giants": "huge heavy bald giant in a loincloth who throws boulders",
     "trolls": "hulking bare-fisted troll",
     "zombies": "shambling clawed zombie",
     "skeletons": "skeleton warrior with a long glaive",
@@ -971,7 +971,7 @@ TROOP_POSES = {
     "barbarians": [
         "standing, axe held low at the side",
         "axe raised back over the shoulder, shield held forward",
-        "axe swung down and forward in a strike, with an impact flash",
+        "axe swung down and forward in a strike",
         "axe raised back over the shoulder again",
     ],
     "cavalry": [
@@ -1007,7 +1007,7 @@ TROOP_POSES = {
     "dwarves": [
         "hammer held low at the side, shield in front",
         "hammer raised up at the shoulder",
-        "hammer swung forward in a strike, with sparks",
+        "hammer swung forward in a strike",
         "hammer raised back at the shoulder",
     ],
     "ghosts": [
@@ -1020,7 +1020,7 @@ TROOP_POSES = {
         "standing, holding a boulder at the chest",
         "crouching, boulder wound back over the shoulder",
         "arm flung forward, just thrown the boulder, hands empty",
-        "bent over, picking up a new boulder from the ground",
+        "bent over, lifting a boulder up from beside the feet",
     ],
     "gnomes": [
         "arms stretched out to the sides",
@@ -1032,36 +1032,36 @@ TROOP_POSES = {
         "flail held out forward, spiked ball hanging",
         "flail swinging upward",
         "flail whirled up over the head behind",
-        "flail striking forward, with impact sparks",
+        "flail striking forward",
     ],
     "militia": [
         "guard stance, sword pointed forward",
         "sword raised back over the head",
-        "sword thrust forward with a glint",
+        "sword thrust forward",
         "sword slashing low across the body",
     ],
     "ogres": [
         "club raised high behind the head",
-        "club swung forward in a strike, with impact sparks",
+        "club swung forward in a strike",
         "club swung all the way down to the ground",
         "club raised at the shoulder",
     ],
     "peasants": [
         "pitchfork held diagonally upward",
         "pitchfork thrust forward, level",
-        "pitchfork jabbing forward, with impact sparks",
+        "pitchfork jabbing forward",
         "pitchfork held level, pulling back",
     ],
     "pikemen": [
         "pike held horizontally low across the body",
         "pike levelled forward at the waist",
-        "lunging, thrusting the pike forward, with impact sparks",
+        "lunging, thrusting the pike forward",
         "pike levelled, drawing back",
     ],
     "skeletons": [
         "glaive held upright and diagonal",
         "glaive levelled forward",
-        "lunging, thrusting the glaive forward, with impact sparks",
+        "lunging, thrusting the glaive forward",
         "glaive levelled, recovering",
     ],
     "sprites": [
@@ -1091,7 +1091,7 @@ TROOP_POSES = {
     "zombies": [
         "shambling, arms outstretched",
         "lurching forward",
-        "clawing swipe, with impact sparks",
+        "clawing swipe",
         "arms outstretched, recovering",
     ],
 }
@@ -1119,6 +1119,8 @@ TROOP_NEG = {
     "orcs": ["", "", "arrow, nocked arrow, drawn bowstring, two bowstrings",
              "full draw, drawn bowstring, aiming, arrow on the string"],
     "elves": ["", "", "", "nocked arrow, drawn bowstring, two bowstrings"],
+    "militia": ["spear", "spear", "spear", "spear"],
+    "giants": ["", "", "", "ground, rock floor, cliff, rubble"],
 }
 
 
