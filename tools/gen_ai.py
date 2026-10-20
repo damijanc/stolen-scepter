@@ -39,7 +39,7 @@ OUT = os.path.join(ROOT, "game-assets", "ai-out")
 # side-by-side archer run, cleaner lines. Pass --ckpt sd_xl_base_1.0.safetensors
 # for the base model.
 CKPT = "DreamShaperXL1.0Alpha2_fixedVae_half_00001_.safetensors"
-VERSION = "1.20"
+VERSION = "1.21"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -1214,6 +1214,121 @@ def write_pose(path, i, w, h):
     return dst
 
 
+# A retry moves the seed this far, so it never lands on another frame's seed
+# (frames use seed + 0..3).
+RETRY_STRIDE = 1000
+
+
+def frame_issues(w, h, rgba):
+    """What is wrong with one matted frame, as short labels; [] if nothing.
+
+    - "empty": the matte kept nothing.
+    - "extra figure": a second blob at least 8% the size of the subject (a
+      background figure or a stray prop the matte kept).
+    - "ground": a baked-in ground patch, slab or rubble. Two signs, either one
+      trips it: a 5% band in the bottom quarter that is nearly solid (>= 0.85
+      filled) and much fuller than the legs, or a bottom row spanning half the
+      subject's width while the bottom 3% is half filled. Measured on real
+      frames: ground patches fill 0.88-0.96 there and span 0.69 of the bottom
+      row; clean figures, wolves included, stay under 0.66 fill and 0.15 span,
+      because feet and paws are sparse.
+    """
+    comps = alpha_components(w, h, rgba)
+    if not comps:
+        return ["empty"]
+    main = comps[0]
+    issues = []
+    if any(len(c) >= 0.08 * len(main) for c in comps[1:]):
+        issues.append("extra figure")
+    xs = [j % w for j in main]
+    ys = [j // w for j in main]
+    x0, y0, x1, y1 = min(xs), min(ys), max(xs) + 1, max(ys) + 1
+    bw, bh = x1 - x0, y1 - y0
+    rows = [0] * bh
+    for y in ys:
+        rows[y - y0] += 1
+
+    lo = [w] * bh
+    hi = [-1] * bh
+    for x, y in zip(xs, ys):
+        lo[y - y0] = min(lo[y - y0], x)
+        hi[y - y0] = max(hi[y - y0], x)
+
+    def fill(a, b):
+        band = rows[int(a * bh):max(int(a * bh) + 1, int(b * bh))]
+        return sum(band) / (len(band) * bw)
+
+    legs = fill(0.55, 0.75)
+    solid = max(fill(a / 20, a / 20 + 0.05) for a in range(15, 20))
+    last_span = (hi[-1] - lo[-1] + 1) / bw
+    if (solid >= 0.85 and solid >= 1.6 * legs) or \
+            (last_span >= 0.5 and fill(0.97, 1.0) >= 0.5):
+        issues.append("ground")
+    return issues
+
+
+def checked_frame(args, label, tag, make_raw):
+    """Generate, matte and check one frame, retrying with new seeds.
+
+    `make_raw(offset)` generates the frame with its seed moved by `offset`
+    and returns the raw PNG path. Up to --tries retries; a clean frame is
+    returned at once, otherwise the attempt with the fewest issues. Returns
+    (matted rgba, raw PNG path of the kept attempt).
+    """
+    best = None
+    for attempt in range(args.tries + 1):
+        raw = make_raw(attempt * RETRY_STRIDE)
+        matted = matte_file(args, raw, tag)
+        issues = frame_issues(GEN_W, GEN_H, matted)
+        if not issues:
+            return matted, raw
+        keep = os.path.join(OUT, f"_best_{tag}.png")
+        if best is None or len(issues) < best[0]:
+            shutil.copyfile(raw, keep)
+            best = (len(issues), matted)
+        more = "retrying" if attempt < args.tries else "keeping the best attempt"
+        print(f"  {label}: {', '.join(issues)}; {more}", flush=True)
+    return best[1], os.path.join(OUT, f"_best_{tag}.png")
+
+
+def silhouette(w, h, rgba, n=32):
+    """The subject's mask on an n x n grid over its own box, for comparing shapes."""
+    sub = cut_subject(w, h, rgba)
+    if sub is None:
+        return None
+    bw, bh, crop, _ = sub
+    return [crop[((y * bh // n) * bw + x * bw // n) * 4 + 3] >= 128
+            for y in range(n) for x in range(n)]
+
+
+def iou(a, b):
+    both = sum(1 for p, q in zip(a, b) if p and q)
+    either = sum(1 for p, q in zip(a, b) if p or q)
+    return both / either if either else 0.0
+
+
+def orient_to_first(matted, margin=0.03):
+    """Flip frames 1-3 whose MIRROR matches frame 0's silhouette better.
+
+    For the units with no pose skeleton (horses, wolves, dragons), where
+    nothing pins the facing, so frames can come out facing either way. It
+    only makes the frames agree with frame 0; frame 0 itself still needs
+    --mirror if it faces left.
+    """
+    ref = silhouette(*matted[0])
+    if ref is None:
+        return matted
+    out = [matted[0]]
+    for i, im in enumerate(matted[1:], 1):
+        flipped = mirror_image(im)
+        a, b = silhouette(*im), silhouette(*flipped)
+        if a is not None and b is not None and iou(b, ref) > iou(a, ref) + margin:
+            print(f"  frame {i} faced the other way; flipped to match frame 0", flush=True)
+            im = flipped
+        out.append(im)
+    return out
+
+
 def render_posed_frames(args, path, tw, th):
     """4 frames, each drawn to its authored OpenPose skeleton (tools/pose_rig.py).
 
@@ -1236,15 +1351,20 @@ def render_posed_frames(args, path, tw, th):
         if ref and getattr(args, "ipadapter", False):
             ip = (ref, resolve_ip_preset(info, getattr(args, "ip_preset", "")),
                   args.ip_weight, resolve_ip_type(info, args), args.ip_start)
-        graph = build_pose_graph(args.ckpt, pos, frame_negative(path, i), seed + i,
-                                 GEN_W, GEN_H, pose_name,
-                                 cn, args.cn_strength, args.cn_end, ip)
-        raw = os.path.join(OUT, f"_raw_{i}.png")
-        with open(raw, "wb") as fh:
-            fh.write(generate(args.host, graph))
+
+        def make_raw(offset, i=i, pos=pos, pose_name=pose_name, ip=ip):
+            graph = build_pose_graph(args.ckpt, pos, frame_negative(path, i),
+                                     seed + i + offset, GEN_W, GEN_H, pose_name,
+                                     cn, args.cn_strength, args.cn_end, ip)
+            raw = os.path.join(OUT, f"_raw_{i}.png")
+            with open(raw, "wb") as fh:
+                fh.write(generate(args.host, graph))
+            return raw
+
+        rgba, raw = checked_frame(args, f"{unit} frame {i}", str(i), make_raw)
         if i == 0:
             ref = upload_image(args.host, raw, f"ob_ref_{unit}.png")
-        matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
+        matted.append((GEN_W, GEN_H, rgba))
     return place_frames(args, group_paths(path), matted, tw, th)
 
 
@@ -1262,13 +1382,19 @@ def render_group_frames(args, path, tw, th):
         _, _, rgba = render_asset(args, path, p[0], p[1], tw, th)
         return idle_frames(tw, th, rgba)
     seed = stable_seed(path)
+    unit = unit_of(path)
     os.makedirs(OUT, exist_ok=True)
-    pos0, _ = frame_prompt(path, 0)
-    raw0 = generate_sprite(args, path, pos0, False, GEN_W, GEN_H, seed)
-    init = os.path.join(OUT, "_init.png")
-    write_png(init, GEN_W, GEN_H, raw0)
     paths = group_paths(path)
-    matted = [(GEN_W, GEN_H, matte_file(args, init, "0"))]
+
+    def make_init(offset):
+        pos0, _ = frame_prompt(path, 0)
+        init = os.path.join(OUT, "_init.png")
+        write_png(init, GEN_W, GEN_H,
+                  generate_sprite(args, path, pos0, False, GEN_W, GEN_H, seed + offset))
+        return init
+
+    rgba0, init = checked_frame(args, f"{unit} frame 0", "0", make_init)
+    matted = [(GEN_W, GEN_H, rgba0)]
     denoise = getattr(args, "denoise", 0.0)
     if denoise > 0:
         try:
@@ -1276,31 +1402,40 @@ def render_group_frames(args, path, tw, th):
             info = http_get(args.host, "/object_info")
             for i in range(1, 4):
                 pos, _ = frame_prompt(path, i)
-                if getattr(args, "ipadapter", False):
-                    preset = resolve_ip_preset(info, getattr(args, "ip_preset", ""))
-                    graph = build_ipadapter_img2img(
-                        args.ckpt, pos, frame_negative(path, i), seed + i, name, denoise,
-                        preset,
-                        getattr(args, "ip_weight", 0.8), resolve_ip_type(info, args))
-                else:
-                    graph = build_img2img(args.ckpt, pos, frame_negative(path, i), seed + i,
-                                          name, denoise)
-                png = generate(args.host, graph)
-                raw = os.path.join(OUT, f"_raw_{i}.png")
-                with open(raw, "wb") as fh:
-                    fh.write(png)
-                matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
-            return place_frames(args, paths, matted, tw, th)
+
+                def make_raw(offset, i=i, pos=pos):
+                    if getattr(args, "ipadapter", False):
+                        preset = resolve_ip_preset(info, getattr(args, "ip_preset", ""))
+                        graph = build_ipadapter_img2img(
+                            args.ckpt, pos, frame_negative(path, i), seed + i + offset,
+                            name, denoise, preset, getattr(args, "ip_weight", 0.8),
+                            resolve_ip_type(info, args))
+                    else:
+                        graph = build_img2img(args.ckpt, pos, frame_negative(path, i),
+                                              seed + i + offset, name, denoise)
+                    raw = os.path.join(OUT, f"_raw_{i}.png")
+                    with open(raw, "wb") as fh:
+                        fh.write(generate(args.host, graph))
+                    return raw
+
+                matted.append((GEN_W, GEN_H,
+                               checked_frame(args, f"{unit} frame {i}", str(i), make_raw)[0]))
+            return place_frames(args, paths, orient_to_first(matted), tw, th)
         except Exception as exc:  # noqa: BLE001
             print(f"  img2img failed ({exc}); using independent frames", flush=True)
             matted = matted[:1]
     for i in range(1, 4):
         pos, _ = frame_prompt(path, i)
-        rgba = generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed + i)
-        raw = os.path.join(OUT, f"_raw_{i}.png")
-        write_png(raw, GEN_W, GEN_H, rgba)
-        matted.append((GEN_W, GEN_H, matte_file(args, raw, str(i))))
-    return place_frames(args, paths, matted, tw, th)
+
+        def make_raw(offset, i=i, pos=pos):
+            raw = os.path.join(OUT, f"_raw_{i}.png")
+            write_png(raw, GEN_W, GEN_H,
+                      generate_sprite(args, path, pos, False, GEN_W, GEN_H, seed + i + offset))
+            return raw
+
+        matted.append((GEN_W, GEN_H,
+                       checked_frame(args, f"{unit} frame {i}", str(i), make_raw)[0]))
+    return place_frames(args, paths, orient_to_first(matted), tw, th)
 
 
 def gen_size(tw, th):
@@ -1576,7 +1711,8 @@ def main():
     ap.add_argument("--scale", type=int, default=6, help="art pixel multiple (6 -> 288x204)")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tries", type=int, default=2,
-                    help="retries when a sprite sheet has the wrong figure count")
+                    help="retries per frame, each with a new seed, when a frame has an "
+                         "extra figure or baked-in ground (also: sprite sheet figure count)")
     ap.add_argument("--denoise", type=float, default=1.0,
                     help="img2img strength for unposed animation frames; below ~0.9 "
                          "frames keep frame 0's pose (0 disables)")

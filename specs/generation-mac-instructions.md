@@ -125,7 +125,7 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-The log must print `gen_ai version 1.20` and `controlnet on`. A missing model
+The log must print `gen_ai version 1.21` and `controlnet on`. A missing model
 stops the run with the fix instead of quietly falling back.
 
 Look for: **one** archer per frame, **facing right**, same character through
@@ -146,7 +146,14 @@ Not posed (no human skeleton): cavalry, nomads, wolves, dragons. They are
 prompt-driven (fresh frames at the default `--denoise 1.0`, look carried by
 IP-Adapter), so check their facing; flip any that came out facing
 left with `--mirror`, e.g. `--mirror wolves,dragons_02` (path substrings),
-and re-run just that unit.
+and re-run just that unit. Frames 1-3 of these units are flipped
+automatically to face the same way as frame 0 (silhouette match), so only
+frame 0 can need it: `--mirror wolves` flips the whole unit.
+
+Every frame is checked after matting. A frame with a second figure or a
+baked-in ground patch is regenerated with a new seed (`--tries`, default 2),
+and the best attempt is kept; the log names what was wrong
+(`giants frame 2: ground; retrying`).
 
 Placement (`--registration spec`, the default): each unit is scaled once for
 all four frames, to the original's height in the cell, and stands on the
