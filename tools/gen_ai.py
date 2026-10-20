@@ -39,7 +39,7 @@ OUT = os.path.join(ROOT, "game-assets", "ai-out")
 # side-by-side archer run, cleaner lines. Pass --ckpt sd_xl_base_1.0.safetensors
 # for the base model.
 CKPT = "DreamShaperXL1.0Alpha2_fixedVae_half_00001_.safetensors"
-VERSION = "1.21"
+VERSION = "1.22"
 GEN_W, GEN_H = 1024, 1024
 SHEET_W, SHEET_H = 1344, 448
 NEG_SHEET = ("text, watermark, labels, numbers, letters, border, frame, grid lines, table, "
@@ -51,7 +51,7 @@ NEG = ("text, watermark, ui, border, frame, perspective, horizon, buildings, "
        "collage, grid, split image, panel, clone, duplicate, mirror, reflection, "
        "signature, blurry, low quality, deformed, 3d render, cgi, octane, "
        "ground patch, grass base, pedestal, platform, miniature figures, "
-       "multiple views")
+       "multiple views, tabletop miniature, figurine, stone base")
 
 # Each unit's kit is what its combat animation acts out (TROOP_POSES), so a
 # giant throws boulders and a troll fights bare-fisted -- a club would fight
@@ -69,7 +69,7 @@ TROOP = {
     "giants": "huge heavy bald giant in a loincloth who throws boulders",
     "trolls": "hulking bare-fisted troll",
     "zombies": "shambling clawed zombie",
-    "skeletons": "skeleton warrior with a long glaive",
+    "skeletons": "skeleton warrior with a long spear",
     "vampires": "vampire lord in a great bat-winged cloak",
     "elves": "kneeling elf archer with a longbow",
     "dwarves": "dwarf warrior with a war hammer and a round shield",
@@ -208,7 +208,7 @@ def prompt_for(path):
         unit = stem.rsplit("_", 1)[0]
         desc = TROOP.get(unit, unit)
         return (f"a single {desc}, full body, side view, centered, one character only, "
-                f"painterly fantasy strategy game unit sprite, plain flat neutral "
+                f"painterly fantasy character illustration, plain flat neutral "
                 f"background, soft light, high detail"), True
     return (f"{stem}, painterly fantasy strategy game art, high detail, centered"), True
 
@@ -662,7 +662,7 @@ def prompt_all(path):
         unit = stem.rsplit("_", 1)[0]
         return (f"a single {TROOP.get(unit, unit)}, one lone figure, full body, side view "
                 f"facing right, centered, large in frame, isolated game asset sprite, one character only, "
-                f"painterly fantasy strategy game unit, plain flat neutral background, "
+                f"painterly fantasy character illustration, plain flat neutral background, "
                 f"crisp, high detail"), True
     if path.startswith("art/villains/"):
         who = stem.rsplit("_", 1)[0].replace("_", " ")
@@ -673,7 +673,7 @@ def prompt_all(path):
         anim = stem.rsplit("_", 1)[0]
         if anim == "hero_walk":
             return ("a single knight hero marching, full body, side view, centered, one "
-                    "character only, painterly fantasy strategy game unit sprite, plain flat "
+                    "character only, painterly fantasy character illustration, plain flat "
                     "neutral background, soft light, high detail"), True
         if anim == "boat":
             return ("a small wooden rowing boat with a striped sail, side view, centered, "
@@ -1059,10 +1059,10 @@ TROOP_POSES = {
         "pike levelled, drawing back",
     ],
     "skeletons": [
-        "glaive held upright and diagonal",
-        "glaive levelled forward",
-        "lunging, thrusting the glaive forward",
-        "glaive levelled, recovering",
+        "spear held upright and diagonal",
+        "spear levelled forward",
+        "lunging, thrusting the spear forward",
+        "spear levelled, recovering",
     ],
     "sprites": [
         "hovering in the air, wings raised",
@@ -1124,10 +1124,21 @@ TROOP_NEG = {
 }
 
 
+# Units that carry ONE weapon. Their skeletons often reach both arms forward
+# (a shield arm, a two-handed grip), which SDXL fills with a second weapon.
+SINGLE_WEAPON = {"barbarians", "dwarves", "knights", "militia", "ogres", "peasants",
+                 "pikemen", "skeletons", "nomads", "cavalry"}
+
+
 def frame_negative(path, i):
-    """NEG plus the troop frame's own exclusions (TROOP_NEG)."""
-    extra = TROOP_NEG.get(unit_of(path), ["", "", "", ""])[i] \
-        if path.startswith("art/troops/") else ""
+    """NEG plus the troop frame's own exclusions (TROOP_NEG, SINGLE_WEAPON)."""
+    extra = []
+    if path.startswith("art/troops/"):
+        unit = unit_of(path)
+        extra.append(TROOP_NEG.get(unit, ["", "", "", ""])[i])
+        if unit in SINGLE_WEAPON:
+            extra.append("two weapons, dual wielding, second weapon")
+    extra = ", ".join(e for e in extra if e)
     return f"{NEG}, {extra}" if extra else NEG
 
 
@@ -1144,7 +1155,7 @@ def frame_prompt(path, i):
         return None
     return (f"a single {desc}, {poses[i]}, full body, side view facing right, centered, "
             f"large in frame, one character only, consistent character design, flat 2d "
-            f"hand-painted illustration, painterly fantasy strategy game unit, plain flat "
+            f"hand-painted illustration, painterly fantasy character illustration, plain flat "
             f"neutral background, crisp, high detail"), True
 
 
