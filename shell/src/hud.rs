@@ -178,7 +178,7 @@ mod tests {
         let resources = Resources::from_json_str(
             r#"{"render": {"mode": "legacy"}, "troops": [],
                 "villains": [
-                  {"index":0,"id":"murray","name":"Murray","castle":"castle0",
+                  {"index":0,"id":"varn","name":"Varn","castle":"castle0",
                    "portrait":"murray.png"}
                 ],
                 "sprites": {
@@ -262,7 +262,7 @@ mod tests {
     fn the_contract_panel_overlays_the_villain_face_on_the_silhouette() {
         let (resources, layout, catalog) = fixtures();
         let mut game = Game::default();
-        game.contract.active_id.copy_from_str("murray");
+        game.contract.active_id.copy_from_str("varn");
         let list = render(&resources, &layout, &catalog, &game, 0.0);
 
         // C blits the silhouette FIRST, then the face over it.

@@ -141,7 +141,7 @@ mod tests {
         let resources = Resources::from_json_str(
             r#"{"render": {"mode": "legacy"}, "troops": [],
                 "villains": [
-                  {"index":0,"id":"murray","name":"Murray","castle":"castle0",
+                  {"index":0,"id":"varn","name":"Varn","castle":"castle0",
                    "portrait":"murray.png"}
                 ],
                 "sprites": {
@@ -205,7 +205,7 @@ mod tests {
     fn the_contract_panel_overlays_the_villain_face_on_the_silhouette() {
         let (resources, layout, catalog) = fixtures();
         let mut game = Game::default();
-        game.contract.active_id.copy_from_str("murray");
+        game.contract.active_id.copy_from_str("varn");
         let list = render(&resources, &layout, &catalog, &game, 0.0);
 
         // C blits the silhouette FIRST, then the face over it.
@@ -348,7 +348,7 @@ Two warnings are expected here and both clear later in the plan, so do not
   `tick()` already.
 
 The test fixture in Step 2 has been verified to parse against the real
-`Resources` loader, including `villain_by_id("murray").index == 0` and all
+`Resources` loader, including `villain_by_id("varn").index == 0` and all
 seven `sprites.hud.*` slots. If it fails to parse, suspect a change to the
 loader rather than the JSON.
 

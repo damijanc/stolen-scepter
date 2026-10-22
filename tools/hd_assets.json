@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "generated_by": "tools/hd_manifest.py",
- "description": "Source art for HD upscaling. Paths mirror the pack layout; write upscaled output to game-assets/generated/<path>.",
+ "generated_by": "tools/hd_manifest.py (removed); kept as the slot list",
+ "description": "Every art slot a pack must provide: pack path, native size, alpha convention, and whether the engine draws it. Read by tools/gen_ai.py and tools/asset_layout.py.",
  "native_cell": {
   "w": 48,
   "h": 34
@@ -52,11 +52,6 @@
    "path": "art/classes/barbarian.png",
    "category": "classes",
    "role": "class_portrait",
-   "source": {
-    "archive": "256",
-    "entry": "barb.256",
-    "frame": 0
-   },
    "native": {
     "w": 96,
     "h": 102
@@ -68,11 +63,6 @@
    "path": "art/classes/knight.png",
    "category": "classes",
    "role": "class_portrait",
-   "source": {
-    "archive": "256",
-    "entry": "knig.256",
-    "frame": 0
-   },
    "native": {
     "w": 96,
     "h": 102
@@ -84,11 +74,6 @@
    "path": "art/classes/paladin.png",
    "category": "classes",
    "role": "class_portrait",
-   "source": {
-    "archive": "256",
-    "entry": "pala.256",
-    "frame": 0
-   },
    "native": {
     "w": 96,
     "h": 102
@@ -100,11 +85,6 @@
    "path": "art/classes/sorceress.png",
    "category": "classes",
    "role": "class_portrait",
-   "source": {
-    "archive": "256",
-    "entry": "sorc.256",
-    "frame": 0
-   },
    "native": {
     "w": 96,
     "h": 102
@@ -116,11 +96,6 @@
    "path": "art/combat/castle_spike.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -132,11 +107,6 @@
    "path": "art/combat/castle_wall_01.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 5
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -148,11 +118,6 @@
    "path": "art/combat/castle_wall_02.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 6
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -164,11 +129,6 @@
    "path": "art/combat/castle_wall_03.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 7
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -180,11 +140,6 @@
    "path": "art/combat/castle_wall_04.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -196,11 +151,6 @@
    "path": "art/combat/castle_wall_05.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 9
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -212,11 +162,6 @@
    "path": "art/combat/castle_wall_06.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 10
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -228,11 +173,6 @@
    "path": "art/combat/cursor_01.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 11
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -244,11 +184,6 @@
    "path": "art/combat/cursor_02.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 12
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -260,11 +195,6 @@
    "path": "art/combat/cursor_03.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 13
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -276,11 +206,6 @@
    "path": "art/combat/cursor_04.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 14
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -292,11 +217,6 @@
    "path": "art/combat/field_grass.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -308,11 +228,6 @@
    "path": "art/combat/obstacle_01.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -324,11 +239,6 @@
    "path": "art/combat/obstacle_02.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -340,11 +250,6 @@
    "path": "art/combat/obstacle_03.png",
    "category": "combat",
    "role": "combat_tile",
-   "source": {
-    "archive": "256",
-    "entry": "comtiles.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -356,11 +261,6 @@
    "path": "art/font/kb-font.png",
    "category": "font",
    "role": "bitmap_font",
-   "source": {
-    "archive": "256",
-    "entry": "KB.CH",
-    "frame": null
-   },
    "native": {
     "w": 1024,
     "h": 8
@@ -372,11 +272,6 @@
    "path": "art/sprites/boat_00.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -388,11 +283,6 @@
    "path": "art/sprites/boat_01.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -404,11 +294,6 @@
    "path": "art/sprites/boat_02.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -420,11 +305,6 @@
    "path": "art/sprites/boat_03.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -436,11 +316,6 @@
    "path": "art/sprites/hero_idle_00.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -453,11 +328,6 @@
    "path": "art/sprites/hero_idle_01.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 5
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -469,11 +339,6 @@
    "path": "art/sprites/hero_idle_02.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 6
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -485,11 +350,6 @@
    "path": "art/sprites/hero_idle_03.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 7
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -501,11 +361,6 @@
    "path": "art/sprites/hero_walk_00.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -517,11 +372,6 @@
    "path": "art/sprites/hero_walk_01.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 9
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -533,11 +383,6 @@
    "path": "art/sprites/hero_walk_02.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 10
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -549,11 +394,6 @@
    "path": "art/sprites/hero_walk_03.png",
    "category": "sprites",
    "role": "hero_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 11
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -565,11 +405,6 @@
    "path": "art/tiles/artifact_chest.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 19
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -581,11 +416,6 @@
    "path": "art/tiles/artifact_ring.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 18
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -597,11 +427,6 @@
    "path": "art/tiles/bridge_h.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -613,11 +438,6 @@
    "path": "art/tiles/bridge_v.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 9
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -629,11 +449,6 @@
    "path": "art/tiles/castle_br.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -645,11 +460,6 @@
    "path": "art/tiles/castle_gate.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 5
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -661,11 +471,6 @@
    "path": "art/tiles/castle_ml.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -677,11 +482,6 @@
    "path": "art/tiles/castle_mr.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 7
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -693,11 +493,6 @@
    "path": "art/tiles/castle_tl.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -709,11 +504,6 @@
    "path": "art/tiles/castle_tr.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 6
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -725,11 +515,6 @@
    "path": "art/tiles/chest.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 11
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -741,11 +526,6 @@
    "path": "art/tiles/desert.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 22
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -757,11 +537,6 @@
    "path": "art/tiles/desert_edge_01.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 10
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -773,11 +548,6 @@
    "path": "art/tiles/desert_edge_02.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 11
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -789,11 +559,6 @@
    "path": "art/tiles/desert_edge_03.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 12
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -805,11 +570,6 @@
    "path": "art/tiles/desert_edge_04.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 13
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -821,11 +581,6 @@
    "path": "art/tiles/desert_edge_05.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 14
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -837,11 +592,6 @@
    "path": "art/tiles/desert_edge_06.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 15
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -853,11 +603,6 @@
    "path": "art/tiles/desert_edge_07.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 16
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -869,11 +614,6 @@
    "path": "art/tiles/desert_edge_08.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 17
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -885,11 +625,6 @@
    "path": "art/tiles/desert_edge_09.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 18
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -901,11 +636,6 @@
    "path": "art/tiles/desert_edge_10.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 19
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -917,11 +647,6 @@
    "path": "art/tiles/desert_edge_11.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 20
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -933,11 +658,6 @@
    "path": "art/tiles/desert_edge_12.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 21
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -949,11 +669,6 @@
    "path": "art/tiles/dwelling_dungeon.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 15
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -965,11 +680,6 @@
    "path": "art/tiles/dwelling_forest.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 13
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -981,11 +691,6 @@
    "path": "art/tiles/dwelling_hills.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 14
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -997,11 +702,6 @@
    "path": "art/tiles/dwelling_plains.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 12
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1013,11 +713,6 @@
    "path": "art/tiles/forest.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 9
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1029,11 +724,6 @@
    "path": "art/tiles/forest_edge_01.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 33
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1045,11 +735,6 @@
    "path": "art/tiles/forest_edge_02.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 34
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1061,11 +746,6 @@
    "path": "art/tiles/forest_edge_03.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 35
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1077,11 +757,6 @@
    "path": "art/tiles/forest_edge_04.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1093,11 +768,6 @@
    "path": "art/tiles/forest_edge_05.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1109,11 +779,6 @@
    "path": "art/tiles/forest_edge_06.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1125,11 +790,6 @@
    "path": "art/tiles/forest_edge_07.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1141,11 +801,6 @@
    "path": "art/tiles/forest_edge_08.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1157,11 +812,6 @@
    "path": "art/tiles/forest_edge_09.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 5
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1173,11 +823,6 @@
    "path": "art/tiles/forest_edge_10.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 6
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1189,11 +834,6 @@
    "path": "art/tiles/forest_edge_11.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 7
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1205,11 +845,6 @@
    "path": "art/tiles/forest_edge_12.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1221,11 +856,6 @@
    "path": "art/tiles/grass.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1237,11 +867,6 @@
    "path": "art/tiles/grass_variant.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1253,11 +878,6 @@
    "path": "art/tiles/mountain.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 35
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1269,11 +889,6 @@
    "path": "art/tiles/mountain_edge_01.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 23
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1285,11 +900,6 @@
    "path": "art/tiles/mountain_edge_02.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 24
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1301,11 +911,6 @@
    "path": "art/tiles/mountain_edge_03.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 25
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1317,11 +922,6 @@
    "path": "art/tiles/mountain_edge_04.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 26
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1333,11 +933,6 @@
    "path": "art/tiles/mountain_edge_05.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 27
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1349,11 +944,6 @@
    "path": "art/tiles/mountain_edge_06.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 28
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1365,11 +955,6 @@
    "path": "art/tiles/mountain_edge_07.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 29
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1381,11 +966,6 @@
    "path": "art/tiles/mountain_edge_08.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 30
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1397,11 +977,6 @@
    "path": "art/tiles/mountain_edge_09.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 31
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1413,11 +988,6 @@
    "path": "art/tiles/mountain_edge_10.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 32
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1429,11 +999,6 @@
    "path": "art/tiles/mountain_edge_11.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 33
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1445,11 +1010,6 @@
    "path": "art/tiles/mountain_edge_12.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesetb.256",
-    "frame": 34
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1461,11 +1021,6 @@
    "path": "art/tiles/sign.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 16
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1477,11 +1032,6 @@
    "path": "art/tiles/tilesalt_00.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1494,11 +1044,6 @@
    "path": "art/tiles/tilesalt_01.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1510,11 +1055,6 @@
    "path": "art/tiles/tilesalt_02.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1526,11 +1066,6 @@
    "path": "art/tiles/tilesalt_03.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1542,11 +1077,6 @@
    "path": "art/tiles/tilesalt_04.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1558,11 +1088,6 @@
    "path": "art/tiles/tilesalt_05.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 5
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1574,11 +1099,6 @@
    "path": "art/tiles/tilesalt_06.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 6
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1590,11 +1110,6 @@
    "path": "art/tiles/tilesalt_07.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 7
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1606,11 +1121,6 @@
    "path": "art/tiles/tilesalt_08.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tilesalt.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1622,11 +1132,6 @@
    "path": "art/tiles/town.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 10
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1638,11 +1143,6 @@
    "path": "art/tiles/wandering_army.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 17
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1654,11 +1154,6 @@
    "path": "art/tiles/water.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 32
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1670,11 +1165,6 @@
    "path": "art/tiles/water_edge_00.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 20
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1686,11 +1176,6 @@
    "path": "art/tiles/water_edge_01.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 21
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1702,11 +1187,6 @@
    "path": "art/tiles/water_edge_02.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 22
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1718,11 +1198,6 @@
    "path": "art/tiles/water_edge_03.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 23
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1734,11 +1209,6 @@
    "path": "art/tiles/water_edge_04.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 24
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1750,11 +1220,6 @@
    "path": "art/tiles/water_edge_05.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 25
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1766,11 +1231,6 @@
    "path": "art/tiles/water_edge_06.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 26
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1782,11 +1242,6 @@
    "path": "art/tiles/water_edge_07.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 27
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1798,11 +1253,6 @@
    "path": "art/tiles/water_edge_08.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 28
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1814,11 +1264,6 @@
    "path": "art/tiles/water_edge_09.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 29
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1830,11 +1275,6 @@
    "path": "art/tiles/water_edge_10.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 30
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1846,11 +1286,6 @@
    "path": "art/tiles/water_edge_11.png",
    "category": "tiles",
    "role": "map_tile",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 31
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1862,11 +1297,6 @@
    "path": "art/troops/archers_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcr.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1878,11 +1308,6 @@
    "path": "art/troops/archers_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcr.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1894,11 +1319,6 @@
    "path": "art/troops/archers_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcr.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1910,11 +1330,6 @@
    "path": "art/troops/archers_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcr.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1926,11 +1341,6 @@
    "path": "art/troops/archmages_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcm.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1942,11 +1352,6 @@
    "path": "art/troops/archmages_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcm.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1958,11 +1363,6 @@
    "path": "art/troops/archmages_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcm.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1974,11 +1374,6 @@
    "path": "art/troops/archmages_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arcm.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -1990,11 +1385,6 @@
    "path": "art/troops/barbarians_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "brbn.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2006,11 +1396,6 @@
    "path": "art/troops/barbarians_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "brbn.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2022,11 +1407,6 @@
    "path": "art/troops/barbarians_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "brbn.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2038,11 +1418,6 @@
    "path": "art/troops/barbarians_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "brbn.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2054,11 +1429,6 @@
    "path": "art/troops/cavalry_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cavl.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2070,11 +1440,6 @@
    "path": "art/troops/cavalry_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cavl.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2086,11 +1451,6 @@
    "path": "art/troops/cavalry_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cavl.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2102,11 +1462,6 @@
    "path": "art/troops/cavalry_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cavl.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2118,11 +1473,6 @@
    "path": "art/troops/demons_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "demo.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2134,11 +1484,6 @@
    "path": "art/troops/demons_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "demo.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2150,11 +1495,6 @@
    "path": "art/troops/demons_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "demo.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2166,11 +1506,6 @@
    "path": "art/troops/demons_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "demo.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2182,11 +1517,6 @@
    "path": "art/troops/dragons_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drag.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2198,11 +1528,6 @@
    "path": "art/troops/dragons_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drag.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2214,11 +1539,6 @@
    "path": "art/troops/dragons_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drag.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2230,11 +1550,6 @@
    "path": "art/troops/dragons_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drag.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2246,11 +1561,6 @@
    "path": "art/troops/druids_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drui.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2262,11 +1572,6 @@
    "path": "art/troops/druids_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drui.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2278,11 +1583,6 @@
    "path": "art/troops/druids_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drui.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2294,11 +1594,6 @@
    "path": "art/troops/druids_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drui.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2310,11 +1605,6 @@
    "path": "art/troops/dwarves_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "dwar.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2326,11 +1616,6 @@
    "path": "art/troops/dwarves_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "dwar.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2342,11 +1627,6 @@
    "path": "art/troops/dwarves_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "dwar.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2358,11 +1638,6 @@
    "path": "art/troops/dwarves_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "dwar.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2374,11 +1649,6 @@
    "path": "art/troops/elves_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "elfs.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2390,11 +1660,6 @@
    "path": "art/troops/elves_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "elfs.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2406,11 +1671,6 @@
    "path": "art/troops/elves_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "elfs.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2422,11 +1682,6 @@
    "path": "art/troops/elves_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "elfs.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2438,11 +1693,6 @@
    "path": "art/troops/ghosts_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ghos.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2454,11 +1704,6 @@
    "path": "art/troops/ghosts_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ghos.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2470,11 +1715,6 @@
    "path": "art/troops/ghosts_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ghos.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2486,11 +1726,6 @@
    "path": "art/troops/ghosts_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ghos.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2502,11 +1737,6 @@
    "path": "art/troops/giants_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gian.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2518,11 +1748,6 @@
    "path": "art/troops/giants_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gian.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2534,11 +1759,6 @@
    "path": "art/troops/giants_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gian.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2550,11 +1770,6 @@
    "path": "art/troops/giants_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gian.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2566,11 +1781,6 @@
    "path": "art/troops/gnomes_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gnom.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2582,11 +1792,6 @@
    "path": "art/troops/gnomes_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gnom.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2598,11 +1803,6 @@
    "path": "art/troops/gnomes_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gnom.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2614,11 +1814,6 @@
    "path": "art/troops/gnomes_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "gnom.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2630,11 +1825,6 @@
    "path": "art/troops/knights_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "kght.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2646,11 +1836,6 @@
    "path": "art/troops/knights_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "kght.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2662,11 +1847,6 @@
    "path": "art/troops/knights_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "kght.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2678,11 +1858,6 @@
    "path": "art/troops/knights_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "kght.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2694,11 +1869,6 @@
    "path": "art/troops/militia_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mili.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2710,11 +1880,6 @@
    "path": "art/troops/militia_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mili.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2726,11 +1891,6 @@
    "path": "art/troops/militia_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mili.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2742,11 +1902,6 @@
    "path": "art/troops/militia_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mili.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2758,11 +1913,6 @@
    "path": "art/troops/nomads_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "noma.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2774,11 +1924,6 @@
    "path": "art/troops/nomads_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "noma.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2790,11 +1935,6 @@
    "path": "art/troops/nomads_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "noma.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2806,11 +1946,6 @@
    "path": "art/troops/nomads_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "noma.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2822,11 +1957,6 @@
    "path": "art/troops/ogres_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ogre.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2838,11 +1968,6 @@
    "path": "art/troops/ogres_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ogre.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2854,11 +1979,6 @@
    "path": "art/troops/ogres_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ogre.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2870,11 +1990,6 @@
    "path": "art/troops/ogres_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ogre.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2886,11 +2001,6 @@
    "path": "art/troops/orcs_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "orcs.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2902,11 +2012,6 @@
    "path": "art/troops/orcs_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "orcs.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2918,11 +2023,6 @@
    "path": "art/troops/orcs_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "orcs.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2934,11 +2034,6 @@
    "path": "art/troops/orcs_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "orcs.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2950,11 +2045,6 @@
    "path": "art/troops/peasants_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "peas.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2966,11 +2056,6 @@
    "path": "art/troops/peasants_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "peas.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2982,11 +2067,6 @@
    "path": "art/troops/peasants_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "peas.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -2998,11 +2078,6 @@
    "path": "art/troops/peasants_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "peas.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3014,11 +2089,6 @@
    "path": "art/troops/pikemen_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "pike.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3030,11 +2100,6 @@
    "path": "art/troops/pikemen_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "pike.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3046,11 +2111,6 @@
    "path": "art/troops/pikemen_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "pike.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3062,11 +2122,6 @@
    "path": "art/troops/pikemen_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "pike.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3078,11 +2133,6 @@
    "path": "art/troops/skeletons_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "skel.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3094,11 +2144,6 @@
    "path": "art/troops/skeletons_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "skel.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3110,11 +2155,6 @@
    "path": "art/troops/skeletons_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "skel.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3126,11 +2166,6 @@
    "path": "art/troops/skeletons_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "skel.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3142,11 +2177,6 @@
    "path": "art/troops/sprites_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "spri.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3158,11 +2188,6 @@
    "path": "art/troops/sprites_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "spri.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3174,11 +2199,6 @@
    "path": "art/troops/sprites_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "spri.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3190,11 +2210,6 @@
    "path": "art/troops/sprites_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "spri.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3206,11 +2221,6 @@
    "path": "art/troops/trolls_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "trol.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3222,11 +2232,6 @@
    "path": "art/troops/trolls_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "trol.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3238,11 +2243,6 @@
    "path": "art/troops/trolls_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "trol.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3254,11 +2254,6 @@
    "path": "art/troops/trolls_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "trol.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3270,11 +2265,6 @@
    "path": "art/troops/vampires_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "vamp.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3286,11 +2276,6 @@
    "path": "art/troops/vampires_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "vamp.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3302,11 +2287,6 @@
    "path": "art/troops/vampires_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "vamp.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3318,11 +2298,6 @@
    "path": "art/troops/vampires_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "vamp.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3334,11 +2309,6 @@
    "path": "art/troops/wolves_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "wolf.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3350,11 +2320,6 @@
    "path": "art/troops/wolves_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "wolf.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3366,11 +2331,6 @@
    "path": "art/troops/wolves_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "wolf.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3382,11 +2342,6 @@
    "path": "art/troops/wolves_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "wolf.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3398,11 +2353,6 @@
    "path": "art/troops/zombies_00.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "zomb.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3414,11 +2364,6 @@
    "path": "art/troops/zombies_01.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "zomb.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3430,11 +2375,6 @@
    "path": "art/troops/zombies_02.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "zomb.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3446,11 +2386,6 @@
    "path": "art/troops/zombies_03.png",
    "category": "troops",
    "role": "troop_still_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "zomb.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3462,11 +2397,6 @@
    "path": "art/ui/backdrop_castle.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cstl.256",
-    "frame": 0
-   },
    "native": {
     "w": 240,
     "h": 102
@@ -3478,11 +2408,6 @@
    "path": "art/ui/backdrop_dungeon.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "dngn.256",
-    "frame": 0
-   },
    "native": {
     "w": 240,
     "h": 102
@@ -3494,11 +2419,6 @@
    "path": "art/ui/backdrop_forest.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "frst.256",
-    "frame": 0
-   },
    "native": {
     "w": 240,
     "h": 102
@@ -3510,11 +2430,6 @@
    "path": "art/ui/backdrop_hillcave.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cave.256",
-    "frame": 0
-   },
    "native": {
     "w": 240,
     "h": 102
@@ -3526,11 +2441,6 @@
    "path": "art/ui/backdrop_plains.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "plai.256",
-    "frame": 0
-   },
    "native": {
     "w": 240,
     "h": 102
@@ -3542,11 +2452,6 @@
    "path": "art/ui/backdrop_town.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "town.256",
-    "frame": 0
-   },
    "native": {
     "w": 240,
     "h": 102
@@ -3558,7 +2463,6 @@
    "path": "art/ui/chrome_overworld.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": null,
    "native": {
     "w": 320,
     "h": 200
@@ -3571,11 +2475,6 @@
    "path": "art/ui/class_select_highlight.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "select.256",
-    "frame": 2
-   },
    "native": {
     "w": 42,
     "h": 44
@@ -3587,11 +2486,6 @@
    "path": "art/ui/class_select_picker.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "select.256",
-    "frame": 0
-   },
    "native": {
     "w": 288,
     "h": 184
@@ -3603,11 +2497,6 @@
    "path": "art/ui/end_carpet.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 9
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3619,11 +2508,6 @@
    "path": "art/ui/end_grass.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "tileseta.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3635,11 +2519,6 @@
    "path": "art/ui/end_hero.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3651,11 +2530,6 @@
    "path": "art/ui/end_lose_screen.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "416",
-    "entry": "endpic.256",
-    "frame": 1
-   },
    "native": {
     "w": 144,
     "h": 170
@@ -3667,11 +2541,6 @@
    "path": "art/ui/end_tile_00.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "416",
-    "entry": "endpic.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3684,11 +2553,6 @@
    "path": "art/ui/end_tile_01.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "416",
-    "entry": "endpic.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3700,11 +2564,6 @@
    "path": "art/ui/end_tile_02.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "416",
-    "entry": "endpic.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3716,11 +2575,6 @@
    "path": "art/ui/end_win_screen.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "416",
-    "entry": "endpic.256",
-    "frame": 0
-   },
    "native": {
     "w": 144,
     "h": 170
@@ -3732,11 +2586,6 @@
    "path": "art/ui/hud_bar_segment_00.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 25
-   },
    "native": {
     "w": 16,
     "h": 5
@@ -3748,11 +2597,6 @@
    "path": "art/ui/hud_bar_segment_01.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 26
-   },
    "native": {
     "w": 16,
     "h": 5
@@ -3764,11 +2608,6 @@
    "path": "art/ui/hud_bar_segment_02.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 27
-   },
    "native": {
     "w": 16,
     "h": 5
@@ -3780,11 +2619,6 @@
    "path": "art/ui/hud_bar_strip.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "select.256",
-    "frame": 1
-   },
    "native": {
     "w": 320,
     "h": 5
@@ -3796,11 +2630,6 @@
    "path": "art/ui/hud_contract_silhouette.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 20
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3812,11 +2641,6 @@
    "path": "art/ui/hud_gold_purse.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 24
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3828,11 +2652,6 @@
    "path": "art/ui/hud_magic_00.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 16
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3844,11 +2663,6 @@
    "path": "art/ui/hud_magic_01.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 17
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3860,11 +2674,6 @@
    "path": "art/ui/hud_magic_02.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 18
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3876,11 +2685,6 @@
    "path": "art/ui/hud_magic_03.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 19
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3892,11 +2696,6 @@
    "path": "art/ui/hud_magic_silhouette.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 22
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3908,11 +2707,6 @@
    "path": "art/ui/hud_puzzle_grid.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 23
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3924,11 +2718,6 @@
    "path": "art/ui/hud_siege_00.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 12
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3940,11 +2729,6 @@
    "path": "art/ui/hud_siege_01.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 13
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3956,11 +2740,6 @@
    "path": "art/ui/hud_siege_02.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 14
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3972,11 +2751,6 @@
    "path": "art/ui/hud_siege_03.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 15
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -3988,11 +2762,6 @@
    "path": "art/ui/hud_siege_silhouette.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "cursor.256",
-    "frame": 21
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4004,11 +2773,6 @@
    "path": "art/ui/inventory_artifact_amulet.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 4
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4020,11 +2784,6 @@
    "path": "art/ui/inventory_artifact_anchor.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 7
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4036,11 +2795,6 @@
    "path": "art/ui/inventory_artifact_articles.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4052,11 +2806,6 @@
    "path": "art/ui/inventory_artifact_book.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 6
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4068,11 +2817,6 @@
    "path": "art/ui/inventory_artifact_crown.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4084,11 +2828,6 @@
    "path": "art/ui/inventory_artifact_ring.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 5
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4100,11 +2839,6 @@
    "path": "art/ui/inventory_artifact_shield.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4116,11 +2850,6 @@
    "path": "art/ui/inventory_artifact_sword.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4132,11 +2861,6 @@
    "path": "art/ui/inventory_zone_archipelia.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 10
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4148,11 +2872,6 @@
    "path": "art/ui/inventory_zone_continentia.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 8
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4164,11 +2883,6 @@
    "path": "art/ui/inventory_zone_forestria.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 9
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4180,11 +2894,6 @@
    "path": "art/ui/inventory_zone_saharia.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 11
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4196,7 +2905,6 @@
    "path": "art/ui/puzzle_cover.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": null,
    "native": {
     "w": 9,
     "h": 6
@@ -4209,11 +2917,6 @@
    "path": "art/ui/splash_logo.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "nwcp.256",
-    "frame": 0
-   },
    "native": {
     "w": 320,
     "h": 84
@@ -4225,11 +2928,6 @@
    "path": "art/ui/splash_title.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "title.256",
-    "frame": 0
-   },
    "native": {
     "w": 320,
     "h": 200
@@ -4241,11 +2939,6 @@
    "path": "art/ui/view_empty.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 12
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4258,11 +2951,6 @@
    "path": "art/ui/view_empty_map.png",
    "category": "ui",
    "role": "ui_or_hud",
-   "source": {
-    "archive": "256",
-    "entry": "view.256",
-    "frame": 13
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4274,11 +2962,6 @@
    "path": "art/villains/aimola_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ammi.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4290,11 +2973,6 @@
    "path": "art/villains/aimola_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ammi.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4306,11 +2984,6 @@
    "path": "art/villains/aimola_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ammi.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4322,11 +2995,6 @@
    "path": "art/villains/aimola_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ammi.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4338,11 +3006,6 @@
    "path": "art/villains/arech_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arec.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4354,11 +3017,6 @@
    "path": "art/villains/arech_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arec.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4370,11 +3028,6 @@
    "path": "art/villains/arech_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arec.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4386,11 +3039,6 @@
    "path": "art/villains/arech_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "arec.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4402,11 +3050,6 @@
    "path": "art/villains/auric_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "auri.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4418,11 +3061,6 @@
    "path": "art/villains/auric_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "auri.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4434,11 +3072,6 @@
    "path": "art/villains/auric_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "auri.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4450,11 +3083,6 @@
    "path": "art/villains/auric_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "auri.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4466,11 +3094,6 @@
    "path": "art/villains/bargash_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barg.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4482,11 +3105,6 @@
    "path": "art/villains/bargash_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barg.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4498,11 +3116,6 @@
    "path": "art/villains/bargash_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barg.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4514,11 +3127,6 @@
    "path": "art/villains/bargash_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barg.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4530,11 +3138,6 @@
    "path": "art/villains/baron_makahl_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "baro.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4546,11 +3149,6 @@
    "path": "art/villains/baron_makahl_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "baro.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4562,11 +3160,6 @@
    "path": "art/villains/baron_makahl_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "baro.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4578,11 +3171,6 @@
    "path": "art/villains/baron_makahl_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "baro.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4594,11 +3182,6 @@
    "path": "art/villains/barrowpine_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barr.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4610,11 +3193,6 @@
    "path": "art/villains/barrowpine_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barr.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4626,11 +3204,6 @@
    "path": "art/villains/barrowpine_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barr.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4642,11 +3215,6 @@
    "path": "art/villains/barrowpine_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "barr.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4658,11 +3226,6 @@
    "path": "art/villains/caneghor_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cane.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4674,11 +3237,6 @@
    "path": "art/villains/caneghor_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cane.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4690,11 +3248,6 @@
    "path": "art/villains/caneghor_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cane.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4706,11 +3259,6 @@
    "path": "art/villains/caneghor_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "cane.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4722,11 +3270,6 @@
    "path": "art/villains/czar_nickolai_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "czar.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4738,11 +3281,6 @@
    "path": "art/villains/czar_nickolai_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "czar.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4754,11 +3292,6 @@
    "path": "art/villains/czar_nickolai_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "czar.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4770,11 +3303,6 @@
    "path": "art/villains/czar_nickolai_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "czar.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4786,11 +3314,6 @@
    "path": "art/villains/dread_rob_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drea.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4802,11 +3325,6 @@
    "path": "art/villains/dread_rob_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drea.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4818,11 +3336,6 @@
    "path": "art/villains/dread_rob_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drea.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4834,11 +3347,6 @@
    "path": "art/villains/dread_rob_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "drea.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4850,11 +3358,6 @@
    "path": "art/villains/hack_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "hack.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4866,11 +3369,6 @@
    "path": "art/villains/hack_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "hack.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4882,11 +3380,6 @@
    "path": "art/villains/hack_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "hack.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4898,11 +3391,6 @@
    "path": "art/villains/hack_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "hack.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4914,11 +3402,6 @@
    "path": "art/villains/magus_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "magu.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4930,11 +3413,6 @@
    "path": "art/villains/magus_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "magu.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4946,11 +3424,6 @@
    "path": "art/villains/magus_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "magu.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4962,11 +3435,6 @@
    "path": "art/villains/magus_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "magu.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4978,11 +3446,6 @@
    "path": "art/villains/mahk_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mahk.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -4994,11 +3457,6 @@
    "path": "art/villains/mahk_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mahk.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5010,11 +3468,6 @@
    "path": "art/villains/mahk_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mahk.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5026,11 +3479,6 @@
    "path": "art/villains/mahk_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mahk.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5042,11 +3490,6 @@
    "path": "art/villains/moradon_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mora.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5058,11 +3501,6 @@
    "path": "art/villains/moradon_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mora.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5074,11 +3512,6 @@
    "path": "art/villains/moradon_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mora.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5090,11 +3523,6 @@
    "path": "art/villains/moradon_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mora.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5106,11 +3534,6 @@
    "path": "art/villains/murray_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mury.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5122,11 +3545,6 @@
    "path": "art/villains/murray_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mury.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5138,11 +3556,6 @@
    "path": "art/villains/murray_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mury.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5154,11 +3567,6 @@
    "path": "art/villains/murray_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "mury.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5170,11 +3578,6 @@
    "path": "art/villains/ragface_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ragf.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5186,11 +3589,6 @@
    "path": "art/villains/ragface_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ragf.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5202,11 +3600,6 @@
    "path": "art/villains/ragface_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ragf.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5218,11 +3611,6 @@
    "path": "art/villains/ragface_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "ragf.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5234,11 +3622,6 @@
    "path": "art/villains/rinaldus_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "rina.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5250,11 +3633,6 @@
    "path": "art/villains/rinaldus_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "rina.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5266,11 +3644,6 @@
    "path": "art/villains/rinaldus_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "rina.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5282,11 +3655,6 @@
    "path": "art/villains/rinaldus_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "rina.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5298,11 +3666,6 @@
    "path": "art/villains/urthrax_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "urth.256",
-    "frame": 0
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5314,11 +3677,6 @@
    "path": "art/villains/urthrax_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "urth.256",
-    "frame": 1
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5330,11 +3688,6 @@
    "path": "art/villains/urthrax_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "urth.256",
-    "frame": 2
-   },
    "native": {
     "w": 48,
     "h": 34
@@ -5346,11 +3699,6 @@
    "path": "art/villains/urthrax_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
-   "source": {
-    "archive": "256",
-    "entry": "urth.256",
-    "frame": 3
-   },
    "native": {
     "w": 48,
     "h": 34

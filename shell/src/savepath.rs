@@ -151,14 +151,14 @@ mod tests {
     fn scan_slots_counts_only_readable_saves() {
         let dir = temp_dir("scan");
         let paths = SavePaths::with_override(&dir);
-        write_header_only(&paths.slot("openbounty", 0).unwrap(), "Murray", 123);
+        write_header_only(&paths.slot("openbounty", 0).unwrap(), "Varn", 123);
         write_header_only(&paths.slot("openbounty", 4).unwrap(), "Hack", 50);
         // A file that is not a save is ignored, not counted.
         std::fs::write(paths.slot("openbounty", 7).unwrap(), "not json").unwrap();
 
         let set = scan_slots(&paths, "openbounty");
         assert_eq!(set.existing, 2);
-        assert_eq!(set.headers[0].unwrap().name.as_str(), "Murray");
+        assert_eq!(set.headers[0].unwrap().name.as_str(), "Varn");
         assert_eq!(set.headers[0].unwrap().days_left, 123);
         assert_eq!(set.headers[4].unwrap().name.as_str(), "Hack");
         assert!(set.headers[7].is_none());

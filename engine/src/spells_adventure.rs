@@ -691,13 +691,13 @@ mod tests {
         let resources = spell_fixture();
         let mut game = knight();
         game.spells.counts[2] = 1;
-        game.contract.active_id.copy_from_str("murray");
+        game.contract.active_id.copy_from_str("varn");
         game.castles[0].id.copy_from_str("castle0");
         game.castles[0].owner_kind = CastleOwnerKind::Villain;
         game.castles[0].villain_id.copy_from_str("someone_else");
         game.castles[1].id.copy_from_str("castle1");
         game.castles[1].owner_kind = CastleOwnerKind::Villain;
-        game.castles[1].villain_id.copy_from_str("murray");
+        game.castles[1].villain_id.copy_from_str("varn");
 
         assert_eq!(
             game.cast_find_villain(&resources),
@@ -728,11 +728,11 @@ mod tests {
         let resources = spell_fixture();
         let mut game = knight();
         game.spells.counts[2] = 1;
-        game.contract.active_id.copy_from_str("murray");
+        game.contract.active_id.copy_from_str("varn");
         // Held by the villain, but not by a VILLAIN-owned castle.
         game.castles[0].id.copy_from_str("castle0");
         game.castles[0].owner_kind = CastleOwnerKind::Player;
-        game.castles[0].villain_id.copy_from_str("murray");
+        game.castles[0].villain_id.copy_from_str("varn");
 
         assert_eq!(
             game.cast_find_villain(&resources),

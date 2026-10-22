@@ -3442,10 +3442,10 @@ mod tests {
             r#"{"render": {"mode": "legacy"}, "troops": [],
                 "zones": [{"id":"home","name":"Continentia"}],
                 "villains": [
-                  {"index":0,"id":"murray","name":"Murray","portrait":"m.png","zone":"home","reward":1000}
+                  {"index":0,"id":"varn","name":"Varn","portrait":"m.png","zone":"home","reward":1000}
                 ],
                 "villain_descriptions": {
-                  "murray": {"alias":"None","features":"Bald.","crimes":"Treason."}
+                  "varn": {"alias":"None","features":"Bald.","crimes":"Treason."}
                 }}"#,
         )
         .expect("fixture parses");
@@ -3460,7 +3460,7 @@ mod tests {
         views.set(ViewKind::Contract);
         let mut game = Game::default();
         assert!(!views.wants_exit_hint(&game));
-        game.contract.active_id.copy_from_str("murray");
+        game.contract.active_id.copy_from_str("varn");
         assert!(views.wants_exit_hint(&game));
     }
 
@@ -3487,7 +3487,7 @@ mod tests {
     fn the_contract_view_shows_the_wanted_poster() {
         let (resources, layout, catalog) = contract_fixtures();
         let mut game = Game::default();
-        game.contract.active_id.copy_from_str("murray");
+        game.contract.active_id.copy_from_str("varn");
         let palette = Palette::fallback();
         let (map, fog) = map_and_fog();
         let present = Present::new();
@@ -3501,7 +3501,7 @@ mod tests {
             &present, 0.0,
         );
 
-        assert!(list.has_text_containing("Name: Murray"));
+        assert!(list.has_text_containing("Name: Varn"));
         assert!(list.has_text_containing("Alias: None"));
         assert!(list.has_text_containing("Reward: 1000 gold"));
         assert!(list.has_text_containing("Last Seen: Continentia"));
@@ -4380,9 +4380,9 @@ mod tests {
     #[test]
     fn town_open_sets_context_and_cursor() {
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
         assert_eq!(views.active(), Some(ViewKind::Town));
-        assert_eq!(views.town_display_name(), "Riverton");
+        assert_eq!(views.town_display_name(), "Ashford");
         assert_eq!(views.town_record_key(), "town0");
         assert_eq!(views.town_boat(), (3, 4));
     }
@@ -4390,7 +4390,7 @@ mod tests {
     #[test]
     fn town_arrows_navigate_and_letters_execute_rows() {
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
 
         assert_eq!(
             views.town_update(&Keys::pressed(&[Key::Down])),
@@ -4410,7 +4410,7 @@ mod tests {
     #[test]
     fn the_town_info_overlay_is_sticky_until_acknowledged() {
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
         views.town_show_info("Hello");
 
         // An unrelated key is consumed but keeps the overlay open.
@@ -4430,7 +4430,7 @@ mod tests {
     fn the_town_view_draws_header_and_rows() {
         let (resources, layout, _) = spells_fixtures();
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
         let palette = Palette::fallback();
         let mut list = DrawList::new();
         let (map, fog) = map_and_fog();
@@ -4451,7 +4451,7 @@ mod tests {
             0.0,
         );
 
-        assert!(list.has_text_containing("Town of Riverton"));
+        assert!(list.has_text_containing("Town of Ashford"));
         assert!(list.has_text_containing("Get New Contract"));
         assert!(list.has_text_containing("Gather information"));
         assert!(!list
@@ -4466,7 +4466,7 @@ mod tests {
         let (resources, layout, catalog) = spells_fixtures();
         let game = Game::default();
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
@@ -4505,7 +4505,7 @@ mod tests {
         let (resources, layout, catalog) = spells_fixtures();
         let game = Game::default();
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
         views.town_show_info("Some info");
 
         let mut list = DrawList::new();
@@ -4533,11 +4533,11 @@ mod tests {
     #[test]
     fn clicking_a_town_row_matches_pressing_its_letter() {
         let mut by_key = Views::new();
-        by_key.town_open("Riverton", "town0", 3, 4);
+        by_key.town_open("Ashford", "town0", 3, 4);
         let keyed = by_key.town_update(&Keys::pressed(&[Key::B]));
 
         let mut by_click = Views::new();
-        by_click.town_open("Riverton", "town0", 3, 4);
+        by_click.town_open("Ashford", "town0", 3, 4);
         let clicked = by_click.town_click(HitTarget::TownRow(TownRow::Boat));
 
         assert_eq!(keyed, TownInput::RunRow(TownRow::Boat));
@@ -4547,7 +4547,7 @@ mod tests {
     #[test]
     fn hover_highlights_a_row_without_moving_the_keyboard_cursor() {
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
         let before = views.town_cursor();
         views.set_hover(Some(HitTarget::TownRow(TownRow::Spell)));
         assert_eq!(
@@ -4560,7 +4560,7 @@ mod tests {
     #[test]
     fn leaving_the_window_clears_the_hover() {
         let mut views = Views::new();
-        views.town_open("Riverton", "town0", 3, 4);
+        views.town_open("Ashford", "town0", 3, 4);
         views.set_hover(Some(HitTarget::TownRow(TownRow::Spell)));
         views.set_hover(None);
         assert_eq!(views.hover(), None);

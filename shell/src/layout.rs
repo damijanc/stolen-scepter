@@ -420,19 +420,4 @@ mod tests {
         assert_eq!((layout.screen_w, layout.screen_h), (320, 200));
         assert!(!layout.is_modern);
     }
-
-    #[test]
-    fn the_hd_pack_lays_out_at_its_art_scale() {
-        // Built by `tools/make_hd_pack.py`; skipped when it has not been run.
-        let path = "../game-assets/hd-pack/game.json";
-        let Ok(resources) = Resources::from_json_file(path) else {
-            eprintln!("SKIPPED: no HD pack at {path}");
-            return;
-        };
-        let layout = Layout::from_resources(&resources).expect("the HD pack lays out");
-        // The logical geometry is the DOS original; only the art scale moves.
-        assert_eq!((layout.screen_w, layout.screen_h), (320, 200));
-        assert_eq!((layout.tile_w, layout.tile_h), (48, 34));
-        assert_eq!(layout.pixel_scale, 4);
-    }
 }

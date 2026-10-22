@@ -29,25 +29,25 @@ Audit run 2026-10-22 over 376 tracked files and the full history:
   was ever committed. The only images in the history are the 267 procedurally
   generated PNGs of the old `packs/open/` attempt, which are our own.
   `reference/` and `game-assets/` have always been ignored.
-- **Original names in tests.** "Riverton" and "Sword of Prowess" appear as
-  fixtures in `engine/src/game.rs`, `engine/src/resources.rs`,
-  `shell/src/interact.rs` and `shell/src/views.rs`. Rename to neutral test
-  names; one line each in two specs as well.
+- **Original names in tests.** A town, an artifact and a villain name from the
+  original were used as test fixtures across 11 files. Done: renamed to
+  neutral test names.
 - **Tools aimed at the original's files.** Remove before publishing:
-  - `tools/manual_word.py` answers the original's manual-lookup copy
-    protection. Do not publish it.
+  - `tools/manual_word.py` answered the original's manual-lookup copy
+    protection. Done: removed.
   - `tools/cc_extract.py`, `cc_output_map.py`, `upscale.py`,
-    `make_hd_pack.py`, `hd_manifest.py`, `modern_proof.py`: readers and
+    `make_hd_pack.py`, `hd_manifest.py`, `open_pack.py`: readers and
     upscalers of the original archives, not needed once the pack is ours.
-    `gen_ai.py` imports `read_png` / `write_png` from `upscale.py`; move those
-    into a small `pngio.py` first.
-  - `tools/hd_assets.json` lists the original archive entries; keep the slot
-    list `gen_ai.py` needs and drop the archive names.
+    Done; the PNG reader and writer moved to `tools/pngio.py`.
+    (`modern_proof.py` stays: it is our own procedural art code.)
+  - `tools/hd_assets.json` listed the original archive entries. Done: the
+    archive names are dropped; the slot list `gen_ai.py` needs stays.
   - `tools/asset_layout.py` reads the originals; its OUTPUT
     (`asset_layout.json`, numbers only) stays.
-- **`specs/manual-reference-notes.md`** describes the local copies of the
-  original game and manual. Remove, or cut to the policy section.
-- **Old `packs/open/` attempt.** Delete; the new pack takes its place (Phase 2).
+- **`specs/manual-reference-notes.md`** described the local copies of the
+  original game and manual. Done: removed.
+- **Old `packs/open/` attempt.** Done: deleted; the new pack takes its place
+  (Phase 2). The procedural generators that wrote there are retargeted then.
 - **Commit author emails.** The history has two author addresses, one a work
   address. Either accept them as public, or rewrite authorship with
   `git filter-repo --mailmap` before the first public push (this rewrites

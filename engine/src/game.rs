@@ -7247,7 +7247,7 @@ mod tests {
                 {"index":2,"id":"castle2","name":"Beta Tower","zone":"home","x":4,"y":0}
               ],
               "towns": [
-                {"index":0,"id":"town0","name":"Riverton","zone":"home","x":1,"y":1},
+                {"index":0,"id":"town0","name":"Ashford","zone":"home","x":1,"y":1},
                 {"index":1,"id":"town1","zone":"isle","x":0,"y":0}
               ],
               "troops": [],
@@ -7382,8 +7382,8 @@ mod tests {
         let mut out = [GateDestination::default(); GAME_GATE_DESTS_MAX];
         let written = game.gate_destinations(&resources, GateDestKind::Town, &mut out);
         assert_eq!(written, 2);
-        // "Riverton" sorts before the nameless town1, which lists as its id.
-        assert_eq!(out[0].name.as_str(), "Riverton");
+        // "Ashford" sorts before the nameless town1, which lists as its id.
+        assert_eq!(out[0].name.as_str(), "Ashford");
         assert_eq!(out[1].name.as_str(), "town1");
         // A town's gate defaults to -1 rather than to a south face, so here
         // the x/y fallback really does supply the landing tile.
@@ -7440,7 +7440,7 @@ mod tests {
                 {{"id":"home","map":"{home}","width":6,"height":2,"hero_spawn":{{"x":1,"y":0}}}},
                 {{"id":"isle","map":"{isle}","width":6,"height":2,"hero_spawn":{{"x":4,"y":1}}}}
               ],
-              "towns": [{{"index":0,"id":"town0","name":"Riverton","zone":"home","x":1,"y":1}}],
+              "towns": [{{"index":0,"id":"town0","name":"Ashford","zone":"home","x":1,"y":1}}],
               "troops": [],
               "spells": [
                 {{"index":0,"id":"town_gate","name":"Town Gate","kind":"adventure","cost":100}}

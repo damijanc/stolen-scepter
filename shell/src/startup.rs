@@ -1147,7 +1147,7 @@ mod tests {
     fn the_picker_loads_an_existing_slot() {
         let resources = resources();
         let paths = paths("picker-load");
-        write_save(&paths.slot("openbounty", 4).expect("slot"), "Murray", 123);
+        write_save(&paths.slot("openbounty", 4).expect("slot"), "Varn", 123);
         let mut startup = Startup::new(&resources);
 
         // L opens the picker with the cursor on the first existing slot.
@@ -1166,7 +1166,7 @@ mod tests {
     fn the_new_row_targets_the_first_empty_slot() {
         let resources = resources();
         let paths = paths("picker-new");
-        write_save(&paths.slot("openbounty", 0).expect("slot"), "Murray", 1);
+        write_save(&paths.slot("openbounty", 0).expect("slot"), "Varn", 1);
         let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::L]), &resources, &paths, 0.0);
         // The cursor starts on slot 0; walk to the "New game" row.
@@ -1201,7 +1201,7 @@ mod tests {
     fn the_picker_lists_a_save_with_its_summary() {
         let resources = resources();
         let paths = paths("picker-draw");
-        write_save(&paths.slot("openbounty", 2).expect("slot"), "Murray", 123);
+        write_save(&paths.slot("openbounty", 2).expect("slot"), "Varn", 123);
         let mut startup = Startup::new(&resources);
         startup.update(&Keys::pressed(&[Key::L]), &resources, &paths, 0.0);
         let layout = layout();
@@ -1222,7 +1222,7 @@ mod tests {
             .any(|(_, _, text)| text.contains("Select game:")));
         assert!(texts
             .iter()
-            .any(|(_, _, text)| text.contains("Murray") && text.contains("123d")));
+            .any(|(_, _, text)| text.contains("Varn") && text.contains("123d")));
         assert!(texts.iter().any(|(_, _, text)| text.contains("New game")));
     }
 
@@ -1436,7 +1436,7 @@ mod tests {
     fn clicking_the_hint_bar_opens_the_picker_like_l() {
         let resources = resources();
         let paths = paths("click-load-bar");
-        write_save(&paths.slot("openbounty", 3).expect("slot"), "Murray", 9);
+        write_save(&paths.slot("openbounty", 3).expect("slot"), "Varn", 9);
         let (_, hits) = drawn_hits(&Startup::default(), &resources);
         assert_eq!(hits.hit(1, 1), Some(HitTarget::StartupLoad));
         let mut by_key = Startup::default();
@@ -1451,7 +1451,7 @@ mod tests {
     fn clicking_a_saved_slot_loads_it_and_off_the_panel_steps_back() {
         let resources = resources();
         let paths = paths("click-slot");
-        write_save(&paths.slot("openbounty", 2).expect("slot"), "Murray", 9);
+        write_save(&paths.slot("openbounty", 2).expect("slot"), "Varn", 9);
         let mut startup = Startup::default();
         startup.click(HitTarget::StartupLoad, &resources, &paths, 0.0);
         let (_, hits) = drawn_hits(&startup, &resources);

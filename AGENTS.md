@@ -48,8 +48,9 @@ will be selected only after headless engine parity is solid.
   engine manifest.
 - `specs/parity-port-plan.md`: original plan; useful background, but its early
   milestones have largely been completed.
-- `specs/manual-reference-notes.md`: policy and useful facts from local game
-  materials.
+- `specs/publish-plan.md`: the road to a public repo and a signed DMG with no
+  file from the original game; read it before adding anything derived from
+  the original.
 - `reference/`: local, ignored clone of OpenBounty. Read it for source parity;
   never commit it.
 - `game-assets/`: local, ignored manuals and game binaries. Use as secondary

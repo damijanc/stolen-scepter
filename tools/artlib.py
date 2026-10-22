@@ -11,7 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from upscale import write_png  # noqa: E402
+from pngio import write_png  # noqa: E402
 
 
 def clamp(x, lo=0.0, hi=1.0):

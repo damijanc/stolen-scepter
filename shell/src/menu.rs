@@ -573,8 +573,8 @@ mod tests {
     #[test]
     fn slot_messages_number_slots_from_one() {
         let resources = resources();
-        let (_, body) = overwrite_prompt(&resources, 0, "Murray");
-        assert!(body.contains("slot 1") && body.contains("Murray"), "{body}");
+        let (_, body) = overwrite_prompt(&resources, 0, "Varn");
+        assert!(body.contains("slot 1") && body.contains("Varn"), "{body}");
         let (_, body) = saved_message(&resources, 9);
         assert!(body.contains("slot 10"), "{body}");
     }

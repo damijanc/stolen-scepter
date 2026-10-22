@@ -23,7 +23,7 @@ BROWN = (122, 86, 50)
 BROWN_D = (84, 58, 32)
 RED = (186, 62, 52)
 from gen_terrain import W, H, grass_tile  # noqa: E402
-from upscale import write_png  # noqa: E402
+from pngio import write_png  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "packs", "open", "art", "combat")

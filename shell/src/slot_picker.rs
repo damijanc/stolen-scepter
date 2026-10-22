@@ -323,7 +323,7 @@ mod tests {
         let path = paths.slot("kb", 0).expect("slot path");
         let body = format!(
             r#"{{"version": {SAVE_VERSION},
-                 "character": {{"name": "Murray"}},
+                 "character": {{"name": "Varn"}},
                  "position": {{"zone": "atlantis"}}}}"#
         );
         std::fs::write(&path, body).expect("write");

@@ -16,11 +16,10 @@ No original King's Bounty assets are shipped here. Game data and media should
 remain bring-your-own and be extracted from a legally owned copy using the
 OpenBounty asset extractor workflow.
 
-## Open Art Pack
+## Independent Content
 
-`packs/open/` holds original artwork created independently from a functional
-spec, not derived from the original game's art. Its license is declared in
-`packs/open/LICENSE`, and each file's authorship and method in
-`packs/open/provenance.json`; contributors are listed in `packs/open/AUTHORS.md`.
-`tools/open_pack.py verify` rejects any file that reproduces the original or an
-upscale of it.
+The goal is a pack that is entirely our own work (art, maps, text, audio), so
+the game can be distributed without any file from the original. That pack is
+being built; see `specs/publish-plan.md`. The art generators in `tools/` take
+only functional geometry from the original (sizes, ground lines, frame
+counts, as numbers in `tools/asset_layout.json`) and never its pixels.

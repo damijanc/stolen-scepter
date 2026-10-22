@@ -3357,7 +3357,7 @@ mod tests {
                 {"index":1,"id":"fireball","name":"Fireball","kind":"combat","cost":50}
               ],
               "artifacts": [
-                {"index":0,"id":"sword","name":"Sword of Prowess","icon":"sword.png","power":"increased_damage","effect":"More damage","puzzle_cell":3,"zone":"home","local_idx":0}
+                {"index":0,"id":"sword","name":"Blade of Testing","icon":"sword.png","power":"increased_damage","effect":"More damage","puzzle_cell":3,"zone":"home","local_idx":0}
               ],
               "villains": [
                 {"index":0,"id":"villain0","name":"Villain Zero","portrait":"v0.png","zone":"home","reward":1000,"puzzle_cell":7,"army":[{"troop":"peasants","count":40}]},
@@ -3455,7 +3455,7 @@ mod tests {
         assert_eq!(bridge.cost, 100);
         assert_eq!(bridge.description.as_str(), "Build bridge");
         let artifact = resources.artifact_by_id("sword").unwrap();
-        assert_eq!(artifact.name.as_str(), "Sword of Prowess");
+        assert_eq!(artifact.name.as_str(), "Blade of Testing");
         assert_eq!(artifact.icon.as_str(), "sword.png");
         assert_eq!(
             artifact.power,
@@ -3827,13 +3827,13 @@ mod tests {
         let resources = Resources::from_json_str(
             r#"{"troops": [],
                 "villain_descriptions": {
-                  "murray": {"alias":"None","features":"Bald.","crimes":"Treason."},
+                  "varn": {"alias":"None","features":"Bald.","crimes":"Treason."},
                   "hack": {"alias":"The Spitter","features":"Beard."}
                 }}"#,
         )
         .expect("fixture parses");
 
-        let murray = resources.villain_desc("murray").expect("present");
+        let murray = resources.villain_desc("varn").expect("present");
         assert_eq!(murray.alias.as_str(), "None");
         assert_eq!(murray.features.as_str(), "Bald.");
         assert_eq!(murray.crimes.as_str(), "Treason.");

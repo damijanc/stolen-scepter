@@ -1585,7 +1585,7 @@ mod tests {
         Resources::from_json_str(&format!(
             r#"{{"render": {{"mode": "legacy"}}, "troops": [], "zones": {zones},
                 "artifacts": [
-                  {{"index":0,"id":"sword","name":"Sword of Prowess","icon":"s.png","power":"increased_damage","effect":"More damage"}}
+                  {{"index":0,"id":"sword","name":"Blade of Testing","icon":"s.png","power":"increased_damage","effect":"More damage"}}
                 ]}}"#
         ))
         .expect("fixture parses")
@@ -1605,7 +1605,7 @@ mod tests {
             id: "sword".to_owned(),
         };
         let (header, body) = pickup_message(&resources, &interaction).expect("a message");
-        assert_eq!(header, "You have found Sword of Prowess!\nMore damage");
+        assert_eq!(header, "You have found Blade of Testing!\nMore damage");
         assert_eq!(body, "...and a piece of the map to\nthe stolen scepter.");
     }
 
@@ -1978,10 +1978,10 @@ mod tests {
                   "spoils_factor":1,"abilities":"","morale_group":"A"}
                ],
                "zones": [{"id":"home","name":"Continentia"}],
-               "towns": [{"id":"town0","name":"Riverton","zone":"home","x":1,"y":1,"intel_castle":"castle0"}],
+               "towns": [{"id":"town0","name":"Ashford","zone":"home","x":1,"y":1,"intel_castle":"castle0"}],
                "castles": [{"id":"castle0","name":"Darkstone","zone":"home","x":2,"y":2}],
                "spells": [{"id":"fireball","name":"Fireball","kind":"combat","cost":50}],
-               "villains": [{"index":0,"id":"murray","name":"Murray","zone":"home","reward":1000}],
+               "villains": [{"index":0,"id":"varn","name":"Varn","zone":"home","reward":1000}],
                "combat": {"number_names": [{"min":10,"label":"Some"},{"min":1,"label":"A few"}]}}"#,
         )
         .expect("fixture parses")
@@ -2010,8 +2010,8 @@ mod tests {
     #[test]
     fn town_contract_toast_names_the_villain() {
         let resources = town_resources();
-        let toast = town_contract_toast(&resources, Some("murray"));
-        assert!(toast.contains("Murray"));
+        let toast = town_contract_toast(&resources, Some("varn"));
+        assert!(toast.contains("Varn"));
         assert!(toast.contains("1000"));
         assert!(toast.contains("Continentia"));
 
@@ -2025,13 +2025,13 @@ mod tests {
         let mut game = Game::default();
         game.castles[0].id.copy_from_str("castle0");
         game.castles[0].owner_kind = openbounty_engine::game::CastleOwnerKind::Villain;
-        game.castles[0].villain_id.copy_from_str("murray");
+        game.castles[0].villain_id.copy_from_str("varn");
         game.castles[0].garrison[0].id.copy_from_str("peasants");
         game.castles[0].garrison[0].count = 5;
 
         let toast = town_intel_toast(&resources, &game, "town0");
         assert!(toast.contains("Darkstone"));
-        assert!(toast.contains("Murray"));
+        assert!(toast.contains("Varn"));
         assert!(toast.contains("A few"));
         assert!(toast.contains("Peasants"));
     }
@@ -2190,33 +2190,33 @@ mod tests {
 
         let mut game = Game::default();
         game.castles[0].id.copy_from_str("castle0");
-        game.castles[0].villain_id.copy_from_str("murray");
+        game.castles[0].villain_id.copy_from_str("varn");
         let (header, body) = siege_villain_prompt(&resources, &game, "castle0");
         assert_eq!(header, "Castle Darkstone");
-        assert!(body.contains("Murray"));
+        assert!(body.contains("Varn"));
     }
 
     #[test]
     fn the_capture_dialog_names_the_villain() {
         let (header, body) =
-            capture_message(VillainSiegeOutcome::Captured, "Murray", 1000).expect("captured");
+            capture_message(VillainSiegeOutcome::Captured, "Varn", 1000).expect("captured");
         assert_eq!(header, "Capture");
-        assert!(body.contains("Murray"));
+        assert!(body.contains("Varn"));
         assert!(body.contains("1000"));
         assert!(body.contains("bounty"));
 
         let (header, body) =
-            capture_message(VillainSiegeOutcome::SetFree, "Murray", 0).expect("set free");
+            capture_message(VillainSiegeOutcome::SetFree, "Varn", 0).expect("set free");
         assert_eq!(header, "Capture");
-        assert!(body.contains("Murray"));
+        assert!(body.contains("Varn"));
         assert!(body.contains("set free"));
 
         assert_eq!(
-            capture_message(VillainSiegeOutcome::Repelled, "Murray", 0),
+            capture_message(VillainSiegeOutcome::Repelled, "Varn", 0),
             None
         );
         assert_eq!(
-            capture_message(VillainSiegeOutcome::NoCastle, "Murray", 0),
+            capture_message(VillainSiegeOutcome::NoCastle, "Varn", 0),
             None
         );
     }
@@ -2229,8 +2229,8 @@ mod tests {
         game.castles[0].id.copy_from_str("castle0");
         assert_eq!(siege_target_name(&resources, &game, "castle0"), "Darkstone");
 
-        game.castles[0].villain_id.copy_from_str("murray");
-        assert_eq!(siege_target_name(&resources, &game, "castle0"), "Murray");
+        game.castles[0].villain_id.copy_from_str("varn");
+        assert_eq!(siege_target_name(&resources, &game, "castle0"), "Varn");
 
         assert_eq!(siege_target_name(&resources, &game, "nope"), "nope");
     }
