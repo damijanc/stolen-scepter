@@ -56,9 +56,14 @@ Audit run 2026-10-22 over 376 tracked files and the full history:
   and folder name. Keep factual credit ("a port of OpenBounty, a
   reimplementation of King's Bounty"), remove it as our product's name, and
   rename the GitHub repository to the new title.
-- **Final gate.** A script (`tools/check_independent.sh`) that fails if any
-  tracked file matches the original's names, archive entries or file hashes;
-  run in CI from then on.
+- **Final gate.** Done: `tools/check_independent.py`, run by
+  `.github/workflows/quality.yml` with `cargo fmt --check` and the tests. It
+  found 85 more lines on its first run: continent, villain and town names in
+  tests and specs (renamed), ~20 shell fallback texts that were the original's
+  wording (rewritten in our own words), and the engine's default starting
+  zone (now "home"). Temporary exemption, text check only: `tools/hd_assets.json`,
+  `tools/asset_layout.json`, `tools/gen_villains.py`, whose slot names follow
+  the original pack until Phase 2 regenerates them.
 
 ## Phase 2 — Independent pack, playable end to end
 

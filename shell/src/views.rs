@@ -3440,7 +3440,7 @@ mod tests {
     fn contract_fixtures() -> (Resources, Layout, SpriteCatalog) {
         let resources = Resources::from_json_str(
             r#"{"render": {"mode": "legacy"}, "troops": [],
-                "zones": [{"id":"home","name":"Continentia"}],
+                "zones": [{"id":"home","name":"Highmoor"}],
                 "villains": [
                   {"index":0,"id":"varn","name":"Varn","portrait":"m.png","zone":"home","reward":1000}
                 ],
@@ -3504,7 +3504,7 @@ mod tests {
         assert!(list.has_text_containing("Name: Varn"));
         assert!(list.has_text_containing("Alias: None"));
         assert!(list.has_text_containing("Reward: 1000 gold"));
-        assert!(list.has_text_containing("Last Seen: Continentia"));
+        assert!(list.has_text_containing("Last Seen: Highmoor"));
         assert!(list.has_text_containing("Castle: Unknown"));
         assert!(list.has_text_containing("Distinguishing Features:"));
         assert!(list.has_text_containing("Bald."));
@@ -4241,12 +4241,12 @@ mod tests {
         views.gate_open(
             &[
                 gate_dest("Avalon"),
-                gate_dest("Elan's Landing"),
+                gate_dest("Eastwatch"),
                 gate_dest("Zion"),
             ],
             false,
         );
-        // 'E' matches Elan's Landing (index 1), not its row.
+        // 'E' matches Eastwatch (index 1), not its row.
         assert!(views.gate_update(&Keys::pressed(&[Key::E])));
         assert_eq!(views.gate_take_chosen(), Some(1));
         assert!(!views.is_active());

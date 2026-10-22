@@ -11,10 +11,10 @@ translation, one-line commit messages, approval before every commit.
 
 Verified by running the real pack (`reference/assets/kings-bounty/game.json`,
 loaded with `Resources::from_json_file` so `resource_root` resolves the map
-paths) through 20,000 steps on the real 64x64 continentia map:
+paths) through 20,000 steps on the real 64x64 highmoor map:
 
 ```
-hero="Sir Rust" class="knight" zone="continentia" pos=(11,58) gold=7500 days=900
+hero="Sir Rust" class="knight" zone="highmoor" pos=(11,58) gold=7500 days=900
 army: [("militia", 20), ("archers", 2)]
 scepter buried at (22,55)
 moved=20000  days_left=400  gold=98253

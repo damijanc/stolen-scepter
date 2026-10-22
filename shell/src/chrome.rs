@@ -20,8 +20,8 @@ pub const DEFAULT_QUIT_PROMPT: &str = " Quit without saving (y/n) ";
 pub const DEFAULT_EXIT_HINT: &str = "Press 'ESC' to exit";
 pub const DEFAULT_DAYS_LEFT: &str = " Options / Controls / Days Left:%DAYS% ";
 pub const DEFAULT_TIME_STOP: &str = " Options / Controls / Time Stop:%STEPS% ";
-pub const DEFAULT_WORLDMAP_YOUR_MAP: &str = "'ESC' to exit / 'SPC' your map";
-pub const DEFAULT_WORLDMAP_WHOLE_MAP: &str = "'ESC' to exit / 'SPC' whole map";
+pub const DEFAULT_WORLDMAP_YOUR_MAP: &str = "ESC close / SPACE own map";
+pub const DEFAULT_WORLDMAP_WHOLE_MAP: &str = "ESC close / SPACE full map";
 
 /// What the status bar says. Three modes, in priority order.
 #[derive(Clone, Debug, Eq, PartialEq)]

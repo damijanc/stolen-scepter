@@ -25,19 +25,19 @@ use crate::slot_picker::{SlotChoice, SlotPicker};
 
 /// Text C compiles in for the startup screens; the pack overrides it under
 /// `strings.startup` and `strings.difficulty`.
-const DEFAULT_CLASS_SELECT_HINT: &str = "Select Char A-D or L-Load saved game";
+const DEFAULT_CLASS_SELECT_HINT: &str = "Pick a hero A-D, or L to load a game";
 const DEFAULT_SAVE_PICKER_TITLE: &str = " Select game:";
 const DEFAULT_SAVE_PICKER_NEW_GAME: &str = "New game";
-const DEFAULT_CONTROLS_HINT: &str = "UP/DN move  ENTER pick  ESC quit";
+const DEFAULT_CONTROLS_HINT: &str = "UP/DN choose  ENTER select  ESC quit";
 const DEFAULT_NEW_GAME_TABLE_HEADER: &str = "   Difficulty   Days  Score";
-const DEFAULT_NEW_GAME_SELECT_HINT: &str = "^v to select   Ent to Accept";
+const DEFAULT_NEW_GAME_SELECT_HINT: &str = "Up/Down to choose, Enter to accept";
 const DEFAULT_DIFFICULTY_LABELS: [&str; 4] = ["Easy", "Normal", "Hard", "Impossible?"];
 const DEFAULT_DIFFICULTY_SCORES: [&str; 4] = ["x.5", " x1", " x2", " x4"];
 const DEFAULT_NEW_GAME_INTRO: &str = "%NAME% the %CLASS%,\n\
-    A new game is being created.\n\
-    Please wait while I perform\n\
-    godlike actions to make this\n\
-    game playable.";
+    Your realm is being\n\
+    prepared. One moment\n\
+    while the world takes\n\
+    shape.";
 
 /// The class-picker bitmap's placement size. The shell cannot read a texture's
 /// intrinsic size, so this uses the shipped art (and C's missing-asset
@@ -1112,7 +1112,7 @@ mod tests {
         assert!(list
             .texts()
             .iter()
-            .any(|(_, _, text)| text.contains("Select Char A-D")));
+            .any(|(_, _, text)| text.contains("Pick a hero A-D")));
         assert!(list.blits_of(Sprite::ClassPicker).len() == 1);
     }
 

@@ -168,8 +168,8 @@ What the flow offers:
 
 # 4. The overworld and what you can walk into
 
-The world is **4 continents** [PACK]: Continentia (start), Forestria,
-Archipelia, Saharia. It holds 26 towns, 27 castles, 17 villains, 8 artifacts and
+The world is **4 continents** [PACK]: Highmoor (start), Greenreach,
+Isleward, Dunemark. It holds 26 towns, 27 castles, 17 villains, 8 artifacts and
 25 troop types.
 
 Interactions, all **OK** unless marked:

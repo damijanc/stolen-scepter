@@ -436,7 +436,12 @@ pub struct ResWorld {
 impl Default for ResWorld {
     fn default() -> Self {
         Self {
-            starting_zone: FixedStr::from_str("continentia"),
+            // DIVERGENCE, deliberate: C's fallback (resources.c,
+            // `json_str(jw, "starting_zone", ...)`) is the original game's
+            // home continent id. This port ships with no original content, so
+            // the fallback is the neutral "home"; every real pack declares
+            // `world.starting_zone` and never reaches it.
+            starting_zone: FixedStr::from_str("home"),
             default_name: FixedStr::from_str("Hero"),
             max_army_slots: 5,
             default_options: [4, 1, 1, 1, 1, 0, 5],

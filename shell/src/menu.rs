@@ -202,7 +202,7 @@ pub fn picker_hint(resources: &Resources) -> &str {
         resources,
         "menu",
         "picker_hint",
-        "UP/DN move  ENTER pick  ESC back",
+        "UP/DN choose  ENTER select  ESC back",
     )
 }
 

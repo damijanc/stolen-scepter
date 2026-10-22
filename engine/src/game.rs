@@ -1610,7 +1610,7 @@ impl Game {
     ///
     /// Returns true when this was the LAST occupied stack, in which case
     /// nothing is dismissed: the caller must confirm, because emptying the
-    /// army entirely sends the hero back to the King in disgrace.
+    /// army entirely sends the hero home in disgrace.
     pub fn dismiss_army_slot(&mut self, slot: usize) -> bool {
         if slot >= GAME_ARMY_SLOTS {
             return false;
@@ -5389,13 +5389,13 @@ mod tests {
         game.stats.gold = cost + 1;
 
         assert_eq!(
-            game.rent_boat(&resources, 7, 9, "continentia"),
+            game.rent_boat(&resources, 7, 9, "highmoor"),
             BoatActionOutcome::RentOk
         );
         assert_eq!(game.stats.gold, 1);
         assert!(game.boat.has_boat);
         assert_eq!((game.boat.x, game.boat.y), (7, 9));
-        assert_eq!(game.boat.zone.as_str(), "continentia");
+        assert_eq!(game.boat.zone.as_str(), "highmoor");
     }
 
     #[test]
@@ -5406,7 +5406,7 @@ mod tests {
         game.stats.gold = cost;
 
         assert_eq!(
-            game.rent_boat(&resources, 1, 2, "continentia"),
+            game.rent_boat(&resources, 1, 2, "highmoor"),
             BoatActionOutcome::RentNoGold
         );
         assert_eq!(game.stats.gold, cost);
@@ -5421,7 +5421,7 @@ mod tests {
         game.stats.gold = 10_000;
 
         assert_eq!(
-            game.rent_boat(&resources, 1, 2, "continentia"),
+            game.rent_boat(&resources, 1, 2, "highmoor"),
             BoatActionOutcome::RentNoGold
         );
         assert_eq!(game.stats.gold, 10_000);

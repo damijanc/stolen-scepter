@@ -131,14 +131,14 @@ enum PendingFlow {
 /// verbatim; the pack overrides them under `strings.banners` and
 /// `strings.dialog_titles`.
 const DEFAULT_DT_SEARCH: &str = "Search...";
-const DEFAULT_BODY_SEARCH: &str = "It will take %DAYS% days to\nsearch this area.\nSearch?";
+const DEFAULT_BODY_SEARCH: &str = "Searching here takes\n%DAYS% days.\nSearch?";
 const DEFAULT_DT_DISMISS_ARMY: &str = "Dismiss Army";
 const DEFAULT_BODY_DISMISS_PICK: &str = "Dismiss which troop?";
 const DEFAULT_DT_DISMISS_LAST: &str = "Dismiss last army";
-const DEFAULT_BODY_DISMISS_LAST: &str = "If you dismiss your last\n\
-    army, you will be sent back\n\
-    to the King in disgrace.\n\
-    Dismiss last army?";
+const DEFAULT_BODY_DISMISS_LAST: &str = "Dismissing your last army\n\
+    sends you home to the\n\
+    crown in disgrace.\n\
+    Dismiss it?";
 const DEFAULT_TEMP_DEATH: &str = "After being disgraced on the\n\
     field of battle, King\n\
     Maximus summons you to his\n\
@@ -146,7 +146,7 @@ const DEFAULT_TEMP_DEATH: &str = "After being disgraced on the\n\
     tactics, he reluctantly re-\n\
     issues your commission and\n\
     sends you on your way.";
-const DEFAULT_BODY_SAVE_CONFIRM: &str = "Press Control-Q to Quit or\nany other key to continue.";
+const DEFAULT_BODY_SAVE_CONFIRM: &str = "Ctrl-Q quits; any other\nkey returns to the game.";
 
 /// Which battle a combat session is resolving.
 enum CombatFlow {
@@ -348,18 +348,16 @@ fn push_audio_options(audio: &mut KiraAudio, game: &Game) {
     audio.set_master_volume(options[audio::OPTION_VOLUME]);
 }
 
-/// C's post-init message: a new game is being created, or a loaded one is
-/// being prepared. The in-game menu shows the loaded form after a load too.
+/// C's post-init message, in our own words: a new game is being set up, or
+/// a loaded one restored. The in-game menu shows the loaded form after a load too.
 fn post_init_message(game: &Game, loaded: bool) -> String {
     let name = game.character.name.as_str();
     let rank = game.character.cls.rank_title.as_str();
     if loaded {
-        format!(
-            "{name} the {rank},\n\nPlease wait while I prepare a suitable environment for your bountying enjoyment!"
-        )
+        format!("{name} the {rank},\n\nYour saved realm is being restored. One moment.")
     } else {
         format!(
-            "{name} the {rank},\n\nA new game is being created. Please wait while I perform godlike actions to make this game playable."
+            "{name} the {rank},\n\nYour realm is being prepared. One moment while the world takes shape."
         )
     }
 }
@@ -956,8 +954,8 @@ async fn main() {
     // single-slot prompt and dialog globals.
     let mut prompt = Prompt::default();
     let mut dialog = Dialog::default();
-    // C queues a post-init message: a new game is being created, or a loaded
-    // one is being prepared. It follows the startup intro rather than
+    // C queues a post-init message (a new game set up, or a loaded one
+    // restored). It follows the startup intro rather than
     // replacing it.
     dialog.open(
         "",

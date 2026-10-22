@@ -26,10 +26,10 @@ use crate::banner;
 const DEFAULT_DT_TELEPORT_CAVE: &str = "Teleport Cave";
 const DEFAULT_DT_CRYSTAL_BALL: &str = "Crystal Ball";
 const DEFAULT_TELECAVE_TELEPORT: &str =
-    "You step into the cave and\nemerge elsewhere on this\ncontinent.";
+    "The cave runs deep and\nlets you out elsewhere\non this continent.";
 const DEFAULT_TELECAVE_INERT: &str = "This cave hums with magic,\nbut nothing happens.";
 const DEFAULT_NAVMAP_PICKUP: &str = "A navigation map of %ZONE%!";
-const DEFAULT_CRYSTAL_BALL_PICKUP: &str = "You gaze into a crystal ball\nand see all of %ZONE%!";
+const DEFAULT_CRYSTAL_BALL_PICKUP: &str = "The crystal ball shows\nyou the whole of %ZONE%!";
 const ARTIFACT_FOOTER: &str = "...and a piece of the map to\nthe stolen scepter.";
 
 /// Chest message templates, one per immediate outcome plus the deferred gold
@@ -47,18 +47,16 @@ const DEFAULT_CHEST_COMMISSION: &str = "After surveying the area,\n\
     The King rewards you for\n\
     your find by increasing\n\
     your weekly income by %POINTS%";
-const DEFAULT_CHEST_SPELL_POWER: &str = "Traversing the area, you\n\
-    stumble upon a time worn\n\
-    cannister. Curious, you un-\n\
-    stop the bottle, releasing\n\
-    a powerful genie who raises\n\
-    your Spell Power by %POINTS% and\n\
-    vanishes.";
-const DEFAULT_CHEST_MAX_SPELLS: &str = "A tribe of nomads greet you\n\
-    and your army warmly. Their\n\
-    shaman, in awe of your\n\
-    prowess, teaches you the\n\
-    secret of his tribe's magic.\n\
+const DEFAULT_CHEST_SPELL_POWER: &str = "Among the stones you find\n\
+    an old sealed flask. You\n\
+    open it, and the spirit\n\
+    bound inside raises your\n\
+    Spell Power by %POINTS%\n\
+    before it fades away.";
+const DEFAULT_CHEST_MAX_SPELLS: &str = "Wandering herders share\n\
+    their fire with your army.\n\
+    Their elder shows you an\n\
+    old way of holding spells.\n\
     Your maximum spell capacity\n\
     is increased by %POINTS%";
 const DEFAULT_CHEST_NEW_SPELL: &str = "You have captured a\n\
@@ -388,7 +386,7 @@ pub fn no_continents(resources: &Resources) -> (String, String) {
 const DEFAULT_SPELL_UNAVAILABLE: &str = "That spell is not available.";
 const DEFAULT_SPELL_NOT_KNOWN: &str = "You don't have that spell.";
 const DEFAULT_SPELL_UNKNOWN: &str = "Unknown spell.";
-const DEFAULT_SPELL_TIME_STOP: &str = "Time has stopped for %STEPS% steps.";
+const DEFAULT_SPELL_TIME_STOP: &str = "Time stands still for %STEPS% steps.";
 const DEFAULT_SPELL_FIND_VILLAIN_NO_CONTRACT: &str = "You have no contract.";
 const DEFAULT_SPELL_FIND_VILLAIN_SUCCESS: &str = "You have found %CASTLE%!";
 const DEFAULT_SPELL_FIND_VILLAIN_NONE: &str = "Your search reveals nothing.";
@@ -401,11 +399,10 @@ const DEFAULT_SPELL_INSTANT_ARMY_FIZZLE: &str = "Spell fizzles.";
 const DEFAULT_SPELL_INSTANT_ARMY_NO_ROOM: &str = "Your army has no room!";
 const DEFAULT_SPELL_INSTANT_ARMY_SUCCESS: &str = "%QTY% %TROOP%\nhave joined your army.";
 const DEFAULT_SPELL_RAISE_CONTROL_SUCCESS: &str = "Your leadership has\nincreased by %AMOUNT%.";
-const DEFAULT_NO_SPELL_BANNER: &str = "You have not been trained in\n\
-    the art of spellcasting yet.\n\
-    Visit the Archmage Aurange\n\
-    in Continentia at 11,19 for\n\
-    this ability.";
+const DEFAULT_NO_SPELL_BANNER: &str = "You know no spells yet.\n\
+    Seek the magic alcove in\n\
+    %ZONE% at %X%,%Y% to\n\
+    learn spellcasting.";
 
 /// A plain spell-refusal message body, keyed by its banner name. Used for the
 /// `spell_not_known` and `spell_unavailable` refusals, which have no header.
@@ -435,7 +432,7 @@ pub fn spell_header(resources: &Resources, id: &str, fallback: &str) -> String {
         .to_owned()
 }
 
-/// The "you have not been trained in magic" banner for the U action, porting
+/// The "you know no spells yet" banner for the U action, porting
 /// the shell's no-spell branch of `INPUT_ACTION_CAST_SPELL`. The alcove
 /// coordinates are substituted from the first zone that declares one.
 pub fn no_spell_banner(resources: &Resources) -> (String, String) {
@@ -657,11 +654,11 @@ const DEFAULT_TOWN_ROW_BOAT_CANCEL: &str = "B) Cancel boat rental";
 const DEFAULT_TOWN_ROW_INFO: &str = "C) Gather information";
 const DEFAULT_TOWN_ROW_SPELL: &str = "D) %SPELL% spell (%SPELL_COST%)";
 const DEFAULT_TOWN_ROW_SPELL_NONE: &str = "D) (no spell available)";
-const DEFAULT_TOWN_ROW_SIEGE_BUY: &str = "E) Buy seige weapons (%SIEGE_COST%)";
+const DEFAULT_TOWN_ROW_SIEGE_BUY: &str = "E) Buy siege engines (%SIEGE_COST%)";
 const DEFAULT_TOWN_ROW_SIEGE_OWNED: &str = "E) Siege weapons (owned)";
 const DEFAULT_TOWN_CONTRACT_NEW: &str =
     "New contract: %VILLAIN%.\nReward: %REWARD% gold.\nLast seen on %ZONE%.";
-const DEFAULT_TOWN_CONTRACT_NONE: &str = "No contracts are available right now.";
+const DEFAULT_TOWN_CONTRACT_NONE: &str = "There are no contracts to take.";
 const DEFAULT_TOWN_BOAT_VACATE_FIRST: &str = "\n\nPlease vacate the boat first";
 const DEFAULT_TOWN_NO_GOLD: &str = "\n\n\nYou don't have enough gold!";
 const DEFAULT_TOWN_INTEL_UNAVAILABLE: &str = "No intelligence is available here.";
@@ -676,8 +673,8 @@ const DEFAULT_TOWN_INTEL_MONSTERS_GENERIC: &str =
     "  Various groups of monsters\n  occupy the castle.";
 const DEFAULT_TOWN_INTEL_NO_GARRISON: &str = "  (no garrison)";
 const DEFAULT_TOWN_SPELL_UNAVAILABLE: &str = "No spell is available here.";
-const DEFAULT_TOWN_SPELL_AT_CAP: &str = "You have learned your maximum number of spells.";
-const DEFAULT_TOWN_SPELL_CAN_LEARN: &str = "You can learn %LEFT% more spell%S%.";
+const DEFAULT_TOWN_SPELL_AT_CAP: &str = "Your spell capacity is full.";
+const DEFAULT_TOWN_SPELL_CAN_LEARN: &str = "Room for %LEFT% more spell%S%.";
 const DEFAULT_TOWN_SIEGE_ALREADY: &str = "You have siege weapons!";
 const DEFAULT_TOWN_SIEGE_PURCHASED: &str = "Siege weapons purchased.";
 
@@ -1593,8 +1590,8 @@ mod tests {
 
     fn zones_fixture() -> &'static str {
         r#"[
-          {"id":"home","name":"Continentia"},
-          {"id":"away","name":"Forestria"}
+          {"id":"home","name":"Highmoor"},
+          {"id":"away","name":"Greenreach"}
         ]"#
     }
 
@@ -1627,10 +1624,7 @@ mod tests {
         };
         let (header, body) = pickup_message(&resources, &interaction).expect("a message");
         assert_eq!(header, "Crystal Ball");
-        assert_eq!(
-            body,
-            "You gaze into a crystal ball\nand see all of Continentia!"
-        );
+        assert_eq!(body, "The crystal ball shows\nyou the whole of Highmoor!");
     }
 
     #[test]
@@ -1642,7 +1636,7 @@ mod tests {
         };
         let (header, body) = pickup_message(&resources, &interaction).expect("a message");
         assert!(header.is_empty());
-        assert_eq!(body, "A navigation map of Forestria!");
+        assert_eq!(body, "A navigation map of Greenreach!");
     }
 
     #[test]
@@ -1666,7 +1660,7 @@ mod tests {
         assert_eq!(header, "Teleport Cave");
         assert_eq!(
             body,
-            "You step into the cave and\nemerge elsewhere on this\ncontinent."
+            "The cave runs deep and\nlets you out elsewhere\non this continent."
         );
 
         let inert = StepInteraction::Telecave {
@@ -1681,7 +1675,7 @@ mod tests {
     fn the_pack_may_reword_a_pickup() {
         let resources = Resources::from_json_str(
             r#"{"render": {"mode": "legacy"}, "troops": [],
-                "zones": [{"id":"home","name":"Continentia"}],
+                "zones": [{"id":"home","name":"Highmoor"}],
                 "strings": {"banners": {"crystal_ball_pickup": "All of %ZONE% revealed."}}}"#,
         )
         .expect("fixture parses");
@@ -1690,7 +1684,7 @@ mod tests {
             zone_index: Some(0),
         };
         let (_, body) = pickup_message(&resources, &interaction).expect("a message");
-        assert_eq!(body, "All of Continentia revealed.");
+        assert_eq!(body, "All of Highmoor revealed.");
     }
 
     #[test]
@@ -1768,7 +1762,7 @@ mod tests {
     fn a_new_spell_chest_names_the_spell() {
         let resources = Resources::from_json_str(
             r#"{"render": {"mode": "legacy"}, "troops": [],
-                "zones": [{"id":"home","name":"Continentia"}],
+                "zones": [{"id":"home","name":"Highmoor"}],
                 "spells": [{"index":0,"id":"fireball","name":"Fireball","kind":"combat","cost":50}]}"#,
         )
         .expect("fixture parses");
@@ -1825,8 +1819,8 @@ mod tests {
             r#"{"render": {"mode": "legacy"}, "troops": [],
                 "zones": [
                   {"id":"home","neighbors":["away","far","undiscovered"]},
-                  {"id":"away","name":"Forestria"},
-                  {"id":"far","name":"Saharia"},
+                  {"id":"away","name":"Greenreach"},
+                  {"id":"far","name":"Dunemark"},
                   {"id":"undiscovered"}
                 ]}"#,
         )
@@ -1840,15 +1834,15 @@ mod tests {
         assert_eq!(
             targets,
             vec![
-                ("away".to_owned(), "Forestria".to_owned()),
-                ("far".to_owned(), "Saharia".to_owned()),
+                ("away".to_owned(), "Greenreach".to_owned()),
+                ("far".to_owned(), "Dunemark".to_owned()),
             ]
         );
 
         let (header, body) = navigate_body(&resources, &targets);
         assert_eq!(header, "Go to which continent?");
-        assert!(body.contains("1. Forestria"));
-        assert!(body.contains("2. Saharia"));
+        assert!(body.contains("1. Greenreach"));
+        assert!(body.contains("2. Dunemark"));
     }
 
     fn spell_resources() -> Resources {
@@ -1859,7 +1853,7 @@ mod tests {
                   "spoils_factor":1,"abilities":"","morale_group":"A"}
                ],
                "zones": [
-                 {"id":"home","name":"Continentia","magic_alcove":{"x":11,"y":19}}
+                 {"id":"home","name":"Highmoor","magic_alcove":{"x":11,"y":19}}
                ],
                "spells": [
                  {"id":"time_stop","name":"Time Stop","kind":"adventure"}
@@ -1880,7 +1874,7 @@ mod tests {
         let resources = spell_resources();
         let (header, body) = no_spell_banner(&resources);
         assert!(header.is_empty());
-        assert!(body.contains("Continentia"));
+        assert!(body.contains("Highmoor"));
         assert!(body.contains("11"));
         assert!(body.contains("19"));
     }
@@ -1977,7 +1971,7 @@ mod tests {
                   "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":10,
                   "spoils_factor":1,"abilities":"","morale_group":"A"}
                ],
-               "zones": [{"id":"home","name":"Continentia"}],
+               "zones": [{"id":"home","name":"Highmoor"}],
                "towns": [{"id":"town0","name":"Ashford","zone":"home","x":1,"y":1,"intel_castle":"castle0"}],
                "castles": [{"id":"castle0","name":"Darkstone","zone":"home","x":2,"y":2}],
                "spells": [{"id":"fireball","name":"Fireball","kind":"combat","cost":50}],
@@ -1998,7 +1992,7 @@ mod tests {
         assert!(town_row_text(&resources, &game, "town0", 1).contains("Rent boat"));
         assert!(town_row_text(&resources, &game, "town0", 3).contains("Fireball"));
         assert!(town_row_text(&resources, &game, "town0", 3).contains("50"));
-        assert!(town_row_text(&resources, &game, "town0", 4).contains("Buy seige"));
+        assert!(town_row_text(&resources, &game, "town0", 4).contains("Buy siege engines"));
 
         game.boat.has_boat = true;
         assert!(town_row_text(&resources, &game, "town0", 1).contains("Cancel boat"));
@@ -2013,10 +2007,10 @@ mod tests {
         let toast = town_contract_toast(&resources, Some("varn"));
         assert!(toast.contains("Varn"));
         assert!(toast.contains("1000"));
-        assert!(toast.contains("Continentia"));
+        assert!(toast.contains("Highmoor"));
 
         let none = town_contract_toast(&resources, None);
-        assert!(none.contains("No contracts"));
+        assert!(none.contains("no contracts"));
     }
 
     #[test]
@@ -2060,9 +2054,11 @@ mod tests {
         game.spells.counts[0] = 2;
 
         assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::NoSpell).contains("No spell"));
-        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::AtCap).contains("maximum"));
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::AtCap)
+            .contains("capacity is full"));
         assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::NoGold).contains("gold"));
-        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::Ok).contains("3 more spells"));
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::Ok)
+            .contains("Room for 3 more spells"));
 
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::Already).contains("siege weapons"));
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::NoGold).contains("gold"));

@@ -51,6 +51,12 @@ will be selected only after headless engine parity is solid.
 - `specs/publish-plan.md`: the road to a public repo and a signed DMG with no
   file from the original game; read it before adding anything derived from
   the original.
+- `tools/check_independent.py`: the CI gate (`.github/workflows/quality.yml`)
+  that fails on any tracked original file, name or text, matched by hash
+  against `tools/independent_hashes.json`. Run it before committing; `--show`
+  prints the matches locally (never in CI). Test fixtures and fallback text
+  must use our own names and words. One deliberate divergence it caused:
+  `ResWorld::default().starting_zone` is "home", not C's original continent id.
 - `reference/`: local, ignored clone of OpenBounty. Read it for source parity;
   never commit it.
 - `game-assets/`: local, ignored manuals and game binaries. Use as secondary

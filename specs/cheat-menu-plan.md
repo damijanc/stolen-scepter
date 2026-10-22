@@ -326,7 +326,7 @@ mod tests {
             .collect();
         Resources::from_json_str(&format!(
             r#"{{"troops": [],
-                "zones": [{{"id":"home"}}, {{"id":"forestria"}}, {{"id":"archipelia"}}],
+                "zones": [{{"id":"home"}}, {{"id":"greenreach"}}, {{"id":"isleward"}}],
                 "spells": [{}]}}"#,
             spells.join(",")
         ))
@@ -431,11 +431,11 @@ mod tests {
     fn n_discovers_the_first_undiscovered_zone_and_names_it_by_id() {
         let mut game = Game::default();
         game.world.zones_discovered[0] = true;
-        assert_eq!(apply('N', &mut game), message("Revealed: forestria"));
+        assert_eq!(apply('N', &mut game), message("Revealed: greenreach"));
         assert!(game.world.zones_discovered[1]);
         assert!(!game.world.zones_discovered[2], "one zone per press");
 
-        assert_eq!(apply('N', &mut game), message("Revealed: archipelia"));
+        assert_eq!(apply('N', &mut game), message("Revealed: isleward"));
         assert_eq!(apply('N', &mut game), message("All zones already known"));
         // Bounded by the pack's zone count, not the array's capacity.
         assert!(!game.world.zones_discovered[3]);
