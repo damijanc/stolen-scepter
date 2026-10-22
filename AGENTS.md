@@ -253,7 +253,9 @@ Implemented and tested:
   explicit `--pack` must resolve, otherwise zero discovered packs is fatal,
   one loads silently, and two or more open the picker. DIVERGENCE:
   discovery also lists a directory holding a `game.json` (C's scan matched
-  only `*.openbounty`, though `pack_open` accepts both), and a closed picker
+  only `*.openbounty`, though `pack_open` accepts both) and scans two extra
+  roots, `./packs` and a macOS bundle's `Contents/Resources/packs`, so a
+  checkout and the DMG both find the game's own pack; and a closed picker
   window ends the process rather than reporting a cancel, since macroquad
   cannot revoke `prevent_quit`. `Pack::hash` computes C's FNV1a-64, and the
   save path still never writes it.

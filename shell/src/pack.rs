@@ -154,15 +154,27 @@ const PACK_EXT: &str = ".openbounty";
 /// user-data directory, then `<exe-dir>/assets`. A root that does not exist
 /// is harmless -- it scans as empty -- so unlike C this does not stat
 /// `assets` before listing it.
+///
+/// DIVERGENCE: two roots C does not have, for the game's own pack. `packs/`
+/// under the working directory, right after it, so `cargo run` in a checkout
+/// finds `packs/stolen-scepter/`; and a macOS app bundle's
+/// `Contents/Resources/packs/`, last, which is where the DMG ships it.
 pub fn discover_roots(saves: &crate::savepath::SavePaths) -> Vec<PathBuf> {
-    let mut roots = vec![PathBuf::from(".")];
-    if let Some(base) = saves.base_dir() {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf));
+    roots_for(saves.base_dir(), exe_dir.as_deref())
+}
+
+/// [`discover_roots`] over explicit inputs, so the order is testable.
+fn roots_for(base: Option<PathBuf>, exe_dir: Option<&Path>) -> Vec<PathBuf> {
+    let mut roots = vec![PathBuf::from("."), PathBuf::from("packs")];
+    if let Some(base) = base {
         roots.push(base);
     }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            roots.push(dir.join("assets"));
-        }
+    if let Some(dir) = exe_dir {
+        roots.push(dir.join("assets"));
+        roots.push(dir.join("../Resources/packs"));
     }
     roots
 }
@@ -429,6 +441,34 @@ mod tests {
         zip.write_all(b"{}").expect("write");
         zip.finish().expect("finish");
         path
+    }
+
+    #[test]
+    fn the_roots_add_the_checkout_and_bundle_pack_folders_to_cs_three() {
+        let exe = Path::new("/Applications/Game.app/Contents/MacOS");
+        let roots = roots_for(Some(PathBuf::from("/data")), Some(exe));
+        assert_eq!(
+            roots,
+            vec![
+                PathBuf::from("."),
+                PathBuf::from("packs"),
+                PathBuf::from("/data"),
+                exe.join("assets"),
+                exe.join("../Resources/packs"),
+            ]
+        );
+        assert_eq!(
+            roots_for(None, None),
+            vec![PathBuf::from("."), PathBuf::from("packs")]
+        );
+    }
+
+    #[test]
+    fn a_checkout_discovers_exactly_the_games_own_pack() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs");
+        let found = discover_in(&[root]);
+        let names: Vec<&str> = found.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, vec!["stolen-scepter"]);
     }
 
     #[test]

@@ -108,7 +108,9 @@ Tasks, in order:
 6. **Font** (done, differently): instead of an OFL font, `glyphs.py` holds
    our own 5x7 glyphs for all printable ASCII and `gen_font.py` packs them
    into the strip, so the font has no third-party licence at all.
-7. **Shell**: discovers `packs/` (and later the app bundle's own pack).
+7. **Shell** (done): discovery also scans `./packs` and the app bundle's
+   `Contents/Resources/packs`, so `cargo run -p openbounty-shell` with no
+   flags opens the game's own pack, and the DMG only has to put it there.
 8. **Proof**: a test that loads `packs/stolen-scepter/` with no `reference/`
    or `game-assets/` present and plays a full headless game (combat, a
    contract, the win check); added to CI.
@@ -132,7 +134,8 @@ New, because Tauri did it there:
    build and `lipo` later if wanted).
 2. Assemble the `.app`: `Info.plist`, icon, binary, and the pack under
    `Contents/Resources/`.
-3. Shell change: discover a pack inside its own bundle (`shell/src/pack.rs`).
+3. Shell change: discover a pack inside its own bundle (`shell/src/pack.rs`)
+   -- done in Phase 2, task 7: the pack goes in `Contents/Resources/packs/`.
 4. Temporary keychain from `APPLE_CERTIFICATE`; `codesign --options runtime
    --timestamp` for the app.
 5. Zip and notarize the `.app`, staple it.
