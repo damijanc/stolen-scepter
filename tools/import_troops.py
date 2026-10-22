@@ -1,20 +1,22 @@
-"""Copy the kept AI troop frames into the pack at their 48x34 cell size.
+"""Copy the kept AI troop frames into the pack at its art scale.
 
 `gen_ai.py` renders each troop frame at 6x (288x204) into
 `game-assets/ai-out/<run>/art/troops/`. The run kept for each unit is the one
-`specs/ai-troop-findings.md` records; this script box-filters those frames
-down to the legacy cell (alpha-weighted, so the matte edge does not darken)
-and writes them to `packs/stolen-scepter/art/troops/`.
+`specs/ai-troop-findings.md` records; this script area-averages those frames
+down to the pack's art scale (`render.scale`, 4x: 192x136), weighting colour
+by alpha so the matte edge does not darken, and writes them to
+`packs/stolen-scepter/art/troops/`.
 
 `game-assets/` is local and ignored; the PNGs this writes are what the repo
 keeps.
 """
 import argparse
+import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from packart import ROOT, out_dir, register  # noqa: E402
+from packart import PACK, ROOT, out_dir, register  # noqa: E402
 from pngio import read_png, write_png  # noqa: E402
 
 AI_OUT = os.path.join(ROOT, "game-assets", "ai-out")
@@ -52,6 +54,29 @@ KEPT_RUN = {
 }
 
 
+def upsample(w, h, px, k):
+    """Nearest-neighbour `px` by an integer `k`, so a fractional area average
+    becomes a whole-block one."""
+    out = bytearray(w * k * h * k * 4)
+    for y in range(h * k):
+        for x in range(w * k):
+            o = ((y // k) * w + x // k) * 4
+            d = (y * w * k + x) * 4
+            out[d:d + 4] = px[o:o + 4]
+    return w * k, h * k, bytes(out)
+
+
+def resample(w, h, px, ow, oh):
+    """Area-average RGBA `px` (w x h) to ow x oh: upsample until the ratio is
+    whole, then box-filter. 288 -> 192 is x2 then /3."""
+    k = 1
+    while (w * k) % ow or (h * k) % oh:
+        k += 1
+    if k > 1:
+        w, h, px = upsample(w, h, px, k)
+    return downscale(w, h, px, ow, oh)
+
+
 def downscale(w, h, px, ow, oh):
     """Box-filter RGBA `px` (w x h) to ow x oh, weighting colour by alpha."""
     fx, fy = w // ow, h // oh
@@ -84,6 +109,9 @@ def main():
     ap.add_argument("--only", nargs="*", help="units to import (default: all)")
     args = ap.parse_args()
 
+    with open(os.path.join(PACK, "game.json")) as fh:
+        scale = json.load(fh)["render"].get("scale", 1)
+    ow, oh = CELL_W * scale, CELL_H * scale
     out = out_dir("troops")
     written = []
     for unit in sorted(args.only or KEPT_RUN):
@@ -92,11 +120,10 @@ def main():
             name = f"{unit}_{frame:02d}.png"
             src = os.path.join(AI_OUT, run, "art", "troops", name)
             w, h, px = read_png(src)
-            write_png(os.path.join(out, name), CELL_W, CELL_H,
-                      downscale(w, h, px, CELL_W, CELL_H))
+            write_png(os.path.join(out, name), ow, oh, resample(w, h, px, ow, oh))
             written.append("art/troops/" + name)
     register(written, AUTHOR, method="ai-generated")
-    print(f"imported {len(written)} troop frames to {os.path.relpath(out, ROOT)}")
+    print(f"imported {len(written)} troop frames at {ow}x{oh} to {os.path.relpath(out, ROOT)}")
     return 0
 
 

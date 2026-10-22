@@ -2,7 +2,8 @@
  "schema": 1,
  "description": "Game rules as numbers and neutral ids only: no names or text (those are in text.json). The mechanics follow the reference ruleset the engine is a port of; retune here.",
  "render": {
-  "mode": "legacy"
+  "mode": "legacy",
+  "scale": 4
  },
  "world": {
   "max_army_slots": 5,

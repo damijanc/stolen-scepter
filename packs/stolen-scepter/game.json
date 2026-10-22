@@ -5,7 +5,8 @@
  "pack_name": "The Quest for a Stolen Scepter",
  "pack_kind": "base",
  "render": {
-  "mode": "legacy"
+  "mode": "legacy",
+  "scale": 4
  },
  "world": {
   "max_army_slots": 5,
