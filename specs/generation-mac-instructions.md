@@ -125,7 +125,7 @@ PATH="$HOME/dev/ai/matte-venv/bin:$PATH" python3 tools/gen_ai.py --controlnet --
 python3 tools/gen_ai.py sheet && open game-assets/ai-out/index.html
 ```
 
-The log must print `gen_ai version 1.22` and `controlnet on`. A missing model
+The log must print `gen_ai version 1.24` and `controlnet on`. A missing model
 stops the run with the fix instead of quietly falling back.
 
 Look for: **one** archer per frame, **facing right**, same character through

@@ -1,7 +1,7 @@
-# AI Troop Art — Findings (2026-10-20)
+# AI Troop Art — Findings (2026-10-20, updated 2026-10-22)
 
-State of the troop generation at `tools/gen_ai.py` v1.22, after one full pass
-over all 25 troops. Read with `specs/generation-mac-instructions.md` (how to
+State of the troop generation at `tools/gen_ai.py` v1.24. All 25 troops have
+a usable set of four frames. Read with `specs/generation-mac-instructions.md` (how to
 run) and `specs/ai-art-handoff.md` (goals and rules).
 
 ## Setup that works
@@ -29,6 +29,12 @@ run) and `specs/ai-art-handoff.md` (goals and rules).
   ground triggers a reseeded retry; tuned on real frames (ground patches fill
   0.88-0.96 of the bottom band, clean figures stay under 0.66).
 - **Facing consistency** (`orient_to_first`) for the units without a skeleton.
+- **Unit-level fill check** (`group_checked`): a frame whose shape is 1.9x
+  fuller than the median of its unit's other three is regenerated. Catches
+  background discs, white effect smears and a second figure JOINED to the
+  first, which the per-frame blob count cannot see. Tuned on 140 real frames:
+  defects measured 2.0-2.5x, normal poses at most 1.78x.
+- **Rerolling a unit**: `--variant N` redraws it from a fresh set of seeds.
 
 ## What did not work, and why
 
@@ -46,46 +52,51 @@ run) and `specs/ai-art-handoff.md` (goals and rules).
   silhouettes. It drifted to a 3D look until "flat 2d hand-painted
   illustration" was added.
 
-## Per-unit status after the full pass
+## Per-unit status
 
-Runs: `game-assets/ai-out/run-wave1` .. `run-wave4` (this Mac, not committed).
+All 25 usable. The kept frames are in `game-assets/ai-out/<run>/art/troops/`
+on this Mac (not committed); the run that holds each unit is listed so a
+later pack build can collect them.
 
-| Unit | Status | Open issue |
-|---|---|---|
-| archers | usable | -- |
-| sprites | usable | -- |
-| giants | usable | frame 2 carries the boulder rather than throwing it |
-| barbarians | usable | -- |
-| knights | usable | the flail is never drawn (sword/spear instead) |
-| pikemen | usable | -- |
-| peasants | usable | stray basket in frame 2 |
-| dwarves | usable | weapon wavers between hammer and axe |
-| wolves | usable with `--mirror wolves` | poses barely change (no skeleton) |
-| archmages | usable | -- |
-| cavalry | usable | poses barely change (no skeleton) |
-| nomads | usable | poses barely change (no skeleton) |
-| demons | usable | -- |
-| ghosts | usable | -- |
-| zombies | usable | -- |
-| militia | usable | last checked in wave 1b |
-| druids | fix | frame 3 white blob (magic effect) |
-| gnomes | fix | frame 3 circular background disc |
-| elves | fix | frame 3 circular background disc |
-| vampires | fix | circular background shapes (moon) behind frames 0, 2, 3 |
-| skeletons | fix | frame 1 holds two spears |
-| ogres | fix | club drawn like a wooden spoon |
-| orcs | rerun | frame 2 has two orcs touching (check sees one blob) |
-| trolls | rerun | frame 0 seen from behind / facing left |
-| dragons | rerun | IP-Adapter step timed out: mixed facing, drifting look |
+| Unit | Run | Flags used | Known flaw (minor) |
+|---|---|---|---|
+| archers | run-wave1 | -- | -- |
+| sprites | run-wave1 | -- | -- |
+| militia | run-wave6 | `--variant 1` | a second shield slung on the back in frames 0 and 2 |
+| barbarians | run-wave2 | -- | frame 1 holds an axe in each hand |
+| knights | run-wave2 | -- | flail never drawn (sword/spear instead) |
+| pikemen | run-wave2 | -- | -- |
+| peasants | run-wave2 | -- | stray basket in frame 2 |
+| giants | run-wave3 | -- | frame 2 carries the boulder rather than throwing it |
+| dwarves | run-wave3 | -- | weapon wavers between hammer and axe |
+| wolves | run-wave3 | `--mirror wolves` | poses barely change (no skeleton) |
+| archmages | run-wave4 | -- | -- |
+| cavalry | run-wave4 | -- | poses barely change (no skeleton) |
+| nomads | run-wave4 | -- | poses barely change (no skeleton) |
+| demons | run-wave4 | -- | -- |
+| ghosts | run-wave4 | -- | -- |
+| zombies | run-wave4 | -- | -- |
+| druids | run-wave5 | -- | -- |
+| gnomes | run-wave5 | -- | -- |
+| elves | run-wave5 | -- | -- |
+| vampires | run-wave5 | -- | -- |
+| trolls | run-wave5 | -- | -- |
+| orcs | run-wave6 | `--variant 1` | shield appears in frame 3 |
+| ogres | run-wave6 | `--variant 1` | club shape varies between frames |
+| skeletons | run-wave6 | `--variant 1` | frame 0 also carries a short sword |
+| dragons | run-wave6 | `--mirror dragons` | -- |
 
-## Next fixes, in order
+Facing changes between runs on this setup, so a `--mirror` that was right for
+one run can be wrong for the next: check facing after every rerun of the
+units without a skeleton.
 
-1. Background shapes: add "moon, halo, circle, disc, sun, magic circle" to
-   `NEG`, and reword the caster frames that ask for glowing rings or bursts.
-2. Two touching figures: a width check (subject much wider than the layout's
-   `frac` for that unit) to catch what the blob count misses.
-3. Rerun dragons (with `--mirror dragons` if frame 0 faces left), orcs,
-   trolls; then the "fix" rows.
-4. The units without a skeleton (wolves, dragons, cavalry, nomads) need their
-   own pose control to move like the originals; OpenPose has no animals.
-5. After that: villains, hero, boat, classes, combat tiles, map objects.
+## Next steps, in order
+
+1. Collect the kept frames into one folder and review all 25 units together
+   at game size, in motion (a looping preview), before promoting any of them.
+2. The units without a skeleton (wolves, dragons, cavalry, nomads) need
+   their own pose control to move like the originals; OpenPose has no
+   animals.
+3. Double figures that overlap the first (ogres frame 3 in run-wave5) are
+   not caught by any check; review catches them, `--variant` fixes them.
+4. Then: villains, hero, boat, classes, combat tiles, map objects.
