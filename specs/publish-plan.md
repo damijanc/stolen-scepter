@@ -111,7 +111,9 @@ Dropped for now: the Tauri updater, the changelog commit, the website dispatch.
 
 ## Phase 4 — Go public
 
-Rename the repository, write the README (what it is, how to play, credits to
+Restore the push and pull-request triggers in `.github/workflows/quality.yml`
+(on demand only while private, to save Actions minutes). Rename the
+repository, write the README (what it is, how to play, credits to
 OpenBounty, licences of every bundled part), flip it to public, tag `v0.1.0`.
 
 ## Phase 5 — Upgrade releases
