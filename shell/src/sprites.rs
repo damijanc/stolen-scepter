@@ -688,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    fn the_games_own_pack_ships_every_image_the_shell_loads() {
+    fn the_games_own_pack_ships_every_file_the_shell_loads() {
         // The same set `Backend::load` walks: the catalog, the tile art the
         // maps and placed objects name, the font and the palette.
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
@@ -708,6 +708,18 @@ mod tests {
         );
         wanted.push(catalog.font_path().to_owned());
         wanted.push(catalog.palette_path().to_owned());
+        let audio = &resources.audio;
+        for path in [
+            &audio.track_openworld,
+            &audio.track_combat,
+            &audio.tune_walk,
+            &audio.tune_bump,
+            &audio.tune_chest,
+            &audio.tune_defeat,
+        ] {
+            assert!(!path.is_empty(), "the pack leaves an audio slot unnamed");
+            wanted.push(path.as_str().to_owned());
+        }
 
         let missing: Vec<&String> = wanted.iter().filter(|p| pack.read(p).is_none()).collect();
         assert!(missing.is_empty(), "missing from the pack: {missing:?}");

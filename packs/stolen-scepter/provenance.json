@@ -1555,6 +1555,36 @@
       "method": "procedural",
       "license": "CC0-1.0"
     },
+    "audio/combat.ogg": {
+      "author": "Emma_MA, \"Determined Pursuit (epic orchestra loop)\", https://opengameart.org/content/determined-pursuit-epic-orchestra-loop",
+      "method": "downloaded, re-encoded to Ogg Vorbis",
+      "license": "CC0-1.0"
+    },
+    "audio/openworld.ogg": {
+      "author": "DST, \"GrassLands Theme\", https://opengameart.org/content/grasslands-theme",
+      "method": "downloaded, re-encoded to Ogg Vorbis",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_bump.wav": {
+      "author": "procedural (tools/gen_tunes.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_chest.wav": {
+      "author": "procedural (tools/gen_tunes.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_defeat.wav": {
+      "author": "procedural (tools/gen_tunes.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_walk.wav": {
+      "author": "procedural (tools/gen_tunes.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
     "palettes/palette.bin": {
       "author": "procedural (tools/gen_ui.py)",
       "method": "procedural",

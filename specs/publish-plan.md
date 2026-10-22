@@ -100,8 +100,11 @@ Tasks, in order:
    write to `packs/stolen-scepter/` through `packart.py`; `gen_ui.py` is new
    for the 43 interface slots), and our own palette. A shell test checks the
    pack ships every path the shell loads. Upgraded in Phase 5.
-5. **Audio**: 2 tracks and 4 tunes picked from CC0 sources (OpenGameArt),
-   each source recorded in the credits; downloads confirmed by hand.
+5. **Audio** (done): the two tracks are CC0 from OpenGameArt -- DST's
+   "GrassLands Theme" (overworld) and Emma_MA's "Determined Pursuit" (combat),
+   re-encoded to Ogg Vorbis, credited in the pack and recorded in
+   `provenance.json`; the originals sit in ignored `game-assets/audio-src/`.
+   The four tunes are synthesised by `tools/gen_tunes.py`.
 6. **Font** (done, differently): instead of an OFL font, `glyphs.py` holds
    our own 5x7 glyphs for all printable ASCII and `gen_font.py` packs them
    into the strip, so the font has no third-party licence at all.

@@ -5589,9 +5589,16 @@
     ]
    },
    {
-    "label": "Art made for this game by:",
+    "label": "Art and sound effects by:",
     "names": [
      "Damijan Cavar"
+    ]
+   },
+   {
+    "label": "Music (CC0, OpenGameArt):",
+    "names": [
+     "DST - GrassLands Theme",
+     "Emma_MA - Determined Pursuit"
     ]
    }
   ],

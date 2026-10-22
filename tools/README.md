@@ -19,13 +19,14 @@ PNG I/O is `pngio.py`.
   from a locally owned copy of the original art; the generators read only the
   JSON.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
-  `game-assets/ai-out/`) down to 48x34 into the pack.
+  `game-assets/ai-out/`) down to the pack's art scale (4x: 192x136).
 - `gen_terrain.py`, `gen_objects.py`, `gen_combat.py`, `gen_sprites.py`,
   `gen_villains.py`, `gen_ui.py`: procedural placeholder art for every other
   slot, plus the palette. `gen_font.py` packs `glyphs.py`, the project's own
   8x8 glyphs, into the font strip. All write into `packs/stolen-scepter/` via
   `packart.py`, which also records each file in the pack's `provenance.json`.
-  `artlib.py` and `modern_proof.py` are the earlier HD experiments.
+  `gen_tunes.py` synthesises the four effect tunes. `artlib.py` and
+  `modern_proof.py` are the earlier HD experiments.
 
 ## The pack
 
@@ -36,7 +37,7 @@ PNG I/O is `pngio.py`.
     python3 tools/gen_terrain.py && python3 tools/gen_objects.py
     python3 tools/gen_combat.py && python3 tools/gen_sprites.py
     python3 tools/gen_villains.py && python3 tools/gen_ui.py
-    python3 tools/gen_font.py
+    python3 tools/gen_font.py && python3 tools/gen_tunes.py
     python3 tools/import_troops.py   # needs the local AI runs
     python3 tools/build_pack.py --check
 
