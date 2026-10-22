@@ -111,9 +111,12 @@ Tasks, in order:
 7. **Shell** (done): discovery also scans `./packs` and the app bundle's
    `Contents/Resources/packs`, so `cargo run -p openbounty-shell` with no
    flags opens the game's own pack, and the DMG only has to put it there.
-8. **Proof**: a test that loads `packs/stolen-scepter/` with no `reference/`
-   or `game-assets/` present and plays a full headless game (combat, a
-   contract, the win check); added to CI.
+8. **Proof** (done): `engine/tests/stolen_scepter_pack.rs` loads only
+   `packs/stolen-scepter/` and plays a whole game -- a contract taken in a
+   town, a wandering army beaten, the contracted villain's castle captured
+   and the reward paid, the Scepter dug up and the game scored -- beside its
+   map, new-game and win checks. CI's `cargo test --workspace` runs it on a
+   checkout that has no `reference/` or `game-assets/` at all.
 
 ## Phase 3 — DMG build (GitHub Actions)
 
