@@ -269,13 +269,17 @@ def puzzle_grid():
 
 
 def gold_purse():
+    """The purse sits in the top two thirds: the HUD prints the gold figure
+    over the bottom 10 rows (`shell/src/hud.rs`, `draw_gold`)."""
     c = icon()
-    c.disc(24, 21, 9, (150, 104, 60))
-    c.rect(20, 9, 8, 5, (150, 104, 60))
-    c.hline(19, 13, 10, GOLD_D)
-    for x, y in ((10, 29), (16, 30), (34, 29), (39, 30)):
+    c.disc(20, 13, 8, (150, 104, 60))
+    c.disc(18, 11, 3, (176, 130, 80))
+    c.rect(16, 2, 8, 4, (150, 104, 60))
+    c.hline(15, 5, 10, GOLD_D)
+    draw_text(c, "$", 15, 9, GOLD, 1)
+    for x, y in ((31, 18), (36, 19), (34, 15), (40, 18)):
         c.disc(x, y, 2, GOLD)
-    draw_text(c, "$", 20, 17, GOLD, 1)
+        c.set(x - 1, y - 1, GLOW)
     return c.px
 
 

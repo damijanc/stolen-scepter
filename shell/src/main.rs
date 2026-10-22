@@ -752,16 +752,17 @@ impl LaunchArgs {
 }
 
 fn window_conf() -> Conf {
-    // The real size needs the pack's geometry, which is not loaded yet, so
-    // this opens at the legacy default; the present layer centres whatever
-    // the pack turns out to want inside it. The title cannot change once the
-    // window exists, so it is read here from the pack that will load.
+    // Title and size come from the pack that will load: the window cannot
+    // be retitled once open, and growing it later leaves macOS drawing for
+    // the old size until the user resizes it. Only a picker launch, where the
+    // pack is not known yet, opens at the legacy default and grows after.
     let launch = LaunchArgs::parse(std::env::args().skip(1));
-    let title = pack::launch_title(launch.explicit_pack.as_deref(), &launch.save_paths());
+    let window = pack::launch_window(launch.explicit_pack.as_deref(), &launch.save_paths());
+    let (width, height) = window.size.unwrap_or((640, 400));
     Conf {
-        window_title: title,
-        window_width: 640,
-        window_height: 400,
+        window_title: window.title,
+        window_width: width,
+        window_height: height,
         high_dpi: true,
         ..Default::default()
     }
@@ -779,6 +780,9 @@ async fn main() {
 
     // C's launch policy (`main.c`): an explicit pack must resolve; otherwise
     // none found is fatal, one loads silently, and two or more get a picker.
+    // Whether the pack came from the picker, i.e. was unknown when the
+    // window opened.
+    let mut picked = false;
     let pack_path = match explicit_pack {
         Some(arg) => match pack::resolve_arg(&arg, &save_paths) {
             Some(path) => path,
@@ -808,7 +812,10 @@ async fn main() {
                 }
                 1 => entries.into_iter().next().expect("one entry").path,
                 _ => match pack_select::run(&entries).await {
-                    Some(index) => entries.into_iter().nth(index).expect("in range").path,
+                    Some(index) => {
+                        picked = true;
+                        entries.into_iter().nth(index).expect("in range").path
+                    }
                     // ESC: load nothing. C returns 0 here.
                     None => return,
                 },
@@ -843,10 +850,14 @@ async fn main() {
         }
     };
 
-    // The macroquad window opens at the legacy default before the pack is
-    // known. Grow it to what this pack actually wants, or an HD (or modern)
-    // pack renders larger than its window and gets cropped.
-    request_new_screen_size(layout.window_w() as f32, layout.window_h() as f32);
+    // A picker launch opened the window at the legacy default before the
+    // pack was known; grow it to what this pack wants, or an HD (or modern)
+    // pack renders larger than its window and gets cropped. Every other
+    // launch already opened at this size (`window_conf`), and asking again
+    // is not harmless: macOS then keeps the stale size until a manual resize.
+    if picked {
+        request_new_screen_size(layout.window_w() as f32, layout.window_h() as f32);
+    }
 
     let catalog = SpriteCatalog::from_resources(&resources);
     let backend = Backend::load(&resources, &catalog, &pack);

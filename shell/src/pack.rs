@@ -230,11 +230,19 @@ fn pack_name(path: &Path) -> Option<String> {
     Some(stem.to_owned())
 }
 
-/// The window title for this launch: the `title` of the pack that will load
+/// What the window needs before it opens, read from the pack that will load
 /// under C's launch policy (an explicit pack, else the single discovered
-/// one), or "OpenBounty" when that is not known before the window opens --
-/// no pack, a picker, or a pack that will not open.
-pub fn launch_title(explicit: Option<&str>, saves: &crate::savepath::SavePaths) -> String {
+/// one): its title and its size. macroquad can neither retitle an open
+/// window nor reliably resize one on macOS -- it keeps drawing for the old
+/// size until the user drags the window -- so both are settled here.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LaunchWindow {
+    pub title: String,
+    /// `None` when the pack is not known yet (none found, or a picker).
+    pub size: Option<(i32, i32)>,
+}
+
+pub fn launch_window(explicit: Option<&str>, saves: &crate::savepath::SavePaths) -> LaunchWindow {
     let path = match explicit {
         Some(arg) => resolve_arg(arg, saves),
         None => {
@@ -242,13 +250,30 @@ pub fn launch_title(explicit: Option<&str>, saves: &crate::savepath::SavePaths) 
             (entries.len() == 1).then(|| entries[0].path.clone())
         }
     };
-    path.and_then(|path| pack_title(&pack_location(&path)))
-        .unwrap_or_else(|| "OpenBounty".to_owned())
+    path.and_then(|path| window_for(&pack_location(&path)))
+        .unwrap_or_else(|| LaunchWindow {
+            title: "OpenBounty".to_owned(),
+            size: None,
+        })
 }
 
-/// A pack's `title`, or `None` when it will not open or names none.
-fn pack_title(path: &Path) -> Option<String> {
+/// The title and size one pack asks for, or `None` when it will not load.
+/// Kept apart so the large `Resources` lives in this frame alone and is
+/// never moved through an `Option`.
+fn window_for(path: &Path) -> Option<LaunchWindow> {
     let pack = Pack::open(path).ok()?;
+    let resources = load_resources(&pack).ok()?;
+    let size = crate::layout::Layout::from_resources(&resources)
+        .ok()
+        .map(|layout| (layout.window_w(), layout.window_h()));
+    Some(LaunchWindow {
+        title: pack_title(&pack).unwrap_or_else(|| "OpenBounty".to_owned()),
+        size,
+    })
+}
+
+/// A pack's `title`, or `None` when it names none.
+fn pack_title(pack: &Pack) -> Option<String> {
     let json: serde_json::Value = serde_json::from_slice(&pack.read("game.json")?).ok()?;
     json.get("title")?
         .as_str()
@@ -470,14 +495,24 @@ mod tests {
     }
 
     #[test]
-    fn the_window_title_comes_from_the_pack_that_will_load() {
+    fn the_window_opens_titled_and_sized_for_the_pack_that_will_load() {
         let saves = crate::savepath::SavePaths::with_override("/nonexistent");
         let ours = concat!(env!("CARGO_MANIFEST_DIR"), "/../packs/stolen-scepter");
         assert_eq!(
-            launch_title(Some(ours), &saves),
-            "The Quest for a Stolen Scepter"
+            launch_window(Some(ours), &saves),
+            LaunchWindow {
+                title: "The Quest for a Stolen Scepter".to_owned(),
+                // 320x200 at the pack's 4x art scale.
+                size: Some((1280, 800)),
+            }
         );
-        assert_eq!(launch_title(Some("/no/such/pack"), &saves), "OpenBounty");
+        assert_eq!(
+            launch_window(Some("/no/such/pack"), &saves),
+            LaunchWindow {
+                title: "OpenBounty".to_owned(),
+                size: None,
+            }
+        );
     }
 
     #[test]
