@@ -1,10 +1,9 @@
 name: Quality
 
-# On demand only while the repository is private: private repos pay for
-# Actions minutes, macOS minutes at 10x. Restore `push: branches: [main]` and
-# `pull_request:` when it goes public (specs/publish-plan.md, Phase 4).
-# Every check here also runs locally before each commit.
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
   workflow_call:
 

@@ -111,9 +111,10 @@ Dropped for now: the Tauri updater, the changelog commit, the website dispatch.
 
 ## Phase 4 — Go public
 
-Restore the push and pull-request triggers in `.github/workflows/quality.yml`
-(on demand only while private, to save Actions minutes). Rename the
-repository, write the README (what it is, how to play, credits to
+Started 2026-10-22: the history was rewritten to one author address, the
+public `stolen-scepter` repository was created, the CI triggers were restored,
+and `LICENSE` (MIT, OpenBounty's notice kept) and the README were added. Still
+to do: finish the README (screenshots, credits for every bundled part), then (what it is, how to play, credits to
 OpenBounty, licences of every bundled part), flip it to public, tag `v0.1.0`.
 
 ## Phase 5 — Upgrade releases
@@ -123,20 +124,16 @@ boat, combat tiles, classes; then better audio.
 
 ## Decisions needed
 
-### Title
+### Title -- decided 2026-10-22
 
-Avoid "King's Bounty" and close variants ("Queen's Bounty"). The game is about
-hunting a realm's villains under royal contract to recover a stolen sceptre.
-Candidates, unchecked for existing games or trademarks:
-
-- **Sceptre of the Realm**
-- **Writ of the Crown**
-- **The Lost Sceptre**
-- **Crown Contracts**
-- **Warlord's Writ**
-
-Before settling: search Steam, itch.io and the USPTO/EUIPO databases for the
-chosen name.
+**The Quest for a Stolen Scepter** (US spelling). In-game title, README and
+release names use the full title; the macOS app and DMG are **Stolen Scepter**
+(it fits under a Dock icon); the repository is
+`github.com/damijanc/stolen-scepter` (public). Clash check: no game by that
+name on Steam, itch.io or the web; nearest is "Myths of Minerva: Stolen
+Sceptre", a card game with a series prefix. A stolen scepter is a common
+fantasy plot, so the name is descriptive rather than unique. A direct
+USPTO/EUIPO register search is still to do by hand.
 
 ### Maps
 

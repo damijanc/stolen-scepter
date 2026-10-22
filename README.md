@@ -1,13 +1,22 @@
-# OpenBounty Rust Port
+# The Quest for a Stolen Scepter
 
-A parity-first Rust port of [OpenBounty](https://github.com/dannyheskett/openbounty),
-the MIT-licensed C reimplementation of King's Bounty. `engine/` holds the game
-rules and is render-free. `shell/` is the playable macroquad front end.
-Contributors and agents should read `AGENTS.md` first.
+A turn-based fantasy strategy game: recruit an army, hunt down the realm's
+villains under royal contract, and recover the stolen scepter before time runs
+out. It is built on a parity-first Rust port of
+[OpenBounty](https://github.com/dannyheskett/openbounty), the MIT-licensed C
+reimplementation of King's Bounty. `engine/` holds the game rules and is
+render-free. `shell/` is the playable macroquad front end. Contributors and
+agents should read `AGENTS.md` first.
 
-No original King's Bounty assets live in this repository (see `NOTICES.md`).
-The game data comes from a separate checkout of OpenBounty in `reference/`,
-which is gitignored.
+**Status: work in progress.** The engine and shell are complete, but the game
+still needs a content pack. Our own pack -- art, maps, text and music made for
+this game, with nothing from the original -- is being built
+(`specs/publish-plan.md`); until it lands, the game plays only with a pack you
+supply yourself, as described below. A signed macOS DMG will follow.
+
+No original King's Bounty assets live in this repository, and CI checks every
+change for them (`tools/check_independent.py`, `NOTICES.md`). The licence is
+MIT (`LICENSE`), keeping OpenBounty's copyright notice.
 
 ## Setting up a machine
 
