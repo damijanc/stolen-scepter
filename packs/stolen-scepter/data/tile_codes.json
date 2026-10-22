@@ -1,0 +1,244 @@
+{
+ "%": {
+  "art": "forest",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ ",": {
+  "art": "grass_variant",
+  "terrain": "grass"
+ },
+ ".": {
+  "art": "grass",
+  "terrain": "grass"
+ },
+ ":": {
+  "art": "desert",
+  "terrain": "desert"
+ },
+ "A": {
+  "art": "forest_edge_01",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "B": {
+  "art": "forest_edge_02",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "C": {
+  "art": "forest_edge_03",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "D": {
+  "art": "forest_edge_04",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "E": {
+  "art": "forest_edge_05",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "F": {
+  "art": "forest_edge_06",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "G": {
+  "art": "forest_edge_07",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "H": {
+  "art": "forest_edge_08",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "I": {
+  "art": "forest_edge_09",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "J": {
+  "art": "forest_edge_10",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "K": {
+  "art": "forest_edge_11",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "L": {
+  "art": "forest_edge_12",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "M": {
+  "art": "mountain_edge_01",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "N": {
+  "art": "mountain_edge_02",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "O": {
+  "art": "mountain_edge_03",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "P": {
+  "art": "mountain_edge_04",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "Q": {
+  "art": "mountain_edge_05",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "R": {
+  "art": "mountain_edge_06",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "S": {
+  "art": "mountain_edge_07",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "T": {
+  "art": "mountain_edge_08",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "U": {
+  "art": "mountain_edge_09",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "V": {
+  "art": "mountain_edge_10",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "W": {
+  "art": "mountain_edge_11",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "X": {
+  "art": "mountain_edge_12",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "^": {
+  "art": "mountain",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "a": {
+  "art": "desert_edge_01",
+  "terrain": "desert"
+ },
+ "b": {
+  "art": "desert_edge_02",
+  "terrain": "desert"
+ },
+ "c": {
+  "art": "desert_edge_03",
+  "terrain": "desert"
+ },
+ "d": {
+  "art": "desert_edge_04",
+  "terrain": "desert"
+ },
+ "e": {
+  "art": "desert_edge_05",
+  "terrain": "desert"
+ },
+ "f": {
+  "art": "desert_edge_06",
+  "terrain": "desert"
+ },
+ "g": {
+  "art": "desert_edge_07",
+  "terrain": "desert"
+ },
+ "h": {
+  "art": "desert_edge_08",
+  "terrain": "desert"
+ },
+ "i": {
+  "art": "desert_edge_09",
+  "terrain": "desert"
+ },
+ "j": {
+  "art": "desert_edge_10",
+  "terrain": "desert"
+ },
+ "k": {
+  "art": "desert_edge_11",
+  "terrain": "desert"
+ },
+ "l": {
+  "art": "desert_edge_12",
+  "terrain": "desert"
+ },
+ "m": {
+  "art": "water_edge_00",
+  "terrain": "water"
+ },
+ "n": {
+  "art": "water_edge_01",
+  "terrain": "water"
+ },
+ "o": {
+  "art": "water_edge_02",
+  "terrain": "water"
+ },
+ "p": {
+  "art": "water_edge_03",
+  "terrain": "water"
+ },
+ "q": {
+  "art": "water_edge_04",
+  "terrain": "water"
+ },
+ "r": {
+  "art": "water_edge_05",
+  "terrain": "water"
+ },
+ "s": {
+  "art": "water_edge_06",
+  "terrain": "water"
+ },
+ "t": {
+  "art": "water_edge_07",
+  "terrain": "water"
+ },
+ "u": {
+  "art": "water_edge_08",
+  "terrain": "water"
+ },
+ "v": {
+  "art": "water_edge_09",
+  "terrain": "water"
+ },
+ "w": {
+  "art": "water_edge_10",
+  "terrain": "water"
+ },
+ "x": {
+  "art": "water_edge_11",
+  "terrain": "water"
+ },
+ "~": {
+  "art": "water",
+  "terrain": "water"
+ }
+}

@@ -67,20 +67,44 @@ Audit run 2026-10-22 over 376 tracked files and the full history:
 
 ## Phase 2 — Independent pack, playable end to end
 
-A committed pack under `packs/<title>/` that the shell loads with nothing from
-the original on disk.
+Decided 2026-10-22: maps are **generated, then curated**; music is **CC0**.
+The pack is `packs/stolen-scepter/`, built by scripts from our own data, so
+it can be regenerated and nothing is hand-copied from the original.
 
-1. **Title and text.** New title, villain names and bios, artifact, town and
-   castle names, every UI string, contract, intro, ending, credits.
-2. **Maps.** Four continents in the engine's 64x64 tile format, with castles,
-   towns, dwellings and spawn points placed to satisfy `game.json`.
-3. **Art.** The generated troops, plus placeholders for every other slot so
-   the pack is complete; upgrade in Phase 5.
-4. **Font.** An OFL-licensed pixel font converted to the bitmap-font slot.
-5. **Audio.** Six short tunes (see options below).
-6. **Proof.** A test that starts a game from the new pack and runs a full
-   headless playthrough (combat, a contract, the win check), on a machine with
-   no `reference/` or `game-assets/`.
+What a pack holds (measured from the original pack's structure, which the
+engine expects): `game.json` (rules, 4 zones with their placements, 26 towns,
+27 castles, 25 troops, 14 spells, 4 classes, 17 villains, 8 artifacts, tile
+codes, ~280 strings), 4 maps, 311 images and a font, 2 music tracks and 4
+effect tunes, and a 768-byte palette.
+
+Tasks, in order:
+
+1. **Map generator** (`tools/gen_maps.py`). Maps are 64x64 text grids; each
+   character is a tile code the pack's own `tile_codes` table defines
+   (terrain, art, passability), and terrain edges are separate tiles chosen
+   from the neighbours (auto-tiling). Per continent: a terrain theme (home
+   grassland, forest, islands, desert), coasts, then placements that match
+   the terrain -- castles (3x2 on land, gate reachable), towns on the coast
+   with a boat dock, signs, chests, wandering armies, spawn points, the magic
+   alcove -- and a reachability check (every placement reachable on foot or
+   by boat). Generate several seeds, keep and hand-fix the best, commit them.
+2. **Names and text** (`packs/stolen-scepter/` source data): the King,
+   continents, towns, castles, villains with bios, artifacts, and every
+   string section, written new. The CI gate catches anything that slips
+   through from the original.
+3. **Pack builder** (`tools/build_pack.py`): assembles `game.json` from the
+   rules (kept, lightly retuned), the generated maps and placements, and the
+   text; writes the pack folder.
+4. **Art**: the 100 generated troop frames, then placeholders for every other
+   slot from the procedural generators (retargeted from the old `packs/open/`),
+   and our own palette. Upgraded in Phase 5.
+5. **Audio**: 2 tracks and 4 tunes picked from CC0 sources (OpenGameArt),
+   each source recorded in the credits; downloads confirmed by hand.
+6. **Font**: an OFL-licensed pixel font converted to the bitmap-font slot.
+7. **Shell**: discovers `packs/` (and later the app bundle's own pack).
+8. **Proof**: a test that loads `packs/stolen-scepter/` with no `reference/`
+   or `game-assets/` present and plays a full headless game (combat, a
+   contract, the win check); added to CI.
 
 ## Phase 3 — DMG build (GitHub Actions)
 
