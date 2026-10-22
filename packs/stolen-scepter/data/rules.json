@@ -1,0 +1,1902 @@
+{
+ "schema": 1,
+ "description": "Game rules as numbers and neutral ids only: no names or text (those are in text.json). The mechanics follow the reference ruleset the engine is a port of; retune here.",
+ "render": {
+  "mode": "legacy"
+ },
+ "world": {
+  "max_army_slots": 5,
+  "fog_sight": 3,
+  "default_options": [
+   4,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ "time": {
+  "day_steps": 40,
+  "week_days": 5,
+  "days_per_difficulty": {
+   "easy": 900,
+   "normal": 600,
+   "hard": 400,
+   "impossible": 200
+  }
+ },
+ "economy": {
+  "alcove_cost": 5000,
+  "boat_cost_cheap": 100,
+  "boat_cost_normal": 500,
+  "siege_cost": 3000,
+  "chest": {
+   "chance_gold": [
+    61,
+    66,
+    76,
+    71
+   ],
+   "chance_commission": [
+    81,
+    86,
+    86,
+    81
+   ],
+   "chance_spell_power": [
+    83,
+    89,
+    89,
+    86
+   ],
+   "chance_max_spells": [
+    86,
+    92,
+    93,
+    91
+   ],
+   "chance_new_spell": [
+    101,
+    101,
+    101,
+    101
+   ],
+   "gold_min": [
+    0,
+    4,
+    9,
+    19
+   ],
+   "gold_max": [
+    5,
+    16,
+    21,
+    31
+   ],
+   "commission_min": [
+    9,
+    49,
+    99,
+    199
+   ],
+   "commission_max": [
+    41,
+    51,
+    101,
+    301
+   ],
+   "max_spells_base": [
+    1,
+    1,
+    2,
+    2
+   ]
+  },
+  "scoring": {
+   "per_villain": 500,
+   "per_artifact": 250,
+   "per_castle": 100,
+   "kill_penalty": 1,
+   "difficulty_multiplier": [
+    0,
+    1,
+    2,
+    4,
+    8
+   ],
+   "easy_halves": true
+  }
+ },
+ "tuning": {
+  "instant_army_multiplier": [
+   3,
+   2,
+   1,
+   1
+  ],
+  "search_cost_days": 10
+ },
+ "contract": {
+  "cycle_length": 5,
+  "initial_last_contract": 4
+ },
+ "spawn": {
+  "tier_chance_curve": [
+   [
+    60,
+    90,
+    98,
+    101
+   ],
+   [
+    20,
+    70,
+    95,
+    99
+   ],
+   [
+    10,
+    20,
+    50,
+    90
+   ],
+   [
+    3,
+    6,
+    10,
+    40
+   ]
+  ],
+  "tier_troop_pool": [
+   [
+    "peasants",
+    "wolves",
+    "nomads",
+    "barbarians",
+    "archmages"
+   ],
+   [
+    "sprites",
+    "gnomes",
+    "elves",
+    "trolls",
+    "druids"
+   ],
+   [
+    "orcs",
+    "dwarves",
+    "ogres",
+    "giants",
+    "dragons"
+   ],
+   [
+    "skeletons",
+    "zombies",
+    "ghosts",
+    "vampires",
+    "demons"
+   ]
+  ]
+ },
+ "morale_chart": [
+  [
+   "N",
+   "N",
+   "N",
+   "N",
+   "N"
+  ],
+  [
+   "N",
+   "N",
+   "N",
+   "N",
+   "N"
+  ],
+  [
+   "N",
+   "N",
+   "H",
+   "N",
+   "N"
+  ],
+  [
+   "L",
+   "N",
+   "L",
+   "H",
+   "N"
+  ],
+  [
+   "L",
+   "L",
+   "L",
+   "N",
+   "N"
+  ]
+ ],
+ "number_name_mins": [
+  500,
+  100,
+  50,
+  20,
+  10,
+  1
+ ],
+ "count_bucket_maxes": {
+  "army_view": [
+   5,
+   20,
+   2147483647
+  ],
+  "instant_army": [
+   1,
+   2,
+   9,
+   2147483647
+  ]
+ },
+ "controls": [
+  {
+   "id": "delay",
+   "type": "numeric",
+   "range": 10,
+   "default": 5
+  },
+  {
+   "id": "sounds",
+   "type": "bool",
+   "default": 1
+  },
+  {
+   "id": "walk_beep",
+   "type": "bool",
+   "default": 1
+  },
+  {
+   "id": "animation",
+   "type": "bool",
+   "default": 1
+  },
+  {
+   "id": "cga",
+   "type": "numeric",
+   "range": 8,
+   "default": 0,
+   "hidden": true
+  },
+  {
+   "id": "music",
+   "type": "bool",
+   "default": 0
+  },
+  {
+   "id": "volume",
+   "type": "numeric",
+   "range": 10,
+   "default": 5
+  }
+ ],
+ "ending": {
+  "grid_width": 6,
+  "grid_height": 5,
+  "carpet_column": 4,
+  "carpet_length": 5,
+  "frame_count": 10,
+  "ticks_per_step": 2,
+  "troop_border": true
+ },
+ "colors": {
+  "minimap_terrain": {
+   "grass": "#55FF55",
+   "forest": "#00AA00",
+   "mountain": "#AA5500",
+   "water": "#5555FF",
+   "desert": "#FFFF55",
+   "fog": "#000000"
+  },
+  "difficulty_bar": {
+   "easy": "#00AAAA",
+   "normal": "#AA0000",
+   "hard": "#5555FF",
+   "impossible": "#AA00AA"
+  }
+ },
+ "troops": [
+  {
+   "id": "peasants",
+   "skill_level": 1,
+   "hit_points": 1,
+   "move_rate": 1,
+   "melee": [
+    1,
+    1
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 10,
+   "spoils_factor": 1,
+   "abilities": "",
+   "dwelling": "plains",
+   "max_population": 250,
+   "growth_per_week": 6,
+   "morale_group": "A",
+   "tier_counts": [
+    10,
+    20,
+    50,
+    100
+   ]
+  },
+  {
+   "id": "sprites",
+   "skill_level": 1,
+   "hit_points": 1,
+   "move_rate": 1,
+   "melee": [
+    1,
+    2
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 15,
+   "spoils_factor": 1,
+   "abilities": "FLY",
+   "dwelling": "forest",
+   "max_population": 200,
+   "growth_per_week": 6,
+   "morale_group": "C",
+   "tier_counts": [
+    10,
+    15,
+    30,
+    50
+   ]
+  },
+  {
+   "id": "militia",
+   "skill_level": 2,
+   "hit_points": 2,
+   "move_rate": 2,
+   "melee": [
+    1,
+    2
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 50,
+   "spoils_factor": 5,
+   "abilities": "",
+   "dwelling": "castle",
+   "max_population": 0,
+   "growth_per_week": 5,
+   "morale_group": "A",
+   "tier_counts": [
+    0,
+    5,
+    15,
+    30
+   ]
+  },
+  {
+   "id": "wolves",
+   "skill_level": 2,
+   "hit_points": 3,
+   "move_rate": 3,
+   "melee": [
+    1,
+    3
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 40,
+   "spoils_factor": 4,
+   "abilities": "",
+   "dwelling": "plains",
+   "max_population": 150,
+   "growth_per_week": 5,
+   "morale_group": "D",
+   "tier_counts": [
+    5,
+    10,
+    20,
+    40
+   ]
+  },
+  {
+   "id": "skeletons",
+   "skill_level": 2,
+   "hit_points": 3,
+   "move_rate": 2,
+   "melee": [
+    1,
+    2
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 40,
+   "spoils_factor": 4,
+   "abilities": "UNDEAD",
+   "dwelling": "dungeon",
+   "max_population": 150,
+   "growth_per_week": 5,
+   "morale_group": "E",
+   "tier_counts": [
+    5,
+    10,
+    15,
+    25
+   ]
+  },
+  {
+   "id": "zombies",
+   "skill_level": 2,
+   "hit_points": 5,
+   "move_rate": 1,
+   "melee": [
+    2,
+    2
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 50,
+   "spoils_factor": 5,
+   "abilities": "UNDEAD",
+   "dwelling": "dungeon",
+   "max_population": 100,
+   "growth_per_week": 5,
+   "morale_group": "E",
+   "tier_counts": [
+    5,
+    10,
+    15,
+    20
+   ]
+  },
+  {
+   "id": "gnomes",
+   "skill_level": 2,
+   "hit_points": 5,
+   "move_rate": 1,
+   "melee": [
+    1,
+    3
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 60,
+   "spoils_factor": 6,
+   "abilities": "",
+   "dwelling": "forest",
+   "max_population": 250,
+   "growth_per_week": 5,
+   "morale_group": "C",
+   "tier_counts": [
+    5,
+    10,
+    15,
+    20
+   ]
+  },
+  {
+   "id": "orcs",
+   "skill_level": 2,
+   "hit_points": 5,
+   "move_rate": 2,
+   "melee": [
+    2,
+    3
+   ],
+   "ranged": [
+    1,
+    2,
+    10
+   ],
+   "recruit_cost": 75,
+   "spoils_factor": 7,
+   "abilities": "",
+   "dwelling": "hill",
+   "max_population": 200,
+   "growth_per_week": 5,
+   "morale_group": "D",
+   "tier_counts": [
+    5,
+    10,
+    12,
+    20
+   ]
+  },
+  {
+   "id": "archers",
+   "skill_level": 2,
+   "hit_points": 10,
+   "move_rate": 2,
+   "melee": [
+    1,
+    2
+   ],
+   "ranged": [
+    1,
+    3,
+    12
+   ],
+   "recruit_cost": 250,
+   "spoils_factor": 25,
+   "abilities": "",
+   "dwelling": "castle",
+   "max_population": 0,
+   "growth_per_week": 5,
+   "morale_group": "B",
+   "tier_counts": [
+    0,
+    5,
+    10,
+    15
+   ]
+  },
+  {
+   "id": "elves",
+   "skill_level": 3,
+   "hit_points": 10,
+   "move_rate": 3,
+   "melee": [
+    1,
+    2
+   ],
+   "ranged": [
+    2,
+    4,
+    24
+   ],
+   "recruit_cost": 200,
+   "spoils_factor": 20,
+   "abilities": "",
+   "dwelling": "forest",
+   "max_population": 100,
+   "growth_per_week": 4,
+   "morale_group": "C",
+   "tier_counts": [
+    5,
+    8,
+    10,
+    15
+   ]
+  },
+  {
+   "id": "pikemen",
+   "skill_level": 3,
+   "hit_points": 10,
+   "move_rate": 2,
+   "melee": [
+    2,
+    4
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 300,
+   "spoils_factor": 30,
+   "abilities": "",
+   "dwelling": "castle",
+   "max_population": 0,
+   "growth_per_week": 4,
+   "morale_group": "B",
+   "tier_counts": [
+    0,
+    5,
+    8,
+    15
+   ]
+  },
+  {
+   "id": "nomads",
+   "skill_level": 3,
+   "hit_points": 15,
+   "move_rate": 2,
+   "melee": [
+    2,
+    4
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 300,
+   "spoils_factor": 30,
+   "abilities": "",
+   "dwelling": "plains",
+   "max_population": 150,
+   "growth_per_week": 4,
+   "morale_group": "C",
+   "tier_counts": [
+    5,
+    8,
+    12,
+    18
+   ]
+  },
+  {
+   "id": "dwarves",
+   "skill_level": 3,
+   "hit_points": 20,
+   "move_rate": 1,
+   "melee": [
+    2,
+    4
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 350,
+   "spoils_factor": 30,
+   "abilities": "",
+   "dwelling": "hill",
+   "max_population": 100,
+   "growth_per_week": 4,
+   "morale_group": "C",
+   "tier_counts": [
+    5,
+    6,
+    8,
+    12
+   ]
+  },
+  {
+   "id": "ghosts",
+   "skill_level": 4,
+   "hit_points": 10,
+   "move_rate": 3,
+   "melee": [
+    3,
+    4
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 400,
+   "spoils_factor": 40,
+   "abilities": "ABSORB|UNDEAD",
+   "dwelling": "dungeon",
+   "max_population": 25,
+   "growth_per_week": 3,
+   "morale_group": "E",
+   "tier_counts": [
+    2,
+    4,
+    6,
+    8
+   ]
+  },
+  {
+   "id": "knights",
+   "skill_level": 5,
+   "hit_points": 35,
+   "move_rate": 1,
+   "melee": [
+    6,
+    10
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 1000,
+   "spoils_factor": 100,
+   "abilities": "",
+   "dwelling": "castle",
+   "max_population": 250,
+   "growth_per_week": 3,
+   "morale_group": "B",
+   "tier_counts": [
+    0,
+    2,
+    5,
+    8
+   ]
+  },
+  {
+   "id": "ogres",
+   "skill_level": 4,
+   "hit_points": 40,
+   "move_rate": 1,
+   "melee": [
+    3,
+    5
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 750,
+   "spoils_factor": 75,
+   "abilities": "",
+   "dwelling": "hill",
+   "max_population": 200,
+   "growth_per_week": 3,
+   "morale_group": "D",
+   "tier_counts": [
+    2,
+    3,
+    5,
+    8
+   ]
+  },
+  {
+   "id": "barbarians",
+   "skill_level": 4,
+   "hit_points": 40,
+   "move_rate": 3,
+   "melee": [
+    1,
+    6
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 750,
+   "spoils_factor": 75,
+   "abilities": "",
+   "dwelling": "plains",
+   "max_population": 100,
+   "growth_per_week": 3,
+   "morale_group": "C",
+   "tier_counts": [
+    2,
+    3,
+    5,
+    8
+   ]
+  },
+  {
+   "id": "trolls",
+   "skill_level": 4,
+   "hit_points": 50,
+   "move_rate": 1,
+   "melee": [
+    2,
+    5
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 1000,
+   "spoils_factor": 100,
+   "abilities": "REGEN",
+   "dwelling": "forest",
+   "max_population": 25,
+   "growth_per_week": 3,
+   "morale_group": "D",
+   "tier_counts": [
+    2,
+    3,
+    4,
+    6
+   ]
+  },
+  {
+   "id": "cavalry",
+   "skill_level": 4,
+   "hit_points": 20,
+   "move_rate": 4,
+   "melee": [
+    3,
+    5
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 800,
+   "spoils_factor": 80,
+   "abilities": "",
+   "dwelling": "castle",
+   "max_population": 0,
+   "growth_per_week": 2,
+   "morale_group": "B",
+   "tier_counts": [
+    0,
+    2,
+    4,
+    6
+   ]
+  },
+  {
+   "id": "druids",
+   "skill_level": 5,
+   "hit_points": 25,
+   "move_rate": 2,
+   "melee": [
+    2,
+    3
+   ],
+   "ranged": [
+    10,
+    0,
+    3
+   ],
+   "recruit_cost": 700,
+   "spoils_factor": 70,
+   "abilities": "MAGIC",
+   "dwelling": "forest",
+   "max_population": 25,
+   "growth_per_week": 2,
+   "morale_group": "C",
+   "tier_counts": [
+    2,
+    3,
+    4,
+    6
+   ]
+  },
+  {
+   "id": "archmages",
+   "skill_level": 5,
+   "hit_points": 25,
+   "move_rate": 1,
+   "melee": [
+    2,
+    3
+   ],
+   "ranged": [
+    25,
+    0,
+    2
+   ],
+   "recruit_cost": 1200,
+   "spoils_factor": 120,
+   "abilities": "FLY|MAGIC",
+   "dwelling": "plains",
+   "max_population": 25,
+   "growth_per_week": 2,
+   "morale_group": "C",
+   "tier_counts": [
+    2,
+    3,
+    4,
+    5
+   ]
+  },
+  {
+   "id": "vampires",
+   "skill_level": 5,
+   "hit_points": 30,
+   "move_rate": 1,
+   "melee": [
+    3,
+    6
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 1500,
+   "spoils_factor": 150,
+   "abilities": "FLY|LEECH|UNDEAD",
+   "dwelling": "dungeon",
+   "max_population": 50,
+   "growth_per_week": 2,
+   "morale_group": "E",
+   "tier_counts": [
+    1,
+    2,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "giants",
+   "skill_level": 5,
+   "hit_points": 60,
+   "move_rate": 3,
+   "melee": [
+    10,
+    20
+   ],
+   "ranged": [
+    5,
+    10,
+    6
+   ],
+   "recruit_cost": 2000,
+   "spoils_factor": 200,
+   "abilities": "",
+   "dwelling": "hill",
+   "max_population": 50,
+   "growth_per_week": 2,
+   "morale_group": "C",
+   "tier_counts": [
+    1,
+    2,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "demons",
+   "skill_level": 6,
+   "hit_points": 50,
+   "move_rate": 1,
+   "melee": [
+    5,
+    7
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 3000,
+   "spoils_factor": 300,
+   "abilities": "FLY|SCYTHE",
+   "dwelling": "dungeon",
+   "max_population": 25,
+   "growth_per_week": 1,
+   "morale_group": "E",
+   "tier_counts": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "id": "dragons",
+   "skill_level": 6,
+   "hit_points": 200,
+   "move_rate": 1,
+   "melee": [
+    25,
+    50
+   ],
+   "ranged": [
+    0,
+    0,
+    0
+   ],
+   "recruit_cost": 5000,
+   "spoils_factor": 500,
+   "abilities": "FLY|IMMUNE",
+   "dwelling": "hill",
+   "max_population": 25,
+   "growth_per_week": 1,
+   "morale_group": "D",
+   "tier_counts": [
+    1,
+    1,
+    1,
+    2
+   ]
+  }
+ ],
+ "spells": [
+  {
+   "id": "clone",
+   "kind": "combat",
+   "cost": 2000
+  },
+  {
+   "id": "teleport",
+   "kind": "combat",
+   "cost": 500
+  },
+  {
+   "id": "fireball",
+   "kind": "combat",
+   "cost": 1500
+  },
+  {
+   "id": "lightning",
+   "kind": "combat",
+   "cost": 500
+  },
+  {
+   "id": "freeze",
+   "kind": "combat",
+   "cost": 300
+  },
+  {
+   "id": "resurrect",
+   "kind": "combat",
+   "cost": 5000
+  },
+  {
+   "id": "turn_undead",
+   "kind": "combat",
+   "cost": 2000
+  },
+  {
+   "id": "bridge",
+   "kind": "adventure",
+   "cost": 100
+  },
+  {
+   "id": "time_stop",
+   "kind": "adventure",
+   "cost": 200
+  },
+  {
+   "id": "find_villain",
+   "kind": "adventure",
+   "cost": 1000
+  },
+  {
+   "id": "castle_gate",
+   "kind": "adventure",
+   "cost": 1000
+  },
+  {
+   "id": "town_gate",
+   "kind": "adventure",
+   "cost": 500
+  },
+  {
+   "id": "instant_army",
+   "kind": "adventure",
+   "cost": 1000
+  },
+  {
+   "id": "raise_control",
+   "kind": "adventure",
+   "cost": 500
+  }
+ ],
+ "classes": [
+  {
+   "id": "knight",
+   "starting_gold": 7500,
+   "starting_troops": [
+    {
+     "id": "militia",
+     "count": 20
+    },
+    {
+     "id": "archers",
+     "count": 2
+    }
+   ],
+   "ranks": [
+    {
+     "villains_needed": 0,
+     "leadership": 100,
+     "max_spells": 2,
+     "spell_power": 1,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 0
+    },
+    {
+     "villains_needed": 2,
+     "leadership": 100,
+     "max_spells": 3,
+     "spell_power": 1,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 2
+    },
+    {
+     "villains_needed": 8,
+     "leadership": 300,
+     "max_spells": 4,
+     "spell_power": 1,
+     "commission": 2000,
+     "knows_magic": false,
+     "instant_army": 8
+    },
+    {
+     "villains_needed": 14,
+     "leadership": 500,
+     "max_spells": 5,
+     "spell_power": 2,
+     "commission": 4000,
+     "knows_magic": false,
+     "instant_army": 14
+    }
+   ]
+  },
+  {
+   "id": "paladin",
+   "starting_gold": 10000,
+   "starting_troops": [
+    {
+     "id": "peasants",
+     "count": 20
+    },
+    {
+     "id": "militia",
+     "count": 20
+    }
+   ],
+   "ranks": [
+    {
+     "villains_needed": 0,
+     "leadership": 80,
+     "max_spells": 3,
+     "spell_power": 1,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 0
+    },
+    {
+     "villains_needed": 2,
+     "leadership": 80,
+     "max_spells": 3,
+     "spell_power": 1,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 2
+    },
+    {
+     "villains_needed": 7,
+     "leadership": 240,
+     "max_spells": 6,
+     "spell_power": 2,
+     "commission": 2000,
+     "knows_magic": false,
+     "instant_army": 8
+    },
+    {
+     "villains_needed": 13,
+     "leadership": 400,
+     "max_spells": 5,
+     "spell_power": 2,
+     "commission": 4000,
+     "knows_magic": false,
+     "instant_army": 18
+    }
+   ]
+  },
+  {
+   "id": "sorceress",
+   "starting_gold": 10000,
+   "starting_troops": [
+    {
+     "id": "peasants",
+     "count": 30
+    },
+    {
+     "id": "sprites",
+     "count": 10
+    }
+   ],
+   "ranks": [
+    {
+     "villains_needed": 0,
+     "leadership": 60,
+     "max_spells": 5,
+     "spell_power": 2,
+     "commission": 3000,
+     "knows_magic": true,
+     "instant_army": 1
+    },
+    {
+     "villains_needed": 3,
+     "leadership": 60,
+     "max_spells": 8,
+     "spell_power": 3,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 6
+    },
+    {
+     "villains_needed": 6,
+     "leadership": 180,
+     "max_spells": 10,
+     "spell_power": 5,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 9
+    },
+    {
+     "villains_needed": 12,
+     "leadership": 300,
+     "max_spells": 12,
+     "spell_power": 5,
+     "commission": 1000,
+     "knows_magic": false,
+     "instant_army": 19
+    }
+   ]
+  },
+  {
+   "id": "barbarian",
+   "starting_gold": 7500,
+   "starting_troops": [
+    {
+     "id": "wolves",
+     "count": 20
+    }
+   ],
+   "ranks": [
+    {
+     "villains_needed": 0,
+     "leadership": 100,
+     "max_spells": 2,
+     "spell_power": 0,
+     "commission": 2000,
+     "knows_magic": false,
+     "instant_army": 0
+    },
+    {
+     "villains_needed": 1,
+     "leadership": 100,
+     "max_spells": 2,
+     "spell_power": 1,
+     "commission": 2000,
+     "knows_magic": false,
+     "instant_army": 3
+    },
+    {
+     "villains_needed": 5,
+     "leadership": 300,
+     "max_spells": 3,
+     "spell_power": 1,
+     "commission": 2000,
+     "knows_magic": false,
+     "instant_army": 7
+    },
+    {
+     "villains_needed": 10,
+     "leadership": 500,
+     "max_spells": 3,
+     "spell_power": 1,
+     "commission": 2000,
+     "knows_magic": false,
+     "instant_army": 15
+    }
+   ]
+  }
+ ],
+ "villains": [
+  {
+   "zone": 0,
+   "reward": 5000,
+   "puzzle_cell": 0,
+   "army": [
+    {
+     "troop": "peasants",
+     "count": 50
+    },
+    {
+     "troop": "wolves",
+     "count": 20
+    },
+    {
+     "troop": "militia",
+     "count": 25
+    },
+    {
+     "troop": "peasants",
+     "count": 30
+    },
+    {
+     "troop": "peasants",
+     "count": 25
+    }
+   ]
+  },
+  {
+   "zone": 0,
+   "reward": 6000,
+   "puzzle_cell": 1,
+   "army": [
+    {
+     "troop": "nomads",
+     "count": 10
+    },
+    {
+     "troop": "militia",
+     "count": 30
+    },
+    {
+     "troop": "militia",
+     "count": 20
+    },
+    {
+     "troop": "peasants",
+     "count": 60
+    },
+    {
+     "troop": "peasants",
+     "count": 40
+    }
+   ]
+  },
+  {
+   "zone": 0,
+   "reward": 7000,
+   "puzzle_cell": 2,
+   "army": [
+    {
+     "troop": "sprites",
+     "count": 70
+    },
+    {
+     "troop": "sprites",
+     "count": 50
+    },
+    {
+     "troop": "skeletons",
+     "count": 20
+    },
+    {
+     "troop": "zombies",
+     "count": 20
+    },
+    {
+     "troop": "ogres",
+     "count": 4
+    }
+   ]
+  },
+  {
+   "zone": 0,
+   "reward": 8000,
+   "puzzle_cell": 3,
+   "army": [
+    {
+     "troop": "wolves",
+     "count": 30
+    },
+    {
+     "troop": "orcs",
+     "count": 20
+    },
+    {
+     "troop": "archers",
+     "count": 10
+    },
+    {
+     "troop": "trolls",
+     "count": 2
+    },
+    {
+     "troop": "dwarves",
+     "count": 6
+    }
+   ]
+  },
+  {
+   "zone": 0,
+   "reward": 9000,
+   "puzzle_cell": 4,
+   "army": [
+    {
+     "troop": "militia",
+     "count": 50
+    },
+    {
+     "troop": "militia",
+     "count": 50
+    },
+    {
+     "troop": "archers",
+     "count": 10
+    },
+    {
+     "troop": "elves",
+     "count": 10
+    },
+    {
+     "troop": "barbarians",
+     "count": 5
+    }
+   ]
+  },
+  {
+   "zone": 0,
+   "reward": 10000,
+   "puzzle_cell": 5,
+   "army": [
+    {
+     "troop": "sprites",
+     "count": 250
+    },
+    {
+     "troop": "ghosts",
+     "count": 10
+    },
+    {
+     "troop": "knights",
+     "count": 10
+    },
+    {
+     "troop": "archmages",
+     "count": 4
+    },
+    {
+     "troop": "archmages",
+     "count": 4
+    }
+   ]
+  },
+  {
+   "zone": 1,
+   "reward": 12000,
+   "puzzle_cell": 6,
+   "army": [
+    {
+     "troop": "militia",
+     "count": 100
+    },
+    {
+     "troop": "archers",
+     "count": 20
+    },
+    {
+     "troop": "pikemen",
+     "count": 20
+    },
+    {
+     "troop": "cavalry",
+     "count": 15
+    },
+    {
+     "troop": "knights",
+     "count": 15
+    }
+   ]
+  },
+  {
+   "zone": 1,
+   "reward": 14000,
+   "puzzle_cell": 7,
+   "army": [
+    {
+     "troop": "elves",
+     "count": 30
+    },
+    {
+     "troop": "archmages",
+     "count": 30
+    },
+    {
+     "troop": "druids",
+     "count": 10
+    },
+    {
+     "troop": "pikemen",
+     "count": 30
+    },
+    {
+     "troop": "sprites",
+     "count": 300
+    }
+   ]
+  },
+  {
+   "zone": 1,
+   "reward": 16000,
+   "puzzle_cell": 8,
+   "army": [
+    {
+     "troop": "orcs",
+     "count": 150
+    },
+    {
+     "troop": "ogres",
+     "count": 20
+    },
+    {
+     "troop": "trolls",
+     "count": 10
+    },
+    {
+     "troop": "giants",
+     "count": 5
+    },
+    {
+     "troop": "wolves",
+     "count": 80
+    }
+   ]
+  },
+  {
+   "zone": 1,
+   "reward": 18000,
+   "puzzle_cell": 9,
+   "army": [
+    {
+     "troop": "skeletons",
+     "count": 500
+    },
+    {
+     "troop": "zombies",
+     "count": 100
+    },
+    {
+     "troop": "ghosts",
+     "count": 30
+    },
+    {
+     "troop": "vampires",
+     "count": 10
+    },
+    {
+     "troop": "demons",
+     "count": 6
+    }
+   ]
+  },
+  {
+   "zone": 2,
+   "reward": 20000,
+   "puzzle_cell": 10,
+   "army": [
+    {
+     "troop": "skeletons",
+     "count": 600
+    },
+    {
+     "troop": "zombies",
+     "count": 200
+    },
+    {
+     "troop": "ghosts",
+     "count": 50
+    },
+    {
+     "troop": "vampires",
+     "count": 25
+    },
+    {
+     "troop": "demons",
+     "count": 10
+    }
+   ]
+  },
+  {
+   "zone": 2,
+   "reward": 25000,
+   "puzzle_cell": 11,
+   "army": [
+    {
+     "troop": "giants",
+     "count": 30
+    },
+    {
+     "troop": "dragons",
+     "count": 5
+    },
+    {
+     "troop": "ogres",
+     "count": 30
+    },
+    {
+     "troop": "orcs",
+     "count": 200
+    },
+    {
+     "troop": "gnomes",
+     "count": 200
+    }
+   ]
+  },
+  {
+   "zone": 2,
+   "reward": 30000,
+   "puzzle_cell": 12,
+   "army": [
+    {
+     "troop": "gnomes",
+     "count": 300
+    },
+    {
+     "troop": "barbarians",
+     "count": 40
+    },
+    {
+     "troop": "giants",
+     "count": 20
+    },
+    {
+     "troop": "nomads",
+     "count": 100
+    },
+    {
+     "troop": "peasants",
+     "count": 700
+    }
+   ]
+  },
+  {
+   "zone": 2,
+   "reward": 35000,
+   "puzzle_cell": 13,
+   "army": [
+    {
+     "troop": "archers",
+     "count": 35
+    },
+    {
+     "troop": "pikemen",
+     "count": 100
+    },
+    {
+     "troop": "cavalry",
+     "count": 80
+    },
+    {
+     "troop": "knights",
+     "count": 60
+    },
+    {
+     "troop": "dragons",
+     "count": 5
+    }
+   ]
+  },
+  {
+   "zone": 3,
+   "reward": 40000,
+   "puzzle_cell": 14,
+   "army": [
+    {
+     "troop": "demons",
+     "count": 30
+    },
+    {
+     "troop": "vampires",
+     "count": 50
+    },
+    {
+     "troop": "archmages",
+     "count": 100
+    },
+    {
+     "troop": "gnomes",
+     "count": 500
+    },
+    {
+     "troop": "peasants",
+     "count": 5000
+    }
+   ]
+  },
+  {
+   "zone": 3,
+   "reward": 45000,
+   "puzzle_cell": 15,
+   "army": [
+    {
+     "troop": "demons",
+     "count": 50
+    },
+    {
+     "troop": "dragons",
+     "count": 10
+    },
+    {
+     "troop": "cavalry",
+     "count": 200
+    },
+    {
+     "troop": "knights",
+     "count": 250
+    },
+    {
+     "troop": "archmages",
+     "count": 60
+    }
+   ]
+  },
+  {
+   "zone": 3,
+   "reward": 50000,
+   "puzzle_cell": 16,
+   "army": [
+    {
+     "troop": "dragons",
+     "count": 100
+    },
+    {
+     "troop": "dragons",
+     "count": 25
+    },
+    {
+     "troop": "dragons",
+     "count": 25
+    },
+    {
+     "troop": "demons",
+     "count": 100
+    },
+    {
+     "troop": "vampires",
+     "count": 100
+    }
+   ]
+  }
+ ],
+ "artifacts": [
+  {
+   "id": "sword",
+   "zone": 3,
+   "power": "increased_damage",
+   "puzzle_cell": 17,
+   "local_idx": 1
+  },
+  {
+   "id": "shield",
+   "zone": 1,
+   "power": "quarter_protection",
+   "puzzle_cell": 18,
+   "local_idx": 0
+  },
+  {
+   "id": "crown",
+   "zone": 2,
+   "power": "double_leadership",
+   "puzzle_cell": 19,
+   "local_idx": 0
+  },
+  {
+   "id": "articles",
+   "zone": 0,
+   "power": "increase_commission",
+   "puzzle_cell": 20,
+   "local_idx": 1
+  },
+  {
+   "id": "amulet",
+   "zone": 3,
+   "power": "double_spell_power",
+   "puzzle_cell": 21,
+   "local_idx": 0
+  },
+  {
+   "id": "ring",
+   "zone": 0,
+   "power": "double_max_spells",
+   "puzzle_cell": 22,
+   "local_idx": 0
+  },
+  {
+   "id": "book",
+   "zone": 2,
+   "power": "unknown_xxx1",
+   "puzzle_cell": 23,
+   "local_idx": 1
+  },
+  {
+   "id": "anchor",
+   "zone": 1,
+   "power": "cheaper_boat_rental",
+   "puzzle_cell": 24,
+   "local_idx": 1
+  }
+ ],
+ "zones": [
+  {
+   "is_home": true,
+   "salt": {
+    "artifacts": 2,
+    "navmaps": 1,
+    "orbs": 1,
+    "telecaves": 2,
+    "dwellings": 10,
+    "friendly_foes": 5,
+    "preferred_troops": [
+     "peasants",
+     "sprites",
+     "orcs",
+     "skeletons",
+     "wolves",
+     "gnomes"
+    ],
+    "dwelling_range": [
+     0,
+     14
+    ]
+   }
+  },
+  {
+   "is_home": false,
+   "salt": {
+    "artifacts": 2,
+    "navmaps": 1,
+    "orbs": 1,
+    "telecaves": 2,
+    "dwellings": 10,
+    "friendly_foes": 5,
+    "preferred_troops": [
+     "dwarves",
+     "zombies",
+     "nomads",
+     "elves",
+     "ogres",
+     "elves"
+    ],
+    "dwelling_range": [
+     1,
+     14
+    ]
+   }
+  },
+  {
+   "is_home": false,
+   "salt": {
+    "artifacts": 2,
+    "navmaps": 1,
+    "orbs": 1,
+    "telecaves": 2,
+    "dwellings": 10,
+    "friendly_foes": 5,
+    "preferred_troops": [
+     "ghosts",
+     "barbarians",
+     "trolls",
+     "druids"
+    ],
+    "dwelling_range": [
+     2,
+     14
+    ]
+   }
+  },
+  {
+   "is_home": false,
+   "salt": {
+    "artifacts": 2,
+    "navmaps": 1,
+    "orbs": 1,
+    "telecaves": 2,
+    "dwellings": 10,
+    "friendly_foes": 5,
+    "preferred_troops": [
+     "giants",
+     "vampires",
+     "archmages",
+     "dragons",
+     "demons"
+    ],
+    "dwelling_range": [
+     20,
+     24
+    ]
+   }
+  }
+ ],
+ "home_castle": {
+  "flow": "audience",
+  "excluded_from_siege": true,
+  "excluded_from_intel": true,
+  "excluded_from_contract": true,
+  "win_condition": "scepter"
+ }
+}
