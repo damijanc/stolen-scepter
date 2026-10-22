@@ -1,7 +1,7 @@
 """Procedurally generate original terrain tiles for the open art pack.
 
 Writes the 54 terrain slots (base tiles plus the 12-piece autotile edges) to
-`packs/open/art/tiles/` and registers their provenance. The art is synthesized
+`packs/stolen-scepter/art/tiles/` and registers their provenance. The art is synthesized
 from noise and hand-chosen palettes -- it never reads the original game art.
 
 The edge scheme is functional, derived from how the maps use each piece:
@@ -16,17 +16,14 @@ The edge scheme is functional, derived from how the maps use each piece:
 Every edge paints the base terrain shape over a grass underlay, which is the
 model the maps are authored against.
 """
-import json
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from packart import ROOT, out_dir, register  # noqa: E402
 from pngio import write_png  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "packs", "open", "art", "tiles")
-PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
+OUT = out_dir("tiles")
 W, H = 48, 34
 AUTHOR = "procedural (tools/gen_terrain.py)"
 
@@ -274,20 +271,7 @@ def main():
             seed = 100 + sum(ord(c) for c in terrain) + int(num)
             emit(f"{terrain}_edge_{num}", edge_tile(base, grass, kind, arg, seed))
 
-    with open(PROVENANCE) as fh:
-        doc = json.load(fh)
-    today = time.strftime("%Y-%m-%d")
-    for rel in written:
-        doc["assets"][rel] = {
-            "author": AUTHOR,
-            "method": "procedural",
-            "source": "original",
-            "license": "CC0-1.0",
-            "date": today,
-        }
-    with open(PROVENANCE, "w") as fh:
-        json.dump(doc, fh, indent=2)
-        fh.write("\n")
+    register(written, AUTHOR)
 
     print(f"wrote {len(written)} terrain tiles to {os.path.relpath(OUT, ROOT)}")
     return 0

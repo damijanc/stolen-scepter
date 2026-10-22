@@ -686,4 +686,31 @@ mod tests {
         assert_eq!(catalog.font_path(), "art/font/kb-font.png");
         assert_eq!(catalog.palette_path(), "palettes/palette.bin");
     }
+
+    #[test]
+    fn the_games_own_pack_ships_every_image_the_shell_loads() {
+        // The same set `Backend::load` walks: the catalog, the tile art the
+        // maps and placed objects name, the font and the palette.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+        let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+        let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+        let catalog = SpriteCatalog::from_resources(&resources);
+
+        let mut wanted: Vec<String> = catalog
+            .all_paths()
+            .iter()
+            .map(|p| (*p).to_owned())
+            .collect();
+        wanted.extend(
+            tile_art_names(&resources)
+                .iter()
+                .map(|art| tile_art_path(art)),
+        );
+        wanted.push(catalog.font_path().to_owned());
+        wanted.push(catalog.palette_path().to_owned());
+
+        let missing: Vec<&String> = wanted.iter().filter(|p| pack.read(p).is_none()).collect();
+        assert!(missing.is_empty(), "missing from the pack: {missing:?}");
+        assert!(wanted.len() > 300, "only {} paths enumerated", wanted.len());
+    }
 }

@@ -3112,623 +3112,7 @@
    ],
    "fill": 0.3689
   },
-  "art/villains/aimola_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/aimola_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/aimola_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/aimola_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/arech_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/arech_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/arech_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/arech_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.86,
-   "cy": 16.22,
-   "foot_cx": 23.04,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9222
-  },
-  "art/villains/auric_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/auric_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/auric_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/auric_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/bargash_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/bargash_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/bargash_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/bargash_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/baron_makahl_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/baron_makahl_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/baron_makahl_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/baron_makahl_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/barrowpine_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/barrowpine_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/barrowpine_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/barrowpine_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/caneghor_00.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/caneghor_01.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/caneghor_02.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/caneghor_03.png": {
-   "mask": "alpha",
-   "cell": [
-    48,
-    34
-   ],
-   "bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "cx": 23.87,
-   "cy": 16.28,
-   "foot_cx": 23.27,
-   "frac": [
-    1.0,
-    1.0
-   ],
-   "fill": 0.9259
-  },
-  "art/villains/czar_nickolai_00.png": {
+  "art/villains/cassian_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3750,7 +3134,7 @@
    ],
    "fill": 0.875
   },
-  "art/villains/czar_nickolai_01.png": {
+  "art/villains/cassian_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3772,7 +3156,7 @@
    ],
    "fill": 0.8756
   },
-  "art/villains/czar_nickolai_02.png": {
+  "art/villains/cassian_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3794,7 +3178,7 @@
    ],
    "fill": 0.8756
   },
-  "art/villains/czar_nickolai_03.png": {
+  "art/villains/cassian_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3816,7 +3200,7 @@
    ],
    "fill": 0.8768
   },
-  "art/villains/dread_rob_00.png": {
+  "art/villains/edric_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3838,7 +3222,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/dread_rob_01.png": {
+  "art/villains/edric_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3860,7 +3244,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/dread_rob_02.png": {
+  "art/villains/edric_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3882,7 +3266,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/dread_rob_03.png": {
+  "art/villains/edric_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3904,7 +3288,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/hack_00.png": {
+  "art/villains/elowen_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3926,7 +3310,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/hack_01.png": {
+  "art/villains/elowen_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3948,7 +3332,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/hack_02.png": {
+  "art/villains/elowen_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3970,7 +3354,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/hack_03.png": {
+  "art/villains/elowen_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -3992,7 +3376,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/magus_00.png": {
+  "art/villains/grubnak_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4014,7 +3398,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/magus_01.png": {
+  "art/villains/grubnak_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4036,7 +3420,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/magus_02.png": {
+  "art/villains/grubnak_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4058,7 +3442,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/magus_03.png": {
+  "art/villains/grubnak_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4080,7 +3464,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/mahk_00.png": {
+  "art/villains/harrek_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4102,7 +3486,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/mahk_01.png": {
+  "art/villains/harrek_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4124,7 +3508,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/mahk_02.png": {
+  "art/villains/harrek_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4146,7 +3530,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/mahk_03.png": {
+  "art/villains/harrek_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4168,7 +3552,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/moradon_00.png": {
+  "art/villains/isolde_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4190,7 +3574,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/moradon_01.png": {
+  "art/villains/isolde_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4212,7 +3596,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/moradon_02.png": {
+  "art/villains/isolde_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4234,7 +3618,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/moradon_03.png": {
+  "art/villains/isolde_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4256,7 +3640,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/murray_00.png": {
+  "art/villains/jessa_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4278,7 +3662,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/murray_01.png": {
+  "art/villains/jessa_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4300,7 +3684,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/murray_02.png": {
+  "art/villains/jessa_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4322,7 +3706,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/murray_03.png": {
+  "art/villains/jessa_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4344,7 +3728,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/ragface_00.png": {
+  "art/villains/mordecai_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4366,7 +3750,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/ragface_01.png": {
+  "art/villains/mordecai_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4388,7 +3772,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/ragface_02.png": {
+  "art/villains/mordecai_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4410,7 +3794,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/ragface_03.png": {
+  "art/villains/mordecai_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4432,7 +3816,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/rinaldus_00.png": {
+  "art/villains/morwen_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4454,7 +3838,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/rinaldus_01.png": {
+  "art/villains/morwen_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4476,7 +3860,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/rinaldus_02.png": {
+  "art/villains/morwen_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4498,7 +3882,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/rinaldus_03.png": {
+  "art/villains/morwen_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4520,7 +3904,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/urthrax_00.png": {
+  "art/villains/nhalia_00.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4542,7 +3926,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/urthrax_01.png": {
+  "art/villains/nhalia_01.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4564,7 +3948,7 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/urthrax_02.png": {
+  "art/villains/nhalia_02.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -4586,7 +3970,623 @@
    ],
    "fill": 0.9259
   },
-  "art/villains/urthrax_03.png": {
+  "art/villains/nhalia_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/oren_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/oren_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/oren_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/oren_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ottoline_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ottoline_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ottoline_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/ottoline_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/sorvane_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/sorvane_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/sorvane_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/sorvane_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.86,
+   "cy": 16.22,
+   "foot_cx": 23.04,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9222
+  },
+  "art/villains/thrumm_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/thrumm_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/thrumm_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/thrumm_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/torvald_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/torvald_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/torvald_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/torvald_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/valdris_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/valdris_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/valdris_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/valdris_03.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/vash_00.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/vash_01.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/vash_02.png": {
+   "mask": "alpha",
+   "cell": [
+    48,
+    34
+   ],
+   "bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "cx": 23.87,
+   "cy": 16.28,
+   "foot_cx": 23.27,
+   "frac": [
+    1.0,
+    1.0
+   ],
+   "fill": 0.9259
+  },
+  "art/villains/vash_03.png": {
    "mask": "alpha",
    "cell": [
     48,
@@ -5898,334 +5898,12 @@
     }
    ]
   },
-  "art/villains/aimola": {
+  "art/villains/cassian": {
    "frames": [
-    "art/villains/aimola_00.png",
-    "art/villains/aimola_01.png",
-    "art/villains/aimola_02.png",
-    "art/villains/aimola_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/arech": {
-   "frames": [
-    "art/villains/arech_00.png",
-    "art/villains/arech_01.png",
-    "art/villains/arech_02.png",
-    "art/villains/arech_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": -0.01,
-     "dcy": -0.06,
-     "dfoot_cx": -0.23,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/auric": {
-   "frames": [
-    "art/villains/auric_00.png",
-    "art/villains/auric_01.png",
-    "art/villains/auric_02.png",
-    "art/villains/auric_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/bargash": {
-   "frames": [
-    "art/villains/bargash_00.png",
-    "art/villains/bargash_01.png",
-    "art/villains/bargash_02.png",
-    "art/villains/bargash_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/baron_makahl": {
-   "frames": [
-    "art/villains/baron_makahl_00.png",
-    "art/villains/baron_makahl_01.png",
-    "art/villains/baron_makahl_02.png",
-    "art/villains/baron_makahl_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/barrowpine": {
-   "frames": [
-    "art/villains/barrowpine_00.png",
-    "art/villains/barrowpine_01.png",
-    "art/villains/barrowpine_02.png",
-    "art/villains/barrowpine_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/caneghor": {
-   "frames": [
-    "art/villains/caneghor_00.png",
-    "art/villains/caneghor_01.png",
-    "art/villains/caneghor_02.png",
-    "art/villains/caneghor_03.png"
-   ],
-   "union_bbox": [
-    0,
-    0,
-    48,
-    34
-   ],
-   "baseline": 34,
-   "max_height_frac": 1.0,
-   "motion": [
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    },
-    {
-     "dcx": 0.0,
-     "dcy": 0.0,
-     "dfoot_cx": 0.0,
-     "dbaseline": 0,
-     "dheight": 0
-    }
-   ]
-  },
-  "art/villains/czar_nickolai": {
-   "frames": [
-    "art/villains/czar_nickolai_00.png",
-    "art/villains/czar_nickolai_01.png",
-    "art/villains/czar_nickolai_02.png",
-    "art/villains/czar_nickolai_03.png"
+    "art/villains/cassian_00.png",
+    "art/villains/cassian_01.png",
+    "art/villains/cassian_02.png",
+    "art/villains/cassian_03.png"
    ],
    "union_bbox": [
     0,
@@ -6266,12 +5944,12 @@
     }
    ]
   },
-  "art/villains/dread_rob": {
+  "art/villains/edric": {
    "frames": [
-    "art/villains/dread_rob_00.png",
-    "art/villains/dread_rob_01.png",
-    "art/villains/dread_rob_02.png",
-    "art/villains/dread_rob_03.png"
+    "art/villains/edric_00.png",
+    "art/villains/edric_01.png",
+    "art/villains/edric_02.png",
+    "art/villains/edric_03.png"
    ],
    "union_bbox": [
     0,
@@ -6312,12 +5990,12 @@
     }
    ]
   },
-  "art/villains/hack": {
+  "art/villains/elowen": {
    "frames": [
-    "art/villains/hack_00.png",
-    "art/villains/hack_01.png",
-    "art/villains/hack_02.png",
-    "art/villains/hack_03.png"
+    "art/villains/elowen_00.png",
+    "art/villains/elowen_01.png",
+    "art/villains/elowen_02.png",
+    "art/villains/elowen_03.png"
    ],
    "union_bbox": [
     0,
@@ -6358,12 +6036,12 @@
     }
    ]
   },
-  "art/villains/magus": {
+  "art/villains/grubnak": {
    "frames": [
-    "art/villains/magus_00.png",
-    "art/villains/magus_01.png",
-    "art/villains/magus_02.png",
-    "art/villains/magus_03.png"
+    "art/villains/grubnak_00.png",
+    "art/villains/grubnak_01.png",
+    "art/villains/grubnak_02.png",
+    "art/villains/grubnak_03.png"
    ],
    "union_bbox": [
     0,
@@ -6404,12 +6082,12 @@
     }
    ]
   },
-  "art/villains/mahk": {
+  "art/villains/harrek": {
    "frames": [
-    "art/villains/mahk_00.png",
-    "art/villains/mahk_01.png",
-    "art/villains/mahk_02.png",
-    "art/villains/mahk_03.png"
+    "art/villains/harrek_00.png",
+    "art/villains/harrek_01.png",
+    "art/villains/harrek_02.png",
+    "art/villains/harrek_03.png"
    ],
    "union_bbox": [
     0,
@@ -6450,12 +6128,12 @@
     }
    ]
   },
-  "art/villains/moradon": {
+  "art/villains/isolde": {
    "frames": [
-    "art/villains/moradon_00.png",
-    "art/villains/moradon_01.png",
-    "art/villains/moradon_02.png",
-    "art/villains/moradon_03.png"
+    "art/villains/isolde_00.png",
+    "art/villains/isolde_01.png",
+    "art/villains/isolde_02.png",
+    "art/villains/isolde_03.png"
    ],
    "union_bbox": [
     0,
@@ -6496,12 +6174,12 @@
     }
    ]
   },
-  "art/villains/murray": {
+  "art/villains/jessa": {
    "frames": [
-    "art/villains/murray_00.png",
-    "art/villains/murray_01.png",
-    "art/villains/murray_02.png",
-    "art/villains/murray_03.png"
+    "art/villains/jessa_00.png",
+    "art/villains/jessa_01.png",
+    "art/villains/jessa_02.png",
+    "art/villains/jessa_03.png"
    ],
    "union_bbox": [
     0,
@@ -6542,12 +6220,12 @@
     }
    ]
   },
-  "art/villains/ragface": {
+  "art/villains/mordecai": {
    "frames": [
-    "art/villains/ragface_00.png",
-    "art/villains/ragface_01.png",
-    "art/villains/ragface_02.png",
-    "art/villains/ragface_03.png"
+    "art/villains/mordecai_00.png",
+    "art/villains/mordecai_01.png",
+    "art/villains/mordecai_02.png",
+    "art/villains/mordecai_03.png"
    ],
    "union_bbox": [
     0,
@@ -6588,12 +6266,12 @@
     }
    ]
   },
-  "art/villains/rinaldus": {
+  "art/villains/morwen": {
    "frames": [
-    "art/villains/rinaldus_00.png",
-    "art/villains/rinaldus_01.png",
-    "art/villains/rinaldus_02.png",
-    "art/villains/rinaldus_03.png"
+    "art/villains/morwen_00.png",
+    "art/villains/morwen_01.png",
+    "art/villains/morwen_02.png",
+    "art/villains/morwen_03.png"
    ],
    "union_bbox": [
     0,
@@ -6634,12 +6312,334 @@
     }
    ]
   },
-  "art/villains/urthrax": {
+  "art/villains/nhalia": {
    "frames": [
-    "art/villains/urthrax_00.png",
-    "art/villains/urthrax_01.png",
-    "art/villains/urthrax_02.png",
-    "art/villains/urthrax_03.png"
+    "art/villains/nhalia_00.png",
+    "art/villains/nhalia_01.png",
+    "art/villains/nhalia_02.png",
+    "art/villains/nhalia_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/oren": {
+   "frames": [
+    "art/villains/oren_00.png",
+    "art/villains/oren_01.png",
+    "art/villains/oren_02.png",
+    "art/villains/oren_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/ottoline": {
+   "frames": [
+    "art/villains/ottoline_00.png",
+    "art/villains/ottoline_01.png",
+    "art/villains/ottoline_02.png",
+    "art/villains/ottoline_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/sorvane": {
+   "frames": [
+    "art/villains/sorvane_00.png",
+    "art/villains/sorvane_01.png",
+    "art/villains/sorvane_02.png",
+    "art/villains/sorvane_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": -0.01,
+     "dcy": -0.06,
+     "dfoot_cx": -0.23,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/thrumm": {
+   "frames": [
+    "art/villains/thrumm_00.png",
+    "art/villains/thrumm_01.png",
+    "art/villains/thrumm_02.png",
+    "art/villains/thrumm_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/torvald": {
+   "frames": [
+    "art/villains/torvald_00.png",
+    "art/villains/torvald_01.png",
+    "art/villains/torvald_02.png",
+    "art/villains/torvald_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/valdris": {
+   "frames": [
+    "art/villains/valdris_00.png",
+    "art/villains/valdris_01.png",
+    "art/villains/valdris_02.png",
+    "art/villains/valdris_03.png"
+   ],
+   "union_bbox": [
+    0,
+    0,
+    48,
+    34
+   ],
+   "baseline": 34,
+   "max_height_frac": 1.0,
+   "motion": [
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    },
+    {
+     "dcx": 0.0,
+     "dcy": 0.0,
+     "dfoot_cx": 0.0,
+     "dbaseline": 0,
+     "dheight": 0
+    }
+   ]
+  },
+  "art/villains/vash": {
+   "frames": [
+    "art/villains/vash_00.png",
+    "art/villains/vash_01.png",
+    "art/villains/vash_02.png",
+    "art/villains/vash_03.png"
    ],
    "union_bbox": [
     0,

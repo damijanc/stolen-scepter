@@ -5522,7 +5522,26 @@
    "puzzle_grid": "art/ui/hud_puzzle_grid.png",
    "gold_purse": "art/ui/hud_gold_purse.png",
    "bar_strip": "art/ui/hud_bar_strip.png"
-  }
+  },
+  "combat": [
+   "art/combat/field_grass.png",
+   "art/combat/obstacle_01.png",
+   "art/combat/obstacle_02.png",
+   "art/combat/obstacle_03.png",
+   "art/combat/castle_spike.png",
+   "art/combat/castle_wall_01.png",
+   "art/combat/castle_wall_02.png",
+   "art/combat/castle_wall_03.png",
+   "art/combat/castle_wall_04.png",
+   "art/combat/castle_wall_05.png",
+   "art/combat/castle_wall_06.png",
+   "art/combat/cursor_01.png",
+   "art/combat/cursor_02.png",
+   "art/combat/cursor_03.png",
+   "art/combat/cursor_04.png"
+  ],
+  "font": "art/font/font.png",
+  "palette": "palettes/palette.bin"
  },
  "ending": {
   "grid_width": 6,

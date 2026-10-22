@@ -1,23 +1,20 @@
 """Programmatically draw the original villain wanted-poster art.
 
-17 villains x 4 animation frames = 68 files under `packs/open/art/villains/`.
-Each villain is an original archetype bust (sorceress, orc warlord, czar,
-wizard, demon, ...) with a blink on frame 2; no original game art is read.
+17 villains x 4 animation frames = 68 files under `packs/stolen-scepter/art/villains/`.
+Each villain is a bust drawn from the look its bio gives (witch, orc chief,
+glass queen, fiend, ...) with a blink on frame 2; no original game art is read.
 
 Writes the PNGs and registers provenance.
 """
-import json
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_objects import Canvas  # noqa: E402
+from packart import ROOT, out_dir, register  # noqa: E402
 from pngio import write_png  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "packs", "open", "art", "villains")
-PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
+OUT = out_dir("villains")
 AUTHOR = "procedural (tools/gen_villains.py)"
 
 OUTLINE = (26, 22, 30)
@@ -109,49 +106,39 @@ def face(frame, cfg):
 
 
 CONFIGS = {
-    "aimola": dict(skin=(224, 198, 196), hair=(66, 44, 86), hood=(96, 56, 128)),
-    "arech": dict(skin=(186, 198, 184), hood=(72, 92, 74), eye=(196, 60, 60)),
-    "auric": dict(skin=(212, 172, 118), hair=(184, 146, 62), helm=(214, 178, 84)),
-    "bargash": dict(skin=(128, 162, 88), hair=(44, 40, 38), tusks=True, angry=True),
-    "baron_makahl": dict(skin=(226, 198, 172), hair=(86, 64, 44), beard=(96, 74, 52)),
-    "barrowpine": dict(skin=(202, 172, 142), hood=(74, 110, 70), beard=(116, 96, 64)),
-    "caneghor": dict(skin=(178, 170, 174), hair=(34, 32, 44), helm=(74, 78, 96), angry=True),
-    "czar_nickolai": dict(skin=(220, 190, 160), beard=(232, 232, 232), crown=(232, 196, 72)),
-    "dread_rob": dict(skin=(208, 178, 150), eyepatch=True, cloth=(120, 40, 46)),
-    "hack": dict(skin=(198, 170, 138), hood=(120, 92, 56), eye=(70, 90, 140)),
-    "magus": dict(skin=(220, 192, 162), beard=(226, 226, 226), hat=(66, 60, 150)),
-    "mahk": dict(skin=(160, 132, 100), helm=(90, 90, 96), angry=True),
-    "moradon": dict(skin=(190, 72, 62), horns=True, eye=(250, 220, 90), angry=True),
-    "murray": dict(skin=(122, 168, 120), hood=(70, 104, 72), eye=(220, 200, 80)),
-    "ragface": dict(skin=(200, 172, 142), hair=(150, 150, 150), scar=True, angry=True),
-    "rinaldus": dict(skin=(224, 196, 166), helm=(150, 156, 170), cloth=(60, 80, 150)),
-    "urthrax": dict(skin=(168, 60, 70), horns=True, eye=(250, 210, 80), crown=(70, 40, 50)),
+    "ottoline": dict(skin=(226, 198, 172), hair=(120, 120, 128), cloth=(92, 74, 52)),
+    "jessa": dict(skin=(206, 170, 134), hood=(96, 70, 48), scar=True, angry=True),
+    "morwen": dict(skin=(224, 210, 204), hair=(40, 34, 58), hat=(52, 40, 86), eye=(240, 200, 90)),
+    "harrek": dict(skin=(196, 156, 118), hair=(92, 60, 36), beard=(92, 60, 36), angry=True),
+    "edric": dict(skin=(222, 192, 160), helm=(150, 156, 170), cloth=(120, 40, 46)),
+    "isolde": dict(skin=(236, 226, 224), hair=(210, 206, 196), crown=(190, 190, 204), eye=(150, 40, 50)),
+    "torvald": dict(skin=(212, 176, 140), helm=(84, 88, 100), beard=(60, 56, 54), angry=True),
+    "elowen": dict(skin=(214, 196, 158), hood=(52, 116, 56), eye=(90, 170, 80)),
+    "grubnak": dict(skin=(128, 162, 88), hair=(44, 40, 38), tusks=True, angry=True),
+    "mordecai": dict(skin=(190, 196, 184), hood=(44, 44, 52), eye=(160, 220, 170)),
+    "nhalia": dict(skin=(232, 228, 214), hood=(214, 210, 196), eye=(70, 60, 70)),
+    "thrumm": dict(skin=(150, 140, 128), hair=(70, 66, 62), beard=(120, 116, 110), angry=True),
+    "vash": dict(skin=(200, 220, 230), crown=(170, 220, 236), hair=(60, 90, 120)),
+    "cassian": dict(skin=(220, 190, 160), hair=(30, 28, 34), eyepatch=True, cloth=(40, 40, 52)),
+    "valdris": dict(skin=(176, 70, 92), horns=True, eye=(250, 220, 90), cloth=(110, 30, 70)),
+    "oren": dict(skin=(200, 176, 150), hat=(36, 34, 46), eye=(120, 150, 200), angry=True),
+    "sorvane": dict(skin=(168, 160, 156), horns=True, hood=(70, 64, 66), eye=(250, 140, 60), crown=(60, 56, 58), angry=True),
 }
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    with open(PROVENANCE) as fh:
-        doc = json.load(fh)
-    today = time.strftime("%Y-%m-%d")
     written = 0
+    written_rels = []
     for name in sorted(CONFIGS):
         for frame in range(4):
             px = face(frame, CONFIGS[name])
             assert len(px) == 48 * 34 * 4
             rel = f"art/villains/{name}_{frame:02d}.png"
             write_png(os.path.join(OUT, f"{name}_{frame:02d}.png"), 48, 34, px)
-            doc["assets"][rel] = {
-                "author": AUTHOR,
-                "method": "procedural",
-                "source": "original",
-                "license": "CC0-1.0",
-                "date": today,
-            }
+            written_rels.append(rel)
             written += 1
-    with open(PROVENANCE, "w") as fh:
-        json.dump(doc, fh, indent=2)
-        fh.write("\n")
+    register(written_rels, AUTHOR)
     print(f"wrote {written} villain files to {os.path.relpath(OUT, ROOT)}")
     return 0
 

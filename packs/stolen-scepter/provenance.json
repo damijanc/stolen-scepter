@@ -1,0 +1,1564 @@
+{
+  "assets": {
+    "art/classes/barbarian.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/classes/knight.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/classes/paladin.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/classes/sorceress.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_spike.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_wall_01.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_wall_02.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_wall_03.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_wall_04.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_wall_05.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/castle_wall_06.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/cursor_01.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/cursor_02.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/cursor_03.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/cursor_04.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/field_grass.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/obstacle_01.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/obstacle_02.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/combat/obstacle_03.png": {
+      "author": "procedural (tools/gen_combat.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/font/font.png": {
+      "author": "procedural (tools/gen_font.py, glyphs from tools/glyphs.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/boat_00.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/boat_01.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/boat_02.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/boat_03.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/hero_walk_00.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/hero_walk_01.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/hero_walk_02.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/sprites/hero_walk_03.png": {
+      "author": "procedural (tools/gen_sprites.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/artifact_chest.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/artifact_ring.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/bridge_h.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/bridge_v.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/castle_br.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/castle_gate.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/castle_ml.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/castle_mr.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/castle_tl.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/castle_tr.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/chest.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_01.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_02.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_03.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_04.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_05.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_06.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_07.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_08.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_09.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_10.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_11.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/desert_edge_12.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/dwelling_dungeon.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/dwelling_forest.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/dwelling_hills.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/dwelling_plains.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_01.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_02.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_03.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_04.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_05.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_06.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_07.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_08.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_09.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_10.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_11.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_edge_12.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/grass.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/grass_variant.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_01.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_02.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_03.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_04.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_05.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_06.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_07.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_08.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_09.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_10.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_11.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_edge_12.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/sign.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/town.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/wandering_army.png": {
+      "author": "procedural (tools/gen_objects.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_00.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_01.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_02.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_03.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_04.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_05.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_06.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_07.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_08.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_09.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_10.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/water_edge_11.png": {
+      "author": "procedural (tools/gen_terrain.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archers_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archers_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archers_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archers_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archmages_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archmages_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archmages_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/archmages_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/barbarians_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/barbarians_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/barbarians_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/barbarians_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/cavalry_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/cavalry_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/cavalry_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/cavalry_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/demons_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/demons_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/demons_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/demons_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dragons_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dragons_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dragons_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dragons_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/druids_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/druids_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/druids_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/druids_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dwarves_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dwarves_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dwarves_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/dwarves_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/elves_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/elves_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/elves_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/elves_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ghosts_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ghosts_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ghosts_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ghosts_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/giants_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/giants_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/giants_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/giants_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/gnomes_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/gnomes_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/gnomes_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/gnomes_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/knights_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/knights_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/knights_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/knights_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/militia_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/militia_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/militia_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/militia_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/nomads_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/nomads_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/nomads_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/nomads_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ogres_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ogres_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ogres_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/ogres_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/orcs_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/orcs_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/orcs_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/orcs_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/peasants_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/peasants_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/peasants_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/peasants_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/pikemen_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/pikemen_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/pikemen_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/pikemen_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/skeletons_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/skeletons_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/skeletons_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/skeletons_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/sprites_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/sprites_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/sprites_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/sprites_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/trolls_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/trolls_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/trolls_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/trolls_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/vampires_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/vampires_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/vampires_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/vampires_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/wolves_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/wolves_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/wolves_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/wolves_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/zombies_00.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/zombies_01.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/zombies_02.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/troops/zombies_03.png": {
+      "author": "AI-generated (tools/gen_ai.py: SDXL DreamShaper XL, ControlNet OpenPose)",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/ui/backdrop_castle.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/backdrop_dungeon.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/backdrop_forest.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/backdrop_hillcave.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/backdrop_plains.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/backdrop_town.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/chrome_overworld.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/class_select_highlight.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/class_select_picker.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/end_carpet.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/end_grass.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/end_hero.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/end_lose_screen.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/end_win_screen.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_bar_strip.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_contract_silhouette.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_gold_purse.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_magic_00.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_magic_01.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_magic_02.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_magic_03.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_magic_silhouette.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_puzzle_grid.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_siege_00.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_siege_01.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_siege_02.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_siege_03.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/hud_siege_silhouette.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_amulet.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_anchor.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_articles.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_book.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_crown.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_ring.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_shield.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_artifact_sword.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_zone_dunemark.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_zone_greenreach.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_zone_highmoor.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/inventory_zone_isleward.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/puzzle_cover.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/splash_logo.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/ui/splash_title.png": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/cassian_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/cassian_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/cassian_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/cassian_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/edric_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/edric_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/edric_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/edric_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/elowen_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/elowen_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/elowen_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/elowen_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/grubnak_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/grubnak_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/grubnak_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/grubnak_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/harrek_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/harrek_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/harrek_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/harrek_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/isolde_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/isolde_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/isolde_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/isolde_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/jessa_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/jessa_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/jessa_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/jessa_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/mordecai_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/mordecai_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/mordecai_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/mordecai_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/morwen_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/morwen_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/morwen_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/morwen_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/nhalia_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/nhalia_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/nhalia_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/nhalia_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/oren_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/oren_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/oren_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/oren_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/ottoline_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/ottoline_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/ottoline_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/ottoline_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/sorvane_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/sorvane_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/sorvane_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/sorvane_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/thrumm_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/thrumm_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/thrumm_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/thrumm_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/torvald_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/torvald_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/torvald_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/torvald_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/valdris_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/valdris_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/valdris_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/valdris_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/vash_00.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/vash_01.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/vash_02.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "art/villains/vash_03.png": {
+      "author": "procedural (tools/gen_villains.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
+    "palettes/palette.bin": {
+      "author": "procedural (tools/gen_ui.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    }
+  }
+}

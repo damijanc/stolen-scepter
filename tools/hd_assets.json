@@ -2858,7 +2858,7 @@
    "engine_used": true
   },
   {
-   "path": "art/ui/inventory_zone_archipelia.png",
+   "path": "art/ui/inventory_zone_dunemark.png",
    "category": "ui",
    "role": "ui_or_hud",
    "native": {
@@ -2869,7 +2869,7 @@
    "engine_used": true
   },
   {
-   "path": "art/ui/inventory_zone_continentia.png",
+   "path": "art/ui/inventory_zone_greenreach.png",
    "category": "ui",
    "role": "ui_or_hud",
    "native": {
@@ -2880,7 +2880,7 @@
    "engine_used": true
   },
   {
-   "path": "art/ui/inventory_zone_forestria.png",
+   "path": "art/ui/inventory_zone_highmoor.png",
    "category": "ui",
    "role": "ui_or_hud",
    "native": {
@@ -2891,7 +2891,7 @@
    "engine_used": true
   },
   {
-   "path": "art/ui/inventory_zone_saharia.png",
+   "path": "art/ui/inventory_zone_isleward.png",
    "category": "ui",
    "role": "ui_or_hud",
    "native": {
@@ -2959,7 +2959,7 @@
    "engine_used": false
   },
   {
-   "path": "art/villains/aimola_00.png",
+   "path": "art/villains/cassian_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -2970,7 +2970,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/aimola_01.png",
+   "path": "art/villains/cassian_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -2981,7 +2981,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/aimola_02.png",
+   "path": "art/villains/cassian_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -2992,7 +2992,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/aimola_03.png",
+   "path": "art/villains/cassian_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3003,7 +3003,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/arech_00.png",
+   "path": "art/villains/edric_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3014,7 +3014,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/arech_01.png",
+   "path": "art/villains/edric_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3025,7 +3025,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/arech_02.png",
+   "path": "art/villains/edric_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3036,7 +3036,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/arech_03.png",
+   "path": "art/villains/edric_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3047,7 +3047,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/auric_00.png",
+   "path": "art/villains/elowen_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3058,7 +3058,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/auric_01.png",
+   "path": "art/villains/elowen_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3069,7 +3069,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/auric_02.png",
+   "path": "art/villains/elowen_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3080,7 +3080,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/auric_03.png",
+   "path": "art/villains/elowen_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3091,7 +3091,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/bargash_00.png",
+   "path": "art/villains/grubnak_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3102,7 +3102,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/bargash_01.png",
+   "path": "art/villains/grubnak_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3113,7 +3113,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/bargash_02.png",
+   "path": "art/villains/grubnak_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3124,7 +3124,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/bargash_03.png",
+   "path": "art/villains/grubnak_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3135,7 +3135,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/baron_makahl_00.png",
+   "path": "art/villains/harrek_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3146,7 +3146,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/baron_makahl_01.png",
+   "path": "art/villains/harrek_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3157,7 +3157,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/baron_makahl_02.png",
+   "path": "art/villains/harrek_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3168,7 +3168,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/baron_makahl_03.png",
+   "path": "art/villains/harrek_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3179,7 +3179,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/barrowpine_00.png",
+   "path": "art/villains/isolde_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3190,7 +3190,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/barrowpine_01.png",
+   "path": "art/villains/isolde_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3201,7 +3201,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/barrowpine_02.png",
+   "path": "art/villains/isolde_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3212,7 +3212,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/barrowpine_03.png",
+   "path": "art/villains/isolde_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3223,7 +3223,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/caneghor_00.png",
+   "path": "art/villains/jessa_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3234,7 +3234,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/caneghor_01.png",
+   "path": "art/villains/jessa_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3245,7 +3245,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/caneghor_02.png",
+   "path": "art/villains/jessa_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3256,7 +3256,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/caneghor_03.png",
+   "path": "art/villains/jessa_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3267,7 +3267,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/czar_nickolai_00.png",
+   "path": "art/villains/mordecai_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3278,7 +3278,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/czar_nickolai_01.png",
+   "path": "art/villains/mordecai_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3289,7 +3289,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/czar_nickolai_02.png",
+   "path": "art/villains/mordecai_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3300,7 +3300,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/czar_nickolai_03.png",
+   "path": "art/villains/mordecai_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3311,7 +3311,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/dread_rob_00.png",
+   "path": "art/villains/morwen_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3322,7 +3322,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/dread_rob_01.png",
+   "path": "art/villains/morwen_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3333,7 +3333,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/dread_rob_02.png",
+   "path": "art/villains/morwen_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3344,7 +3344,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/dread_rob_03.png",
+   "path": "art/villains/morwen_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3355,7 +3355,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/hack_00.png",
+   "path": "art/villains/nhalia_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3366,7 +3366,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/hack_01.png",
+   "path": "art/villains/nhalia_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3377,7 +3377,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/hack_02.png",
+   "path": "art/villains/nhalia_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3388,7 +3388,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/hack_03.png",
+   "path": "art/villains/nhalia_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3399,7 +3399,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/magus_00.png",
+   "path": "art/villains/oren_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3410,7 +3410,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/magus_01.png",
+   "path": "art/villains/oren_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3421,7 +3421,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/magus_02.png",
+   "path": "art/villains/oren_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3432,7 +3432,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/magus_03.png",
+   "path": "art/villains/oren_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3443,7 +3443,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/mahk_00.png",
+   "path": "art/villains/ottoline_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3454,7 +3454,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/mahk_01.png",
+   "path": "art/villains/ottoline_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3465,7 +3465,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/mahk_02.png",
+   "path": "art/villains/ottoline_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3476,7 +3476,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/mahk_03.png",
+   "path": "art/villains/ottoline_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3487,7 +3487,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/moradon_00.png",
+   "path": "art/villains/sorvane_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3498,7 +3498,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/moradon_01.png",
+   "path": "art/villains/sorvane_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3509,7 +3509,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/moradon_02.png",
+   "path": "art/villains/sorvane_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3520,7 +3520,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/moradon_03.png",
+   "path": "art/villains/sorvane_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3531,7 +3531,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/murray_00.png",
+   "path": "art/villains/thrumm_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3542,7 +3542,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/murray_01.png",
+   "path": "art/villains/thrumm_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3553,7 +3553,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/murray_02.png",
+   "path": "art/villains/thrumm_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3564,7 +3564,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/murray_03.png",
+   "path": "art/villains/thrumm_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3575,7 +3575,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/ragface_00.png",
+   "path": "art/villains/torvald_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3586,7 +3586,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/ragface_01.png",
+   "path": "art/villains/torvald_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3597,7 +3597,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/ragface_02.png",
+   "path": "art/villains/torvald_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3608,7 +3608,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/ragface_03.png",
+   "path": "art/villains/torvald_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3619,7 +3619,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/rinaldus_00.png",
+   "path": "art/villains/valdris_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3630,7 +3630,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/rinaldus_01.png",
+   "path": "art/villains/valdris_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3641,7 +3641,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/rinaldus_02.png",
+   "path": "art/villains/valdris_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3652,7 +3652,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/rinaldus_03.png",
+   "path": "art/villains/valdris_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3663,7 +3663,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/urthrax_00.png",
+   "path": "art/villains/vash_00.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3674,7 +3674,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/urthrax_01.png",
+   "path": "art/villains/vash_01.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3685,7 +3685,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/urthrax_02.png",
+   "path": "art/villains/vash_02.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {
@@ -3696,7 +3696,7 @@
    "engine_used": true
   },
   {
-   "path": "art/villains/urthrax_03.png",
+   "path": "art/villains/vash_03.png",
    "category": "villains",
    "role": "villain_portrait_or_anim",
    "native": {

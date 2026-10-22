@@ -4,20 +4,17 @@ Covers `art/sprites/hero_walk_00..03`, `boat_00..03` (48x34, alpha-keyed) and
 `art/classes/{knight,paladin,sorceress,barbarian}.png` (96x102). Original pixel
 art composed from primitives; nothing reads the original game art.
 
-Writes `packs/open/art/**` and registers provenance.
+Writes `packs/stolen-scepter/art/**` and registers provenance.
 """
-import json
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_objects import Canvas  # noqa: E402
+from packart import ART, ROOT, register  # noqa: E402
 from pngio import write_png  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "packs", "open", "art")
-PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
+OUT = ART
 AUTHOR = "procedural (tools/gen_sprites.py)"
 
 OUTLINE = (26, 22, 30)
@@ -222,23 +219,14 @@ def main():
     sprites["art/classes/sorceress.png"] = (96, 102, class_sorceress())
     sprites["art/classes/barbarian.png"] = (96, 102, class_barbarian())
 
-    with open(PROVENANCE) as fh:
-        doc = json.load(fh)
-    today = time.strftime("%Y-%m-%d")
+    written_rels = []
     for rel, (w, h, px) in sprites.items():
         assert len(px) == w * h * 4, (rel, len(px), w * h * 4)
         path = os.path.join(OUT, rel[len("art/"):])
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         write_png(path, w, h, px)
-        doc["assets"][rel] = {
-            "author": AUTHOR,
-            "method": "procedural",
-            "source": "original",
-            "license": "CC0-1.0",
-            "date": today,
-        }
-    with open(PROVENANCE, "w") as fh:
-        json.dump(doc, fh, indent=2)
-        fh.write("\n")
+        written_rels.append(rel)
+    register(written_rels, AUTHOR)
 
     print(f"wrote {len(sprites)} sprite/portrait files to {os.path.relpath(OUT, ROOT)}")
     return 0

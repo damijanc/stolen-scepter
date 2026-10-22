@@ -61,9 +61,9 @@ Audit run 2026-10-22 over 376 tracked files and the full history:
   found 85 more lines on its first run: continent, villain and town names in
   tests and specs (renamed), ~20 shell fallback texts that were the original's
   wording (rewritten in our own words), and the engine's default starting
-  zone (now "home"). Temporary exemption, text check only: `tools/hd_assets.json`,
-  `tools/asset_layout.json`, `tools/gen_villains.py`, whose slot names follow
-  the original pack until Phase 2 regenerates them.
+  zone (now "home"). The temporary text exemption for the slot lists and
+  the villain generator was dropped in Phase 2, task 4, once their slots
+  were rekeyed to our own villain and continent ids.
 
 ## Phase 2 — Independent pack, playable end to end
 
@@ -95,12 +95,16 @@ Tasks, in order:
 3. **Pack builder** (`tools/build_pack.py`): assembles `game.json` from the
    rules (kept, lightly retuned), the generated maps and placements, and the
    text; writes the pack folder.
-4. **Art**: the 100 generated troop frames, then placeholders for every other
-   slot from the procedural generators (retargeted from the old `packs/open/`),
-   and our own palette. Upgraded in Phase 5.
+4. **Art** (done): the 100 AI troop frames (`import_troops.py`, box-filtered
+   to 48x34), procedural placeholders for every other slot (the generators now
+   write to `packs/stolen-scepter/` through `packart.py`; `gen_ui.py` is new
+   for the 43 interface slots), and our own palette. A shell test checks the
+   pack ships every path the shell loads. Upgraded in Phase 5.
 5. **Audio**: 2 tracks and 4 tunes picked from CC0 sources (OpenGameArt),
    each source recorded in the credits; downloads confirmed by hand.
-6. **Font**: an OFL-licensed pixel font converted to the bitmap-font slot.
+6. **Font** (done, differently): instead of an OFL font, `glyphs.py` holds
+   our own 5x7 glyphs for all printable ASCII and `gen_font.py` packs them
+   into the strip, so the font has no third-party licence at all.
 7. **Shell**: discovers `packs/` (and later the app bundle's own pack).
 8. **Proof**: a test that loads `packs/stolen-scepter/` with no `reference/`
    or `game-assets/` present and plays a full headless game (combat, a

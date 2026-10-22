@@ -5,13 +5,11 @@ splat, six castle wall pieces and the four-frame cursor ring. Slot order and
 meaning follow the renderer: index 0 field, 1..3 obstacles, 4 burst, 5..10
 walls, 11..14 cursor.
 
-Writes `packs/open/art/combat/*.png` and registers provenance.
+Writes `packs/stolen-scepter/art/combat/*.png` and registers provenance.
 """
-import json
 import math
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_objects import (  # noqa: E402
@@ -23,11 +21,10 @@ BROWN = (122, 86, 50)
 BROWN_D = (84, 58, 32)
 RED = (186, 62, 52)
 from gen_terrain import W, H, grass_tile  # noqa: E402
+from packart import ROOT, out_dir, register  # noqa: E402
 from pngio import write_png  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "packs", "open", "art", "combat")
-PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
+OUT = out_dir("combat")
 AUTHOR = "procedural (tools/gen_combat.py)"
 
 ORANGE = (222, 132, 48)
@@ -171,22 +168,12 @@ def main():
         "cursor_04": cursor(3),
     }
 
-    with open(PROVENANCE) as fh:
-        doc = json.load(fh)
-    today = time.strftime("%Y-%m-%d")
+    written_rels = []
     for name, px in tiles.items():
         assert len(px) == W * H * 4, (name, len(px))
         write_png(os.path.join(OUT, name + ".png"), W, H, px)
-        doc["assets"]["art/combat/" + name + ".png"] = {
-            "author": AUTHOR,
-            "method": "procedural",
-            "source": "original",
-            "license": "CC0-1.0",
-            "date": today,
-        }
-    with open(PROVENANCE, "w") as fh:
-        json.dump(doc, fh, indent=2)
-        fh.write("\n")
+        written_rels.append("art/combat/" + name + ".png")
+    register(written_rels, AUTHOR)
 
     print(f"wrote {len(tiles)} combat tiles to {os.path.relpath(OUT, ROOT)}")
     return 0

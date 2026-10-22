@@ -29,6 +29,11 @@ DATA = os.path.join(PACK, "data")
 OUT = os.path.join(PACK, "game.json")
 PACK_ID = "stolen-scepter"
 
+# The battle tileset, in the slot order the combat view indexes
+# (field, three obstacles, the castle spike and six walls, four cursor frames).
+COMBAT_TILES = ["field_grass", "obstacle_01", "obstacle_02", "obstacle_03", "castle_spike"] + \
+    [f"castle_wall_{i:02d}" for i in range(1, 7)] + [f"cursor_{i:02d}" for i in range(1, 5)]
+
 # Every string the shell reads, with the placeholders its code substitutes.
 # A key missing here makes the shell fall back to its built-in text; a
 # placeholder missing makes a value vanish from the screen.
@@ -304,7 +309,10 @@ def build():
                      magic_animation=frames("ui", "hud_magic"),
                      puzzle_grid=art("ui", "hud_puzzle_grid.png"),
                      gold_purse=art("ui", "hud_gold_purse.png"),
-                     bar_strip=art("ui", "hud_bar_strip.png"))),
+                     bar_strip=art("ui", "hud_bar_strip.png")),
+            combat=[art("combat", f"{name}.png") for name in COMBAT_TILES],
+            font=art("font", "font.png"),
+            palette="palettes/palette.bin"),
         ending=dict(rules["ending"], grass_tile=art("ui", "end_grass.png"),
                     carpet_tile=art("ui", "end_carpet.png"),
                     hero_tile=art("ui", "end_hero.png"),

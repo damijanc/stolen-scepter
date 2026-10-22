@@ -5,20 +5,17 @@ and sliced, so they align), town, chest, the four dwellings, sign and the two
 bridges. Everything is original pixel art composed from primitives over the
 same grass underlay the terrain edges use; nothing reads the original game art.
 
-Writes `packs/open/art/tiles/*.png` and registers provenance.
+Writes `packs/stolen-scepter/art/tiles/*.png` and registers provenance.
 """
-import json
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_terrain import W, H, grass_tile, water_tile  # noqa: E402
+from packart import ROOT, out_dir, register  # noqa: E402
 from pngio import write_png  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "packs", "open", "art", "tiles")
-PROVENANCE = os.path.join(ROOT, "packs", "open", "provenance.json")
+OUT = out_dir("tiles")
 AUTHOR = "procedural (tools/gen_objects.py)"
 
 STONE_L = (178, 176, 168)
@@ -363,20 +360,7 @@ def main():
         write_png(os.path.join(OUT, name + ".png"), W, H, px)
         written.append("art/tiles/" + name + ".png")
 
-    with open(PROVENANCE) as fh:
-        doc = json.load(fh)
-    today = time.strftime("%Y-%m-%d")
-    for rel in written:
-        doc["assets"][rel] = {
-            "author": AUTHOR,
-            "method": "procedural",
-            "source": "original",
-            "license": "CC0-1.0",
-            "date": today,
-        }
-    with open(PROVENANCE, "w") as fh:
-        json.dump(doc, fh, indent=2)
-        fh.write("\n")
+    register(written, AUTHOR)
 
     print(f"wrote {len(written)} object tiles to {os.path.relpath(OUT, ROOT)}")
     return 0

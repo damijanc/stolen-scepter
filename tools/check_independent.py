@@ -40,7 +40,7 @@ FORBIDDEN_DIRS = ("reference/", "game-assets/")
 # follows the original pack's file naming (villain and continent ids in the
 # slot paths). Phase 2 regenerates it from the new pack; remove these then.
 # Only the TEXT check is skipped for them -- the path and file checks still run.
-TEXT_EXEMPT = ("tools/hd_assets.json", "tools/asset_layout.json", "tools/gen_villains.py")
+TEXT_EXEMPT = ()
 NAME_SOURCES = ("villains", "artifacts", "towns", "castles", "zones")
 SHINGLE = 6          # words per copied-text window
 MAX_NGRAM = 5        # longest name, in words
