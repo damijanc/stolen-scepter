@@ -146,6 +146,17 @@ New, because Tauri did it there:
 
 Dropped for now: the Tauri updater, the changelog commit, the website dispatch.
 
+Progress: the preview channel is built. `tools/make_dmg.sh [VERSION]
+[CHANNEL]` builds the release binary, assembles `dist/Stolen Scepter.app`
+(`Info.plist`, an icon from `tools/gen_icon.py`, the pack under
+`Contents/Resources/packs/`), signs it ad hoc and wraps it in a DMG with an
+Applications link and the licence; `.github/workflows/macos-dmg.yml` runs it
+by hand (`workflow_dispatch`) after the quality checks and uploads the DMG
+as an artifact. The window now takes its title from the pack that will load
+(`pack::launch_title`), since macroquad cannot retitle an open window.
+Still to do for stable: steps 4-6 above, the secrets check, the `v*` tag
+trigger and the `publish-release` job.
+
 ## Phase 4 — Go public
 
 Started 2026-10-22: the history was rewritten to one author address, the

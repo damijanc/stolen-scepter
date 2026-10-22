@@ -45,6 +45,14 @@ PNG I/O is `pngio.py`.
 and strings) and the generated maps into `game.json`, and `--check` validates
 it against what the shell reads.
 
+## Release
+
+- `make_dmg.sh [VERSION] [CHANNEL]`: builds `dist/Stolen Scepter.app` and its
+  DMG (preview: ad-hoc signed). Run outside a sandbox: `iconutil` and
+  `hdiutil` need the system temp directory. Used by
+  `.github/workflows/macos-dmg.yml`.
+- `gen_icon.py`: the app icon, written as a macOS iconset.
+
 ## Development
 
 - `engine_sweep.sh`: lists every function the OpenBounty C headers declare as

@@ -1,0 +1,74 @@
+name: Build macOS DMG
+
+# Preview builds only, for now: an ad-hoc signed app in a DMG, uploaded as a
+# workflow artifact. The stable channel (Developer ID signing, notarization,
+# a GitHub Release on a `v*` tag) is added once the Apple secrets exist; see
+# specs/publish-plan.md, Phase 3.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version, for example 0.1.0 (default: the shell crate's)"
+        required: false
+        type: string
+
+concurrency:
+  group: macos-dmg-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # No build goes out on a red tree: the same checks every push runs.
+  quality:
+    name: Quality
+    uses: ./.github/workflows/quality.yml
+
+  build:
+    name: Build Apple Silicon DMG
+    needs: quality
+    runs-on: macos-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+
+      - name: Cache Cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-release-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-release-
+
+      - name: Build app and DMG
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: tools/make_dmg.sh "${INPUT_VERSION}" preview
+
+      - name: Verify bundle
+        run: |
+          set -euo pipefail
+          app="dist/Stolen Scepter.app"
+          dmg="$(find dist -name '*.dmg' -print -quit)"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          hdiutil verify "${dmg}"
+          test -f "${app}/Contents/Resources/packs/stolen-scepter/game.json"
+          echo "Preview build: ad-hoc signed, not notarized."
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Stolen-Scepter-macOS-arm64-preview-DMG
+          path: dist/*.dmg
+          if-no-files-found: error

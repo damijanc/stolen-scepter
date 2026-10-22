@@ -230,6 +230,32 @@ fn pack_name(path: &Path) -> Option<String> {
     Some(stem.to_owned())
 }
 
+/// The window title for this launch: the `title` of the pack that will load
+/// under C's launch policy (an explicit pack, else the single discovered
+/// one), or "OpenBounty" when that is not known before the window opens --
+/// no pack, a picker, or a pack that will not open.
+pub fn launch_title(explicit: Option<&str>, saves: &crate::savepath::SavePaths) -> String {
+    let path = match explicit {
+        Some(arg) => resolve_arg(arg, saves),
+        None => {
+            let entries = discover(saves);
+            (entries.len() == 1).then(|| entries[0].path.clone())
+        }
+    };
+    path.and_then(|path| pack_title(&pack_location(&path)))
+        .unwrap_or_else(|| "OpenBounty".to_owned())
+}
+
+/// A pack's `title`, or `None` when it will not open or names none.
+fn pack_title(path: &Path) -> Option<String> {
+    let pack = Pack::open(path).ok()?;
+    let json: serde_json::Value = serde_json::from_slice(&pack.read("game.json")?).ok()?;
+    json.get("title")?
+        .as_str()
+        .filter(|title| !title.is_empty())
+        .map(str::to_owned)
+}
+
 /// Resolve a `--pack` value, porting `pack_resolve_arg`.
 pub fn resolve_arg(arg: &str, saves: &crate::savepath::SavePaths) -> Option<PathBuf> {
     resolve_arg_in(arg, &discover_roots(saves))
@@ -441,6 +467,17 @@ mod tests {
         zip.write_all(b"{}").expect("write");
         zip.finish().expect("finish");
         path
+    }
+
+    #[test]
+    fn the_window_title_comes_from_the_pack_that_will_load() {
+        let saves = crate::savepath::SavePaths::with_override("/nonexistent");
+        let ours = concat!(env!("CARGO_MANIFEST_DIR"), "/../packs/stolen-scepter");
+        assert_eq!(
+            launch_title(Some(ours), &saves),
+            "The Quest for a Stolen Scepter"
+        );
+        assert_eq!(launch_title(Some("/no/such/pack"), &saves), "OpenBounty");
     }
 
     #[test]

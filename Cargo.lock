@@ -783,6 +783,7 @@ dependencies = [
  "kira",
  "macroquad",
  "openbounty-engine",
+ "serde_json",
  "zip",
 ]
 

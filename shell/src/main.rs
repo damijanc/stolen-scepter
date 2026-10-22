@@ -710,12 +710,56 @@ fn finish_pointer(list: &mut DrawList, backend: &Backend, at: Option<(i32, i32)>
     backend.set_os_cursor_visible(at.is_none());
 }
 
+/// The command line, read by both `window_conf` and `main`.
+struct LaunchArgs {
+    explicit_pack: Option<String>,
+    seed_index: i32,
+    save_dir: Option<String>,
+}
+
+impl LaunchArgs {
+    fn parse(mut args: impl Iterator<Item = String>) -> Self {
+        // `--pack <arg>` is C's flag; a bare positional is the older spelling
+        // of the same thing, kept so every `.../game.json` invocation still runs.
+        let mut launch = Self {
+            explicit_pack: None,
+            seed_index: -1,
+            save_dir: None,
+        };
+        while let Some(arg) = args.next() {
+            if arg == "--seed" {
+                launch.seed_index = args
+                    .next()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(-1);
+            } else if arg == "--save-dir" {
+                launch.save_dir = args.next();
+            } else if arg == "--pack" {
+                launch.explicit_pack = args.next();
+            } else if launch.explicit_pack.is_none() {
+                launch.explicit_pack = Some(arg);
+            }
+        }
+        launch
+    }
+
+    fn save_paths(&self) -> SavePaths {
+        match &self.save_dir {
+            Some(dir) => SavePaths::with_override(dir),
+            None => SavePaths::new(),
+        }
+    }
+}
+
 fn window_conf() -> Conf {
     // The real size needs the pack's geometry, which is not loaded yet, so
     // this opens at the legacy default; the present layer centres whatever
-    // the pack turns out to want inside it.
+    // the pack turns out to want inside it. The title cannot change once the
+    // window exists, so it is read here from the pack that will load.
+    let launch = LaunchArgs::parse(std::env::args().skip(1));
+    let title = pack::launch_title(launch.explicit_pack.as_deref(), &launch.save_paths());
     Conf {
-        window_title: "OpenBounty".to_owned(),
+        window_title: title,
         window_width: 640,
         window_height: 400,
         high_dpi: true,
@@ -725,30 +769,13 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    // `--pack <arg>` is C's flag; a bare positional is the older spelling of
-    // the same thing, kept so every `.../game.json` invocation still runs.
-    let mut explicit_pack: Option<String> = None;
-    let mut seed_index: i32 = -1;
-    let mut save_dir: Option<String> = None;
-    let mut args = std::env::args().skip(1);
-    while let Some(arg) = args.next() {
-        if arg == "--seed" {
-            seed_index = args
-                .next()
-                .and_then(|value| value.parse().ok())
-                .unwrap_or(-1);
-        } else if arg == "--save-dir" {
-            save_dir = args.next();
-        } else if arg == "--pack" {
-            explicit_pack = args.next();
-        } else if explicit_pack.is_none() {
-            explicit_pack = Some(arg);
-        }
-    }
-    let save_paths = match &save_dir {
-        Some(dir) => SavePaths::with_override(dir),
-        None => SavePaths::new(),
-    };
+    let launch = LaunchArgs::parse(std::env::args().skip(1));
+    let save_paths = launch.save_paths();
+    let LaunchArgs {
+        explicit_pack,
+        seed_index,
+        ..
+    } = launch;
 
     // C's launch policy (`main.c`): an explicit pack must resolve; otherwise
     // none found is fatal, one loads silently, and two or more get a picker.
