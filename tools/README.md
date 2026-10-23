@@ -18,6 +18,12 @@ PNG I/O is `pngio.py`.
   ground line, foot centre) as numbers. `asset_layout.py` measured it once
   from a locally owned copy of the original art; the generators read only the
   JSON.
+- `gen_startup.py` / `compose_startup.py`: the startup screens. The first
+  renders the raw AI pieces on ComfyUI (a full-body figure and a portrait per
+  class, an empty hall; several seeds each, with a contact sheet); the second
+  places the picked seeds into the class picker, the class portraits and the
+  credits image. The picker's four columns are `CLASS_FIGURES` in
+  `shell/src/startup.rs`; change both together.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
   `game-assets/ai-out/`) down to the pack's art scale (4x: 192x136).
 - `gen_terrain.py`, `gen_objects.py`, `gen_combat.py`, `gen_sprites.py`,

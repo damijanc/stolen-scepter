@@ -45,22 +45,19 @@ const DEFAULT_NEW_GAME_INTRO: &str = "%NAME% the %CLASS%,\n\
 const CLASS_PICKER_W: i32 = 288;
 const CLASS_PICKER_H: i32 = 184;
 
-/// Where each class's figure stands on the stock class-select art, relative
-/// to the picker's top-left in its 288x184 placement, keyed by class index
-/// (the letter A-D printed on the art).
+/// Where each class's figure stands on the class-select art, relative to the
+/// picker's top-left in its 288x184 placement, keyed by class index (the
+/// letter A-D printed above it).
 ///
 /// DIVERGENCE (mouse): C has no pointer, so nothing in C or the pack locates
-/// the figures. This geometry is authored by eye from the shipped art; the HD
-/// pack's picker is the same composition at 4x, and the shell always places
-/// it at 288x184 logical. Pushed in this order and a later region wins: the
-/// barbarian (D), in front, covers the paladin's legs, and his region is split
-/// so the sorceress keeps her own "C" label.
-const CLASS_FIGURES: [(usize, Rect); 5] = [
-    (0, Rect::new(0, 55, 112, 129)),
-    (1, Rect::new(112, 8, 113, 176)),
-    (2, Rect::new(225, 18, 63, 166)),
-    (3, Rect::new(165, 80, 60, 104)),
-    (3, Rect::new(225, 110, 37, 74)),
+/// the figures. This is the composition `tools/compose_startup.py` draws: four
+/// equal columns, each hero standing in its own, letter centred above. The two
+/// must change together.
+const CLASS_FIGURES: [(usize, Rect); 4] = [
+    (0, Rect::new(0, 4, 72, 178)),
+    (1, Rect::new(72, 4, 72, 178)),
+    (2, Rect::new(144, 4, 72, 178)),
+    (3, Rect::new(216, 4, 72, 178)),
 ];
 
 /// Longest accepted hero name, C's `char name_buf[11]`.
@@ -1353,15 +1350,15 @@ mod tests {
         (list, hits)
     }
 
-    /// Each letter printed on the stock art lands on its own class. The
-    /// letter positions are read off `class_select_picker.png`.
+    /// Each letter printed on the art lands on its own class. The letters sit
+    /// centred above each column, where `tools/compose_startup.py` draws them.
     #[test]
     fn each_printed_letter_on_the_art_hits_its_own_class() {
         let resources = four_class_resources();
         let layout = Layout::from_resources(&resources).expect("lays out");
         let (px, py) = Startup::class_picker_origin(&layout);
         let (_, hits) = drawn_hits(&Startup::default(), &resources);
-        for (index, (lx, ly)) in [(37, 77), (182, 22), (233, 78), (258, 172)]
+        for (index, (lx, ly)) in [(36, 12), (108, 12), (180, 12), (252, 12)]
             .into_iter()
             .enumerate()
         {
@@ -1374,7 +1371,7 @@ mod tests {
         }
     }
 
-    /// The sky above the knight is no figure, and class select publishes no
+    /// The strip above the columns is no figure, and class select publishes no
     /// backdrop: a stray click there does nothing -- it certainly never quits.
     #[test]
     fn a_click_off_the_figures_on_class_select_does_nothing() {
@@ -1382,7 +1379,7 @@ mod tests {
         let layout = Layout::from_resources(&resources).expect("lays out");
         let (px, py) = Startup::class_picker_origin(&layout);
         let (_, hits) = drawn_hits(&Startup::default(), &resources);
-        assert_eq!(hits.hit(px + 20, py + 30), None);
+        assert_eq!(hits.hit(px + 20, py + 3), None);
     }
 
     #[test]

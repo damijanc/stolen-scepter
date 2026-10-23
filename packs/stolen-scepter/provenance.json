@@ -1,23 +1,23 @@
 {
   "assets": {
     "art/classes/barbarian.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/classes/knight.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/classes/paladin.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/classes/sorceress.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_spike.png": {
@@ -1036,13 +1036,13 @@
       "license": "CC0-1.0"
     },
     "art/ui/class_select_highlight.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/class_select_picker.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/end_carpet.png": {
