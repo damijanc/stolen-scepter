@@ -238,6 +238,30 @@ impl KiraAudio {
     }
 }
 
+impl crate::audio::AudioOut for KiraAudio {
+    fn is_available(&self) -> bool {
+        KiraAudio::is_available(self)
+    }
+    fn set_sounds_enabled(&mut self, on: bool) {
+        KiraAudio::set_sounds_enabled(self, on)
+    }
+    fn set_music_enabled(&mut self, on: bool) {
+        KiraAudio::set_music_enabled(self, on)
+    }
+    fn set_track(&mut self, track: Track) {
+        KiraAudio::set_track(self, track)
+    }
+    fn set_master_volume(&mut self, value: i32) {
+        KiraAudio::set_master_volume(self, value)
+    }
+    fn play_tune(&mut self, tune: Tune) {
+        KiraAudio::play_tune(self, tune)
+    }
+    fn tick(&mut self) {
+        KiraAudio::tick(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

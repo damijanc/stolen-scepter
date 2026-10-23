@@ -3,10 +3,12 @@ name = "openbounty-shell"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
+default-run = "openbounty-shell"
 
 [dependencies]
 kira = "0.12"
 macroquad = { version = "0.4.16", default-features = false }
 openbounty-engine = { path = "../engine" }
+png = "0.17"
 serde_json = "1"
 zip = { version = "8.6", default-features = false, features = ["deflate"] }

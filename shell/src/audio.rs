@@ -29,6 +29,35 @@ pub enum Track {
     Combat,
 }
 
+/// Where the session's audio decisions go: `audio_backend::KiraAudio` plays
+/// them, [`Silent`] (the headless playtest) drops them.
+pub trait AudioOut {
+    fn is_available(&self) -> bool;
+    fn set_sounds_enabled(&mut self, on: bool);
+    fn set_music_enabled(&mut self, on: bool);
+    fn set_track(&mut self, track: Track);
+    fn set_master_volume(&mut self, value: i32);
+    fn play_tune(&mut self, tune: Tune);
+    fn tick(&mut self);
+}
+
+/// No device and no sound, but reported as available so the Controls panel
+/// and the saved options behave as they do with speakers.
+#[derive(Debug, Default)]
+pub struct Silent;
+
+impl AudioOut for Silent {
+    fn is_available(&self) -> bool {
+        true
+    }
+    fn set_sounds_enabled(&mut self, _on: bool) {}
+    fn set_music_enabled(&mut self, _on: bool) {}
+    fn set_track(&mut self, _track: Track) {}
+    fn set_master_volume(&mut self, _value: i32) {}
+    fn play_tune(&mut self, _tune: Tune) {}
+    fn tick(&mut self) {}
+}
+
 /// Anything at or below this is inaudible. kira has its own `Decibels::SILENCE`;
 /// this module stays library-free, so it names its own floor.
 pub const SILENCE_DB: f32 = -100.0;

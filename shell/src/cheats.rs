@@ -581,7 +581,7 @@ mod tests {
         // What main.rs then does with it. The fixture ships no ending tiles,
         // so the cartoon is skipped and the win screen opens directly.
         let mut views = Views::new();
-        crate::show_win_game(&mut views, &frame.resources, &mut frame.game);
+        crate::session::show_win_game(&mut views, &frame.resources, &mut frame.game);
         assert!(frame.game.stats.game_over);
         assert!(!frame.game.stats.won, "C's show_win_game never sets won");
         assert_eq!(views.active(), Some(ViewKind::Win));
@@ -598,7 +598,7 @@ mod tests {
         assert!(!frame.dialog.is_active());
 
         let mut views = Views::new();
-        crate::show_lose_game(&mut views, &frame.resources, &frame.game);
+        crate::session::show_lose_game(&mut views, &frame.resources, &frame.game);
         assert_eq!(views.active(), Some(ViewKind::Lose));
         // C's show_lose_game writes nothing, so dismissing the screen returns
         // to a live board.

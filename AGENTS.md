@@ -40,6 +40,15 @@ will be selected only after headless engine parity is solid.
   `cargo run -p openbounty-shell -- [--seed <n>] [--save-dir <dir>] [--pack <name | dir | file.openbounty>]`.
   With no `--pack`, one discovered pack loads silently and two or more open
   the picker.
+  The shell is a library (`lib.rs`) with two binaries. `session.rs` holds a
+  running game and its `frame(input, time) -> DrawList`, which `main.rs`
+  feeds from the window and `bin/playtest.rs` feeds from a script; game-loop
+  logic belongs in the session, never in either binary. `raster.rs` paints a
+  DrawList in software (the headless twin of `backend.rs`). Play the real
+  game without a window, saving PNG screenshots and each screen's text:
+  `cargo run -p openbounty-shell --bin playtest -- --script s.txt --out dir [--seed n]`
+  (the command list is in `bin/playtest.rs`'s header). Use it to check a
+  change on screen before asking the user to.
 - `specs/shell-renderer-plan.md`: the agreed shell architecture, the renderer
   decision and what was rejected, the legacy geometry, and the work order.
   READ THIS before touching the shell.
@@ -280,7 +289,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 365 engine unit tests, 493 shell unit tests, 25 combat digest
+Test coverage is 366 engine unit tests, 502 shell unit tests, 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written

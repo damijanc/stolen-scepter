@@ -90,6 +90,69 @@ pub enum Key {
 }
 
 /// The top-row digit keys, 0..9, in order.
+impl Key {
+    /// The key a playtest script names, spelled as the variant (`Up`, `Kp7`,
+    /// `Digit3`, `A`, `F10`, ...). Bare digits and lowercase letters also work.
+    pub fn from_name(name: &str) -> Option<Key> {
+        use Key::*;
+        let letters = [
+            A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+        ];
+        if name.len() == 1 {
+            let ch = name.chars().next()?;
+            if ch.is_ascii_alphabetic() {
+                return Some(letters[(ch.to_ascii_uppercase() as u8 - b'A') as usize]);
+            }
+            if let Some(digit) = ch.to_digit(10) {
+                return Some(DIGITS[digit as usize]);
+            }
+        }
+        if let Some(rest) = name.strip_prefix("Digit") {
+            return rest
+                .parse::<usize>()
+                .ok()
+                .and_then(|d| DIGITS.get(d).copied());
+        }
+        if let Some(rest) = name.strip_prefix("Kp") {
+            if let Ok(d) = rest.parse::<usize>() {
+                return NUMPAD_DIGITS.get(d).copied();
+            }
+        }
+        Some(match name {
+            "Up" => Up,
+            "Down" => Down,
+            "Left" => Left,
+            "Right" => Right,
+            "Home" => Home,
+            "End" => End,
+            "PageUp" => PageUp,
+            "PageDown" => PageDown,
+            "Escape" | "Esc" => Escape,
+            "Enter" => Enter,
+            "KpEnter" => KpEnter,
+            "Backspace" => Backspace,
+            "Space" => Space,
+            "LeftControl" | "Ctrl" => LeftControl,
+            "RightControl" => RightControl,
+            "F10" => F10,
+            _ => return None,
+        })
+    }
+
+    /// The character typing this key produces, for text entry.
+    pub fn typed_char(self) -> Option<char> {
+        let name = format!("{self:?}");
+        match self {
+            Key::Space => Some(' '),
+            _ if name.len() == 1 => name.chars().next().map(|c| c.to_ascii_lowercase()),
+            _ => DIGITS
+                .iter()
+                .position(|d| *d == self)
+                .and_then(|d| char::from_digit(d as u32, 10)),
+        }
+    }
+}
+
 pub const DIGITS: [Key; 10] = [
     Key::Digit0,
     Key::Digit1,
