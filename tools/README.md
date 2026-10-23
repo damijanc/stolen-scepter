@@ -24,6 +24,13 @@ PNG I/O is `pngio.py`.
   places the picked seeds into the class picker, the class portraits and the
   credits image. The picker's four columns are `CLASS_FIGURES` in
   `shell/src/startup.rs`; change both together.
+- `gen_terrain_ai.py`: the map terrain. `render` draws each base texture
+  (grass, water, desert, forest, mountain) on ComfyUI, several seeds each;
+  `compose` makes the picked seeds tileable, then builds every base tile, the
+  twelve edge tiles per terrain, and the grass under the combat field and the
+  end screen.
+- `preview_map.py`: renders a patch of a continent from the pack's own tiles,
+  to judge seams, edges and repetition without starting the game.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
   `game-assets/ai-out/`) down to the pack's art scale (4x: 192x136).
 - `gen_terrain.py`, `gen_objects.py`, `gen_combat.py`, `gen_sprites.py`,

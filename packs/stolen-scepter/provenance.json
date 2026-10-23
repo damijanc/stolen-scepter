@@ -76,8 +76,8 @@
       "license": "CC0-1.0"
     },
     "art/combat/field_grass.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/obstacle_01.png": {
@@ -196,68 +196,68 @@
       "license": "CC0-1.0"
     },
     "art/tiles/desert.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_01.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_02.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_03.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_04.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_05.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_06.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_07.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_08.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_09.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_10.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_11.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/desert_edge_12.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/dwelling_dungeon.png": {
@@ -281,143 +281,143 @@
       "license": "CC0-1.0"
     },
     "art/tiles/forest.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_01.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_02.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_03.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_04.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_05.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_06.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_07.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_08.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_09.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_10.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_11.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/forest_edge_12.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/grass.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/grass_variant.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_01.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_02.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_03.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_04.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_05.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_06.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_07.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_08.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_09.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_10.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_11.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_12.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/sign.png": {
@@ -436,68 +436,68 @@
       "license": "CC0-1.0"
     },
     "art/tiles/water.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_00.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_01.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_02.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_03.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_04.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_05.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_06.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_07.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_08.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_09.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_10.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/water_edge_11.png": {
-      "author": "procedural (tools/gen_terrain.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/troops/archers_00.png": {
@@ -1051,8 +1051,8 @@
       "license": "CC0-1.0"
     },
     "art/ui/end_grass.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/end_hero.png": {
