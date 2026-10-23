@@ -569,7 +569,12 @@ fn dispatch_answer(
                 let zone = game.position.zone.as_str().to_owned();
                 let x = game.position.dwelling_x;
                 let y = game.position.dwelling_y;
-                game.recruit_from_dwelling(resources, &zone, x, y, &troop_id, requested);
+                let clamped = requested.min(game.max_recruitable(resources, &troop_id));
+                let outcome =
+                    game.recruit_from_dwelling(resources, &zone, x, y, &troop_id, requested);
+                if let Some(message) = interact::dwelling_refusal(resources, clamped, outcome) {
+                    dialog.open("", &message);
+                }
             }
         }
         PendingFlow::SiegeMonster { castle_id } => {

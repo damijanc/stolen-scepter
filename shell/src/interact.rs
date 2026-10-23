@@ -1174,6 +1174,20 @@ pub fn recruit_refusal(resources: &Resources, outcome: RecruitOutcome) -> Option
     }
 }
 
+/// The dwelling recruit's refusal popup, porting `flow_apply_recruit`: a
+/// request the leadership cap clamps to nothing returns silently before
+/// `GameBuyTroop` runs, so only a positive `clamped` count can be refused.
+pub fn dwelling_refusal(
+    resources: &Resources,
+    clamped: i32,
+    outcome: RecruitOutcome,
+) -> Option<String> {
+    if clamped <= 0 {
+        return None;
+    }
+    recruit_refusal(resources, outcome)
+}
+
 /// The audience flow's two messages, porting `run_audience_dialog`: the
 /// fanfare (page 1) and the king's words (page 2), with %NAME%/%RANK%/%NEEDED%
 /// /%S% substituted.
@@ -2112,6 +2126,22 @@ mod tests {
             .unwrap()
             .contains("slots"));
         assert_eq!(recruit_refusal(&resources, RecruitOutcome::Ok), None);
+    }
+
+    #[test]
+    fn a_dwelling_refuses_a_full_army_but_not_an_empty_request() {
+        let resources = town_resources();
+        assert!(
+            dwelling_refusal(&resources, 5, RecruitOutcome::NoSlotOrInvalid)
+                .unwrap()
+                .contains("slots")
+        );
+        // C's flow_apply_recruit returns before GameBuyTroop when the clamped
+        // count is zero, so the same outcome shows nothing.
+        assert_eq!(
+            dwelling_refusal(&resources, 0, RecruitOutcome::NoSlotOrInvalid),
+            None
+        );
     }
 
     #[test]
