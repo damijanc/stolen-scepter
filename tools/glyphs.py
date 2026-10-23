@@ -11,6 +11,12 @@ borrow the cell's eighth row, which is why they list eight rows.
 
 GLYPHS = {
     " ": ["     "] * 7,
+    # The four arrows the options screen (`views.rs` draw_options) labels the
+    # arrow keys with, at the control codes it uses: down, up, right, left.
+    "\x18": ["  #  ", "  #  ", "  #  ", "# # #", " ### ", "  #  ", "     "],
+    "\x19": ["     ", "  #  ", " ### ", "# # #", "  #  ", "  #  ", "  #  "],
+    "\x1a": ["     ", "   # ", "    #", "#####", "    #", "   # ", "     "],
+    "\x1b": ["     ", " #   ", "#    ", "#####", "#    ", " #   ", "     "],
     "!": ["  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "     ", "  #  "],
     '"': [" # # ", " # # ", " # # ", "     ", "     ", "     ", "     "],
     "#": [" # # ", " # # ", "#####", " # # ", "#####", " # # ", " # # "],

@@ -5963,44 +5963,8 @@
   },
   "keybinds": [
    {
-    "key": "Dn",
-    "label": "Move Down"
-   },
-   {
-    "key": "Lf",
-    "label": "Move Left"
-   },
-   {
-    "key": "Rt",
-    "label": "Move Right"
-   },
-   {
-    "key": "Up",
-    "label": "Move Up"
-   },
-   {
-    "key": "End",
-    "label": "Down Left"
-   },
-   {
-    "key": "PgDn",
-    "label": "Down Right"
-   },
-   {
-    "key": "Hm",
-    "label": "Up Left"
-   },
-   {
-    "key": "PgUp",
-    "label": "Up Right"
-   },
-   {
     "key": "A",
     "label": "Army"
-   },
-   {
-    "key": "C",
-    "label": "Controls"
    },
    {
     "key": "F",

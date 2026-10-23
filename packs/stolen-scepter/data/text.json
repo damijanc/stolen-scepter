@@ -150,9 +150,7 @@
  },
  "controls": {"delay": "Delay", "sounds": "Sounds", "walk_beep": "Step Sound", "animation": "Animation", "cga": "CGA", "music": "Music", "volume": "Volume"},
  "keybinds": [
-  ["Dn", "Move Down"], ["Lf", "Move Left"], ["Rt", "Move Right"], ["Up", "Move Up"],
-  ["End", "Down Left"], ["PgDn", "Down Right"], ["Hm", "Up Left"], ["PgUp", "Up Right"],
-  ["A", "Army"], ["C", "Controls"], ["F", "Fly"], ["L", "Land"], ["I", "Contract"],
+  ["A", "Army"], ["F", "Fly"], ["L", "Land"], ["I", "Contract"],
   ["M", "World Map"], ["P", "Puzzle Map"], ["S", "Dig Here"], ["U", "Cast Spell"],
   ["V", "Character"], ["W", "End the Week"], ["Q", "Save and Quit"]
  ],
