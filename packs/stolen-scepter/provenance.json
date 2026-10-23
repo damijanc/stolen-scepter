@@ -101,43 +101,43 @@
       "license": "CC0-1.0"
     },
     "art/sprites/boat_00.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/boat_01.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/boat_02.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/boat_03.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/hero_walk_00.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/hero_walk_01.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/hero_walk_02.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/sprites/hero_walk_03.png": {
-      "author": "procedural (tools/gen_sprites.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hero_ai.py: SDXL DreamShaper XL), animated by tools/gen_hero_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/tiles/artifact_chest.png": {

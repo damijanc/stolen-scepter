@@ -33,6 +33,9 @@ PNG I/O is `pngio.py`.
   sign, camp, bridges). `render` draws each on ComfyUI, matted; `compose`
   sets the picked seeds on the pack's grass (bridges on water), the castle
   as one picture sliced into its six pieces.
+- `gen_hero_ai.py`: the hero on the map, a mounted knight and a boat, both
+  facing east (the shell mirrors them going west). One picture each,
+  animated with a small bob over the four frames.
 - `preview_map.py`: renders a patch of a continent from the pack's own tiles,
   to judge seams, edges and repetition without starting the game.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
