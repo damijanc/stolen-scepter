@@ -202,6 +202,14 @@ pub fn game_step_basic(
         })
     };
     let interaction = resolve_interaction(game, map, resources, &tile, nx, ny);
+    // C's opened_telecave block reveals around the paired cave too.
+    if let StepInteraction::Telecave {
+        destination: Some((tx, ty)),
+        ..
+    } = &interaction
+    {
+        fog.reveal(map, *tx, *ty, resources.world.fog_sight);
+    }
 
     StepResult::Moved {
         terrain: tile.terrain,
@@ -738,6 +746,32 @@ mod tests {
         assert!(fog.seen(5, 4));
         assert!(fog.seen(7, 6), "corner of the square around (5,4)");
         assert!(!fog.seen(2, 4), "two columns behind the start stays dark");
+    }
+
+    #[test]
+    fn a_telecave_reveals_fog_around_the_cave_it_comes_out_of() {
+        // C's step.c reveals the arrival tile after the jump as well as the
+        // cave stepped into, so the hero never lands in the dark.
+        let mut map = Map::from_tiles(16, 8, vec![Tile::plain_grass(); 128])
+            .expect("fixture dimensions match");
+        let mut game = Game::default();
+        let resources = time_fixture();
+        game.position.zone.copy_from_str("home");
+        game.position.x = 1;
+        game.position.y = 4;
+        game.stats.steps_left_today = 40;
+        for (x, id) in [(2, "telecave_0"), (13, "telecave_1")] {
+            game.add_placement("home", x, 4, Interact::Telecave, id);
+            *map.tile_mut_i32(x, 4).expect("cave tile") = tile_with_id(Interact::Telecave, id);
+        }
+        let mut fog = Fog::new();
+
+        game_step_basic(&mut game, &mut map, &mut fog, &resources, 1, 0);
+
+        assert_eq!((game.position.x, game.position.y), (13, 4));
+        assert!(fog.seen(2, 4), "the cave stepped into");
+        assert!(fog.seen(13, 4));
+        assert!(fog.seen(15, 6), "corner of the square around the arrival");
     }
 
     #[test]
