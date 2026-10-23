@@ -216,6 +216,13 @@ fn any_pressed(keys: &dyn KeySource, group: &[Key]) -> bool {
     group.iter().any(|key| keys.pressed(*key))
 }
 
+/// The first held direction on one axis, or 0.
+fn held_axis(keys: &dyn KeySource, axis: &[(&[Key], i32); 2]) -> i32 {
+    axis.iter()
+        .find(|(group, _)| group.iter().any(|key| keys.down(*key)))
+        .map_or(0, |(_, step)| *step)
+}
+
 /// Read one frame, porting `input_poll`.
 pub fn poll(keys: &dyn KeySource) -> InputState {
     let mut state = InputState::default();
@@ -231,6 +238,15 @@ pub fn poll(keys: &dyn KeySource) -> InputState {
             state.dx = dx;
             break;
         }
+    }
+    // DIVERGENCE: C takes two arrows as a diagonal only when both go down in
+    // the same frame, which a player almost never manages. Here an arrow
+    // pressed while the other axis is HELD makes the diagonal too. It is still
+    // one step per press; a held key alone never moves.
+    if state.dy != 0 && state.dx == 0 {
+        state.dx = held_axis(keys, &HORIZONTAL);
+    } else if state.dx != 0 && state.dy == 0 {
+        state.dy = held_axis(keys, &VERTICAL);
     }
     for (group, dx, dy) in DIAGONAL {
         if any_pressed(keys, group) {
@@ -342,6 +358,19 @@ mod tests {
     fn two_cardinals_at_once_make_a_diagonal() {
         let state = poll_keys(&[Key::Up, Key::Right]);
         assert_eq!((state.dx, state.dy), (1, -1));
+    }
+
+    #[test]
+    fn an_arrow_pressed_while_another_is_held_makes_a_diagonal() {
+        let held = Keys::pressed(&[Key::Right]).with_held(&[Key::Up]);
+        let state = poll(&held);
+        assert_eq!((state.dx, state.dy), (1, -1));
+        let held = Keys::pressed(&[Key::Down]).with_held(&[Key::Left]);
+        let state = poll(&held);
+        assert_eq!((state.dx, state.dy), (-1, 1));
+        // A held key on its own still never steps.
+        let state = poll(&Keys::pressed(&[]).with_held(&[Key::Up, Key::Right]));
+        assert_eq!((state.dx, state.dy), (0, 0));
     }
 
     #[test]
