@@ -50,6 +50,26 @@ HALL_SIZE = (1216, 768)       # the 288x184 picker's aspect
 TITLE_SIZE = (1280, 832)      # the 320x200 title screen's aspect
 LOGO_SIZE = (1536, 448)       # the 320x84 logo strip, wide
 
+BACKDROP_SIZE = (1344, 576)   # the 240x102 dialog backdrops
+ENDING_SIZE = (832, 960)      # the 144x170 win and lose pictures
+
+# The dialog backdrops: a troop stands on the lower left, so each scene keeps
+# open, empty ground across its foreground.
+BACKDROPS = {
+    "town": "a medieval market town street with timber-framed houses and shop signs, "
+            "a wide cobblestone street in the foreground",
+    "castle": "the inner courtyard of a great stone castle, gatehouse and towers, "
+              "wide flagstones in the foreground",
+    "plains": "open green grassland with rolling hills, a few lone trees and a blue sky, "
+              "flat grass in the foreground",
+    "forest": "a deep old forest glade with tall mossy trees and shafts of light, "
+              "a flat mossy clearing in the foreground",
+    "hillcave": "rocky brown hills with a large dark cave mouth in a cliff, flat stony "
+                "ground in the foreground",
+    "dungeon": "a dark underground dungeon hall of stone with torches on the walls and "
+               "iron doors, a flat stone floor in the foreground",
+}
+
 SCENE_NEG = ("text, letters, words, title, logo, watermark, signature, people, person, "
              "figure, character, blurry, low quality, deformed")
 
@@ -108,7 +128,8 @@ def main():
     ap.add_argument("--seeds", type=int, default=3, help="variants per piece")
     ap.add_argument("--first-seed", type=int, default=101)
     ap.add_argument("--only", default="figure,portrait,hall",
-                    help="comma list of: figure, portrait, hall, title, logo")
+                    help="comma list of: figure, portrait, hall, title, logo, "
+                         "backdrop, ending")
     ap.add_argument("--classes", default=",".join(CLASSES))
     ap.add_argument("--host", default="http://127.0.0.1:8188")
     ap.add_argument("--ckpt", default=gen_ai.CKPT)
@@ -173,6 +194,28 @@ def main():
                    f"product shot, centered, {STYLE}",
                    SCENE_NEG, LOGO_SIZE, seed, False,
                    os.path.join(out, f"logo_{seed}.png"))
+    if "backdrop" in pieces:
+        for kind, scene in BACKDROPS.items():
+            print(f"backdrop {kind}", flush=True)
+            for seed in seeds:
+                render(args, f"{scene}, wide view, empty of people, {STYLE}",
+                       SCENE_NEG, BACKDROP_SIZE, seed, False,
+                       os.path.join(out, f"backdrop_{kind}_{seed}.png"))
+    if "ending" in pieces:
+        print("ending", flush=True)
+        for seed in seeds:
+            render(args,
+                   "an old bearded king on a golden throne in a bright royal hall, raising a "
+                   "golden scepter with a large red ruby in triumph, red and gold banners, "
+                   f"single figure, {STYLE}",
+                   PORTRAIT_NEG, ENDING_SIZE, seed, False,
+                   os.path.join(out, f"ending_win_{seed}.png"))
+            render(args,
+                   "a dark empty throne room at night, an empty throne on a dais, cold blue "
+                   "moonlight through tall windows, torn fallen banners, dust, gloomy, "
+                   f"{STYLE}",
+                   SCENE_NEG, ENDING_SIZE, seed, False,
+                   os.path.join(out, f"ending_lose_{seed}.png"))
     contact_sheet(out)
     return 0
 

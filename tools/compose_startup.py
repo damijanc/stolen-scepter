@@ -12,6 +12,10 @@ Writes, at the pack's art scale (`render.scale`):
 - `art/ui/splash_title.png` (320x200): the castle at dusk with the game's
   title lettered over its sky.
 - `art/ui/splash_logo.png` (320x84): the Scepter, with a byline.
+- `art/ui/backdrop_<kind>.png` (240x102): the six dialog scenes (town,
+  castle, plains, forest, hill cave, dungeon) a troop stands in front of.
+- `art/ui/end_win_screen.png` / `end_lose_screen.png` (144x170): the
+  pictures beside the win and lose text.
 
 The picks below name which seed of each piece was kept; the sources are in
 local, ignored `game-assets/ai-out/<run>/startup/`, and the PNGs this writes
@@ -37,6 +41,9 @@ PICKS = {
     "portrait": {"knight": 102, "paladin": 102, "sorceress": 102, "barbarian": 103},
     "title": 101,
     "logo": 103,
+    "backdrop": {"town": 102, "castle": 102, "plains": 102,
+                 "forest": 101, "hillcave": 101, "dungeon": 101},
+    "ending": {"win": 102, "lose": 102},
 }
 AUTHOR = "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by " \
          "tools/compose_startup.py"
@@ -218,6 +225,15 @@ def main():
         if cls["id"] == "knight":
             hw, hh = HIGHLIGHT_W * scale, HIGHLIGHT_H * scale
             written[pack["sprites"]["ui"]["class_highlight"]] = (hw, hh, cover(w, h, px, hw, hh))
+
+    for kind, seed in PICKS["backdrop"].items():
+        w, h, px = read_png(src("backdrop", kind))
+        tw, th = 240 * scale, 102 * scale
+        written[ui[f"{kind}_backdrop"]] = (tw, th, cover(w, h, px, tw, th))
+    for outcome in ("win", "lose"):
+        w, h, px = read_png(src("ending", outcome))
+        tw, th = 144 * scale, 170 * scale
+        written[ui[f"ending_{outcome}"]] = (tw, th, cover(w, h, px, tw, th))
 
     for rel, (w, h, px) in written.items():
         write_png(os.path.join(PACK, rel), w, h, px)

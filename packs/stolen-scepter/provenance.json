@@ -1001,33 +1001,33 @@
       "license": "CC0-1.0"
     },
     "art/ui/backdrop_castle.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/backdrop_dungeon.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/backdrop_forest.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/backdrop_hillcave.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/backdrop_plains.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/backdrop_town.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/chrome_overworld.png": {
@@ -1061,13 +1061,13 @@
       "license": "CC0-1.0"
     },
     "art/ui/end_lose_screen.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/end_win_screen.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_bar_strip.png": {
