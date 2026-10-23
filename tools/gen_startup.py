@@ -47,6 +47,11 @@ HALL_NEG = ("text, watermark, signature, people, person, figure, character, crow
 FIGURE_SIZE = (832, 1216)     # tall: a whole standing figure
 PORTRAIT_SIZE = (960, 1024)   # the 96x102 slot's aspect
 HALL_SIZE = (1216, 768)       # the 288x184 picker's aspect
+TITLE_SIZE = (1280, 832)      # the 320x200 title screen's aspect
+LOGO_SIZE = (1536, 448)       # the 320x84 logo strip, wide
+
+SCENE_NEG = ("text, letters, words, title, logo, watermark, signature, people, person, "
+             "figure, character, blurry, low quality, deformed")
 
 
 class Args:
@@ -103,7 +108,7 @@ def main():
     ap.add_argument("--seeds", type=int, default=3, help="variants per piece")
     ap.add_argument("--first-seed", type=int, default=101)
     ap.add_argument("--only", default="figure,portrait,hall",
-                    help="comma list of: figure, portrait, hall")
+                    help="comma list of: figure, portrait, hall, title, logo")
     ap.add_argument("--classes", default=",".join(CLASSES))
     ap.add_argument("--host", default="http://127.0.0.1:8188")
     ap.add_argument("--ckpt", default=gen_ai.CKPT)
@@ -121,7 +126,7 @@ def main():
 
     pieces = cli.only.split(",")
     seeds = range(cli.first_seed, cli.first_seed + cli.seeds)
-    for cls in cli.classes.split(","):
+    for cls in filter(None, cli.classes.split(",")):
         look = CLASSES[cls]
         if "figure" in pieces:
             print(f"figure {cls}", flush=True)
@@ -149,6 +154,25 @@ def main():
                    f"the foreground, wide view, {STYLE}",
                    HALL_NEG, HALL_SIZE, seed, False,
                    os.path.join(out, f"hall_{seed}.png"))
+    if "title" in pieces:
+        print("title", flush=True)
+        for seed in seeds:
+            render(args,
+                   "a majestic royal castle on a high cliff above a misty valley at dusk, "
+                   "a deep twilight sky with the first stars filling the upper half of the "
+                   "picture, a faint golden glow behind the towers, a winding road leading "
+                   f"to the gate, epic wide landscape, {STYLE}",
+                   SCENE_NEG, TITLE_SIZE, seed, False,
+                   os.path.join(out, f"title_{seed}.png"))
+    if "logo" in pieces:
+        print("logo", flush=True)
+        for seed in seeds:
+            render(args,
+                   "an ornate golden royal scepter with a large red ruby, lying horizontally "
+                   "across the middle of the picture on a plain pure black background, "
+                   f"product shot, centered, {STYLE}",
+                   SCENE_NEG, LOGO_SIZE, seed, False,
+                   os.path.join(out, f"logo_{seed}.png"))
     contact_sheet(out)
     return 0
 

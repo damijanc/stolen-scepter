@@ -9,6 +9,9 @@ Writes, at the pack's art scale (`render.scale`):
 - `art/classes/<class>.png` (96x102): the portrait busts.
 - `art/ui/class_select_highlight.png` (42x44): the credits image, cut from
   the knight's portrait.
+- `art/ui/splash_title.png` (320x200): the castle at dusk with the game's
+  title lettered over its sky.
+- `art/ui/splash_logo.png` (320x84): the Scepter, with a byline.
 
 The picks below name which seed of each piece was kept; the sources are in
 local, ignored `game-assets/ai-out/<run>/startup/`, and the PNGs this writes
@@ -23,7 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_ai import alpha_components, box_downscale  # noqa: E402
 from gen_objects import Canvas  # noqa: E402
-from glyphs import draw_text  # noqa: E402
+from glyphs import draw_text, lit, text_width  # noqa: E402
 from packart import PACK, ROOT, register  # noqa: E402
 from pngio import read_png, write_png  # noqa: E402
 
@@ -32,6 +35,8 @@ PICKS = {
     "hall": 103,
     "figure": {"knight": 101, "paladin": 101, "sorceress": 101, "barbarian": 103},
     "portrait": {"knight": 102, "paladin": 102, "sorceress": 102, "barbarian": 103},
+    "title": 101,
+    "logo": 103,
 }
 AUTHOR = "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by " \
          "tools/compose_startup.py"
@@ -55,7 +60,14 @@ PORTRAIT_W, PORTRAIT_H = 96, 102
 HIGHLIGHT_W, HIGHLIGHT_H = 42, 44
 
 GOLD = (232, 196, 72)
+GOLD_L = (255, 236, 150)
+GOLD_D = (190, 128, 36)
+PARCH = (240, 226, 196)
 INK = (20, 16, 24)
+
+TITLE_TOP = "THE QUEST FOR A"
+TITLE_MAIN = "STOLEN SCEPTER"
+BYLINE = "AN OPENBOUNTY TALE"
 
 
 def src(kind, name=None):
@@ -133,13 +145,72 @@ def picker(scale):
     return tw, th, bytes(canvas)
 
 
+def lettering(w, h, px, text, y, dot, top, bottom, outline=2):
+    """Centre `text` at row `y` in glyph dots of `dot` pixels: an `outline`-dot
+    dark border, then the letters shaded from `top` to `bottom` colour."""
+    px = bytearray(px)
+    x0 = (w - text_width(text, dot)) // 2
+    dots = [(x0 + (i * 8 + gx) * dot, y + gy * dot)
+            for i, ch in enumerate(text) for gx, gy in lit(ch)]
+    ink = outline * dot // 2
+    for dx, dy in dots:
+        for yy in range(dy - ink, dy + dot + ink):
+            for xx in range(dx - ink, dx + dot + ink):
+                if 0 <= xx < w and 0 <= yy < h:
+                    o = (yy * w + xx) * 4
+                    px[o:o + 3] = bytes(INK)
+    span = 7 * dot
+    for dx, dy in dots:
+        for yy in range(dy, dy + dot):
+            t = min(1.0, max(0.0, (yy - y) / span))
+            col = tuple(round(top[c] + (bottom[c] - top[c]) * t) for c in range(3))
+            for xx in range(dx, dx + dot):
+                if 0 <= xx < w and 0 <= yy < h:
+                    o = (yy * w + xx) * 4
+                    px[o:o + 3] = bytes(col)
+    return bytes(px)
+
+
+def darken_top(w, h, px, depth, strength):
+    """Fade the top `depth` rows toward black, strongest at the top edge."""
+    px = bytearray(px)
+    for y in range(min(depth, h)):
+        k = 1 - strength * (1 - y / depth)
+        for x in range(w):
+            o = (y * w + x) * 4
+            for c in range(3):
+                px[o + c] = round(px[o + c] * k)
+    return bytes(px)
+
+
+def title(scale):
+    tw, th = 320 * scale, 200 * scale
+    w, h, px = read_png(src("title"))
+    out = cover(w, h, px, tw, th)
+    out = darken_top(tw, th, out, 90 * scale, 0.55)
+    out = lettering(tw, th, out, TITLE_TOP, 18 * scale, scale, PARCH, GOLD)
+    out = lettering(tw, th, out, TITLE_MAIN, 34 * scale, 2 * scale, GOLD_L, GOLD_D)
+    return tw, th, out
+
+
+def logo(scale):
+    tw, th = 320 * scale, 84 * scale
+    w, h, px = read_png(src("logo"))
+    out = cover(w, h, px, tw, th)
+    out = lettering(tw, th, out, BYLINE, 72 * scale, scale, PARCH, GOLD)
+    return tw, th, out
+
+
 def main():
     with open(os.path.join(PACK, "game.json")) as fh:
         pack = json.load(fh)
     scale = pack["render"].get("scale", 1)
     written = {}
 
-    written[pack["sprites"]["ui"]["class_picker"]] = picker(scale)
+    ui = pack["sprites"]["ui"]
+    written[ui["class_picker"]] = picker(scale)
+    written[ui["splash_title"]] = title(scale)
+    written[ui["splash_logo"]] = logo(scale)
     for cls in pack["classes"]:
         w, h, px = read_png(src("portrait", cls["id"]))
         tw, th = PORTRAIT_W * scale, PORTRAIT_H * scale

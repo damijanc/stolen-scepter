@@ -1206,13 +1206,13 @@
       "license": "CC0-1.0"
     },
     "art/ui/splash_logo.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/splash_title.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_startup.py: SDXL DreamShaper XL), composed by tools/compose_startup.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/villains/cassian_00.png": {
