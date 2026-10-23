@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 
 use macroquad::prelude::{
-    clear_background, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
+    clear_background, draw_arc, draw_circle, draw_rectangle, draw_rectangle_lines, draw_texture_ex,
     get_char_pressed, get_internal_gl, get_keys_pressed, is_key_down, is_key_pressed,
     is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
     screen_dpi_scale, screen_height, screen_width, show_mouse, Color as MqColor, DrawTextureParams,
@@ -357,9 +357,15 @@ impl Frame {
         draw_rectangle(x + radius, y + h - t, w - radius * 2.0, t, color);
         draw_rectangle(x, y + radius, t, h - radius * 2.0, color);
         draw_rectangle(x + w - t, y + radius, t, h - radius * 2.0, color);
-        for (cx, cy) in corners(x, y, w, h, radius) {
-            draw_circle(cx, cy, radius, color);
-            draw_circle(cx, cy, radius - t, MqColor::from_rgba(0, 0, 0, 0));
+        // A quarter ring per corner, inside the radius. Painting a disc and
+        // then a transparent one over it does not cut a hole -- drawing in
+        // transparent changes nothing -- so the corners came out solid.
+        // Screen y points down, so 0 degrees is east and 90 is south.
+        for ((cx, cy), start) in corners(x, y, w, h, radius)
+            .into_iter()
+            .zip([180.0, 270.0, 90.0, 0.0])
+        {
+            draw_arc(cx, cy, 32, radius - t, start, t, 90.0, color);
         }
     }
 }
