@@ -202,17 +202,17 @@
     "dunemark"
    ],
    "hero_spawn": {
-    "x": 10,
-    "y": 41
+    "x": 20,
+    "y": 26
    },
    "is_home": true,
    "home_spawn": {
-    "x": 36,
-    "y": 37
+    "x": 34,
+    "y": 35
    },
    "magic_alcove": {
-    "x": 20,
-    "y": 54
+    "x": 48,
+    "y": 21
    },
    "salt": {
     "artifacts": 2,
@@ -236,85 +236,85 @@
    },
    "signs": [
     {
-     "x": 31,
-     "y": 17,
+     "x": 26,
+     "y": 48,
      "id": "sign_highmoor_00",
      "title": "Welcome, traveller.",
      "body": "The ferry is in town."
     },
     {
-     "x": 56,
-     "y": 55,
+     "x": 50,
+     "y": 11,
      "id": "sign_highmoor_01",
      "title": "Beware the deep woods.",
      "body": "Wolves hunt there at dusk."
     },
     {
-     "x": 16,
+     "x": 56,
      "y": 48,
      "id": "sign_highmoor_02",
      "title": "Boats for hire in",
      "body": "every harbour town."
     },
     {
-     "x": 60,
-     "y": 25,
+     "x": 27,
+     "y": 22,
      "id": "sign_highmoor_03",
      "title": "Lost something?",
      "body": "Try digging. Mind the days."
     },
     {
-     "x": 43,
-     "y": 38,
+     "x": 34,
+     "y": 5,
      "id": "sign_highmoor_04",
      "title": "The King pays well",
      "body": "for villains brought in."
     },
     {
-     "x": 45,
-     "y": 2,
+     "x": 51,
+     "y": 30,
      "id": "sign_highmoor_05",
      "title": "Mountains ahead.",
      "body": "Go around, not through."
     },
     {
-     "x": 34,
-     "y": 61,
+     "x": 35,
+     "y": 39,
      "id": "sign_highmoor_06",
      "title": "Every chest is a gamble.",
      "body": "Some hold more than gold."
     },
     {
-     "x": 24,
-     "y": 33,
+     "x": 22,
+     "y": 35,
      "id": "sign_highmoor_07",
      "title": "Here lies a brave fool.",
      "body": "He fought a dragon alone."
     },
     {
-     "x": 53,
-     "y": 13,
+     "x": 35,
+     "y": 14,
      "id": "sign_highmoor_08",
      "title": "Castles hold armies.",
      "body": "Count them before you knock."
     },
     {
      "x": 28,
-     "y": 1,
+     "y": 31,
      "id": "sign_highmoor_09",
      "title": "The scepter is buried",
      "body": "somewhere in this realm."
     },
     {
-     "x": 31,
-     "y": 45,
+     "x": 50,
+     "y": 21,
      "id": "sign_highmoor_10",
      "title": "Rest your feet, friend.",
      "body": ""
     },
     {
-     "x": 44,
-     "y": 21,
+     "x": 31,
+     "y": 53,
      "id": "sign_highmoor_11",
      "title": "Dwellings refill weekly.",
      "body": "Recruit while you can."
@@ -322,494 +322,494 @@
    ],
    "towns": [
     {
-     "x": 51,
-     "y": 57,
+     "x": 16,
+     "y": 58,
      "id": "millbrook",
-     "boat_x": 51,
+     "boat_x": 15,
      "boat_y": 58
     },
     {
-     "x": 25,
-     "y": 3,
+     "x": 55,
+     "y": 10,
      "id": "oakhollow",
-     "boat_x": 24,
-     "boat_y": 3
-    },
-    {
-     "x": 10,
-     "y": 43,
-     "id": "saltmarsh",
-     "boat_x": 10,
-     "boat_y": 44
-    },
-    {
-     "x": 62,
-     "y": 21,
-     "id": "brightwater",
-     "boat_x": 63,
-     "boat_y": 21
-    },
-    {
-     "x": 23,
-     "y": 61,
-     "id": "harrowgate",
-     "boat_x": 23,
-     "boat_y": 62
-    },
-    {
-     "x": 53,
-     "y": 4,
-     "id": "copperton",
-     "boat_x": 54,
-     "boat_y": 4
-    },
-    {
-     "x": 16,
-     "y": 26,
-     "id": "redfern",
-     "boat_x": 16,
-     "boat_y": 27
+     "boat_x": 56,
+     "boat_y": 10
     },
     {
      "x": 61,
-     "y": 43,
-     "id": "stillwell",
+     "y": 49,
+     "id": "saltmarsh",
      "boat_x": 62,
-     "boat_y": 43
+     "boat_y": 49
     },
     {
-     "x": 24,
-     "y": 18,
-     "id": "gullcliff",
+     "x": 23,
+     "y": 22,
+     "id": "brightwater",
      "boat_x": 23,
-     "boat_y": 18
+     "boat_y": 21
     },
     {
-     "x": 40,
+     "x": 33,
      "y": 2,
-     "id": "thornbury",
-     "boat_x": 40,
+     "id": "harrowgate",
+     "boat_x": 33,
      "boat_y": 1
     },
     {
-     "x": 38,
+     "x": 48,
      "y": 61,
-     "id": "larkspur",
-     "boat_x": 38,
+     "id": "copperton",
+     "boat_x": 48,
      "boat_y": 62
+    },
+    {
+     "x": 12,
+     "y": 38,
+     "id": "redfern",
+     "boat_x": 11,
+     "boat_y": 38
+    },
+    {
+     "x": 61,
+     "y": 30,
+     "id": "stillwell",
+     "boat_x": 62,
+     "boat_y": 30
+    },
+    {
+     "x": 18,
+     "y": 29,
+     "id": "gullcliff",
+     "boat_x": 17,
+     "boat_y": 29
+    },
+    {
+     "x": 15,
+     "y": 47,
+     "id": "thornbury",
+     "boat_x": 15,
+     "boat_y": 48
+    },
+    {
+     "x": 54,
+     "y": 55,
+     "id": "larkspur",
+     "boat_x": 54,
+     "boat_y": 56
     }
    ],
    "castles": [
     {
-     "x": 36,
-     "y": 35,
+     "x": 34,
+     "y": 33,
      "id": "royal_hall"
     },
     {
-     "x": 43,
+     "x": 40,
      "y": 25,
      "id": "grimhold"
     },
     {
-     "x": 23,
-     "y": 41,
+     "x": 47,
+     "y": 35,
      "id": "ravenkeep"
     },
     {
-     "x": 33,
-     "y": 50,
+     "x": 24,
+     "y": 28,
      "id": "stonecrest"
     },
     {
-     "x": 20,
-     "y": 26,
+     "x": 30,
+     "y": 44,
      "id": "ironwatch"
     },
     {
-     "x": 59,
-     "y": 36,
+     "x": 53,
+     "y": 17,
      "id": "blackmoor"
-    },
-    {
-     "x": 52,
-     "y": 49,
-     "id": "hollowspire"
-    },
-    {
-     "x": 57,
-     "y": 21,
-     "id": "dunmarrow"
     },
     {
      "x": 26,
      "y": 13,
+     "id": "hollowspire"
+    },
+    {
+     "x": 58,
+     "y": 38,
+     "id": "dunmarrow"
+    },
+    {
+     "x": 38,
+     "y": 7,
      "id": "wolfgate"
     },
     {
-     "x": 42,
-     "y": 60,
+     "x": 49,
+     "y": 55,
      "id": "ashenfell"
     },
     {
-     "x": 49,
-     "y": 4,
+     "x": 51,
+     "y": 5,
      "id": "cragmere"
     },
     {
-     "x": 18,
-     "y": 60,
+     "x": 20,
+     "y": 59,
      "id": "brackenhold"
     }
    ],
    "chests": [
     {
-     "x": 18,
-     "y": 43,
+     "x": 52,
+     "y": 12,
      "id": "chest_highmoor_000"
     },
     {
-     "x": 54,
-     "y": 7,
+     "x": 20,
+     "y": 55,
      "id": "chest_highmoor_001"
     },
     {
-     "x": 58,
-     "y": 54,
+     "x": 61,
+     "y": 47,
      "id": "chest_highmoor_002"
     },
     {
-     "x": 32,
-     "y": 21,
+     "x": 12,
+     "y": 20,
      "id": "chest_highmoor_003"
     },
     {
-     "x": 32,
-     "y": 61,
+     "x": 28,
+     "y": 2,
      "id": "chest_highmoor_004"
     },
     {
-     "x": 49,
-     "y": 34,
+     "x": 35,
+     "y": 37,
      "id": "chest_highmoor_005"
     },
     {
-     "x": 9,
-     "y": 18,
+     "x": 48,
+     "y": 59,
      "id": "chest_highmoor_006"
     },
     {
-     "x": 36,
-     "y": 1,
+     "x": 15,
+     "y": 38,
      "id": "chest_highmoor_007"
     },
     {
-     "x": 62,
-     "y": 24,
+     "x": 35,
+     "y": 16,
      "id": "chest_highmoor_008"
     },
     {
-     "x": 34,
-     "y": 39,
+     "x": 51,
+     "y": 32,
      "id": "chest_highmoor_009"
     },
     {
-     "x": 24,
-     "y": 9,
+     "x": 2,
+     "y": 30,
      "id": "chest_highmoor_010"
     },
     {
-     "x": 40,
-     "y": 51,
+     "x": 28,
+     "y": 27,
      "id": "chest_highmoor_011"
     },
     {
-     "x": 43,
-     "y": 14,
+     "x": 26,
+     "y": 44,
      "id": "chest_highmoor_012"
     },
     {
-     "x": 23,
-     "y": 30,
+     "x": 45,
+     "y": 22,
      "id": "chest_highmoor_013"
     },
     {
-     "x": 61,
-     "y": 40,
+     "x": 46,
+     "y": 43,
      "id": "chest_highmoor_014"
     },
     {
-     "x": 25,
+     "x": 33,
      "y": 52,
      "id": "chest_highmoor_015"
     },
     {
-     "x": 48,
-     "y": 61,
+     "x": 54,
+     "y": 52,
      "id": "chest_highmoor_016"
     },
     {
-     "x": 39,
-     "y": 29,
+     "x": 22,
+     "y": 33,
      "id": "chest_highmoor_017"
     },
     {
-     "x": 52,
-     "y": 45,
+     "x": 39,
+     "y": 3,
      "id": "chest_highmoor_018"
     },
     {
-     "x": 50,
-     "y": 21,
+     "x": 26,
+     "y": 18,
      "id": "chest_highmoor_019"
     },
     {
-     "x": 14,
-     "y": 34,
+     "x": 55,
+     "y": 21,
      "id": "chest_highmoor_020"
     },
     {
-     "x": 58,
-     "y": 15,
+     "x": 59,
+     "y": 34,
      "id": "chest_highmoor_021"
     },
     {
-     "x": 34,
-     "y": 11,
+     "x": 37,
+     "y": 29,
      "id": "chest_highmoor_022"
     },
     {
-     "x": 17,
-     "y": 56,
+     "x": 18,
+     "y": 47,
      "id": "chest_highmoor_023"
     },
     {
-     "x": 45,
-     "y": 4,
+     "x": 34,
+     "y": 7,
      "id": "chest_highmoor_024"
     },
     {
-     "x": 58,
-     "y": 32,
+     "x": 26,
+     "y": 9,
      "id": "chest_highmoor_025"
     },
     {
-     "x": 29,
-     "y": 45,
+     "x": 39,
+     "y": 12,
      "id": "chest_highmoor_026"
     },
     {
-     "x": 46,
-     "y": 41,
+     "x": 54,
+     "y": 37,
      "id": "chest_highmoor_027"
     },
     {
-     "x": 29,
-     "y": 4,
+     "x": 30,
+     "y": 40,
      "id": "chest_highmoor_028"
     },
     {
-     "x": 26,
-     "y": 17,
+     "x": 49,
+     "y": 18,
      "id": "chest_highmoor_029"
     },
     {
-     "x": 15,
-     "y": 22,
+     "x": 50,
+     "y": 47,
      "id": "chest_highmoor_030"
     },
     {
-     "x": 9,
-     "y": 39,
+     "x": 39,
+     "y": 20,
      "id": "chest_highmoor_031"
     },
     {
-     "x": 54,
-     "y": 38,
+     "x": 25,
+     "y": 52,
      "id": "chest_highmoor_032"
     },
     {
-     "x": 39,
-     "y": 19,
+     "x": 21,
+     "y": 39,
      "id": "chest_highmoor_033"
     },
     {
-     "x": 36,
-     "y": 56,
+     "x": 30,
+     "y": 32,
      "id": "chest_highmoor_034"
     },
     {
-     "x": 47,
+     "x": 53,
      "y": 27,
      "id": "chest_highmoor_035"
     },
     {
-     "x": 40,
-     "y": 8,
+     "x": 30,
+     "y": 14,
      "id": "chest_highmoor_036"
     },
     {
-     "x": 45,
-     "y": 55,
+     "x": 29,
+     "y": 49,
      "id": "chest_highmoor_037"
     },
     {
-     "x": 41,
-     "y": 37,
+     "x": 25,
+     "y": 23,
      "id": "chest_highmoor_038"
     },
     {
-     "x": 48,
-     "y": 10,
+     "x": 55,
+     "y": 46,
      "id": "chest_highmoor_039"
     },
     {
-     "x": 62,
-     "y": 48,
+     "x": 25,
+     "y": 36,
      "id": "chest_highmoor_040"
     },
     {
-     "x": 25,
-     "y": 37,
+     "x": 30,
+     "y": 55,
      "id": "chest_highmoor_041"
     },
     {
-     "x": 23,
-     "y": 59,
+     "x": 24,
+     "y": 47,
      "id": "chest_highmoor_042"
     },
     {
-     "x": 53,
-     "y": 29,
+     "x": 58,
+     "y": 49,
      "id": "chest_highmoor_043"
     },
     {
-     "x": 13,
-     "y": 46,
+     "x": 48,
+     "y": 13,
      "id": "chest_highmoor_044"
     },
     {
-     "x": 19,
-     "y": 50,
+     "x": 29,
+     "y": 22,
      "id": "chest_highmoor_045"
     },
     {
-     "x": 32,
-     "y": 33,
+     "x": 50,
+     "y": 9,
      "id": "chest_highmoor_046"
     },
     {
-     "x": 28,
-     "y": 25,
+     "x": 58,
+     "y": 30,
      "id": "chest_highmoor_047"
     },
     {
-     "x": 48,
-     "y": 49,
+     "x": 47,
+     "y": 39,
      "id": "chest_highmoor_048"
     },
     {
-     "x": 36,
-     "y": 46,
+     "x": 35,
+     "y": 2,
      "id": "chest_highmoor_049"
     },
     {
-     "x": 23,
-     "y": 22,
+     "x": 49,
+     "y": 23,
      "id": "chest_highmoor_050"
     },
     {
-     "x": 29,
-     "y": 57,
+     "x": 53,
+     "y": 23,
      "id": "chest_highmoor_051"
     },
     {
-     "x": 44,
-     "y": 31,
+     "x": 27,
+     "y": 5,
      "id": "chest_highmoor_052"
     },
     {
      "x": 51,
-     "y": 15,
+     "y": 44,
      "id": "chest_highmoor_053"
     },
     {
-     "x": 10,
-     "y": 24,
+     "x": 32,
+     "y": 17,
      "id": "chest_highmoor_054"
     },
     {
-     "x": 31,
-     "y": 15,
+     "x": 36,
+     "y": 26,
      "id": "chest_highmoor_055"
     },
     {
-     "x": 19,
-     "y": 36,
+     "x": 32,
+     "y": 38,
      "id": "chest_highmoor_056"
     },
     {
-     "x": 34,
-     "y": 27,
+     "x": 26,
+     "y": 40,
      "id": "chest_highmoor_057"
     },
     {
-     "x": 23,
-     "y": 46,
+     "x": 48,
+     "y": 45,
      "id": "chest_highmoor_058"
     },
     {
-     "x": 58,
-     "y": 44,
+     "x": 49,
+     "y": 42,
      "id": "chest_highmoor_059"
     },
     {
-     "x": 52,
-     "y": 55,
+     "x": 38,
+     "y": 17,
      "id": "chest_highmoor_060"
     },
     {
-     "x": 46,
-     "y": 18,
+     "x": 50,
+     "y": 28,
      "id": "chest_highmoor_061"
     },
     {
-     "x": 32,
-     "y": 54,
+     "x": 13,
+     "y": 23,
      "id": "chest_highmoor_062"
     },
     {
-     "x": 55,
-     "y": 12,
+     "x": 53,
+     "y": 48,
      "id": "chest_highmoor_063"
     },
     {
-     "x": 60,
-     "y": 28,
+     "x": 15,
+     "y": 21,
      "id": "chest_highmoor_064"
     },
     {
-     "x": 56,
-     "y": 48,
+     "x": 28,
+     "y": 53,
      "id": "chest_highmoor_065"
     },
     {
-     "x": 16,
-     "y": 39,
+     "x": 21,
+     "y": 46,
      "id": "chest_highmoor_066"
     },
     {
-     "x": 38,
-     "y": 13,
+     "x": 22,
+     "y": 53,
      "id": "chest_highmoor_067"
     },
     {
-     "x": 35,
-     "y": 6,
+     "x": 51,
+     "y": 36,
      "id": "chest_highmoor_068"
     },
     {
-     "x": 28,
-     "y": 40,
+     "x": 31,
+     "y": 3,
      "id": "chest_highmoor_069"
     }
    ],
@@ -817,153 +817,153 @@
    "dwellings": [],
    "wandering_armies": [
     {
-     "x": 26,
-     "y": 20,
+     "x": 25,
+     "y": 34,
      "id": "army_highmoor_000"
     },
     {
-     "x": 61,
-     "y": 50,
+     "x": 53,
+     "y": 10,
      "id": "army_highmoor_001"
     },
     {
-     "x": 29,
-     "y": 61,
+     "x": 55,
+     "y": 50,
      "id": "army_highmoor_002"
     },
     {
-     "x": 54,
-     "y": 9,
+     "x": 26,
+     "y": 2,
      "id": "army_highmoor_003"
     },
     {
-     "x": 11,
-     "y": 39,
+     "x": 32,
+     "y": 55,
      "id": "army_highmoor_004"
     },
     {
-     "x": 45,
-     "y": 34,
+     "x": 41,
+     "y": 21,
      "id": "army_highmoor_005"
     },
     {
-     "x": 34,
-     "y": 2,
+     "x": 59,
+     "y": 32,
      "id": "army_highmoor_006"
     },
     {
-     "x": 62,
-     "y": 26,
+     "x": 46,
+     "y": 41,
      "id": "army_highmoor_007"
     },
     {
-     "x": 43,
-     "y": 54,
+     "x": 32,
+     "y": 14,
      "id": "army_highmoor_008"
     },
     {
-     "x": 31,
-     "y": 42,
+     "x": 20,
+     "y": 52,
      "id": "army_highmoor_009"
     },
     {
-     "x": 43,
-     "y": 17,
+     "x": 33,
+     "y": 40,
      "id": "army_highmoor_010"
     },
     {
-     "x": 21,
-     "y": 51,
+     "x": 50,
+     "y": 26,
      "id": "army_highmoor_011"
     },
     {
-     "x": 22,
-     "y": 33,
+     "x": 28,
+     "y": 24,
      "id": "army_highmoor_012"
     },
     {
-     "x": 50,
-     "y": 45,
+     "x": 17,
+     "y": 39,
      "id": "army_highmoor_013"
     },
     {
-     "x": 34,
-     "y": 29,
+     "x": 26,
+     "y": 46,
      "id": "army_highmoor_014"
     },
     {
-     "x": 24,
-     "y": 7,
+     "x": 37,
+     "y": 3,
      "id": "army_highmoor_015"
     },
     {
-     "x": 51,
-     "y": 23,
+     "x": 48,
+     "y": 16,
      "id": "army_highmoor_016"
     },
     {
-     "x": 33,
-     "y": 14,
+     "x": 39,
+     "y": 15,
      "id": "army_highmoor_017"
     },
     {
-     "x": 58,
-     "y": 40,
+     "x": 30,
+     "y": 30,
      "id": "army_highmoor_018"
     },
     {
-     "x": 37,
-     "y": 48,
+     "x": 53,
+     "y": 21,
      "id": "army_highmoor_019"
     },
     {
-     "x": 55,
-     "y": 31,
+     "x": 52,
+     "y": 46,
      "id": "army_highmoor_020"
     },
     {
-     "x": 42,
-     "y": 6,
+     "x": 28,
+     "y": 51,
      "id": "army_highmoor_021"
     },
     {
-     "x": 54,
-     "y": 55,
+     "x": 23,
+     "y": 38,
      "id": "army_highmoor_022"
     },
     {
-     "x": 58,
-     "y": 17,
+     "x": 47,
+     "y": 23,
      "id": "army_highmoor_023"
     },
     {
-     "x": 16,
-     "y": 45,
+     "x": 26,
+     "y": 20,
      "id": "army_highmoor_024"
     },
     {
-     "x": 48,
-     "y": 59,
+     "x": 27,
+     "y": 7,
      "id": "army_highmoor_025"
     },
     {
-     "x": 37,
-     "y": 59,
+     "x": 53,
+     "y": 29,
      "id": "army_highmoor_026"
     },
     {
-     "x": 37,
-     "y": 21,
+     "x": 45,
+     "y": 20,
      "id": "army_highmoor_027"
     },
     {
-     "x": 40,
-     "y": 39,
+     "x": 30,
+     "y": 38,
      "id": "army_highmoor_028"
     },
     {
-     "x": 46,
-     "y": 11,
+     "x": 50,
+     "y": 13,
      "id": "army_highmoor_029"
     }
    ]
@@ -980,8 +980,8 @@
     "dunemark"
    ],
    "hero_spawn": {
-    "x": 25,
-    "y": 1
+    "x": 6,
+    "y": 40
    },
    "is_home": false,
    "salt": {
@@ -1006,71 +1006,71 @@
    },
    "signs": [
     {
-     "x": 13,
-     "y": 4,
+     "x": 17,
+     "y": 13,
      "id": "sign_greenreach_00",
      "title": "No camping.",
      "body": ""
     },
     {
-     "x": 51,
-     "y": 56,
+     "x": 43,
+     "y": 59,
      "id": "sign_greenreach_01",
      "title": "Maps are sold in no shop.",
      "body": "Find them in the wild."
     },
     {
-     "x": 28,
-     "y": 34,
+     "x": 53,
+     "y": 23,
      "id": "sign_greenreach_02",
      "title": "A wizard lives nearby.",
      "body": "He teaches for a price."
     },
     {
-     "x": 45,
-     "y": 10,
+     "x": 20,
+     "y": 46,
      "id": "sign_greenreach_03",
      "title": "Turn back.",
      "body": "Nothing good lies ahead."
     },
     {
-     "x": 19,
-     "y": 59,
+     "x": 42,
+     "y": 2,
      "id": "sign_greenreach_04",
      "title": "Welcome, traveller.",
      "body": "The ferry is in town."
     },
     {
-     "x": 8,
-     "y": 28,
+     "x": 6,
+     "y": 30,
      "id": "sign_greenreach_05",
      "title": "Beware the deep woods.",
      "body": "Wolves hunt there at dusk."
     },
     {
-     "x": 40,
-     "y": 45,
+     "x": 38,
+     "y": 38,
      "id": "sign_greenreach_06",
      "title": "Boats for hire in",
      "body": "every harbour town."
     },
     {
-     "x": 23,
-     "y": 17,
+     "x": 27,
+     "y": 25,
      "id": "sign_greenreach_07",
      "title": "Lost something?",
      "body": "Try digging. Mind the days."
     },
     {
-     "x": 43,
-     "y": 28,
+     "x": 26,
+     "y": 61,
      "id": "sign_greenreach_08",
      "title": "The King pays well",
      "body": "for villains brought in."
     },
     {
-     "x": 15,
-     "y": 41,
+     "x": 35,
+     "y": 15,
      "id": "sign_greenreach_09",
      "title": "Mountains ahead.",
      "body": "Go around, not through."
@@ -1078,379 +1078,379 @@
    ],
    "towns": [
     {
-     "x": 38,
-     "y": 61,
+     "x": 53,
+     "y": 29,
      "id": "mossbridge",
-     "boat_x": 38,
+     "boat_x": 53,
+     "boat_y": 30
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "id": "deepglen",
+     "boat_x": 1,
+     "boat_y": 4
+    },
+    {
+     "x": 21,
+     "y": 61,
+     "id": "fernwick",
+     "boat_x": 21,
      "boat_y": 62
     },
     {
-     "x": 5,
-     "y": 3,
-     "id": "deepglen",
-     "boat_x": 4,
-     "boat_y": 3
-    },
-    {
-     "x": 46,
-     "y": 12,
-     "id": "fernwick",
-     "boat_x": 46,
-     "boat_y": 13
-    },
-    {
-     "x": 9,
-     "y": 45,
+     "x": 40,
+     "y": 2,
      "id": "ivyford",
-     "boat_x": 9,
-     "boat_y": 46
+     "boat_x": 40,
+     "boat_y": 1
     },
     {
-     "x": 47,
-     "y": 41,
+     "x": 8,
+     "y": 35,
      "id": "elderdown",
-     "boat_x": 48,
-     "boat_y": 41
+     "boat_x": 7,
+     "boat_y": 35
     },
     {
-     "x": 30,
-     "y": 1,
+     "x": 51,
+     "y": 55,
      "id": "willowmere",
-     "boat_x": 30,
-     "boat_y": 0
+     "boat_x": 52,
+     "boat_y": 55
     }
    ],
    "castles": [
     {
-     "x": 20,
-     "y": 34,
+     "x": 46,
+     "y": 14,
      "id": "thornwall"
     },
     {
-     "x": 48,
+     "x": 17,
      "y": 60,
      "id": "mossmantle"
     },
     {
-     "x": 44,
-     "y": 4,
+     "x": 6,
+     "y": 5,
      "id": "briarkeep"
     },
     {
-     "x": 6,
-     "y": 7,
+     "x": 36,
+     "y": 42,
      "id": "rootdeep"
     },
     {
-     "x": 25,
-     "y": 56,
+     "x": 18,
+     "y": 29,
      "id": "gloomwood"
     },
     {
-     "x": 38,
-     "y": 25,
+     "x": 30,
+     "y": 3,
      "id": "hartspire"
     }
    ],
    "chests": [
     {
-     "x": 13,
-     "y": 39,
+     "x": 27,
+     "y": 21,
      "id": "chest_greenreach_000"
     },
     {
-     "x": 47,
-     "y": 8,
+     "x": 45,
+     "y": 59,
      "id": "chest_greenreach_001"
     },
     {
-     "x": 44,
-     "y": 61,
+     "x": 8,
+     "y": 41,
      "id": "chest_greenreach_002"
     },
     {
-     "x": 7,
-     "y": 2,
+     "x": 47,
+     "y": 4,
      "id": "chest_greenreach_003"
     },
     {
-     "x": 27,
-     "y": 21,
+     "x": 10,
+     "y": 4,
      "id": "chest_greenreach_004"
     },
     {
-     "x": 40,
-     "y": 36,
+     "x": 53,
+     "y": 38,
      "id": "chest_greenreach_005"
     },
     {
-     "x": 27,
-     "y": 52,
+     "x": 20,
+     "y": 56,
      "id": "chest_greenreach_006"
     },
     {
-     "x": 28,
-     "y": 1,
+     "x": 46,
+     "y": 24,
      "id": "chest_greenreach_007"
     },
     {
-     "x": 8,
-     "y": 23,
+     "x": 19,
+     "y": 33,
      "id": "chest_greenreach_008"
     },
     {
-     "x": 50,
-     "y": 47,
+     "x": 34,
+     "y": 10,
      "id": "chest_greenreach_009"
     },
     {
-     "x": 17,
-     "y": 11,
+     "x": 34,
+     "y": 52,
      "id": "chest_greenreach_010"
     },
     {
-     "x": 17,
-     "y": 60,
+     "x": 38,
+     "y": 34,
      "id": "chest_greenreach_011"
     },
     {
-     "x": 35,
-     "y": 12,
+     "x": 9,
+     "y": 24,
      "id": "chest_greenreach_012"
     },
     {
      "x": 19,
-     "y": 29,
+     "y": 12,
      "id": "chest_greenreach_013"
     },
     {
-     "x": 26,
-     "y": 37,
+     "x": 43,
+     "y": 45,
      "id": "chest_greenreach_014"
     },
     {
-     "x": 33,
-     "y": 44,
+     "x": 4,
+     "y": 13,
      "id": "chest_greenreach_015"
     },
     {
-     "x": 34,
-     "y": 28,
+     "x": 29,
+     "y": 61,
      "id": "chest_greenreach_016"
     },
     {
-     "x": 40,
-     "y": 51,
+     "x": 18,
+     "y": 45,
      "id": "chest_greenreach_017"
     },
     {
-     "x": 39,
-     "y": 3,
+     "x": 31,
+     "y": 29,
      "id": "chest_greenreach_018"
     },
     {
-     "x": 32,
-     "y": 60,
+     "x": 52,
+     "y": 49,
      "id": "chest_greenreach_019"
     },
     {
-     "x": 21,
-     "y": 45,
+     "x": 42,
+     "y": 13,
      "id": "chest_greenreach_020"
     },
     {
-     "x": 5,
-     "y": 13,
+     "x": 37,
+     "y": 22,
      "id": "chest_greenreach_021"
     },
     {
-     "x": 45,
-     "y": 29,
+     "x": 13,
+     "y": 17,
      "id": "chest_greenreach_022"
     },
     {
-     "x": 14,
-     "y": 51,
+     "x": 6,
+     "y": 32,
      "id": "chest_greenreach_023"
     },
     {
      "x": 38,
-     "y": 21,
+     "y": 2,
      "id": "chest_greenreach_024"
     },
     {
-     "x": 45,
-     "y": 41,
+     "x": 53,
+     "y": 27,
      "id": "chest_greenreach_025"
     },
     {
-     "x": 26,
-     "y": 9,
+     "x": 47,
+     "y": 33,
      "id": "chest_greenreach_026"
     },
     {
      "x": 21,
-     "y": 17,
+     "y": 4,
      "id": "chest_greenreach_027"
     },
     {
-     "x": 9,
-     "y": 33,
+     "x": 37,
+     "y": 60,
      "id": "chest_greenreach_028"
     },
     {
-     "x": 43,
-     "y": 14,
+     "x": 14,
+     "y": 29,
      "id": "chest_greenreach_029"
     },
     {
-     "x": 20,
-     "y": 4,
+     "x": 30,
+     "y": 15,
      "id": "chest_greenreach_030"
+    },
+    {
+     "x": 28,
+     "y": 7,
+     "id": "chest_greenreach_031"
+    },
+    {
+     "x": 41,
+     "y": 54,
+     "id": "chest_greenreach_032"
+    },
+    {
+     "x": 42,
+     "y": 29,
+     "id": "chest_greenreach_033"
+    },
+    {
+     "x": 51,
+     "y": 20,
+     "id": "chest_greenreach_034"
+    },
+    {
+     "x": 45,
+     "y": 39,
+     "id": "chest_greenreach_035"
+    },
+    {
+     "x": 11,
+     "y": 11,
+     "id": "chest_greenreach_036"
+    },
+    {
+     "x": 22,
+     "y": 18,
+     "id": "chest_greenreach_037"
+    },
+    {
+     "x": 44,
+     "y": 18,
+     "id": "chest_greenreach_038"
+    },
+    {
+     "x": 21,
+     "y": 49,
+     "id": "chest_greenreach_039"
     },
     {
      "x": 48,
      "y": 55,
-     "id": "chest_greenreach_031"
-    },
-    {
-     "x": 14,
-     "y": 20,
-     "id": "chest_greenreach_032"
-    },
-    {
-     "x": 10,
-     "y": 9,
-     "id": "chest_greenreach_033"
-    },
-    {
-     "x": 21,
-     "y": 55,
-     "id": "chest_greenreach_034"
-    },
-    {
-     "x": 8,
-     "y": 43,
-     "id": "chest_greenreach_035"
-    },
-    {
-     "x": 29,
-     "y": 14,
-     "id": "chest_greenreach_036"
-    },
-    {
-     "x": 33,
-     "y": 5,
-     "id": "chest_greenreach_037"
-    },
-    {
-     "x": 27,
-     "y": 30,
-     "id": "chest_greenreach_038"
-    },
-    {
-     "x": 33,
-     "y": 18,
-     "id": "chest_greenreach_039"
-    },
-    {
-     "x": 25,
-     "y": 61,
      "id": "chest_greenreach_040"
     },
     {
-     "x": 32,
-     "y": 35,
+     "x": 15,
+     "y": 23,
      "id": "chest_greenreach_041"
     },
     {
-     "x": 34,
-     "y": 53,
+     "x": 26,
+     "y": 12,
      "id": "chest_greenreach_042"
     },
     {
-     "x": 28,
-     "y": 46,
+     "x": 26,
+     "y": 27,
      "id": "chest_greenreach_043"
     },
     {
-     "x": 38,
-     "y": 46,
+     "x": 35,
+     "y": 17,
      "id": "chest_greenreach_044"
     },
     {
-     "x": 44,
-     "y": 48,
+     "x": 46,
+     "y": 10,
      "id": "chest_greenreach_045"
     },
     {
-     "x": 36,
-     "y": 40,
+     "x": 32,
+     "y": 57,
      "id": "chest_greenreach_046"
     },
     {
-     "x": 11,
-     "y": 16,
+     "x": 35,
+     "y": 5,
      "id": "chest_greenreach_047"
     },
     {
-     "x": 39,
-     "y": 59,
+     "x": 36,
+     "y": 28,
      "id": "chest_greenreach_048"
     },
     {
-     "x": 15,
-     "y": 2,
+     "x": 47,
+     "y": 43,
      "id": "chest_greenreach_049"
     },
     {
-     "x": 39,
-     "y": 30,
+     "x": 42,
+     "y": 5,
      "id": "chest_greenreach_050"
     },
     {
-     "x": 23,
-     "y": 26,
+     "x": 24,
+     "y": 60,
      "id": "chest_greenreach_051"
     },
     {
-     "x": 12,
-     "y": 26,
+     "x": 18,
+     "y": 38,
      "id": "chest_greenreach_052"
     },
     {
-     "x": 19,
-     "y": 22,
+     "x": 40,
+     "y": 42,
      "id": "chest_greenreach_053"
     },
     {
-     "x": 16,
-     "y": 33,
+     "x": 40,
+     "y": 48,
      "id": "chest_greenreach_054"
     },
     {
-     "x": 12,
-     "y": 46,
+     "x": 45,
+     "y": 49,
      "id": "chest_greenreach_055"
     },
     {
-     "x": 35,
-     "y": 1,
+     "x": 16,
+     "y": 5,
      "id": "chest_greenreach_056"
     },
     {
-     "x": 22,
-     "y": 50,
+     "x": 47,
+     "y": 28,
      "id": "chest_greenreach_057"
     },
     {
-     "x": 22,
-     "y": 12,
+     "x": 38,
+     "y": 7,
      "id": "chest_greenreach_058"
     },
     {
-     "x": 42,
-     "y": 9,
+     "x": 10,
+     "y": 28,
      "id": "chest_greenreach_059"
     }
    ],
@@ -1458,128 +1458,128 @@
    "dwellings": [],
    "wandering_armies": [
     {
-     "x": 41,
-     "y": 60,
+     "x": 23,
+     "y": 21,
      "id": "army_greenreach_000"
     },
     {
-     "x": 9,
-     "y": 2,
+     "x": 47,
+     "y": 57,
      "id": "army_greenreach_001"
     },
     {
      "x": 47,
-     "y": 10,
+     "y": 6,
      "id": "army_greenreach_002"
     },
     {
-     "x": 18,
-     "y": 38,
+     "x": 20,
+     "y": 51,
      "id": "army_greenreach_003"
     },
     {
-     "x": 29,
-     "y": 21,
+     "x": 38,
+     "y": 36,
      "id": "army_greenreach_004"
     },
     {
-     "x": 44,
-     "y": 35,
+     "x": 12,
+     "y": 4,
      "id": "army_greenreach_005"
     },
     {
-     "x": 7,
-     "y": 26,
+     "x": 8,
+     "y": 33,
      "id": "army_greenreach_006"
     },
     {
-     "x": 33,
-     "y": 1,
+     "x": 53,
+     "y": 25,
      "id": "army_greenreach_007"
     },
     {
-     "x": 19,
+     "x": 31,
      "y": 61,
      "id": "army_greenreach_008"
     },
     {
-     "x": 31,
-     "y": 48,
+     "x": 35,
+     "y": 13,
      "id": "army_greenreach_009"
     },
     {
-     "x": 19,
-     "y": 12,
+     "x": 49,
+     "y": 41,
      "id": "army_greenreach_010"
     },
     {
-     "x": 49,
-     "y": 49,
+     "x": 38,
+     "y": 51,
      "id": "army_greenreach_011"
     },
     {
-     "x": 13,
-     "y": 49,
+     "x": 42,
+     "y": 21,
      "id": "army_greenreach_012"
     },
     {
-     "x": 3,
-     "y": 11,
+     "x": 6,
+     "y": 13,
      "id": "army_greenreach_013"
     },
     {
-     "x": 39,
-     "y": 16,
+     "x": 29,
+     "y": 29,
      "id": "army_greenreach_014"
     },
     {
-     "x": 23,
-     "y": 29,
+     "x": 20,
+     "y": 10,
      "id": "army_greenreach_015"
     },
     {
-     "x": 7,
-     "y": 41,
+     "x": 19,
+     "y": 36,
      "id": "army_greenreach_016"
     },
     {
-     "x": 38,
-     "y": 42,
+     "x": 12,
+     "y": 23,
      "id": "army_greenreach_017"
     },
     {
-     "x": 30,
-     "y": 36,
+     "x": 46,
+     "y": 31,
      "id": "army_greenreach_018"
     },
     {
-     "x": 16,
-     "y": 22,
+     "x": 36,
+     "y": 2,
      "id": "army_greenreach_019"
     },
     {
-     "x": 37,
-     "y": 29,
+     "x": 30,
+     "y": 7,
      "id": "army_greenreach_020"
     },
     {
-     "x": 20,
-     "y": 1,
+     "x": 36,
+     "y": 26,
      "id": "army_greenreach_021"
     },
     {
-     "x": 28,
-     "y": 8,
+     "x": 27,
+     "y": 15,
      "id": "army_greenreach_022"
     },
     {
-     "x": 30,
-     "y": 59,
+     "x": 42,
+     "y": 43,
      "id": "army_greenreach_023"
     },
     {
-     "x": 22,
-     "y": 52,
+     "x": 6,
+     "y": 26,
      "id": "army_greenreach_024"
     }
    ]
@@ -1596,8 +1596,8 @@
     "dunemark"
    ],
    "hero_spawn": {
-    "x": 55,
-    "y": 53
+    "x": 33,
+    "y": 4
    },
    "is_home": false,
    "salt": {
@@ -1620,57 +1620,57 @@
    },
    "signs": [
     {
-     "x": 44,
-     "y": 40,
+     "x": 35,
+     "y": 3,
      "id": "sign_isleward_00",
      "title": "Every chest is a gamble.",
      "body": "Some hold more than gold."
     },
     {
-     "x": 9,
-     "y": 6,
+     "x": 11,
+     "y": 51,
      "id": "sign_isleward_01",
      "title": "Here lies a brave fool.",
      "body": "He fought a dragon alone."
     },
     {
-     "x": 57,
-     "y": 2,
+     "x": 51,
+     "y": 50,
      "id": "sign_isleward_02",
      "title": "Castles hold armies.",
      "body": "Count them before you knock."
     },
     {
-     "x": 4,
-     "y": 46,
+     "x": 14,
+     "y": 18,
      "id": "sign_isleward_03",
      "title": "The scepter is buried",
      "body": "somewhere in this realm."
     },
     {
-     "x": 24,
-     "y": 25,
+     "x": 25,
+     "y": 36,
      "id": "sign_isleward_04",
      "title": "Rest your feet, friend.",
      "body": ""
     },
     {
-     "x": 41,
-     "y": 14,
+     "x": 4,
+     "y": 34,
      "id": "sign_isleward_05",
      "title": "Dwellings refill weekly.",
      "body": "Recruit while you can."
     },
     {
-     "x": 61,
-     "y": 26,
+     "x": 30,
+     "y": 16,
      "id": "sign_isleward_06",
      "title": "No camping.",
      "body": ""
     },
     {
-     "x": 59,
-     "y": 50,
+     "x": 20,
+     "y": 59,
      "id": "sign_isleward_07",
      "title": "Maps are sold in no shop.",
      "body": "Find them in the wild."
@@ -1678,11 +1678,11 @@
    ],
    "towns": [
     {
-     "x": 2,
-     "y": 49,
+     "x": 27,
+     "y": 59,
      "id": "coralhaven",
-     "boat_x": 2,
-     "boat_y": 50
+     "boat_x": 27,
+     "boat_y": 60
     },
     {
      "x": 59,
@@ -1692,290 +1692,290 @@
      "boat_y": 2
     },
     {
-     "x": 54,
-     "y": 57,
+     "x": 8,
+     "y": 16,
      "id": "tidewater",
-     "boat_x": 54,
-     "boat_y": 58
+     "boat_x": 8,
+     "boat_y": 15
     },
     {
-     "x": 31,
-     "y": 26,
+     "x": 55,
+     "y": 50,
      "id": "pearlstrand",
-     "boat_x": 31,
-     "boat_y": 25
+     "boat_x": 56,
+     "boat_y": 50
     },
     {
-     "x": 7,
-     "y": 5,
+     "x": 35,
+     "y": 34,
      "id": "driftmoor",
-     "boat_x": 6,
-     "boat_y": 5
+     "boat_x": 36,
+     "boat_y": 34
     },
     {
-     "x": 60,
-     "y": 32,
+     "x": 11,
+     "y": 44,
      "id": "shellbay",
-     "boat_x": 61,
-     "boat_y": 32
+     "boat_x": 11,
+     "boat_y": 43
     }
    ],
    "castles": [
     {
-     "x": 51,
-     "y": 45,
+     "x": 45,
+     "y": 49,
      "id": "tidegrave"
     },
     {
-     "x": 37,
-     "y": 4,
+     "x": 23,
+     "y": 5,
      "id": "saltspire"
     },
     {
-     "x": 9,
-     "y": 49,
+     "x": 10,
+     "y": 37,
      "id": "wavebreak"
     },
     {
-     "x": 31,
-     "y": 30,
+     "x": 30,
+     "y": 28,
      "id": "shellcairn"
     },
     {
-     "x": 55,
-     "y": 18,
+     "x": 20,
+     "y": 53,
      "id": "stormhaven"
     },
     {
-     "x": 34,
-     "y": 55,
+     "x": 43,
+     "y": 3,
      "id": "reefhold"
     }
    ],
    "chests": [
     {
-     "x": 17,
-     "y": 54,
+     "x": 4,
+     "y": 28,
      "id": "chest_isleward_000"
     },
     {
      "x": 61,
-     "y": 4,
+     "y": 6,
      "id": "chest_isleward_001"
     },
     {
-     "x": 5,
-     "y": 8,
+     "x": 43,
+     "y": 53,
      "id": "chest_isleward_002"
     },
     {
-     "x": 44,
-     "y": 34,
+     "x": 32,
+     "y": 17,
      "id": "chest_isleward_003"
     },
     {
-     "x": 57,
-     "y": 57,
+     "x": 15,
+     "y": 49,
      "id": "chest_isleward_004"
     },
     {
-     "x": 20,
-     "y": 25,
+     "x": 23,
+     "y": 33,
      "id": "chest_isleward_005"
     },
     {
-     "x": 31,
+     "x": 39,
      "y": 2,
      "id": "chest_isleward_006"
     },
     {
-     "x": 3,
-     "y": 42,
+     "x": 11,
+     "y": 14,
      "id": "chest_isleward_007"
     },
     {
-     "x": 61,
-     "y": 28,
-     "id": "chest_isleward_008"
-    },
-    {
-     "x": 48,
-     "y": 14,
-     "id": "chest_isleward_009"
-    },
-    {
-     "x": 30,
-     "y": 43,
-     "id": "chest_isleward_010"
-    },
-    {
-     "x": 37,
-     "y": 59,
-     "id": "chest_isleward_011"
-    },
-    {
-     "x": 2,
-     "y": 24,
-     "id": "chest_isleward_012"
-    },
-    {
-     "x": 37,
-     "y": 21,
-     "id": "chest_isleward_013"
-    },
-    {
-     "x": 46,
-     "y": 50,
-     "id": "chest_isleward_014"
-    },
-    {
-     "x": 26,
-     "y": 14,
-     "id": "chest_isleward_015"
-    },
-    {
-     "x": 56,
-     "y": 40,
-     "id": "chest_isleward_016"
-    },
-    {
-     "x": 18,
-     "y": 40,
-     "id": "chest_isleward_017"
-    },
-    {
-     "x": 42,
-     "y": 6,
-     "id": "chest_isleward_018"
-    },
-    {
-     "x": 18,
-     "y": 7,
-     "id": "chest_isleward_019"
-    },
-    {
-     "x": 52,
-     "y": 23,
-     "id": "chest_isleward_020"
-    },
-    {
-     "x": 35,
-     "y": 31,
-     "id": "chest_isleward_021"
-    },
-    {
-     "x": 23,
-     "y": 48,
-     "id": "chest_isleward_022"
-    },
-    {
-     "x": 14,
-     "y": 31,
-     "id": "chest_isleward_023"
-    },
-    {
-     "x": 51,
-     "y": 2,
-     "id": "chest_isleward_024"
-    },
-    {
-     "x": 13,
-     "y": 47,
-     "id": "chest_isleward_025"
-    },
-    {
-     "x": 42,
-     "y": 43,
-     "id": "chest_isleward_026"
-    },
-    {
-     "x": 33,
-     "y": 51,
-     "id": "chest_isleward_027"
-    },
-    {
      "x": 24,
-     "y": 32,
-     "id": "chest_isleward_028"
-    },
-    {
-     "x": 54,
-     "y": 32,
-     "id": "chest_isleward_029"
-    },
-    {
-     "x": 55,
-     "y": 49,
-     "id": "chest_isleward_030"
-    },
-    {
-     "x": 57,
-     "y": 13,
-     "id": "chest_isleward_031"
-    },
-    {
-     "x": 42,
-     "y": 17,
-     "id": "chest_isleward_032"
-    },
-    {
-     "x": 37,
-     "y": 38,
-     "id": "chest_isleward_033"
-    },
-    {
-     "x": 28,
-     "y": 21,
-     "id": "chest_isleward_034"
-    },
-    {
-     "x": 48,
-     "y": 39,
-     "id": "chest_isleward_035"
-    },
-    {
-     "x": 22,
-     "y": 2,
-     "id": "chest_isleward_036"
-    },
-    {
-     "x": 51,
-     "y": 54,
-     "id": "chest_isleward_037"
-    },
-    {
-     "x": 59,
-     "y": 21,
-     "id": "chest_isleward_038"
-    },
-    {
-     "x": 9,
-     "y": 4,
-     "id": "chest_isleward_039"
-    },
-    {
-     "x": 60,
-     "y": 36,
-     "id": "chest_isleward_040"
-    },
-    {
-     "x": 5,
-     "y": 48,
-     "id": "chest_isleward_041"
+     "y": 59,
+     "id": "chest_isleward_008"
     },
     {
      "x": 27,
      "y": 6,
+     "id": "chest_isleward_009"
+    },
+    {
+     "x": 15,
+     "y": 24,
+     "id": "chest_isleward_010"
+    },
+    {
+     "x": 53,
+     "y": 50,
+     "id": "chest_isleward_011"
+    },
+    {
+     "x": 4,
+     "y": 51,
+     "id": "chest_isleward_012"
+    },
+    {
+     "x": 42,
+     "y": 42,
+     "id": "chest_isleward_013"
+    },
+    {
+     "x": 22,
+     "y": 15,
+     "id": "chest_isleward_014"
+    },
+    {
+     "x": 33,
+     "y": 35,
+     "id": "chest_isleward_015"
+    },
+    {
+     "x": 6,
+     "y": 37,
+     "id": "chest_isleward_016"
+    },
+    {
+     "x": 25,
+     "y": 23,
+     "id": "chest_isleward_017"
+    },
+    {
+     "x": 35,
+     "y": 9,
+     "id": "chest_isleward_018"
+    },
+    {
+     "x": 14,
+     "y": 40,
+     "id": "chest_isleward_019"
+    },
+    {
+     "x": 36,
+     "y": 50,
+     "id": "chest_isleward_020"
+    },
+    {
+     "x": 49,
+     "y": 55,
+     "id": "chest_isleward_021"
+    },
+    {
+     "x": 60,
+     "y": 13,
+     "id": "chest_isleward_022"
+    },
+    {
+     "x": 16,
+     "y": 31,
+     "id": "chest_isleward_023"
+    },
+    {
+     "x": 25,
+     "y": 39,
+     "id": "chest_isleward_024"
+    },
+    {
+     "x": 16,
+     "y": 17,
+     "id": "chest_isleward_025"
+    },
+    {
+     "x": 10,
+     "y": 27,
+     "id": "chest_isleward_026"
+    },
+    {
+     "x": 32,
+     "y": 2,
+     "id": "chest_isleward_027"
+    },
+    {
+     "x": 22,
+     "y": 27,
+     "id": "chest_isleward_028"
+    },
+    {
+     "x": 26,
+     "y": 12,
+     "id": "chest_isleward_029"
+    },
+    {
+     "x": 41,
+     "y": 48,
+     "id": "chest_isleward_030"
+    },
+    {
+     "x": 6,
+     "y": 24,
+     "id": "chest_isleward_031"
+    },
+    {
+     "x": 9,
+     "y": 50,
+     "id": "chest_isleward_032"
+    },
+    {
+     "x": 26,
+     "y": 29,
+     "id": "chest_isleward_033"
+    },
+    {
+     "x": 13,
+     "y": 45,
+     "id": "chest_isleward_034"
+    },
+    {
+     "x": 30,
+     "y": 32,
+     "id": "chest_isleward_035"
+    },
+    {
+     "x": 20,
+     "y": 57,
+     "id": "chest_isleward_036"
+    },
+    {
+     "x": 28,
+     "y": 16,
+     "id": "chest_isleward_037"
+    },
+    {
+     "x": 5,
+     "y": 32,
+     "id": "chest_isleward_038"
+    },
+    {
+     "x": 29,
+     "y": 10,
+     "id": "chest_isleward_039"
+    },
+    {
+     "x": 24,
+     "y": 18,
+     "id": "chest_isleward_040"
+    },
+    {
+     "x": 34,
+     "y": 13,
+     "id": "chest_isleward_041"
+    },
+    {
+     "x": 32,
+     "y": 7,
      "id": "chest_isleward_042"
     },
     {
-     "x": 31,
-     "y": 36,
+     "x": 22,
+     "y": 37,
      "id": "chest_isleward_043"
     },
     {
-     "x": 2,
-     "y": 16,
+     "x": 39,
+     "y": 52,
      "id": "chest_isleward_044"
     }
    ],
@@ -1983,63 +1983,63 @@
    "dwellings": [],
    "wandering_armies": [
     {
-     "x": 16,
-     "y": 31,
+     "x": 47,
+     "y": 54,
      "id": "army_isleward_000"
     },
     {
-     "x": 61,
-     "y": 6,
+     "x": 10,
+     "y": 16,
      "id": "army_isleward_001"
     },
     {
-     "x": 52,
-     "y": 56,
+     "x": 37,
+     "y": 2,
      "id": "army_isleward_002"
     },
     {
-     "x": 26,
-     "y": 1,
+     "x": 6,
+     "y": 51,
      "id": "army_isleward_003"
     },
     {
-     "x": 42,
-     "y": 21,
+     "x": 30,
+     "y": 34,
      "id": "army_isleward_004"
     },
     {
-     "x": 27,
-     "y": 50,
+     "x": 22,
+     "y": 59,
      "id": "army_isleward_005"
     },
     {
-     "x": 2,
-     "y": 46,
+     "x": 4,
+     "y": 30,
      "id": "army_isleward_006"
     },
     {
-     "x": 58,
-     "y": 33,
+     "x": 26,
+     "y": 10,
      "id": "army_isleward_007"
     },
     {
-     "x": 2,
-     "y": 18,
+     "x": 22,
+     "y": 24,
      "id": "army_isleward_008"
     },
     {
-     "x": 35,
-     "y": 36,
+     "x": 15,
+     "y": 42,
      "id": "army_isleward_009"
     },
     {
-     "x": 17,
-     "y": 12,
+     "x": 38,
+     "y": 46,
      "id": "army_isleward_010"
     },
     {
-     "x": 44,
-     "y": 3,
+     "x": 35,
+     "y": 17,
      "id": "army_isleward_011"
     }
    ]
@@ -2056,8 +2056,8 @@
     "isleward"
    ],
    "hero_spawn": {
-    "x": 39,
-    "y": 11
+    "x": 23,
+    "y": 61
    },
    "is_home": false,
    "salt": {
@@ -2081,57 +2081,57 @@
    },
    "signs": [
     {
-     "x": 16,
-     "y": 41,
+     "x": 42,
+     "y": 39,
      "id": "sign_dunemark_00",
      "title": "A wizard lives nearby.",
      "body": "He teaches for a price."
     },
     {
-     "x": 57,
-     "y": 17,
+     "x": 8,
+     "y": 23,
      "id": "sign_dunemark_01",
      "title": "Turn back.",
      "body": "Nothing good lies ahead."
     },
     {
-     "x": 46,
-     "y": 54,
+     "x": 18,
+     "y": 61,
      "id": "sign_dunemark_02",
      "title": "Welcome, traveller.",
      "body": "The ferry is in town."
     },
     {
-     "x": 25,
-     "y": 11,
+     "x": 61,
+     "y": 15,
      "id": "sign_dunemark_03",
      "title": "Beware the deep woods.",
      "body": "Wolves hunt there at dusk."
     },
     {
-     "x": 38,
-     "y": 31,
+     "x": 31,
+     "y": 8,
      "id": "sign_dunemark_04",
      "title": "Boats for hire in",
      "body": "every harbour town."
     },
     {
-     "x": 61,
-     "y": 40,
+     "x": 30,
+     "y": 50,
      "id": "sign_dunemark_05",
      "title": "Lost something?",
      "body": "Try digging. Mind the days."
     },
     {
-     "x": 25,
-     "y": 59,
+     "x": 61,
+     "y": 43,
      "id": "sign_dunemark_06",
      "title": "The King pays well",
      "body": "for villains brought in."
     },
     {
-     "x": 9,
-     "y": 22,
+     "x": 18,
+     "y": 35,
      "id": "sign_dunemark_07",
      "title": "Mountains ahead.",
      "body": "Go around, not through."
@@ -2139,293 +2139,293 @@
    ],
    "towns": [
     {
-     "x": 10,
-     "y": 16,
+     "x": 41,
+     "y": 57,
      "id": "sandwell",
-     "boat_x": 10,
-     "boat_y": 15
+     "boat_x": 41,
+     "boat_y": 58
     },
     {
-     "x": 59,
-     "y": 44,
+     "x": 61,
+     "y": 4,
      "id": "oasis_rest",
-     "boat_x": 59,
-     "boat_y": 45
+     "boat_x": 62,
+     "boat_y": 4
     },
     {
-     "x": 21,
-     "y": 61,
+     "x": 6,
+     "y": 21,
      "id": "sunreach",
-     "boat_x": 21,
-     "boat_y": 62
+     "boat_x": 5,
+     "boat_y": 21
     }
    ],
    "castles": [
     {
-     "x": 21,
-     "y": 56,
+     "x": 23,
+     "y": 41,
      "id": "sunscar"
     },
     {
      "x": 60,
-     "y": 28,
+     "y": 9,
      "id": "dustcrown"
     },
     {
-     "x": 8,
-     "y": 26,
+     "x": 9,
+     "y": 17,
      "id": "mirage_keep"
     }
    ],
    "chests": [
     {
-     "x": 46,
-     "y": 30,
+     "x": 2,
+     "y": 36,
      "id": "chest_dunemark_000"
     },
     {
-     "x": 17,
-     "y": 60,
+     "x": 61,
+     "y": 13,
      "id": "chest_dunemark_001"
     },
     {
-     "x": 12,
-     "y": 14,
+     "x": 44,
+     "y": 57,
      "id": "chest_dunemark_002"
     },
     {
-     "x": 2,
-     "y": 40,
-     "id": "chest_dunemark_003"
-    },
-    {
-     "x": 60,
-     "y": 9,
-     "id": "chest_dunemark_004"
-    },
-    {
-     "x": 30,
-     "y": 44,
-     "id": "chest_dunemark_005"
-    },
-    {
-     "x": 61,
-     "y": 42,
-     "id": "chest_dunemark_006"
-    },
-    {
-     "x": 33,
-     "y": 8,
-     "id": "chest_dunemark_007"
-    },
-    {
-     "x": 44,
-     "y": 55,
-     "id": "chest_dunemark_008"
-    },
-    {
-     "x": 20,
-     "y": 30,
-     "id": "chest_dunemark_009"
-    },
-    {
-     "x": 45,
-     "y": 13,
-     "id": "chest_dunemark_010"
-    },
-    {
-     "x": 33,
-     "y": 26,
-     "id": "chest_dunemark_011"
-    },
-    {
-     "x": 14,
-     "y": 45,
-     "id": "chest_dunemark_012"
-    },
-    {
-     "x": 57,
-     "y": 24,
-     "id": "chest_dunemark_013"
-    },
-    {
-     "x": 25,
-     "y": 18,
-     "id": "chest_dunemark_014"
-    },
-    {
-     "x": 49,
-     "y": 45,
-     "id": "chest_dunemark_015"
-    },
-    {
-     "x": 31,
-     "y": 58,
-     "id": "chest_dunemark_016"
-    },
-    {
-     "x": 4,
-     "y": 27,
-     "id": "chest_dunemark_017"
-    },
-    {
-     "x": 37,
-     "y": 36,
-     "id": "chest_dunemark_018"
-    },
-    {
-     "x": 22,
-     "y": 50,
-     "id": "chest_dunemark_019"
-    },
-    {
-     "x": 53,
-     "y": 36,
-     "id": "chest_dunemark_020"
-    },
-    {
-     "x": 10,
-     "y": 34,
-     "id": "chest_dunemark_021"
-    },
-    {
-     "x": 39,
-     "y": 48,
-     "id": "chest_dunemark_022"
-    },
-    {
-     "x": 14,
-     "y": 24,
-     "id": "chest_dunemark_023"
-    },
-    {
-     "x": 27,
-     "y": 35,
-     "id": "chest_dunemark_024"
-    },
-    {
-     "x": 60,
-     "y": 32,
-     "id": "chest_dunemark_025"
-    },
-    {
-     "x": 51,
-     "y": 18,
-     "id": "chest_dunemark_026"
-    },
-    {
-     "x": 6,
-     "y": 48,
-     "id": "chest_dunemark_027"
-    },
-    {
-     "x": 41,
-     "y": 20,
-     "id": "chest_dunemark_028"
-    },
-    {
-     "x": 19,
-     "y": 39,
-     "id": "chest_dunemark_029"
-    },
-    {
-     "x": 43,
-     "y": 41,
-     "id": "chest_dunemark_030"
-    },
-    {
-     "x": 21,
-     "y": 13,
-     "id": "chest_dunemark_031"
-    },
-    {
-     "x": 54,
-     "y": 49,
-     "id": "chest_dunemark_032"
-    },
-    {
-     "x": 35,
-     "y": 53,
-     "id": "chest_dunemark_033"
-    },
-    {
-     "x": 57,
-     "y": 15,
-     "id": "chest_dunemark_034"
-    },
-    {
-     "x": 15,
-     "y": 53,
-     "id": "chest_dunemark_035"
-    },
-    {
-     "x": 16,
-     "y": 18,
-     "id": "chest_dunemark_036"
-    },
-    {
-     "x": 54,
-     "y": 29,
-     "id": "chest_dunemark_037"
-    },
-    {
-     "x": 30,
-     "y": 21,
-     "id": "chest_dunemark_038"
-    },
-    {
-     "x": 23,
-     "y": 25,
-     "id": "chest_dunemark_039"
-    },
-    {
      "x": 26,
-     "y": 54,
-     "id": "chest_dunemark_040"
-    },
-    {
-     "x": 8,
-     "y": 42,
-     "id": "chest_dunemark_041"
-    },
-    {
-     "x": 24,
-     "y": 42,
-     "id": "chest_dunemark_042"
-    },
-    {
-     "x": 27,
-     "y": 10,
-     "id": "chest_dunemark_043"
+     "y": 8,
+     "id": "chest_dunemark_003"
     },
     {
      "x": 38,
      "y": 29,
-     "id": "chest_dunemark_044"
+     "id": "chest_dunemark_004"
+    },
+    {
+     "x": 16,
+     "y": 61,
+     "id": "chest_dunemark_005"
+    },
+    {
+     "x": 58,
+     "y": 41,
+     "id": "chest_dunemark_006"
+    },
+    {
+     "x": 27,
+     "y": 45,
+     "id": "chest_dunemark_007"
+    },
+    {
+     "x": 16,
+     "y": 24,
+     "id": "chest_dunemark_008"
+    },
+    {
+     "x": 42,
+     "y": 12,
+     "id": "chest_dunemark_009"
+    },
+    {
+     "x": 9,
+     "y": 49,
+     "id": "chest_dunemark_010"
+    },
+    {
+     "x": 51,
+     "y": 21,
+     "id": "chest_dunemark_011"
+    },
+    {
+     "x": 42,
+     "y": 42,
+     "id": "chest_dunemark_012"
+    },
+    {
+     "x": 32,
+     "y": 18,
+     "id": "chest_dunemark_013"
+    },
+    {
+     "x": 32,
+     "y": 61,
+     "id": "chest_dunemark_014"
+    },
+    {
+     "x": 20,
+     "y": 36,
+     "id": "chest_dunemark_015"
+    },
+    {
+     "x": 60,
+     "y": 27,
+     "id": "chest_dunemark_016"
+    },
+    {
+     "x": 54,
+     "y": 51,
+     "id": "chest_dunemark_017"
+    },
+    {
+     "x": 9,
+     "y": 30,
+     "id": "chest_dunemark_018"
     },
     {
      "x": 24,
-     "y": 61,
-     "id": "chest_dunemark_045"
+     "y": 56,
+     "id": "chest_dunemark_019"
     },
     {
-     "x": 10,
-     "y": 20,
-     "id": "chest_dunemark_046"
+     "x": 38,
+     "y": 51,
+     "id": "chest_dunemark_020"
+    },
+    {
+     "x": 50,
+     "y": 38,
+     "id": "chest_dunemark_021"
+    },
+    {
+     "x": 18,
+     "y": 47,
+     "id": "chest_dunemark_022"
+    },
+    {
+     "x": 42,
+     "y": 22,
+     "id": "chest_dunemark_023"
+    },
+    {
+     "x": 4,
+     "y": 44,
+     "id": "chest_dunemark_024"
+    },
+    {
+     "x": 38,
+     "y": 6,
+     "id": "chest_dunemark_025"
+    },
+    {
+     "x": 8,
+     "y": 21,
+     "id": "chest_dunemark_026"
     },
     {
      "x": 47,
-     "y": 37,
-     "id": "chest_dunemark_047"
+     "y": 16,
+     "id": "chest_dunemark_027"
+    },
+    {
+     "x": 61,
+     "y": 35,
+     "id": "chest_dunemark_028"
+    },
+    {
+     "x": 14,
+     "y": 53,
+     "id": "chest_dunemark_029"
+    },
+    {
+     "x": 34,
+     "y": 43,
+     "id": "chest_dunemark_030"
+    },
+    {
+     "x": 30,
+     "y": 53,
+     "id": "chest_dunemark_031"
+    },
+    {
+     "x": 43,
+     "y": 33,
+     "id": "chest_dunemark_032"
     },
     {
      "x": 33,
-     "y": 33,
-     "id": "chest_dunemark_048"
+     "y": 10,
+     "id": "chest_dunemark_033"
+    },
+    {
+     "x": 58,
+     "y": 19,
+     "id": "chest_dunemark_034"
+    },
+    {
+     "x": 46,
+     "y": 50,
+     "id": "chest_dunemark_035"
+    },
+    {
+     "x": 21,
+     "y": 28,
+     "id": "chest_dunemark_036"
+    },
+    {
+     "x": 36,
+     "y": 57,
+     "id": "chest_dunemark_037"
+    },
+    {
+     "x": 14,
+     "y": 34,
+     "id": "chest_dunemark_038"
+    },
+    {
+     "x": 56,
+     "y": 10,
+     "id": "chest_dunemark_039"
+    },
+    {
+     "x": 6,
+     "y": 26,
+     "id": "chest_dunemark_040"
+    },
+    {
+     "x": 59,
+     "y": 47,
+     "id": "chest_dunemark_041"
+    },
+    {
+     "x": 23,
+     "y": 49,
+     "id": "chest_dunemark_042"
+    },
+    {
+     "x": 16,
+     "y": 30,
+     "id": "chest_dunemark_043"
+    },
+    {
+     "x": 28,
+     "y": 59,
+     "id": "chest_dunemark_044"
     },
     {
      "x": 37,
-     "y": 11,
+     "y": 40,
+     "id": "chest_dunemark_045"
+    },
+    {
+     "x": 42,
+     "y": 53,
+     "id": "chest_dunemark_046"
+    },
+    {
+     "x": 18,
+     "y": 55,
+     "id": "chest_dunemark_047"
+    },
+    {
+     "x": 12,
+     "y": 26,
+     "id": "chest_dunemark_048"
+    },
+    {
+     "x": 61,
+     "y": 22,
      "id": "chest_dunemark_049"
     }
    ],
@@ -2433,18 +2433,18 @@
    "dwellings": [],
    "wandering_armies": [
     {
-     "x": 20,
-     "y": 48,
+     "x": 25,
+     "y": 60,
      "id": "army_dunemark_000"
     },
     {
-     "x": 55,
-     "y": 15,
+     "x": 59,
+     "y": 13,
      "id": "army_dunemark_001"
     },
     {
-     "x": 14,
-     "y": 13,
+     "x": 6,
+     "y": 24,
      "id": "army_dunemark_002"
     },
     {
@@ -2453,58 +2453,58 @@
      "id": "army_dunemark_003"
     },
     {
-     "x": 2,
-     "y": 34,
+     "x": 28,
+     "y": 8,
      "id": "army_dunemark_004"
     },
     {
-     "x": 28,
-     "y": 27,
+     "x": 21,
+     "y": 34,
      "id": "army_dunemark_005"
     },
     {
-     "x": 37,
-     "y": 56,
+     "x": 61,
+     "y": 45,
      "id": "army_dunemark_006"
     },
     {
-     "x": 35,
-     "y": 10,
+     "x": 44,
+     "y": 18,
      "id": "army_dunemark_007"
     },
     {
-     "x": 62,
-     "y": 33,
+     "x": 16,
+     "y": 49,
      "id": "army_dunemark_008"
     },
     {
-     "x": 52,
-     "y": 50,
+     "x": 41,
+     "y": 55,
      "id": "army_dunemark_009"
     },
     {
      "x": 31,
-     "y": 42,
+     "y": 45,
      "id": "army_dunemark_010"
     },
     {
-     "x": 13,
-     "y": 39,
+     "x": 36,
+     "y": 28,
      "id": "army_dunemark_011"
     },
     {
-     "x": 51,
-     "y": 28,
+     "x": 60,
+     "y": 29,
      "id": "army_dunemark_012"
     },
     {
-     "x": 43,
-     "y": 19,
+     "x": 39,
+     "y": 10,
      "id": "army_dunemark_013"
     },
     {
-     "x": 5,
-     "y": 46,
+     "x": 54,
+     "y": 21,
      "id": "army_dunemark_014"
     }
    ]
@@ -2515,15 +2515,15 @@
    "index": 0,
    "id": "millbrook",
    "name": "Millbrook",
-   "x": 51,
-   "y": 57,
+   "x": 16,
+   "y": 58,
    "boat": {
-    "x": 51,
+    "x": 15,
     "y": 58
    },
    "gate": {
-    "x": 50,
-    "y": 57
+    "x": 16,
+    "y": 59
    },
    "zone": "highmoor",
    "intel_castle": "grimhold"
@@ -2532,15 +2532,15 @@
    "index": 1,
    "id": "oakhollow",
    "name": "Oakhollow",
-   "x": 25,
-   "y": 3,
+   "x": 55,
+   "y": 10,
    "boat": {
-    "x": 24,
-    "y": 3
+    "x": 56,
+    "y": 10
    },
    "gate": {
-    "x": 25,
-    "y": 4
+    "x": 55,
+    "y": 11
    },
    "zone": "highmoor",
    "intel_castle": "ravenkeep"
@@ -2549,15 +2549,15 @@
    "index": 2,
    "id": "saltmarsh",
    "name": "Saltmarsh",
-   "x": 10,
-   "y": 43,
+   "x": 61,
+   "y": 49,
    "boat": {
-    "x": 10,
-    "y": 44
+    "x": 62,
+    "y": 49
    },
    "gate": {
-    "x": 11,
-    "y": 43
+    "x": 60,
+    "y": 49
    },
    "zone": "highmoor",
    "intel_castle": "stonecrest"
@@ -2566,15 +2566,15 @@
    "index": 3,
    "id": "brightwater",
    "name": "Brightwater",
-   "x": 62,
-   "y": 21,
+   "x": 23,
+   "y": 22,
    "boat": {
-    "x": 63,
+    "x": 23,
     "y": 21
    },
    "gate": {
-    "x": 62,
-    "y": 22
+    "x": 23,
+    "y": 23
    },
    "zone": "highmoor",
    "intel_castle": "ironwatch"
@@ -2583,15 +2583,15 @@
    "index": 4,
    "id": "harrowgate",
    "name": "Harrowgate",
-   "x": 23,
-   "y": 61,
+   "x": 33,
+   "y": 2,
    "boat": {
-    "x": 23,
-    "y": 62
+    "x": 33,
+    "y": 1
    },
    "gate": {
-    "x": 24,
-    "y": 61
+    "x": 33,
+    "y": 3
    },
    "zone": "highmoor",
    "intel_castle": "blackmoor"
@@ -2600,15 +2600,15 @@
    "index": 5,
    "id": "copperton",
    "name": "Copperton",
-   "x": 53,
-   "y": 4,
+   "x": 48,
+   "y": 61,
    "boat": {
-    "x": 54,
-    "y": 4
+    "x": 48,
+    "y": 62
    },
    "gate": {
-    "x": 53,
-    "y": 5
+    "x": 49,
+    "y": 61
    },
    "zone": "highmoor",
    "intel_castle": "hollowspire"
@@ -2617,15 +2617,15 @@
    "index": 6,
    "id": "redfern",
    "name": "Redfern",
-   "x": 16,
-   "y": 26,
+   "x": 12,
+   "y": 38,
    "boat": {
-    "x": 16,
-    "y": 27
+    "x": 11,
+    "y": 38
    },
    "gate": {
-    "x": 17,
-    "y": 26
+    "x": 12,
+    "y": 39
    },
    "zone": "highmoor",
    "intel_castle": "dunmarrow"
@@ -2635,14 +2635,14 @@
    "id": "stillwell",
    "name": "Stillwell",
    "x": 61,
-   "y": 43,
+   "y": 30,
    "boat": {
     "x": 62,
-    "y": 43
+    "y": 30
    },
    "gate": {
     "x": 61,
-    "y": 44
+    "y": 31
    },
    "zone": "highmoor",
    "intel_castle": "wolfgate"
@@ -2651,15 +2651,15 @@
    "index": 8,
    "id": "gullcliff",
    "name": "Gullcliff",
-   "x": 24,
-   "y": 18,
+   "x": 18,
+   "y": 29,
    "boat": {
-    "x": 23,
-    "y": 18
+    "x": 17,
+    "y": 29
    },
    "gate": {
-    "x": 24,
-    "y": 19
+    "x": 19,
+    "y": 29
    },
    "zone": "highmoor",
    "intel_castle": "ashenfell"
@@ -2668,6 +2668,91 @@
    "index": 9,
    "id": "thornbury",
    "name": "Thornbury",
+   "x": 15,
+   "y": 47,
+   "boat": {
+    "x": 15,
+    "y": 48
+   },
+   "gate": {
+    "x": 16,
+    "y": 47
+   },
+   "zone": "highmoor",
+   "intel_castle": "cragmere"
+  },
+  {
+   "index": 10,
+   "id": "larkspur",
+   "name": "Larkspur",
+   "x": 54,
+   "y": 55,
+   "boat": {
+    "x": 54,
+    "y": 56
+   },
+   "gate": {
+    "x": 55,
+    "y": 55
+   },
+   "zone": "highmoor",
+   "intel_castle": "brackenhold"
+  },
+  {
+   "index": 11,
+   "id": "mossbridge",
+   "name": "Mossbridge",
+   "x": 53,
+   "y": 29,
+   "boat": {
+    "x": 53,
+    "y": 30
+   },
+   "gate": {
+    "x": 52,
+    "y": 29
+   },
+   "zone": "greenreach",
+   "intel_castle": "thornwall"
+  },
+  {
+   "index": 12,
+   "id": "deepglen",
+   "name": "Deepglen",
+   "x": 2,
+   "y": 4,
+   "boat": {
+    "x": 1,
+    "y": 4
+   },
+   "gate": {
+    "x": 2,
+    "y": 5
+   },
+   "zone": "greenreach",
+   "intel_castle": "mossmantle"
+  },
+  {
+   "index": 13,
+   "id": "fernwick",
+   "name": "Fernwick",
+   "x": 21,
+   "y": 61,
+   "boat": {
+    "x": 21,
+    "y": 62
+   },
+   "gate": {
+    "x": 22,
+    "y": 61
+   },
+   "zone": "greenreach",
+   "intel_castle": "briarkeep"
+  },
+  {
+   "index": 14,
+   "id": "ivyford",
+   "name": "Ivyford",
    "x": 40,
    "y": 2,
    "boat": {
@@ -2678,91 +2763,6 @@
     "x": 40,
     "y": 3
    },
-   "zone": "highmoor",
-   "intel_castle": "cragmere"
-  },
-  {
-   "index": 10,
-   "id": "larkspur",
-   "name": "Larkspur",
-   "x": 38,
-   "y": 61,
-   "boat": {
-    "x": 38,
-    "y": 62
-   },
-   "gate": {
-    "x": 39,
-    "y": 61
-   },
-   "zone": "highmoor",
-   "intel_castle": "brackenhold"
-  },
-  {
-   "index": 11,
-   "id": "mossbridge",
-   "name": "Mossbridge",
-   "x": 38,
-   "y": 61,
-   "boat": {
-    "x": 38,
-    "y": 62
-   },
-   "gate": {
-    "x": 39,
-    "y": 61
-   },
-   "zone": "greenreach",
-   "intel_castle": "thornwall"
-  },
-  {
-   "index": 12,
-   "id": "deepglen",
-   "name": "Deepglen",
-   "x": 5,
-   "y": 3,
-   "boat": {
-    "x": 4,
-    "y": 3
-   },
-   "gate": {
-    "x": 5,
-    "y": 4
-   },
-   "zone": "greenreach",
-   "intel_castle": "mossmantle"
-  },
-  {
-   "index": 13,
-   "id": "fernwick",
-   "name": "Fernwick",
-   "x": 46,
-   "y": 12,
-   "boat": {
-    "x": 46,
-    "y": 13
-   },
-   "gate": {
-    "x": 45,
-    "y": 12
-   },
-   "zone": "greenreach",
-   "intel_castle": "briarkeep"
-  },
-  {
-   "index": 14,
-   "id": "ivyford",
-   "name": "Ivyford",
-   "x": 9,
-   "y": 45,
-   "boat": {
-    "x": 9,
-    "y": 46
-   },
-   "gate": {
-    "x": 10,
-    "y": 45
-   },
    "zone": "greenreach",
    "intel_castle": "rootdeep"
   },
@@ -2770,15 +2770,15 @@
    "index": 15,
    "id": "elderdown",
    "name": "Elderdown",
-   "x": 47,
-   "y": 41,
+   "x": 8,
+   "y": 35,
    "boat": {
-    "x": 48,
-    "y": 41
+    "x": 7,
+    "y": 35
    },
    "gate": {
-    "x": 47,
-    "y": 42
+    "x": 8,
+    "y": 36
    },
    "zone": "greenreach",
    "intel_castle": "gloomwood"
@@ -2787,15 +2787,15 @@
    "index": 16,
    "id": "willowmere",
    "name": "Willowmere",
-   "x": 30,
-   "y": 1,
+   "x": 51,
+   "y": 55,
    "boat": {
-    "x": 30,
-    "y": 0
+    "x": 52,
+    "y": 55
    },
    "gate": {
-    "x": 31,
-    "y": 1
+    "x": 50,
+    "y": 55
    },
    "zone": "greenreach",
    "intel_castle": "hartspire"
@@ -2804,15 +2804,15 @@
    "index": 17,
    "id": "coralhaven",
    "name": "Coralhaven",
-   "x": 2,
-   "y": 49,
+   "x": 27,
+   "y": 59,
    "boat": {
-    "x": 2,
-    "y": 50
+    "x": 27,
+    "y": 60
    },
    "gate": {
-    "x": 2,
-    "y": 48
+    "x": 26,
+    "y": 59
    },
    "zone": "isleward",
    "intel_castle": "tidegrave"
@@ -2838,15 +2838,15 @@
    "index": 19,
    "id": "tidewater",
    "name": "Tidewater",
-   "x": 54,
-   "y": 57,
+   "x": 8,
+   "y": 16,
    "boat": {
-    "x": 54,
-    "y": 58
+    "x": 8,
+    "y": 15
    },
    "gate": {
-    "x": 55,
-    "y": 57
+    "x": 8,
+    "y": 17
    },
    "zone": "isleward",
    "intel_castle": "wavebreak"
@@ -2855,15 +2855,15 @@
    "index": 20,
    "id": "pearlstrand",
    "name": "Pearlstrand",
-   "x": 31,
-   "y": 26,
+   "x": 55,
+   "y": 50,
    "boat": {
-    "x": 31,
-    "y": 25
+    "x": 56,
+    "y": 50
    },
    "gate": {
-    "x": 31,
-    "y": 27
+    "x": 55,
+    "y": 51
    },
    "zone": "isleward",
    "intel_castle": "shellcairn"
@@ -2872,15 +2872,15 @@
    "index": 21,
    "id": "driftmoor",
    "name": "Driftmoor",
-   "x": 7,
-   "y": 5,
+   "x": 35,
+   "y": 34,
    "boat": {
-    "x": 6,
-    "y": 5
+    "x": 36,
+    "y": 34
    },
    "gate": {
-    "x": 7,
-    "y": 6
+    "x": 35,
+    "y": 35
    },
    "zone": "isleward",
    "intel_castle": "stormhaven"
@@ -2889,15 +2889,15 @@
    "index": 22,
    "id": "shellbay",
    "name": "Shellbay",
-   "x": 60,
-   "y": 32,
+   "x": 11,
+   "y": 44,
    "boat": {
-    "x": 61,
-    "y": 32
+    "x": 11,
+    "y": 43
    },
    "gate": {
-    "x": 60,
-    "y": 33
+    "x": 11,
+    "y": 45
    },
    "zone": "isleward",
    "intel_castle": "reefhold"
@@ -2906,15 +2906,15 @@
    "index": 23,
    "id": "sandwell",
    "name": "Sandwell",
-   "x": 10,
-   "y": 16,
+   "x": 41,
+   "y": 57,
    "boat": {
-    "x": 10,
-    "y": 15
+    "x": 41,
+    "y": 58
    },
    "gate": {
-    "x": 10,
-    "y": 17
+    "x": 40,
+    "y": 57
    },
    "zone": "dunemark",
    "intel_castle": "sunscar"
@@ -2923,15 +2923,15 @@
    "index": 24,
    "id": "oasis_rest",
    "name": "Oasis Rest",
-   "x": 59,
-   "y": 44,
+   "x": 61,
+   "y": 4,
    "boat": {
-    "x": 59,
-    "y": 45
+    "x": 62,
+    "y": 4
    },
    "gate": {
-    "x": 58,
-    "y": 44
+    "x": 61,
+    "y": 5
    },
    "zone": "dunemark",
    "intel_castle": "dustcrown"
@@ -2940,15 +2940,15 @@
    "index": 25,
    "id": "sunreach",
    "name": "Sunreach",
-   "x": 21,
-   "y": 61,
+   "x": 6,
+   "y": 21,
    "boat": {
-    "x": 21,
-    "y": 62
+    "x": 5,
+    "y": 21
    },
    "gate": {
-    "x": 22,
-    "y": 61
+    "x": 6,
+    "y": 22
    },
    "zone": "dunemark",
    "intel_castle": "mirage_keep"
@@ -2958,7 +2958,7 @@
   {
    "id": "grimhold",
    "name": "Grimhold",
-   "x": 43,
+   "x": 40,
    "y": 25,
    "zone": "highmoor",
    "difficulty_tier": 0,
@@ -2967,8 +2967,8 @@
   {
    "id": "ravenkeep",
    "name": "Ravenkeep",
-   "x": 23,
-   "y": 41,
+   "x": 47,
+   "y": 35,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 1
@@ -2976,8 +2976,8 @@
   {
    "id": "stonecrest",
    "name": "Stonecrest",
-   "x": 33,
-   "y": 50,
+   "x": 24,
+   "y": 28,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 2
@@ -2985,8 +2985,8 @@
   {
    "id": "ironwatch",
    "name": "Ironwatch",
-   "x": 20,
-   "y": 26,
+   "x": 30,
+   "y": 44,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 3
@@ -2994,8 +2994,8 @@
   {
    "id": "blackmoor",
    "name": "Blackmoor",
-   "x": 59,
-   "y": 36,
+   "x": 53,
+   "y": 17,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 4
@@ -3003,8 +3003,8 @@
   {
    "id": "hollowspire",
    "name": "Hollowspire",
-   "x": 52,
-   "y": 49,
+   "x": 26,
+   "y": 13,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 5
@@ -3012,8 +3012,8 @@
   {
    "id": "dunmarrow",
    "name": "Dunmarrow",
-   "x": 57,
-   "y": 21,
+   "x": 58,
+   "y": 38,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 6
@@ -3021,8 +3021,8 @@
   {
    "id": "wolfgate",
    "name": "Wolfgate",
-   "x": 26,
-   "y": 13,
+   "x": 38,
+   "y": 7,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 7
@@ -3030,8 +3030,8 @@
   {
    "id": "ashenfell",
    "name": "Ashenfell",
-   "x": 42,
-   "y": 60,
+   "x": 49,
+   "y": 55,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 8
@@ -3039,8 +3039,8 @@
   {
    "id": "cragmere",
    "name": "Cragmere",
-   "x": 49,
-   "y": 4,
+   "x": 51,
+   "y": 5,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 9
@@ -3048,8 +3048,8 @@
   {
    "id": "brackenhold",
    "name": "Brackenhold",
-   "x": 18,
-   "y": 60,
+   "x": 20,
+   "y": 59,
    "zone": "highmoor",
    "difficulty_tier": 0,
    "index": 10
@@ -3057,8 +3057,8 @@
   {
    "id": "thornwall",
    "name": "Thornwall",
-   "x": 20,
-   "y": 34,
+   "x": 46,
+   "y": 14,
    "zone": "greenreach",
    "difficulty_tier": 1,
    "index": 11
@@ -3066,7 +3066,7 @@
   {
    "id": "mossmantle",
    "name": "Mossmantle",
-   "x": 48,
+   "x": 17,
    "y": 60,
    "zone": "greenreach",
    "difficulty_tier": 1,
@@ -3075,8 +3075,8 @@
   {
    "id": "briarkeep",
    "name": "Briarkeep",
-   "x": 44,
-   "y": 4,
+   "x": 6,
+   "y": 5,
    "zone": "greenreach",
    "difficulty_tier": 1,
    "index": 13
@@ -3084,8 +3084,8 @@
   {
    "id": "rootdeep",
    "name": "Rootdeep",
-   "x": 6,
-   "y": 7,
+   "x": 36,
+   "y": 42,
    "zone": "greenreach",
    "difficulty_tier": 1,
    "index": 14
@@ -3093,8 +3093,8 @@
   {
    "id": "gloomwood",
    "name": "Gloomwood",
-   "x": 25,
-   "y": 56,
+   "x": 18,
+   "y": 29,
    "zone": "greenreach",
    "difficulty_tier": 1,
    "index": 15
@@ -3102,8 +3102,8 @@
   {
    "id": "hartspire",
    "name": "Hartspire",
-   "x": 38,
-   "y": 25,
+   "x": 30,
+   "y": 3,
    "zone": "greenreach",
    "difficulty_tier": 1,
    "index": 16
@@ -3111,8 +3111,8 @@
   {
    "id": "tidegrave",
    "name": "Tidegrave",
-   "x": 51,
-   "y": 45,
+   "x": 45,
+   "y": 49,
    "zone": "isleward",
    "difficulty_tier": 2,
    "index": 17
@@ -3120,8 +3120,8 @@
   {
    "id": "saltspire",
    "name": "Saltspire",
-   "x": 37,
-   "y": 4,
+   "x": 23,
+   "y": 5,
    "zone": "isleward",
    "difficulty_tier": 2,
    "index": 18
@@ -3129,8 +3129,8 @@
   {
    "id": "wavebreak",
    "name": "Wavebreak",
-   "x": 9,
-   "y": 49,
+   "x": 10,
+   "y": 37,
    "zone": "isleward",
    "difficulty_tier": 2,
    "index": 19
@@ -3138,8 +3138,8 @@
   {
    "id": "shellcairn",
    "name": "Shellcairn",
-   "x": 31,
-   "y": 30,
+   "x": 30,
+   "y": 28,
    "zone": "isleward",
    "difficulty_tier": 2,
    "index": 20
@@ -3147,8 +3147,8 @@
   {
    "id": "stormhaven",
    "name": "Stormhaven",
-   "x": 55,
-   "y": 18,
+   "x": 20,
+   "y": 53,
    "zone": "isleward",
    "difficulty_tier": 2,
    "index": 21
@@ -3156,8 +3156,8 @@
   {
    "id": "reefhold",
    "name": "Reefhold",
-   "x": 34,
-   "y": 55,
+   "x": 43,
+   "y": 3,
    "zone": "isleward",
    "difficulty_tier": 2,
    "index": 22
@@ -3165,8 +3165,8 @@
   {
    "id": "sunscar",
    "name": "Sunscar",
-   "x": 21,
-   "y": 56,
+   "x": 23,
+   "y": 41,
    "zone": "dunemark",
    "difficulty_tier": 3,
    "index": 23
@@ -3175,7 +3175,7 @@
    "id": "dustcrown",
    "name": "Dustcrown",
    "x": 60,
-   "y": 28,
+   "y": 9,
    "zone": "dunemark",
    "difficulty_tier": 3,
    "index": 24
@@ -3183,8 +3183,8 @@
   {
    "id": "mirage_keep",
    "name": "Mirage Keep",
-   "x": 8,
-   "y": 26,
+   "x": 9,
+   "y": 17,
    "zone": "dunemark",
    "difficulty_tier": 3,
    "index": 25
@@ -3192,8 +3192,8 @@
   {
    "id": "royal_hall",
    "name": "Royal Hall",
-   "x": 36,
-   "y": 35,
+   "x": 34,
+   "y": 33,
    "zone": "highmoor",
    "special": {
     "flow": "audience",
@@ -5112,22 +5112,122 @@
   }
  ],
  "tile_codes": {
+  "!": {
+   "art": "mountain_shore_03",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "$": {
+   "art": "mountain_shore_04",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
   "%": {
    "art": "forest",
    "blocks_foot": true,
    "terrain": "forest"
   },
+  "&": {
+   "art": "mountain_shore_05",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "*": {
+   "art": "mountain_shore_06",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "+": {
+   "art": "mountain_shore_07",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
   ",": {
    "art": "grass_variant",
    "terrain": "grass"
+  },
+  "-": {
+   "art": "mountain_shore_08",
+   "blocks_foot": true,
+   "terrain": "mountain"
   },
   ".": {
    "art": "grass",
    "terrain": "grass"
   },
+  "0": {
+   "art": "forest_shore_01",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "1": {
+   "art": "forest_shore_02",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "2": {
+   "art": "forest_shore_03",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "3": {
+   "art": "forest_shore_04",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "4": {
+   "art": "forest_shore_05",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "5": {
+   "art": "forest_shore_06",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "6": {
+   "art": "forest_shore_07",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "7": {
+   "art": "forest_shore_08",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "8": {
+   "art": "forest_shore_09",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "9": {
+   "art": "forest_shore_10",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
   ":": {
    "art": "desert",
    "terrain": "desert"
+  },
+  "<": {
+   "art": "mountain_shore_12",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "=": {
+   "art": "mountain_shore_09",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "?": {
+   "art": "mountain_shore_10",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "@": {
+   "art": "mountain_shore_11",
+   "blocks_foot": true,
+   "terrain": "mountain"
   },
   "A": {
    "art": "forest_edge_01",
@@ -5249,6 +5349,16 @@
    "blocks_foot": true,
    "terrain": "mountain"
   },
+  "Y": {
+   "art": "forest_shore_11",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
+  "Z": {
+   "art": "forest_shore_12",
+   "blocks_foot": true,
+   "terrain": "forest"
+  },
   "^": {
    "art": "mountain",
    "blocks_foot": true,
@@ -5349,6 +5459,16 @@
   "x": {
    "art": "water_edge_11",
    "terrain": "water"
+  },
+  "y": {
+   "art": "mountain_shore_01",
+   "blocks_foot": true,
+   "terrain": "mountain"
+  },
+  "z": {
+   "art": "mountain_shore_02",
+   "blocks_foot": true,
+   "terrain": "mountain"
   },
   "~": {
    "art": "water",

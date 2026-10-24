@@ -1,20 +1,120 @@
 {
+ "!": {
+  "art": "mountain_shore_03",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "$": {
+  "art": "mountain_shore_04",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
  "%": {
   "art": "forest",
   "blocks_foot": true,
   "terrain": "forest"
  },
+ "&": {
+  "art": "mountain_shore_05",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "*": {
+  "art": "mountain_shore_06",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "+": {
+  "art": "mountain_shore_07",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
  ",": {
   "art": "grass_variant",
   "terrain": "grass"
+ },
+ "-": {
+  "art": "mountain_shore_08",
+  "blocks_foot": true,
+  "terrain": "mountain"
  },
  ".": {
   "art": "grass",
   "terrain": "grass"
  },
+ "0": {
+  "art": "forest_shore_01",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "1": {
+  "art": "forest_shore_02",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "2": {
+  "art": "forest_shore_03",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "3": {
+  "art": "forest_shore_04",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "4": {
+  "art": "forest_shore_05",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "5": {
+  "art": "forest_shore_06",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "6": {
+  "art": "forest_shore_07",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "7": {
+  "art": "forest_shore_08",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "8": {
+  "art": "forest_shore_09",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "9": {
+  "art": "forest_shore_10",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
  ":": {
   "art": "desert",
   "terrain": "desert"
+ },
+ "<": {
+  "art": "mountain_shore_12",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "=": {
+  "art": "mountain_shore_09",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "?": {
+  "art": "mountain_shore_10",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "@": {
+  "art": "mountain_shore_11",
+  "blocks_foot": true,
+  "terrain": "mountain"
  },
  "A": {
   "art": "forest_edge_01",
@@ -136,6 +236,16 @@
   "blocks_foot": true,
   "terrain": "mountain"
  },
+ "Y": {
+  "art": "forest_shore_11",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
+ "Z": {
+  "art": "forest_shore_12",
+  "blocks_foot": true,
+  "terrain": "forest"
+ },
  "^": {
   "art": "mountain",
   "blocks_foot": true,
@@ -236,6 +346,16 @@
  "x": {
   "art": "water_edge_11",
   "terrain": "water"
+ },
+ "y": {
+  "art": "mountain_shore_01",
+  "blocks_foot": true,
+  "terrain": "mountain"
+ },
+ "z": {
+  "art": "mountain_shore_02",
+  "blocks_foot": true,
+  "terrain": "mountain"
  },
  "~": {
   "art": "water",

@@ -345,6 +345,66 @@
       "method": "ai-generated",
       "license": "CC0-1.0"
     },
+    "art/tiles/forest_shore_01.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_02.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_03.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_04.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_05.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_06.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_07.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_08.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_09.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_10.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_11.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/forest_shore_12.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
     "art/tiles/grass.png": {
       "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
       "method": "ai-generated",
@@ -416,6 +476,66 @@
       "license": "CC0-1.0"
     },
     "art/tiles/mountain_edge_12.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_01.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_02.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_03.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_04.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_05.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_06.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_07.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_08.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_09.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_10.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_11.png": {
+      "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/tiles/mountain_shore_12.png": {
       "author": "AI-generated (tools/gen_terrain_ai.py: SDXL DreamShaper XL), made tileable and edged by tools/gen_terrain_ai.py",
       "method": "ai-generated",
       "license": "CC0-1.0"

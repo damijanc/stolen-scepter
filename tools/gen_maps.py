@@ -1,7 +1,9 @@
 """Generate the four continent maps and their placements for the pack.
 
-Every map is our own: terrain comes from seeded noise, then is cleaned until
-every tile can be drawn with the 12 edge tiles each terrain has, and the
+Every map is our own: land from seeded noise is filled with forest and
+mountain walls, grass is carved through it as clearings and winding paths
+(`raw_terrain`), then it is cleaned until every tile can be drawn with the 12
+edge tiles each terrain has, and the
 placements (castles, towns, chests, wandering armies, signs, spawns, the magic
 alcove) are put where the terrain allows and the hero can reach them.
 
@@ -32,6 +34,7 @@ Engine facts this follows (engine/src/map.rs, game.rs):
 Stdlib only.
 """
 import argparse
+import heapq
 import json
 import math
 import os
@@ -48,22 +51,26 @@ SIZE = 64
 
 WATER, GRASS, FOREST, MOUNTAIN, DESERT = "W", "G", "F", "M", "D"
 WALKABLE = {GRASS, DESERT}
+# Which terrain keeps its tile where two meet (higher wins). Forest and
+# mountain may meet water directly: their shore tiles draw that edge.
+RANK = {WATER: 4, MOUNTAIN: 3, FOREST: 2, DESERT: 1}
+WALLS = {FOREST, MOUNTAIN}
 
 # Totals match what the engine's salting is built around: 26 towns (spells
 # are pinned to towns) and 27 castles (17 villains plus the King and monster
 # holds). Chests also feed the salt pool, which needs at least 21 slots.
 CONTINENTS = [
     dict(id="highmoor", home=True, seed=11, land=0.58, falloff=1.6, freq=3.0,
-         patch=9.0, forest=0.24, mountain=0.16, desert=0.00,
+         patch=4.0, forest=0.8, mountain=1.0, desert=0.0, clearings=14, loops=0.3,
          towns=11, castles=12, signs=12, chests=70, armies=30),
-    dict(id="greenreach", home=False, seed=23, land=0.56, falloff=1.6, freq=3.0,
-         patch=8.0, forest=0.36, mountain=0.10, desert=0.00,
+    dict(id="greenreach", home=False, seed=23, land=0.66, falloff=1.6, freq=3.0,
+         patch=4.0, forest=1.0, mountain=0.9, desert=0.0, clearings=14, loops=0.25,
          towns=6, castles=6, signs=10, chests=60, armies=25),
-    dict(id="isleward", home=False, seed=37, land=0.36, falloff=0.4, freq=7.0,
-         islands=True, patch=9.0, forest=0.18, mountain=0.12, desert=0.00,
-         towns=6, castles=6, signs=8, chests=45, armies=12),
-    dict(id="dunemark", home=False, seed=41, land=0.56, falloff=1.6, freq=3.0,
-         patch=8.0, forest=0.06, mountain=0.16, desert=0.36,
+    dict(id="isleward", home=False, seed=37, land=0.42, falloff=0.4, freq=6.0,
+         islands=True, patch=5.0, forest=1.0, mountain=0.6, desert=0.0, clearings=14,
+         loops=0.25, towns=6, castles=6, signs=8, chests=45, armies=12),
+    dict(id="dunemark", home=False, seed=41, land=0.70, falloff=1.6, freq=3.0,
+         patch=4.5, forest=0.2, mountain=1.05, desert=1.0, clearings=10, loops=0.3,
          towns=3, castles=3, signs=8, chests=50, armies=15),
 ]
 
@@ -95,6 +102,8 @@ BASE_OF = {GRASS: ".", WATER: "~", FOREST: "%", MOUNTAIN: "^", DESERT: ":"}
 # Edge codes: a run of letters per terrain, edge number order.
 EDGE_CODES = {FOREST: "ABCDEFGHIJKL", MOUNTAIN: "MNOPQRSTUVWX",
               DESERT: "abcdefghijkl", WATER: "mnopqrstuvwx"}
+# Shore codes: a wall edge drawn over water instead of grass, same numbering.
+SHORE_CODES = {FOREST: "0123456789YZ", MOUNTAIN: "yz!$&*+-=?@<"}
 EDGE_ART = {FOREST: "forest", MOUNTAIN: "mountain", DESERT: "desert", WATER: "water"}
 TERRAIN_NAME = {FOREST: "forest", MOUNTAIN: "mountain", DESERT: "desert", WATER: "water"}
 
@@ -108,6 +117,10 @@ def tile_codes():
             if t in (FOREST, MOUNTAIN):
                 entry["blocks_foot"] = True
             codes[code] = entry
+    for t, letters in SHORE_CODES.items():
+        for i, code in enumerate(letters):
+            codes[code] = dict(art=f"{EDGE_ART[t]}_shore_{i + 1:02d}",
+                               terrain=TERRAIN_NAME[t], blocks_foot=True)
     return codes
 
 
@@ -150,33 +163,169 @@ def quantile(values, frac):
 # --- terrain ---------------------------------------------------------------
 
 def raw_terrain(cfg, rng):
+    """Land from noise, filled with walls, then grass carved through it.
+
+    The originals (measured as numbers by `measure_maps.py`, kept in
+    `map_targets.json`) are solid forest and mountain cut by narrow paths and
+    small clearings, so this builds terrain that way round: every land cell
+    starts as a wall chosen by biome noise, then clearings (castle-sized ones
+    first) and coves are opened and joined by winding paths, with a few extra
+    joins for loops. Desert is a floor biome: it stays open, as a desert
+    continent's basins are.
+
+    It works on a half-resolution grid of 2x2 tile blocks. Any shape made of
+    aligned 2x2 blocks can be drawn with the 12 edge tiles, so the walls come
+    out whole instead of being eroded by `clean`; paths are two tiles wide.
+    """
+    m = SIZE // 2
     land_n = fbm(rng, cfg["freq"])
-    # A high biome frequency breaks terrain into many patches: corridors and
-    # detours rather than one forest and one range on an open plain.
-    fields = {t: fbm(rng, cfg.get("patch", 8.0)) for t in (FOREST, MOUNTAIN, DESERT)}
+    biome = {t: fbm(rng, cfg.get("patch", 5.0)) for t in (FOREST, MOUNTAIN, DESERT)}
+    weight = {FOREST: cfg["forest"], MOUNTAIN: cfg["mountain"], DESERT: cfg["desert"]}
     height = {}
-    for y in range(SIZE):
-        for x in range(SIZE):
-            u, v = (x + 0.5) / SIZE, (y + 0.5) / SIZE
+    for y in range(m):
+        for x in range(m):
+            u, v = (x + 0.5) / m, (y + 0.5) / m
             d = math.hypot(u - 0.5, v - 0.5) * 2
             height[x, y] = land_n(u, v) - cfg["falloff"] * 0.25 * d * d
     cut = quantile(list(height.values()), 1 - cfg["land"])
-    grid = [[WATER] * SIZE for _ in range(SIZE)]
+    cell = [[WATER] * m for _ in range(m)]
     land = [(x, y) for (x, y), h in height.items() if h > cut
-            and 2 <= x < SIZE - 2 and 2 <= y < SIZE - 2]
+            and 1 <= x < m - 1 and 1 <= y < m - 1]
+    land_set = set(land)
     for x, y in land:
-        grid[y][x] = GRASS
-    # Biomes: each terrain claims its fraction of the land, highest noise first.
-    for t in (MOUNTAIN, FOREST, DESERT):
-        frac = cfg[{FOREST: "forest", MOUNTAIN: "mountain", DESERT: "desert"}[t]]
-        if frac <= 0:
+        u, v = (x + 0.5) / m, (y + 0.5) / m
+        cell[y][x] = max((t for t in weight if weight[t] > 0),
+                         key=lambda t: biome[t](u, v) * weight[t])
+
+    def get(x, y):
+        return cell[y][x] if 0 <= x < m and 0 <= y < m else None
+
+    def opened(x, y):
+        if (x, y) in land_set and cell[y][x] != DESERT:
+            cell[y][x] = GRASS
+
+    # Castle clearings first (2x2 blocks: 4x4 tiles hold the 3x2 castle and
+    # the tile before its gate), then small clearings, then coves.
+    roomy = [(x, y) for x, y in land
+             if all((x + dx, y + dy) in land_set for dx in (-1, 0, 1, 2) for dy in (-1, 0, 1, 2))]
+    rng.shuffle(roomy)
+    anchors = []
+    for x, y in roomy:
+        if len(anchors) >= cfg["castles"] + 1:
+            break
+        if all(abs(x - ax) + abs(y - ay) >= 5 for ax, ay in anchors):
+            anchors.append((x, y))
+            for dx in (0, 1):
+                for dy in (0, 1):
+                    opened(x + dx, y + dy)
+    rest = [c for c in land if c not in anchors]
+    rng.shuffle(rest)
+    for x, y in rest:
+        if len(anchors) >= cfg["castles"] + cfg["clearings"]:
+            break
+        if all(abs(x - ax) + abs(y - ay) >= cfg.get("spacing", 4) for ax, ay in anchors):
+            anchors.append((x, y))
+            opened(x, y)
+            if rng.random() < 0.5:
+                opened(x + rng.choice((-1, 1)), y)
+    shore = [(x, y) for x, y in land
+             if any(get(x + dx, y + dy) == WATER for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+    rng.shuffle(shore)
+    coves = []
+    for x, y in shore:
+        if len(coves) >= cfg["towns"] + cfg.get("coves", 4):
+            break
+        if all(abs(x - cx) + abs(y - cy) >= 3 for cx, cy in coves):
+            coves.append((x, y))
+            opened(x, y)
+    anchors += coves
+
+    # Paths: a minimum spanning tree over each landmass's clearings, walked on
+    # a noisy cost so they wind, plus extra joins for loops.
+    wiggle = fbm(rng, 6.0)
+
+    def cost(x, y):
+        if cell[y][x] in (GRASS, DESERT):
+            return 1.0
+        return 2.0 + 6.0 * wiggle((x + 0.5) / m, (y + 0.5) / m)
+
+    def carve(a, b):
+        dist, prev = {a: 0.0}, {}
+        heap = [(0.0, a)]
+        while heap:
+            d, cur = heapq.heappop(heap)
+            if cur == b:
+                break
+            if d > dist[cur]:
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (cur[0] + dx, cur[1] + dy)
+                if n in land_set:
+                    nd = d + cost(*n)
+                    if nd < dist.get(n, 1e18):
+                        dist[n] = nd
+                        prev[n] = cur
+                        heapq.heappush(heap, (nd, n))
+        cur = b
+        while cur in prev:
+            opened(*cur)
+            cur = prev[cur]
+
+    seen = set()
+    for x, y in land:
+        if (x, y) in seen:
             continue
-        f = fields[t]
-        free = [(x, y) for x, y in land if grid[y][x] == GRASS]
-        score = {(x, y): f((x + 0.5) / SIZE, (y + 0.5) / SIZE) for x, y in free}
-        n = int(len(land) * frac)
-        for x, y in sorted(free, key=lambda p: -score[p])[:n]:
-            grid[y][x] = t
+        mass, q = set(), deque([(x, y)])
+        seen.add((x, y))
+        while q:
+            cx, cy = q.popleft()
+            mass.add((cx, cy))
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (cx + dx, cy + dy)
+                if n in land_set and n not in seen:
+                    seen.add(n)
+                    q.append(n)
+        pts = [a for a in anchors if a in mass]
+        if len(pts) < 2:
+            continue
+        tree, todo, edges = [pts[0]], pts[1:], []
+        while todo:
+            a, b = min(((a, b) for a in tree for b in todo),
+                       key=lambda e: abs(e[0][0] - e[1][0]) + abs(e[0][1] - e[1][1]))
+            edges.append((a, b))
+            tree.append(b)
+            todo.remove(b)
+        for _ in range(int(len(pts) * cfg.get("loops", 0.25))):
+            a = rng.choice(pts)
+            near = sorted((p for p in pts if p != a),
+                          key=lambda p: abs(p[0] - a[0]) + abs(p[1] - a[1]))[:3]
+            edges.append((a, rng.choice(near)))
+        for a, b in edges:
+            carve(a, b)
+
+    # Block-level rules, so the tiles need no erosion: two different walls (or
+    # a wall and desert) never touch -- the lower-ranked one opens to grass --
+    # and desert never meets water.
+    for _ in range(50):
+        changed = False
+        for y in range(m):
+            for x in range(m):
+                t = cell[y][x]
+                if t in (GRASS, WATER):
+                    continue
+                around = [get(x + dx, y + dy) for dx, dy in OFFSETS.values()]
+                clash = any(RANK.get(n, -1) > RANK[t] and not (t in WALLS and n == WATER)
+                            for n in around)
+                if clash:
+                    cell[y][x] = GRASS
+                    changed = True
+        if not changed:
+            break
+
+    grid = [[WATER] * SIZE for _ in range(SIZE)]
+    for y in range(SIZE):
+        for x in range(SIZE):
+            grid[y][x] = cell[y // 2][x // 2]
     return grid
 
 
@@ -186,12 +335,31 @@ def at(grid, x, y):
     return None
 
 
+def pure_shore(grid, x, y):
+    """A wall that meets the sea and nothing else: drawn with its shore tile,
+    which shows the water's edge itself."""
+    around = {at(grid, x + dx, y + dy) for dx, dy in OFFSETS.values()}
+    return grid[y][x] in WALLS and WATER in around and not (around & {GRASS, DESERT})
+
+
+def same_as_at(grid, t, x, y):
+    """Whether the tile at (x, y) counts as more of `t` when shaping `t`.
+    Water takes a pure-shore wall as more water, since the wall's shore tile
+    draws that edge; a wall that also touches grass is drawn with its grass
+    edge, so the water draws its own shoreline against it."""
+    n = at(grid, x, y)
+    if n is None or n == t:
+        return True
+    return t == WATER and n in WALLS and pure_shore(grid, x, y)
+
+
 def shape(grid, x, y):
     """The edge shape of a non-grass tile: (kind, where), "interior", or None
-    if no edge tile can draw it. Out-of-map neighbours count as the same."""
+    if no edge tile can draw it. Out-of-map neighbours count as the same. A
+    wall bordering both grass and water is drawn with its grass edge (see
+    `encode`), so its shape counts both."""
     t = grid[y][x]
-    diff = {k for k, (dx, dy) in OFFSETS.items()
-            if at(grid, x + dx, y + dy) not in (None, t)}
+    diff = {k for k, (dx, dy) in OFFSETS.items() if not same_as_at(grid, t, x + dx, y + dy)}
     orth = {k for k in diff if len(k) == 1}
     diag = diff - orth
     if not orth:
@@ -261,11 +429,18 @@ def clean(grid):
                 t = grid[y][x]
                 if t == GRASS:
                     continue
-                # Two different non-grass terrains may not touch.
-                clash = any(at(grid, x + dx, y + dy) not in (None, t, GRASS)
-                            for dx, dy in OFFSETS.values())
+                # Two different non-grass terrains may not touch. Only the
+                # lower-ranked one gives way, so the seam between a forest and
+                # a mountain range is one grass tile wide, not two.
+                clash = any(RANK.get(n, -1) > RANK[t] and not (t in WALLS and n == WATER)
+                            for n in (at(grid, x + dx, y + dy) for dx, dy in OFFSETS.values()))
                 if clash or shape(grid, x, y) is None:
-                    grid[y][x] = GRASS
+                    # A wall on the coast that cannot be drawn sinks into the
+                    # sea; turning it to grass would leave its neighbours
+                    # bordering grass and water at once, and unzip the coast.
+                    wet = t in WALLS and any(at(grid, x + dx, y + dy) == WATER
+                                             for dx, dy in OFFSETS.values())
+                    grid[y][x] = WATER if wet else GRASS
                     changed = True
         if not changed:
             return grid
@@ -287,7 +462,12 @@ def encode(grid, rng):
             else:
                 table = WATER_EDGE if t == WATER else LAND_EDGE
                 num = table[s]
-                row.append(EDGE_CODES[t][num if t == WATER else num - 1])
+                # The shore set only where the wall meets water alone; where it
+                # meets grass too, its grass edge and the water's own shoreline
+                # read as a strip of beach.
+                shore = pure_shore(grid, x, y)
+                codes = SHORE_CODES[t] if shore else EDGE_CODES[t]
+                row.append(codes[num if t == WATER else num - 1])
         rows.append("".join(row))
     return rows
 
@@ -361,14 +541,15 @@ def place(cfg, grid, rng):
         for t in tiles:
             taken.add(t)
 
-    # Castles: a 3x2 grass block (gate at the bottom middle) with grass around
-    # it and the tile below the gate reachable.
+    # Castles: a 3x2 grass block (gate at the bottom middle) with the tile
+    # below the gate reachable. The castle's own tiles carry their grass, so
+    # it may stand against a wall, as the originals' castles do.
     sites = []
     for x, y in home_land:
         block = [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0)]
-        ring = [(x + dx, y + dy) for dx in (-2, -1, 0, 1, 2) for dy in (-2, -1, 0, 1)]
         below = (x, y + 1)
-        if all(at(grid, *c) == GRASS for c in block + ring) and below in home_land:
+        if all(at(grid, *c) == GRASS for c in block) and below in home_land \
+                and at(grid, *below) == GRASS:
             sites.append((x, y))
     castles = spread(rng, sites, cfg["castles"], 7, taken, keep_off=2)
     if len(castles) < cfg["castles"]:

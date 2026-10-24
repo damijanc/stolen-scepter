@@ -1,0 +1,87 @@
+{
+ "continent_1": {
+  "water": 0.42,
+  "land": {
+   "grass": 0.379,
+   "forest": 0.206,
+   "mountain": 0.305,
+   "desert": 0.11
+  },
+  "clearance": {
+   "1": 0.768,
+   "2": 0.127,
+   "3": 0.044,
+   "4": 0.029,
+   "5": 0.022,
+   "6": 0.009
+  },
+  "mean_clearance": 1.44,
+  "walls": 30,
+  "wall_mean": 40.5,
+  "wall_largest": 324,
+  "landmasses": 5,
+  "direct_contact": 0.297
+ },
+ "continent_2": {
+  "water": 0.323,
+  "land": {
+   "grass": 0.377,
+   "forest": 0.252,
+   "mountain": 0.363,
+   "desert": 0.009
+  },
+  "clearance": {
+   "1": 0.959,
+   "2": 0.037,
+   "3": 0.004
+  },
+  "mean_clearance": 1.04,
+  "walls": 19,
+  "wall_mean": 89.7,
+  "wall_largest": 806,
+  "landmasses": 3,
+  "direct_contact": 0.204
+ },
+ "continent_3": {
+  "water": 0.601,
+  "land": {
+   "grass": 0.356,
+   "forest": 0.48,
+   "mountain": 0.163,
+   "desert": 0.0
+  },
+  "clearance": {
+   "1": 0.976,
+   "2": 0.024
+  },
+  "mean_clearance": 1.02,
+  "walls": 22,
+  "wall_mean": 47.9,
+  "wall_largest": 742,
+  "landmasses": 5,
+  "direct_contact": 0.199
+ },
+ "continent_4": {
+  "water": 0.275,
+  "land": {
+   "grass": 0.238,
+   "forest": 0.035,
+   "mountain": 0.296,
+   "desert": 0.431
+  },
+  "clearance": {
+   "1": 0.524,
+   "2": 0.294,
+   "3": 0.136,
+   "4": 0.037,
+   "5": 0.009,
+   "6": 0.001
+  },
+  "mean_clearance": 1.71,
+  "walls": 16,
+  "wall_mean": 61.5,
+  "wall_largest": 875,
+  "landmasses": 1,
+  "direct_contact": 0.209
+ }
+}

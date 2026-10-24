@@ -41,6 +41,10 @@ PNG I/O is `pngio.py`.
   and animated with a slow breathing zoom over the four frames.
 - `gen_icons_ai.py`: the eight artifact icons and the four continent maps,
   matted and centred in a transparent 48x34 cell.
+- `measure_maps.py`: continent maps as numbers (water, land mix, path
+  width, wall size). `--reference --write` measures the original maps in the
+  local `reference/` clone into `map_targets.json`, numbers only, which
+  `gen_maps.py` is tuned toward; without flags it measures ours.
 - `preview_map.py`: renders a patch of a continent from the pack's own tiles,
   to judge seams, edges and repetition without starting the game.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local

@@ -238,11 +238,15 @@ def inside(kind, arg, w, h):
     return inner
 
 
-def edge_tile(terrain, grass, base, kind, arg, w, h, scale):
+def edge_tile(terrain, grass, base, kind, arg, w, h, scale, foam=None):
+    """`base` blended into `grass` (the outside) along the edge. `foam` puts
+    the white surf line on the shore: on by default for water's own edges, and
+    for a wall's shore tiles, where the outside is the sea."""
     pred = inside(kind, arg, w, h)
     soft = 2.5 * scale
     out = bytearray(w * h * 4)
-    rim = (255, 255, 255) if terrain == "water" else (24, 30, 20)
+    foam = terrain == "water" if foam is None else foam
+    rim = (255, 255, 255) if foam else (24, 30, 20)
     rim_w = 3.0 * scale
     for y in range(h):
         for x in range(w):
@@ -253,7 +257,7 @@ def edge_tile(terrain, grass, base, kind, arg, w, h, scale):
             col = [grass[o + c] * (1 - t) + base[o + c] * t for c in range(3)]
             # A foam line on water, a shaded rim on land, along the shore.
             near = max(0.0, 1 - abs(d) / rim_w)
-            k = 0.35 * near if terrain == "water" else 0.25 * near
+            k = 0.35 * near if foam else 0.25 * near
             col = [col[c] * (1 - k) + rim[c] * k for c in range(3)]
             out[o:o + 4] = bytes((round(col[0]), round(col[1]), round(col[2]), 255))
     return bytes(out)
@@ -272,6 +276,15 @@ def cmd_compose(cli):
         for num, (kind, arg) in sides.items():
             px = edge_tile(terrain, bases["grass"], bases[terrain], kind, arg, tw, th, scale)
             rel = f"art/tiles/{terrain}_edge_{num}.png"
+            write_png(os.path.join(PACK, rel), tw, th, px)
+            written.append(rel)
+    # Shore tiles: a forest or mountain edge over the sea instead of grass,
+    # where the maps run walls straight into the water.
+    for terrain in ("forest", "mountain"):
+        for num, (kind, arg) in SIDES.items():
+            px = edge_tile(terrain, bases["water"], bases[terrain], kind, arg, tw, th, scale,
+                           foam=True)
+            rel = f"art/tiles/{terrain}_shore_{num}.png"
             write_png(os.path.join(PACK, rel), tw, th, px)
             written.append(rel)
     with open(os.path.join(PACK, "game.json")) as fh:
