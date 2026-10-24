@@ -39,6 +39,8 @@ PNG I/O is `pngio.py`.
 - `gen_villains_ai.py`: the seventeen villain portraits, one prompt each from
   the villain's description in the pack text, cropped to the 48x34 face slot
   and animated with a slow breathing zoom over the four frames.
+- `gen_icons_ai.py`: the eight artifact icons and the four continent maps,
+  matted and centred in a transparent 48x34 cell.
 - `preview_map.py`: renders a patch of a continent from the pack's own tiles,
   to judge seams, edges and repetition without starting the game.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
