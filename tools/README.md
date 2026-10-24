@@ -36,6 +36,9 @@ PNG I/O is `pngio.py`.
 - `gen_hero_ai.py`: the hero on the map, a mounted knight and a boat, both
   facing east (the shell mirrors them going west). One picture each,
   animated with a small bob over the four frames.
+- `gen_villains_ai.py`: the seventeen villain portraits, one prompt each from
+  the villain's description in the pack text, cropped to the 48x34 face slot
+  and animated with a slow breathing zoom over the four frames.
 - `preview_map.py`: renders a patch of a continent from the pack's own tiles,
   to judge seams, edges and repetition without starting the game.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
