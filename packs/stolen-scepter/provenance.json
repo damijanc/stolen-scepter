@@ -21,57 +21,57 @@
       "license": "CC0-1.0"
     },
     "art/combat/castle_spike.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_wall_01.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_wall_02.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_wall_03.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_wall_04.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_wall_05.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/castle_wall_06.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/cursor_01.png": {
-      "author": "procedural (tools/gen_combat.py)",
+      "author": "procedural (tools/gen_combat_ai.py)",
       "method": "procedural",
       "license": "CC0-1.0"
     },
     "art/combat/cursor_02.png": {
-      "author": "procedural (tools/gen_combat.py)",
+      "author": "procedural (tools/gen_combat_ai.py)",
       "method": "procedural",
       "license": "CC0-1.0"
     },
     "art/combat/cursor_03.png": {
-      "author": "procedural (tools/gen_combat.py)",
+      "author": "procedural (tools/gen_combat_ai.py)",
       "method": "procedural",
       "license": "CC0-1.0"
     },
     "art/combat/cursor_04.png": {
-      "author": "procedural (tools/gen_combat.py)",
+      "author": "procedural (tools/gen_combat_ai.py)",
       "method": "procedural",
       "license": "CC0-1.0"
     },
@@ -81,18 +81,18 @@
       "license": "CC0-1.0"
     },
     "art/combat/obstacle_01.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/obstacle_02.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/combat/obstacle_03.png": {
-      "author": "procedural (tools/gen_combat.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_combat_ai.py: SDXL DreamShaper XL), composed by tools/gen_combat_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/font/font.png": {

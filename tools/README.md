@@ -41,6 +41,11 @@ PNG I/O is `pngio.py`.
   and animated with a slow breathing zoom over the four frames.
 - `gen_icons_ai.py`: the eight artifact icons and the four continent maps,
   matted and centred in a transparent 48x34 cell.
+- `gen_combat_ai.py`: the combat field pieces. `render` draws the three field
+  obstacles and the hit burst on ComfyUI (matted) plus one seamless castle-stone
+  wall texture; `compose` mattes the obstacles and burst into the transparent
+  cell, then draws the six castle wall pieces from the one texture so they tile
+  into a continuous wall, and draws the four-frame target ring in code.
 - `measure_maps.py`: continent maps as numbers (water, land mix, path
   width, wall size). `--reference --write` measures the original maps in the
   local `reference/` clone into `map_targets.json`, numbers only, which
