@@ -46,6 +46,12 @@ PNG I/O is `pngio.py`.
   wall texture; `compose` mattes the obstacles and burst into the transparent
   cell, then draws the six castle wall pieces from the one texture so they tile
   into a continuous wall, and draws the four-frame target ring in code.
+- `gen_hud_ai.py`: the sidebar HUD art. `render` draws the hooded contract
+  figure, the wooden catapult, the arcane star and the coin purse on ComfyUI
+  (matted) plus aged-parchment and dark-wood textures; `compose` places them
+  into the five 48x34 panels -- the siege and magic four-frame loops and their
+  matching grey silhouettes, the wanted-poster contract silhouette, the gold
+  purse, and the parchment puzzle grid with its wood cover tile.
 - `measure_maps.py`: continent maps as numbers (water, land mix, path
   width, wall size). `--reference --write` measures the original maps in the
   local `reference/` clone into `map_targets.json`, numbers only, which

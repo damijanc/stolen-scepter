@@ -1196,68 +1196,68 @@
       "license": "CC0-1.0"
     },
     "art/ui/hud_contract_silhouette.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_gold_purse.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_magic_00.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_magic_01.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_magic_02.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_magic_03.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_magic_silhouette.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_puzzle_grid.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_siege_00.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_siege_01.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_siege_02.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_siege_03.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_siege_silhouette.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/inventory_artifact_amulet.png": {
@@ -1321,8 +1321,8 @@
       "license": "CC0-1.0"
     },
     "art/ui/puzzle_cover.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/splash_logo.png": {
