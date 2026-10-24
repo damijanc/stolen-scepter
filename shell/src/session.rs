@@ -12,6 +12,7 @@ use crate::banner;
 use crate::cheats::{CheatMenu, CheatOutcome, CheatResult};
 use crate::chrome::{Chrome, StatusMode};
 use crate::combat::{combat_render, combat_view_input, CombatLoop, CombatStatus, PointerInput};
+use crate::cursor::Shape;
 use crate::dialog::Dialog;
 use crate::draw::{self, DrawList};
 use crate::hud::Hud;
@@ -127,6 +128,8 @@ pub struct Session<'r> {
     /// `PendingFlow`, which ports C's `pending_flow`; this answer needs the
     /// save paths, which `dispatch_answer` does not have.
     pending_overwrite: Option<usize>,
+    /// The pointer the frame just drawn asks for; see [`Session::pointer_shape`].
+    pointer_shape: Shape,
 }
 
 impl<'r> Session<'r> {
@@ -277,6 +280,7 @@ impl<'r> Session<'r> {
             menu_picker,
             walk,
             pending_overwrite,
+            pointer_shape: Shape::Arrow,
         })
     }
 
@@ -316,6 +320,7 @@ impl<'r> Session<'r> {
             menu_picker,
             walk,
             pending_overwrite,
+            pointer_shape,
             ..
         } = self;
         // C pushes the toggles every frame because the Controls panel changes
@@ -1314,7 +1319,22 @@ impl<'r> Session<'r> {
             dialog.draw(list, hits, layout, palette);
         }
 
+        // The pointer for what is under it now, hit-tested against the
+        // regions this frame just drew. Combat's own field only, and only
+        // when nothing modal is over it.
+        let hovered_now = pointer_at.and_then(|(lx, ly)| hits.hit(lx, ly));
+        *pointer_shape = match combat.as_ref() {
+            Some(session) if !views.is_active() && !prompt.is_active() && !dialog.is_active() => {
+                session.combat.pointer_shape(hovered_now, resources)
+            }
+            _ => Shape::Arrow,
+        };
         FrameStatus::Running
+    }
+
+    /// Which pointer to draw over the frame `frame` last produced.
+    pub fn pointer_shape(&self) -> Shape {
+        self.pointer_shape
     }
 }
 

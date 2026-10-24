@@ -29,6 +29,7 @@ use openbounty_engine::resources::Resources;
 use openbounty_engine::tables::TROOP_ABIL_FLY;
 
 use crate::banner;
+use crate::cursor::Shape;
 use crate::draw::{DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::input::{Key, KeySource, DIGITS};
@@ -41,6 +42,12 @@ use crate::sprites::SpriteCatalog;
 use crate::views::{controls_visible, troop_sprite, ViewKind, Views};
 
 /// The A-G keys the cast menu reads, in order.
+/// The title's tip line and picker hint, overridable under `strings.combat_log`.
+const DEFAULT_KEY_TIPS: &str = " S Shoot F Fly U Cast W Wait";
+const DEFAULT_PICK_HINT: &str = " Choose a target, ESC cancels";
+/// How long the title shows the unit line, then the tips, in turn.
+const TIP_SECONDS: f64 = 3.0;
+
 const COMBAT_SPELL_KEYS: [Key; 7] = [Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G];
 
 /// Combat-log banner defaults, porting `load_combat_log_defaults`. Only the
@@ -486,6 +493,8 @@ pub struct CombatLoop {
     action_menu: bool,
     /// What the pointer was over last frame (see [`CombatLoop::set_hover`]).
     hover: Option<HitTarget>,
+    /// The time of the latest step, which the title's tip line alternates on.
+    now: f64,
 }
 
 impl CombatLoop {
@@ -532,17 +541,97 @@ impl CombatLoop {
             next_tick: 0.0,
             action_menu: false,
             hover: None,
+            now: 0.0,
         }
     }
 
     /// The status-bar line, porting the three-branch `combat_format_title`:
     /// the action banner when one is set, else the acting-unit line before the
     /// first kill, else the running kill tally.
+    ///
+    /// DIVERGENCE, shell UI: C names no combat keys anywhere. While a target
+    /// is being picked the line says how to pick, and on the player's own turn
+    /// it alternates with the key tips every [`TIP_SECONDS`].
     pub fn title(&self, resources: &Resources) -> String {
         if !self.banner.is_empty() {
             return self.banner.clone();
         }
+        if self.picker_active {
+            return banner::text(resources, "combat_log", "pick_hint", DEFAULT_PICK_HINT)
+                .to_owned();
+        }
+        if self.player_turn() && (self.now / TIP_SECONDS) as i64 % 2 == 1 {
+            return banner::text(resources, "combat_log", "key_tips", DEFAULT_KEY_TIPS).to_owned();
+        }
         combat_title(&self.combat, resources)
+    }
+
+    /// The acting unit is the player's and under the player's control.
+    fn player_turn(&self) -> bool {
+        self.combat.result == 0
+            && self.combat.side == COMBAT_SIDE_PLAYER
+            && self.combat.unit_id >= 0
+            && !self.combat.units[self.combat.side][self.combat.unit_id as usize].out_of_control
+    }
+
+    /// The pointer for `target`: what a left click there would do, by the
+    /// same rules [`CombatLoop::click_cell`] and the pickers apply. The arrow
+    /// off the field, over a menu, and while it is not the player's turn.
+    pub fn pointer_shape(&self, target: Option<HitTarget>, resources: &Resources) -> Shape {
+        let Some(HitTarget::CombatCell(x, y)) = target else {
+            return Shape::Arrow;
+        };
+        if !self.player_turn()
+            || self.action_menu
+            || self.cast_phase == CastPhase::PickSpell
+            || !combat_in_bounds(x, y)
+        {
+            return Shape::Arrow;
+        }
+        let side = self.combat.side;
+        if self.picker_active {
+            if !combat_cell_passes_filter(
+                &self.combat,
+                resources,
+                x as usize,
+                y as usize,
+                side,
+                self.pick_filter,
+            ) {
+                return Shape::No;
+            }
+            return match self.pick_reason {
+                PickReason::Shoot => Shape::Shoot,
+                PickReason::Fly | PickReason::TeleportDest => Shape::Move,
+                _ => Shape::Target,
+            };
+        }
+        let id = self.combat.unit_id as usize;
+        let unit = &self.combat.units[side][id];
+        if (x, y) == (unit.x, unit.y) {
+            return Shape::Arrow;
+        }
+        let uid = self.combat.umap[y as usize][x as usize];
+        let (dx, dy) = (x - unit.x, y - unit.y);
+        if dx.abs() <= 1 && dy.abs() <= 1 {
+            if self.combat.omap[y as usize][x as usize] != 0 {
+                return Shape::No;
+            }
+            if uid == 0 {
+                return Shape::Move;
+            }
+            let o_side = (uid - 1) as usize / COMBAT_SLOTS;
+            let o_slot = (uid - 1) as usize % COMBAT_SLOTS;
+            if o_side == side && !self.combat.units[o_side][o_slot].out_of_control {
+                return Shape::No;
+            }
+            return Shape::Attack;
+        }
+        let enemy = uid != 0 && (uid - 1) as usize / COMBAT_SLOTS != side;
+        if enemy && unit.shots > 0 && !combat_unit_surrounded(&self.combat, side, id) {
+            return Shape::Shoot;
+        }
+        Shape::No
     }
 
     /// Where the target ring goes: the pick cursor, while a picker is armed.
@@ -701,6 +790,7 @@ impl CombatLoop {
         time: f64,
         prompt: &mut Prompt,
     ) -> CombatStatus {
+        self.now = time;
         if self.combat.result != 0 {
             return self.status();
         }
@@ -884,6 +974,11 @@ impl CombatLoop {
             if keys.any_pressed() {
                 self.action_menu = false;
             }
+        } else if pointer.cancel {
+            // DIVERGENCE, shell UI: with nothing open to back out of, a
+            // right-click opens the action menu -- the discoverable way in.
+            self.action_menu = true;
+            return false;
         }
         if let Some(HitTarget::CombatCell(x, y)) = pointer.click {
             return self.click_cell(x, y, game, resources);
@@ -1732,6 +1827,7 @@ mod tests {
             next_tick: 0.0,
             action_menu: false,
             hover: None,
+            now: 0.0,
         };
         (loop_, resources, game)
     }
@@ -2792,6 +2888,102 @@ mod tests {
             by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::Left]);
             l.set_hover(Some(HitTarget::CombatCell(4, 2)));
             assert_eq!(l.pick_cursor(), Some((3, 2)), "the arrows still steer it");
+        });
+    }
+
+    /// The pointer names what a click on the hovered cell does, by the
+    /// click's own rules.
+    #[test]
+    fn the_pointer_shows_what_a_click_on_the_cell_would_do() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let shape = |l: &CombatLoop, x, y| {
+                l.pointer_shape(Some(HitTarget::CombatCell(x, y)), &resources)
+            };
+            assert_eq!(
+                shape(&l, 0, 0),
+                Shape::Arrow,
+                "the acting unit opens the menu"
+            );
+            assert_eq!(shape(&l, 1, 0), Shape::Move);
+            assert_eq!(shape(&l, 4, 4), Shape::Shoot, "a far enemy with shots left");
+            assert_eq!(shape(&l, 3, 0), Shape::No, "a far empty cell");
+            assert_eq!(l.pointer_shape(None, &resources), Shape::Arrow);
+            l.combat.omap[0][1] = 1;
+            assert_eq!(shape(&l, 1, 0), Shape::No, "an obstacle");
+            l.combat.units[COMBAT_SIDE_PLAYER][0].shots = 0;
+            assert_eq!(shape(&l, 4, 4), Shape::No, "no shots left");
+
+            let (mut l, resources, _) = loop_fixture();
+            foe_adjacent(&mut l, &mut game);
+            assert_eq!(
+                l.pointer_shape(Some(HitTarget::CombatCell(1, 1)), &resources),
+                Shape::Attack
+            );
+
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::S]);
+            let shape = |l: &CombatLoop, x, y| {
+                l.pointer_shape(Some(HitTarget::CombatCell(x, y)), &resources)
+            };
+            assert_eq!(shape(&l, 4, 4), Shape::Shoot, "the armed picker's target");
+            assert_eq!(shape(&l, 2, 2), Shape::No, "fails the picker's filter");
+        });
+    }
+
+    /// With nothing open, a right-click opens the action menu; a second one
+    /// backs out of it as ESC does.
+    #[test]
+    fn a_right_click_opens_the_action_menu_and_a_second_closes_it() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_pointer(&mut l, &mut game, &resources, &mut prompt, RIGHT_CLICK);
+            assert!(l.action_menu);
+            by_pointer(&mut l, &mut game, &resources, &mut prompt, RIGHT_CLICK);
+            assert!(!l.action_menu);
+        });
+    }
+
+    /// The title alternates the unit line with the key tips on the player's
+    /// turn, and names how to pick while a picker is armed.
+    #[test]
+    fn the_title_alternates_with_the_key_tips_and_hints_the_picker() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            let unit_line = combat_title(&l.combat, &resources);
+            let none = Keys::pressed(&[]);
+            l.step_input(
+                &none,
+                PointerInput::default(),
+                &mut game,
+                &resources,
+                1.0,
+                &mut prompt,
+            );
+            assert_eq!(l.title(&resources), unit_line);
+            l.step_input(
+                &none,
+                PointerInput::default(),
+                &mut game,
+                &resources,
+                4.0,
+                &mut prompt,
+            );
+            assert_eq!(l.title(&resources), DEFAULT_KEY_TIPS);
+            l.step_input(
+                &none,
+                PointerInput::default(),
+                &mut game,
+                &resources,
+                7.0,
+                &mut prompt,
+            );
+            assert_eq!(l.title(&resources), unit_line);
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::S]);
+            assert_eq!(l.title(&resources), DEFAULT_PICK_HINT);
         });
     }
 }

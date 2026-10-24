@@ -237,7 +237,11 @@ fn shot(
     name: &str,
 ) -> Result<(), String> {
     let mut list = runner.list.clone();
-    cursor::push_pointer(&mut list, runner.pointer);
+    let shape = match &runner.phase {
+        Phase::Game(session) => session.pointer_shape(),
+        _ => cursor::Shape::Arrow,
+    };
+    cursor::push_shape(&mut list, runner.pointer, shape);
     let mut canvas = Canvas::new(
         runner.ctx.layout.screen_w,
         runner.ctx.layout.screen_h,

@@ -287,7 +287,8 @@ async fn main() {
         if session.frame(&input, get_time(), &mut list) == FrameStatus::Quit {
             return;
         }
-        finish_pointer(&mut list, &backend, pointer_at);
+        cursor::push_shape(&mut list, pointer_at, session.pointer_shape());
+        backend.set_os_cursor_visible(pointer_at.is_none());
         backend.execute(&list, &catalog, &layout, &session.present);
         next_frame().await;
     }

@@ -44,6 +44,18 @@ action menu. This is the first binding for `Button::Right`. It mirrors the
 Amiga's right-button-backs-out habit, and in combat it is the only way to
 cancel without ESC.
 
+*Changed 2026-10-24 (playtest feedback: the action menu was hard to find):*
+with nothing open to back out of, a right-click OPENS the action menu. It
+still backs out of everything it backed out of before.
+
+**The pointer names the click** (added 2026-10-24): over a field cell on the
+player's turn it is a move, attack, shoot or spell-target shape, or a red
+"no" sign where a click does nothing, decided by the same rules the click
+uses (`CombatLoop::pointer_shape`, shapes in `cursor.rs`). The arrow
+elsewhere. **The title bar alternates** the unit line with the key tips
+every 3 seconds on the player's turn, and says how to pick while a picker is
+armed (`strings.combat_log.key_tips` / `pick_hint`).
+
 **Hover moves the target ring** while a picker is armed: the "one highlight"
 rule from the Game Menu. The ring is where Enter or a click would land.
 

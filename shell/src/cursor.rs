@@ -36,6 +36,144 @@ pub const ARROW: [&str; 16] = [
 
 pub const OUTLINE: Color = Color::BLACK;
 pub const FILL: Color = Color::WHITE;
+const GOLD: Color = Color::rgb(232, 196, 72);
+const RED: Color = Color::rgb(214, 40, 40);
+
+/// Which pointer to draw. Combat swaps the arrow for one that says what a
+/// click on the hovered cell would do; everywhere else it is the arrow.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Shape {
+    #[default]
+    Arrow,
+    /// Step onto (or fly to) this cell.
+    Move,
+    /// Melee the stack on this cell.
+    Attack,
+    /// Shoot the stack on this cell.
+    Shoot,
+    /// Cast the armed spell on this cell.
+    Target,
+    /// A click here does nothing.
+    No,
+}
+
+/// The combat shapes as FILL masks: `#` white, `y` gold, `r` red, a space
+/// transparent. The black outline is added around the fill when drawn, so
+/// these stay readable over grass and over a dark troop alike. The hotspot is
+/// the centre cell.
+const MOVE: [&str; 11] = [
+    "     #     ",
+    "    ###    ",
+    "   #####   ",
+    "  #  #  #  ",
+    " #   #   # ",
+    "###########",
+    " #   #   # ",
+    "  #  #  #  ",
+    "   #####   ",
+    "    ###    ",
+    "     #     ",
+];
+const ATTACK: [&str; 11] = [
+    "         ##",
+    "        ###",
+    "       ### ",
+    "      ###  ",
+    " y   ###   ",
+    "  y ###    ",
+    "   y##     ",
+    "   yy      ",
+    "  y  y     ",
+    " y         ",
+    "y          ",
+];
+const SHOOT: [&str; 11] = [
+    "     #     ",
+    "   #####   ",
+    "  #  #  #  ",
+    " #       # ",
+    " #       # ",
+    "###  r  ###",
+    " #       # ",
+    " #       # ",
+    "  #  #  #  ",
+    "   #####   ",
+    "     #     ",
+];
+const TARGET: [&str; 11] = [
+    "     y     ",
+    "     y     ",
+    "    yyy    ",
+    "y   yyy   y",
+    " yyyyyyyyy ",
+    "  yyyyyyy  ",
+    "   yyyyy   ",
+    "  yyy yyy  ",
+    "  yy   yy  ",
+    " yy     yy ",
+    " y       y ",
+];
+const NO: [&str; 11] = [
+    "   rrrrr   ",
+    "  rr   rr  ",
+    " rr    rrr ",
+    "rr    rr rr",
+    "r    rr   r",
+    "r   rr    r",
+    "r  rr     r",
+    "rr rr    rr",
+    " rrr    rr ",
+    "  rr   rr  ",
+    "   rrrrr   ",
+];
+
+/// Push `shape` with its hotspot at logical `(x, y)`.
+pub fn push_shape(list: &mut DrawList, at: Option<(i32, i32)>, shape: Shape) {
+    let mask = match shape {
+        Shape::Arrow => return push_pointer(list, at),
+        Shape::Move => &MOVE,
+        Shape::Attack => &ATTACK,
+        Shape::Shoot => &SHOOT,
+        Shape::Target => &TARGET,
+        Shape::No => &NO,
+    };
+    let Some((x, y)) = at else {
+        return;
+    };
+    let (w, h) = (mask[0].len() as i32, mask.len() as i32);
+    let (ox, oy) = (x - w / 2, y - h / 2);
+    let lit = |cx: i32, cy: i32| -> Option<u8> {
+        if cx < 0 || cy < 0 || cx >= w || cy >= h {
+            return None;
+        }
+        let b = mask[cy as usize].as_bytes()[cx as usize];
+        (b != b' ').then_some(b)
+    };
+    // The outline: every empty cell touching the fill, one pixel past the
+    // mask's edge included.
+    for cy in -1..=h {
+        for cx in -1..=w {
+            if lit(cx, cy).is_some() {
+                continue;
+            }
+            let touches = (-1..=1).any(|dy| (-1..=1).any(|dx| lit(cx + dx, cy + dy).is_some()));
+            if touches {
+                list.rect(Rect::new(ox + cx, oy + cy, 1, 1), OUTLINE);
+            }
+        }
+    }
+    for cy in 0..h {
+        for cx in 0..w {
+            let color = match lit(cx, cy) {
+                Some(b'y') => GOLD,
+                Some(b'r') => RED,
+                Some(_) => FILL,
+                None => continue,
+            };
+            list.rect(Rect::new(ox + cx, oy + cy, 1, 1), color);
+        }
+    }
+}
 
 /// Push the arrow with its tip at logical `(x, y)`. `None` -- the pointer is
 /// off the game area -- draws nothing, and the OS arrow shows instead.
