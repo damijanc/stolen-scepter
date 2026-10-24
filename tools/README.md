@@ -52,6 +52,12 @@ PNG I/O is `pngio.py`.
   into the five 48x34 panels -- the siege and magic four-frame loops and their
   matching grey silhouettes, the wanted-poster contract silhouette, the gold
   purse, and the parchment puzzle grid with its wood cover tile.
+- `gen_chrome_ai.py`: the last four procedural pieces. `render` draws three
+  seamless textures (castle stone, red velvet, red carpet) and a matted
+  back-view knight on ComfyUI; `compose` turns them into the 4x overworld
+  frame (its new alpha is asserted to equal the 4x-upscaled old alpha, only
+  the colours change), the deep-red bar strip with its gold bead row, the
+  end-cartoon carpet runner, and the hero walking up it.
 - `measure_maps.py`: continent maps as numbers (water, land mix, path
   width, wall size). `--reference --write` measures the original maps in the
   local `reference/` clone into `map_targets.json`, numbers only, which

@@ -1151,8 +1151,8 @@
       "license": "CC0-1.0"
     },
     "art/ui/chrome_overworld.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_chrome_ai.py: SDXL DreamShaper XL), composed by tools/gen_chrome_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/class_select_highlight.png": {
@@ -1166,8 +1166,8 @@
       "license": "CC0-1.0"
     },
     "art/ui/end_carpet.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_chrome_ai.py: SDXL DreamShaper XL), composed by tools/gen_chrome_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/end_grass.png": {
@@ -1176,8 +1176,8 @@
       "license": "CC0-1.0"
     },
     "art/ui/end_hero.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_chrome_ai.py: SDXL DreamShaper XL), composed by tools/gen_chrome_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/end_lose_screen.png": {
@@ -1191,8 +1191,8 @@
       "license": "CC0-1.0"
     },
     "art/ui/hud_bar_strip.png": {
-      "author": "procedural (tools/gen_ui.py)",
-      "method": "procedural",
+      "author": "AI-generated (tools/gen_chrome_ai.py: SDXL DreamShaper XL), composed by tools/gen_chrome_ai.py",
+      "method": "ai-generated",
       "license": "CC0-1.0"
     },
     "art/ui/hud_contract_silhouette.png": {
