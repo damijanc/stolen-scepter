@@ -104,6 +104,11 @@ impl Images {
                 None => images.missing.push(path),
             }
         }
+        for path in catalog.optional_paths() {
+            if let Some(image) = pack.read(path).and_then(|bytes| decode_png(&bytes)) {
+                images.images.insert(path.to_owned(), image);
+            }
+        }
         images.font = pack
             .read(catalog.font_path())
             .and_then(|bytes| decode_png(&bytes));

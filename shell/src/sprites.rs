@@ -110,6 +110,7 @@ pub struct SpriteCatalog {
     troop_still: Vec<String>,
     troop_anim: Vec<Vec<String>>,
     combat_tile: Vec<String>,
+    worldmap: Vec<String>,
     sprites: Box<ResSprites>,
     ending: ResEnding,
 }
@@ -190,6 +191,15 @@ impl SpriteCatalog {
             .map(|path| path.as_str().to_owned())
             .collect();
 
+        let worldmap = (0..resources.zone_count())
+            .map(|index| {
+                resources
+                    .zone_by_index(index)
+                    .map(|zone| worldmap_path(zone.id.as_str()))
+                    .unwrap_or_default()
+            })
+            .collect();
+
         Self {
             hero_walk: AnimPaths::from_res(&sprites.hero_walk),
             hero_idle: AnimPaths::from_res(&sprites.hero_idle),
@@ -201,6 +211,7 @@ impl SpriteCatalog {
             troop_still,
             troop_anim,
             combat_tile,
+            worldmap,
             ending: resources.ending,
             sprites,
         }
@@ -273,6 +284,7 @@ impl SpriteCatalog {
                 self.troop_anim.get(troop)?.get(frame as usize)?.as_str()
             }
             Sprite::CombatTile(index) => self.combat_tile.get(index)?.as_str(),
+            Sprite::WorldMap(zone) => self.worldmap.get(zone)?.as_str(),
 
             Sprite::PuzzleCover => self.sprites.puzzle_cover.as_str(),
             Sprite::Backdrop(Backdrop::Town) => self.sprites.town_backdrop.as_str(),
@@ -368,6 +380,17 @@ impl SpriteCatalog {
         paths
     }
 
+    /// Art a pack may leave out without it being a hole: the world map
+    /// pictures, which the view draws over a fallback. A backend loads these
+    /// when present and reports nothing when not.
+    pub fn optional_paths(&self) -> Vec<&str> {
+        self.worldmap
+            .iter()
+            .map(String::as_str)
+            .filter(|path| !path.is_empty())
+            .collect()
+    }
+
     /// The bitmap font strip and the VGA palette, which a backend loads once.
     pub fn font_path(&self) -> &str {
         self.sprites.font.as_str()
@@ -415,6 +438,13 @@ const ROLE_FIXED_SPRITES: [Sprite; 25] = [
 /// which C's `tile_cache` also hardcodes.
 pub fn tile_art_path(art: &str) -> String {
     format!("art/tiles/{art}.png")
+}
+
+/// Where a continent's world map picture lives, `art/worldmap/<zone>.png`, as
+/// `tools/gen_worldmap.py` writes it. Not in the manifest: the shell's own
+/// convention, like the tile art's.
+pub fn worldmap_path(zone: &str) -> String {
+    format!("art/worldmap/{zone}.png")
 }
 
 /// Every tile art name a map can ask for: the pack's legend, plus the names
@@ -685,6 +715,63 @@ mod tests {
         assert_eq!(catalog.path(Sprite::CombatTile(15)), None);
         assert_eq!(catalog.font_path(), "art/font/kb-font.png");
         assert_eq!(catalog.palette_path(), "palettes/palette.bin");
+    }
+
+    #[test]
+    fn the_worldmap_resolves_one_picture_per_zone_in_pack_order() {
+        assert_eq!(worldmap_path("home"), "art/worldmap/home.png");
+        assert_eq!(worldmap_path("desert"), "art/worldmap/desert.png");
+
+        // One entry per zone, in catalog order; the path is the shell's own
+        // convention, not something the manifest names.
+        let catalog =
+            catalog(r#"{"troops":[],"zones":[{"id":"home"},{"id":"desert"},{"id":"snow"}]}"#);
+        assert_eq!(
+            catalog.path(Sprite::WorldMap(0)),
+            Some("art/worldmap/home.png")
+        );
+        assert_eq!(
+            catalog.path(Sprite::WorldMap(1)),
+            Some("art/worldmap/desert.png")
+        );
+        assert_eq!(
+            catalog.path(Sprite::WorldMap(2)),
+            Some("art/worldmap/snow.png")
+        );
+        // Past the zones is None, not a stale slot.
+        assert_eq!(catalog.path(Sprite::WorldMap(3)), None);
+    }
+
+    #[test]
+    fn the_worldmap_pictures_are_optional_and_not_in_all_paths() {
+        let catalog = catalog(r#"{"troops":[],"zones":[{"id":"home"},{"id":"desert"}]}"#);
+        // A pack may leave the pictures out, so a backend loads them when
+        // present and reports nothing when not -- they never join the
+        // mandatory `all_paths` set.
+        assert_eq!(
+            catalog.optional_paths(),
+            vec!["art/worldmap/home.png", "art/worldmap/desert.png"]
+        );
+        assert!(!catalog.all_paths().contains(&"art/worldmap/home.png"));
+        assert!(!catalog.all_paths().contains(&"art/worldmap/desert.png"));
+    }
+
+    #[test]
+    fn the_games_own_pack_ships_every_worldmap_picture() {
+        // `optional_paths` is the exact set a backend loads when the file is
+        // present, so the game's own pack must ship every one of them.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+        let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+        let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+        let catalog = SpriteCatalog::from_resources(&resources);
+
+        let optional = catalog.optional_paths();
+        assert!(!optional.is_empty(), "no world map pictures enumerated");
+        let missing: Vec<&str> = optional
+            .into_iter()
+            .filter(|path| pack.read(path).is_none())
+            .collect();
+        assert!(missing.is_empty(), "missing from the pack: {missing:?}");
     }
 
     #[test]

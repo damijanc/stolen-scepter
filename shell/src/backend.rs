@@ -75,6 +75,11 @@ impl Backend {
         for art in tile_art_names(resources) {
             backend.load_texture_at(pack, &tile_art_path(&art));
         }
+        for relative in catalog.optional_paths() {
+            if pack.read(relative).is_some() {
+                backend.load_texture_at(pack, relative);
+            }
+        }
 
         backend.font = backend.fetch(pack, catalog.font_path());
         backend.palette = match catalog.palette_path() {

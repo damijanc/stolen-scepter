@@ -1675,6 +1675,26 @@
       "method": "ai-generated",
       "license": "CC0-1.0"
     },
+    "art/worldmap/dunemark.png": {
+      "author": "composed by tools/gen_worldmap.py from the pack's own terrain tiles",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/worldmap/greenreach.png": {
+      "author": "composed by tools/gen_worldmap.py from the pack's own terrain tiles",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/worldmap/highmoor.png": {
+      "author": "composed by tools/gen_worldmap.py from the pack's own terrain tiles",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/worldmap/isleward.png": {
+      "author": "composed by tools/gen_worldmap.py from the pack's own terrain tiles",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
     "audio/combat.ogg": {
       "author": "Emma_MA, \"Determined Pursuit (epic orchestra loop)\", https://opengameart.org/content/determined-pursuit-epic-orchestra-loop",
       "method": "downloaded, re-encoded to Ogg Vorbis",

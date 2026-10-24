@@ -1463,6 +1463,32 @@ impl Views {
             }
         }
 
+        // DIVERGENCE: the pack's picture of the continent covers C's colour
+        // blocks (they stay underneath as the fallback for a pack that ships
+        // none), and the fog goes back on top of it, one black run per row.
+        if let Some(zone) = resources.zone_index_by_id(game.position.zone.as_str()) {
+            list.blit(Sprite::WorldMap(zone), Dst::rect(gx, gy, grid_w, grid_h));
+        }
+        if !reveal_all {
+            for y in 0..map.height as i32 {
+                let mut x = 0;
+                while x < map.width as i32 {
+                    if fog.seen(x, y) {
+                        x += 1;
+                        continue;
+                    }
+                    let start = x;
+                    while x < map.width as i32 && !fog.seen(x, y) {
+                        x += 1;
+                    }
+                    list.rect(
+                        Rect::new(gx + start * pix, gy + y * pix, (x - start) * pix, pix),
+                        palette.clr(Pal::Black),
+                    );
+                }
+            }
+        }
+
         // Towns are green markers, castles red, for the current zone only and
         // fog-gated unless the orb has revealed the whole continent.
         for i in 0..resources.town_count() {
@@ -3710,6 +3736,101 @@ mod tests {
         );
 
         assert_eq!(rects_of_color(&list, Color::rgb(0x00, 0xAA, 0x00)), 25);
+    }
+
+    /// The grid `draw_worldmap` computes, as `(pix, gx, gy, grid_w)`. The
+    /// fixtures are square, so `grid_h == grid_w`.
+    fn worldmap_grid(layout: &Layout, map: &Map) -> (i32, i32, i32, i32) {
+        let avail_w = layout.map_w - 2 * VIEW_PAD;
+        let avail_h = layout.map_h - 2 * VIEW_PAD;
+        let pix = (avail_w / map.width as i32)
+            .min(avail_h / map.height as i32)
+            .max(1);
+        let grid_w = pix * map.width as i32;
+        let grid_h = pix * map.height as i32;
+        let gx = MAP_X + (layout.map_w - grid_w) / 2;
+        let gy = MAP_Y + (layout.map_h - grid_h) / 2;
+        (pix, gx, gy, grid_w)
+    }
+
+    /// The black rects the worldmap draws after its picture blit: one fog run
+    /// per horizontal stretch of unseen tiles, per row.
+    fn worldmap_fog_runs(list: &DrawList) -> Vec<Rect> {
+        let mut after_picture = false;
+        let mut runs = Vec::new();
+        for cmd in list.as_slice() {
+            match cmd {
+                DrawCmd::Blit {
+                    sprite: Sprite::WorldMap(_),
+                    ..
+                } => after_picture = true,
+                DrawCmd::Rect { rect, color } if after_picture && *color == Color::BLACK => {
+                    runs.push(*rect);
+                }
+                _ => {}
+            }
+        }
+        runs
+    }
+
+    #[test]
+    fn the_worldmap_blits_the_continents_picture_over_the_grid() {
+        let (resources, layout, catalog, palette, map, fog, game) = worldmap_parts();
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+
+        let list = draw_worldmap_view(
+            &mut views, &resources, &layout, &catalog, &palette, &map, &fog, &game, 0.0,
+        );
+
+        let (_pix, gx, gy, grid_w) = worldmap_grid(&layout, &map);
+        assert_eq!(
+            list.blits_of(Sprite::WorldMap(0)),
+            vec![Dst::rect(gx, gy, grid_w, grid_w)]
+        );
+    }
+
+    #[test]
+    fn the_worldmap_redraws_fog_over_the_picture_as_black_runs() {
+        let (resources, layout, catalog, palette, map, mut fog, game) = worldmap_parts();
+        fog.seen[0][0] = true;
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+
+        let list = draw_worldmap_view(
+            &mut views, &resources, &layout, &catalog, &palette, &map, &fog, &game, 0.0,
+        );
+
+        let (pix, gx, gy, _grid_w) = worldmap_grid(&layout, &map);
+        let runs = worldmap_fog_runs(&list);
+        assert_eq!(runs.len(), 5, "one run per row, over the picture");
+        // Row 0: one run of the four unseen tiles right of (0,0).
+        assert_eq!(runs[0], Rect::new(gx + pix, gy, 4 * pix, pix));
+        // Rows 1..4: one run of all five tiles each.
+        for row in 1..5 {
+            assert_eq!(
+                runs[row as usize],
+                Rect::new(gx, gy + row * pix, 5 * pix, pix)
+            );
+        }
+    }
+
+    #[test]
+    fn the_worldmap_draws_no_fog_runs_once_the_orb_reveals_everything() {
+        let (resources, layout, catalog, palette, map, mut fog, mut game) = worldmap_parts();
+        fog.seen[0][0] = true;
+        game.world.orbs_found[0] = true;
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+        views.toggle_whole_map();
+
+        let list = draw_worldmap_view(
+            &mut views, &resources, &layout, &catalog, &palette, &map, &fog, &game, 0.0,
+        );
+
+        // The picture still covers the grid; nothing is drawn back over it.
+        assert!(!list.blits_of(Sprite::WorldMap(0)).is_empty());
+        assert!(worldmap_fog_runs(&list).is_empty());
     }
 
     #[test]

@@ -173,6 +173,9 @@ pub enum Sprite {
     },
     /// 0-7 artifacts, 8-11 maps, 12 empty, 13 empty map.
     ViewIcon(usize),
+    /// A continent's world map picture, by zone index. Optional: a pack that
+    /// ships none gets the colour blocks drawn underneath.
+    WorldMap(usize),
     TroopStill(usize),
     TroopAnim {
         troop: usize,

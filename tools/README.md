@@ -45,6 +45,9 @@ PNG I/O is `pngio.py`.
   width, wall size). `--reference --write` measures the original maps in the
   local `reference/` clone into `map_targets.json`, numbers only, which
   `gen_maps.py` is tuned toward; without flags it measures ours.
+- `gen_worldmap.py`: bakes each continent's world map picture from the pack's
+  own terrain tiles, edges rebuilt at the small size and bases graded apart.
+  The M view draws it under fog and markers, falling back to colour blocks.
 - `preview_map.py`: renders a patch of a continent from the pack's own tiles,
   to judge seams, edges and repetition without starting the game.
 - `import_troops.py`: box-filters the kept AI troop frames (6x, local
@@ -64,6 +67,7 @@ PNG I/O is `pngio.py`.
     python3 tools/gen_maps.py
     python3 tools/build_pack.py
     python3 tools/gen_terrain.py && python3 tools/gen_objects.py
+    python3 tools/gen_worldmap.py
     python3 tools/gen_combat.py && python3 tools/gen_sprites.py
     python3 tools/gen_villains.py && python3 tools/gen_ui.py
     python3 tools/gen_font.py && python3 tools/gen_tunes.py
