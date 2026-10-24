@@ -372,6 +372,13 @@ impl Views {
 
     /// True once the cartoon has played past its last frame.
     pub fn win_cartoon_done(&self, resources: &Resources, time: f64) -> bool {
+        // The first active draw latches the clock; until it runs, the cartoon
+        // has not started, so it can never be done no matter how large `time`
+        // is. Otherwise `session.rs` (which asks before `draw`) would judge a
+        // late-opened cartoon finished on the frame it began.
+        if !self.cartoon_was_active {
+            return false;
+        }
         let (_, frame) = cartoon_clock(resources, time - self.cartoon_started);
         let max_frames = if resources.ending.frame_count > 0 {
             resources.ending.frame_count
@@ -4051,6 +4058,38 @@ mod tests {
         assert_eq!(list.blits_of(Sprite::EndHero).len(), 1);
         // Past the last frame, the cutscene is done.
         assert!(views.win_cartoon_done(&resources, 2.0));
+    }
+
+    #[test]
+    fn a_win_cartoon_opened_late_in_the_game_plays_before_the_win_screen() {
+        let (resources, layout) = cartoon_fixture();
+        let mut views = Views::new();
+        // The hero wins far into a long run, so the first frame's clock is large.
+        views.win_cartoon_open(&resources, "You win!");
+        assert_eq!(views.active(), Some(ViewKind::WinCartoon));
+
+        // Before the first draw resets the clock, the cartoon is NOT done no
+        // matter how large the time is.
+        assert!(!views.win_cartoon_done(&resources, 500.0));
+
+        // The first draw latches the clock to the current time.
+        let game = Game::default();
+        let present = Present::for_layout(&layout);
+        let (map, fog) = map_and_fog();
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let palette = Palette::fallback();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        views.draw(
+            &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+            &present, 500.0,
+        );
+
+        // Shortly after the first draw the cartoon is still playing.
+        assert!(!views.win_cartoon_done(&resources, 500.5));
+
+        // Past the last frame (10 frames * 2 ticks * 0.08 s = 1.6 s), it is done.
+        assert!(views.win_cartoon_done(&resources, 503.0));
     }
 
     #[test]
