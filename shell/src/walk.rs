@@ -449,6 +449,7 @@ mod tests {
             },
             interaction,
             collision,
+            bounced: false,
         };
         assert!(!stops_walk(&moved(StepInteraction::None, None, false)));
         assert!(stops_walk(&moved(StepInteraction::Alcove, None, false)));

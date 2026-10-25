@@ -1085,12 +1085,17 @@ impl<'r> Session<'r> {
                     interaction,
                     advance,
                     collision,
+                    bounced,
                     ..
                 } = &result
                 {
                     // The clock the hero animates on: he walks for a moment
-                    // after each step, then holds still.
-                    *last_step = Some(now);
+                    // after each step, then holds still. A bounced step never
+                    // moves him -- he ends where he entered from -- so it does
+                    // not start the walk animation either.
+                    if !*bounced {
+                        *last_step = Some(now);
+                    }
                     if advance.week_ended {
                         schedule_week_end(pending_week, game, resources, advance.commission_paid);
                     }

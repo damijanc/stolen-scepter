@@ -82,6 +82,12 @@ pub enum StepResult {
         /// shell opens the attack or recruit prompt against it; `friendly`
         /// says which.
         collision: Option<FoeCollision>,
+        /// The hero stepped onto a town, castle gate, dwelling, alcove or
+        /// hostile foe and bounced back to the tile they entered from. A
+        /// bounced step opens its interaction but leaves the hero standing
+        /// NEXT to the tile, never advancing the calendar or running the
+        /// foe-follow pass (`step.c:581`-`591`).
+        bounced: bool,
     },
 }
 
@@ -95,8 +101,12 @@ pub struct FoeCollision {
 }
 
 impl StepResult {
+    /// Whether the hero actually ended up on a new tile, matching `GameStep`'s
+    /// `return !bounced` (`step.c:627`). A bounced step resolves its
+    /// interaction and reports `Moved`, but the hero stays where they entered
+    /// from, so it is NOT a move.
     pub fn moved(self) -> bool {
-        matches!(self, Self::Moved { .. })
+        matches!(self, Self::Moved { bounced: false, .. })
     }
 }
 
@@ -137,6 +147,12 @@ pub fn game_step_basic(
 
     let prev_x = game.position.x;
     let prev_y = game.position.y;
+    // Snapshot the state the move below mutates, so a bounce-back can roll all
+    // of it back rather than just x/y -- otherwise boarding a boat and then
+    // stepping onto a town strands the hero "walking on water" (step.c:49-56).
+    let prev_travel_mode = game.travel_mode;
+    let prev_boat_x = game.boat.x;
+    let prev_boat_y = game.boat.y;
     let in_boat = game.travel_mode == TravelMode::Boat;
     let flying = game.character.mount == Mount::Fly;
     let will_board = boards_boat(game, nx, ny);
@@ -181,26 +197,6 @@ pub fn game_step_basic(
     // so a bounce-back still leaves the destination revealed.
     fog.reveal(map, nx, ny, resources.world.fog_sight);
 
-    let terrain_costs_full_day = !flying && tile.terrain == Terrain::Desert;
-    // Timestop freezes the world, so the foe-follow pass is skipped with it.
-    // Sample the flag BEFORE consuming the step: consume_step decrements
-    // time_stop, so reading it afterwards cannot tell "last frozen step" from
-    // "not frozen at all".
-    let frozen = game.stats.time_stop > 0;
-    let advance = consume_step(game, resources, terrain_costs_full_day);
-    let collision = if frozen {
-        None
-    } else {
-        game.foes_follow(map).map(|index| {
-            let foe = game.foes[index];
-            FoeCollision {
-                id: foe.placement_id.as_str().to_owned(),
-                friendly: foe.friendly,
-                x: game.position.x,
-                y: game.position.y,
-            }
-        })
-    };
     let interaction = resolve_interaction(game, map, resources, &tile, nx, ny);
     // C's opened_telecave block reveals around the paired cave too.
     if let StepInteraction::Telecave {
@@ -211,12 +207,64 @@ pub fn game_step_basic(
         fog.reveal(map, *tx, *ty, resources.world.fog_sight);
     }
 
+    // Towns, castle gates, dwellings, the alcove and a hostile foe bounce the
+    // hero back to the tile they entered from: the interaction still fires,
+    // but the hero ends the step standing NEXT to it, and neither the calendar
+    // nor the foe-follow pass runs (step.c:581-591).
+    let bounced = interaction_bounces(&interaction);
+    if bounced {
+        game.position.x = prev_x;
+        game.position.y = prev_y;
+        game.travel_mode = prev_travel_mode;
+        game.boat.x = prev_boat_x;
+        game.boat.y = prev_boat_y;
+    }
+
+    let mut advance = StepAdvance::default();
+    let mut collision = None;
+    if !bounced {
+        let terrain_costs_full_day = !flying && tile.terrain == Terrain::Desert;
+        // Timestop freezes the world, so the foe-follow pass is skipped with it.
+        // Sample the flag BEFORE consuming the step: consume_step decrements
+        // time_stop, so reading it afterwards cannot tell "last frozen step" from
+        // "not frozen at all".
+        let frozen = game.stats.time_stop > 0;
+        advance = consume_step(game, resources, terrain_costs_full_day);
+        if !frozen {
+            collision = game.foes_follow(map).map(|index| {
+                let foe = game.foes[index];
+                FoeCollision {
+                    id: foe.placement_id.as_str().to_owned(),
+                    friendly: foe.friendly,
+                    x: game.position.x,
+                    y: game.position.y,
+                }
+            });
+        }
+    }
+
     StepResult::Moved {
         terrain: tile.terrain,
         move_cost: step_move_cost(tile.terrain, flying),
         advance,
         interaction,
         collision,
+        bounced,
+    }
+}
+
+/// Whether stepping onto the resolved interaction bounces the hero back to the
+/// tile they entered from, porting the `bounce_back` flags `adventure.c` sets
+/// on towns, castle gates, dwellings and the alcove, plus the hostile-foe
+/// bounce `step.c:577` sets.
+fn interaction_bounces(interaction: &StepInteraction) -> bool {
+    match interaction {
+        StepInteraction::Town { .. }
+        | StepInteraction::CastleGate { .. }
+        | StepInteraction::Dwelling { .. }
+        | StepInteraction::Alcove => true,
+        StepInteraction::Foe { friendly, .. } => !friendly,
+        _ => false,
     }
 }
 
@@ -637,7 +685,8 @@ mod tests {
                 move_cost: 1,
                 advance: Default::default(),
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -672,7 +721,8 @@ mod tests {
                     commission_paid: 0
                 },
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -948,7 +998,8 @@ mod tests {
                 move_cost: 1,
                 advance: Default::default(),
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -1087,7 +1138,8 @@ mod tests {
                 move_cost: 1,
                 advance: Default::default(),
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!(game.stats.steps_left_today, 32);
@@ -1121,7 +1173,8 @@ mod tests {
                 move_cost: 1,
                 advance: Default::default(),
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!((game.position.x, game.position.y), (1, 0));
@@ -1168,7 +1221,8 @@ mod tests {
                     commission_paid: 0
                 },
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!(game.stats.steps_left_today, 33);
@@ -1200,7 +1254,8 @@ mod tests {
                     commission_paid: 25
                 },
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!(game.stats.days_left, 5);
@@ -1231,7 +1286,8 @@ mod tests {
                     commission_paid: 0
                 },
                 interaction: StepInteraction::None,
-                collision: None
+                collision: None,
+                bounced: false
             }
         );
         assert_eq!(game.stats.days_left, 0);
@@ -1281,8 +1337,17 @@ mod tests {
         game.foes[0].friendly = true;
         game.foe_count = 1;
 
+        // Towns, castle gates, dwellings and the alcove bounce the hero back to
+        // the tile they entered from, so each tile is stepped onto from the one
+        // to its west rather than walked through in a line.
+        let step_onto = |game: &mut Game, map: &mut Map, x: i32| {
+            game.position.x = x - 1;
+            game.position.y = 0;
+            move_interaction(game, map, &resources)
+        };
+
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 1),
             StepInteraction::Town {
                 id: "town0".to_owned(),
                 boat_x: 20,
@@ -1293,7 +1358,7 @@ mod tests {
         assert!(game.towns[0].visited);
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 2),
             StepInteraction::CastleGate {
                 id: "castle0".to_owned()
             }
@@ -1302,7 +1367,7 @@ mod tests {
         assert!(game.castles[0].known);
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 3),
             StepInteraction::Sign {
                 id: "sign0".to_owned(),
                 title: "Beware".to_owned(),
@@ -1312,7 +1377,7 @@ mod tests {
 
         let chest_roll = game.peek_chest(&resources, 0, 4, 0);
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 4),
             StepInteraction::TreasureChest {
                 id: "chest0".to_owned(),
                 roll: chest_roll
@@ -1321,7 +1386,7 @@ mod tests {
         assert_consumed(&game, &map, "home", 4, 0);
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 5),
             StepInteraction::Artifact {
                 id: "sword".to_owned()
             }
@@ -1330,7 +1395,7 @@ mod tests {
         assert_consumed(&game, &map, "home", 5, 0);
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 6),
             StepInteraction::Dwelling {
                 id: "dwelling0".to_owned(),
                 kind: Interact::DwellingForest,
@@ -1341,10 +1406,7 @@ mod tests {
         assert_eq!(game.position.dwelling_troop.as_str(), "sprites");
         assert_eq!((game.position.dwelling_x, game.position.dwelling_y), (6, 0));
 
-        assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
-            StepInteraction::Alcove
-        );
+        assert_eq!(step_onto(&mut game, &mut map, 7), StepInteraction::Alcove);
         assert!(game.position.dwelling_troop.is_empty());
         // The alcove only OFFERS magic: the tile stays until the offer is
         // accepted and paid, so the step neither grants nor consumes it.
@@ -1352,7 +1414,7 @@ mod tests {
         assert!(!game.is_consumed("home", 7, 0));
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 8),
             StepInteraction::Navmap {
                 id: "navmap0".to_owned(),
                 discovered_zone: Some(1)
@@ -1362,7 +1424,7 @@ mod tests {
         assert_consumed(&game, &map, "home", 8, 0);
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 9),
             StepInteraction::Orb {
                 id: "orb0".to_owned(),
                 zone_index: Some(0)
@@ -1372,7 +1434,7 @@ mod tests {
         assert_consumed(&game, &map, "home", 9, 0);
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 10),
             StepInteraction::Telecave {
                 id: "telecave0".to_owned(),
                 destination: None
@@ -1384,12 +1446,166 @@ mod tests {
         );
 
         assert_eq!(
-            move_interaction(&mut game, &mut map, &resources),
+            step_onto(&mut game, &mut map, 11),
             StepInteraction::Foe {
                 id: "foe0".to_owned(),
                 friendly: true
             }
         );
+    }
+
+    #[test]
+    fn step_basic_bounces_off_a_dwelling_without_spending_the_step() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 40, "week_days": 5},
+              "zones": [{"id": "home"}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut map = Map::from_tiles(
+            2,
+            1,
+            vec![
+                Tile::plain_grass(),
+                tile_with_id(Interact::DwellingPlains, "dwelling0"),
+            ],
+        )
+        .expect("fixture dimensions match");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.stats.steps_left_today = 5;
+        game.stats.days_left = 10;
+
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Grass,
+                move_cost: 1,
+                advance: Default::default(),
+                interaction: StepInteraction::Dwelling {
+                    id: "dwelling0".to_owned(),
+                    kind: Interact::DwellingPlains,
+                    troop_id: String::new(),
+                    count: 0
+                },
+                collision: None,
+                bounced: true
+            }
+        );
+        // The hero ends the step NEXT to the dwelling, not standing on it, and
+        // a bounced step never advances the calendar. C's `GameStep` returns
+        // `!bounced`, so `moved()` must answer false here.
+        assert_eq!((game.position.x, game.position.y), (0, 0));
+        assert_eq!(game.stats.steps_left_today, 5);
+        assert_eq!(game.stats.days_left, 10);
+        assert!(!result.moved(), "a bounced step did not move the hero");
+    }
+
+    #[test]
+    fn step_basic_does_not_bounce_off_consumables_or_a_friendly_foe() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 40, "week_days": 5},
+              "zones": [{"id": "home"}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        // Chests and orbs are consumed in place and do not bounce; a sign does
+        // not either.
+        let mut map = Map::from_tiles(
+            4,
+            1,
+            vec![
+                Tile::plain_grass(),
+                tile_with_id(Interact::TreasureChest, "chest0"),
+                tile_with_id(Interact::Sign, "sign0"),
+                tile_with_id(Interact::Foe, "foe0"),
+            ],
+        )
+        .expect("fixture dimensions match");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+        game.stats.steps_left_today = 40;
+        game.foes[0].zone.copy_from_str("home");
+        game.foes[0].x = 3;
+        game.foes[0].y = 0;
+        game.foes[0].placement_id.copy_from_str("foe0");
+        game.foes[0].alive = true;
+        game.foes[0].friendly = true;
+        game.foe_count = 1;
+
+        // Chest: consumed, hero stays on the cleared tile.
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
+        assert!(matches!(result, StepResult::Moved { bounced: false, .. }));
+        assert_eq!((game.position.x, game.position.y), (1, 0));
+
+        // Sign: hero stays.
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
+        assert!(matches!(result, StepResult::Moved { bounced: false, .. }));
+        assert_eq!((game.position.x, game.position.y), (2, 0));
+
+        // A friendly foe opens the recruit flow WITHOUT bouncing.
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
+        assert!(matches!(result, StepResult::Moved { bounced: false, .. }));
+        assert_eq!((game.position.x, game.position.y), (3, 0));
+    }
+
+    #[test]
+    fn step_basic_bounces_off_a_hostile_foe_without_spending_the_step() {
+        let resources = Resources::from_json_str(
+            r#"{
+              "time": {"day_steps": 40, "week_days": 5},
+              "zones": [{"id": "home"}],
+              "troops": []
+            }"#,
+        )
+        .expect("fixture parses");
+        let mut map = Map::from_tiles(
+            2,
+            1,
+            vec![Tile::plain_grass(), tile_with_id(Interact::Foe, "foe0")],
+        )
+        .expect("fixture dimensions match");
+        let mut game = Game::default();
+        game.position.zone.copy_from_str("home");
+        game.world.zones_discovered[0] = true;
+        game.stats.steps_left_today = 7;
+        game.stats.days_left = 20;
+        game.foes[0].zone.copy_from_str("home");
+        game.foes[0].x = 1;
+        game.foes[0].y = 0;
+        game.foes[0].placement_id.copy_from_str("foe0");
+        game.foes[0].alive = true;
+        game.foes[0].friendly = false;
+        game.foe_count = 1;
+
+        let result = game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0);
+
+        assert_eq!(
+            result,
+            StepResult::Moved {
+                terrain: Terrain::Grass,
+                move_cost: 1,
+                advance: Default::default(),
+                interaction: StepInteraction::Foe {
+                    id: "foe0".to_owned(),
+                    friendly: false
+                },
+                collision: None,
+                bounced: true
+            }
+        );
+        // The hostile-foe bounce is C's `step.c:577` `ir.bounce_back = true`.
+        assert_eq!((game.position.x, game.position.y), (0, 0));
+        assert_eq!(game.stats.steps_left_today, 7);
+        assert_eq!(game.stats.days_left, 20);
+        assert!(!result.moved());
     }
 
     fn move_interaction(game: &mut Game, map: &mut Map, resources: &Resources) -> StepInteraction {
@@ -1599,8 +1815,8 @@ mod tests {
         )
         .expect("fixture parses");
         let mut map = Map::from_tiles(
-            4,
-            1,
+            2,
+            2,
             vec![
                 Tile::plain_grass(),
                 tile_with_id(Interact::CastleGate, "keep"),
@@ -1616,17 +1832,33 @@ mod tests {
         game.castles[0].id.copy_from_str("keep");
         game.castles[1].id.copy_from_str("outpost");
 
-        move_interaction(&mut game, &mut map, &resources);
+        // Stepping east onto the audience gate sets the home marker and bounces
+        // the hero back to the tile they entered from.
+        game.position.x = 0;
+        game.position.y = 0;
+        assert!(matches!(
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0),
+            StepResult::Moved { bounced: true, .. }
+        ));
         assert_eq!(game.position.home_castle.as_str(), "keep");
+        assert_eq!((game.position.x, game.position.y), (0, 0));
 
         // Stepping away revokes the recruit privilege, exactly like in_town.
-        move_interaction(&mut game, &mut map, &resources);
+        assert!(matches!(
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 0, 1),
+            StepResult::Moved { bounced: false, .. }
+        ));
         assert!(game.position.home_castle.is_empty());
 
         // A non-audience castle gate never sets the home marker; an owned one
         // sets own_castle instead.
         game.castles[1].owner_kind = CastleOwnerKind::Player;
-        move_interaction(&mut game, &mut map, &resources);
+        game.position.x = 0;
+        game.position.y = 1;
+        assert!(matches!(
+            game_step_basic(&mut game, &mut map, &mut Fog::new(), &resources, 1, 0),
+            StepResult::Moved { bounced: true, .. }
+        ));
         assert!(game.position.home_castle.is_empty());
         assert_eq!(game.position.own_castle.as_str(), "outpost");
     }
