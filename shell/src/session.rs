@@ -1084,6 +1084,7 @@ impl<'r> Session<'r> {
                 if let StepResult::Moved {
                     interaction,
                     advance,
+                    collision,
                     ..
                 } = &result
                 {
@@ -1179,30 +1180,20 @@ impl<'r> Session<'r> {
                                 .find(|foe| foe.placement_id.as_str() == id)
                                 .map(|foe| (foe.x, foe.y))
                                 .unwrap_or((0, 0));
-                            if !friendly {
-                                *combat = Some(start_combat(
-                                    game,
-                                    resources,
-                                    CombatFlow::HostileFoe {
-                                        foe_id: id.clone(),
-                                        foe_x,
-                                        foe_y,
-                                    },
-                                ));
-                                audio.set_track(audio::Track::Combat);
-                            } else if let Some(offer) = game.begin_friendly_encounter(
+                            begin_foe_encounter(
+                                game,
                                 map,
                                 resources,
+                                combat,
+                                audio.as_mut(),
+                                prompt,
+                                dialog,
+                                pending,
                                 id.as_str(),
+                                *friendly,
                                 foe_x,
                                 foe_y,
-                            ) {
-                                let body = interact::friendly_offer_prompt(resources, &offer);
-                                prompt.yes_no("", &body);
-                                *pending = PendingFlow::FriendlyOffer { offer };
-                            } else {
-                                dialog.open("", &interact::friendly_flees(resources));
-                            }
+                            );
                         }
                         StepInteraction::Dwelling {
                             kind,
@@ -1262,6 +1253,26 @@ impl<'r> Session<'r> {
                                 println!("{other:?}");
                             }
                         }
+                    }
+                    // A foe that walked onto the hero starts its encounter
+                    // after the tile interaction, as C's follow pass does
+                    // (step.c:604). The foe and the hero share the tile, so
+                    // `collision` carries it.
+                    if let Some(collision) = collision {
+                        begin_foe_encounter(
+                            game,
+                            map,
+                            resources,
+                            combat,
+                            audio.as_mut(),
+                            prompt,
+                            dialog,
+                            pending,
+                            collision.id.as_str(),
+                            collision.friendly,
+                            collision.x,
+                            collision.y,
+                        );
                     }
                 }
                 if game.stats.game_over {
@@ -1554,6 +1565,48 @@ fn start_combat(game: &Game, resources: &Resources, flow: CombatFlow) -> CombatS
                 target_name: "Hostile band".to_owned(),
             }
         }
+    }
+}
+
+/// Start the encounter a foe brings: combat for a hostile foe, the free join
+/// offer for a friendly one. Both ways a foe reaches the hero run through
+/// here -- the hero stepping onto a foe tile (`StepInteraction::Foe`) and a
+/// foe walking onto the hero (`FoeCollision`) -- because C calls
+/// `start_foe_friendly_flow` / `start_foe_hostile_flow` from both
+/// (`step.c:574`, `step.c:613`).
+#[allow(clippy::too_many_arguments)]
+fn begin_foe_encounter(
+    game: &mut Game,
+    map: &mut Map,
+    resources: &Resources,
+    combat: &mut Option<CombatSession>,
+    audio: &mut dyn AudioOut,
+    prompt: &mut Prompt,
+    dialog: &mut Dialog,
+    pending: &mut PendingFlow,
+    foe_id: &str,
+    friendly: bool,
+    foe_x: i32,
+    foe_y: i32,
+) {
+    if !friendly {
+        *combat = Some(start_combat(
+            game,
+            resources,
+            CombatFlow::HostileFoe {
+                foe_id: foe_id.to_owned(),
+                foe_x,
+                foe_y,
+            },
+        ));
+        audio.set_track(audio::Track::Combat);
+    } else if let Some(offer) = game.begin_friendly_encounter(map, resources, foe_id, foe_x, foe_y)
+    {
+        let body = interact::friendly_offer_prompt(resources, &offer);
+        prompt.yes_no("", &body);
+        *pending = PendingFlow::FriendlyOffer { offer };
+    } else {
+        dialog.open("", &interact::friendly_flees(resources));
     }
 }
 
@@ -2053,8 +2106,8 @@ mod tests {
     use crate::startup::{StartupAction, StartupChoice};
     use crate::views::ViewKind;
     use openbounty_engine::fog::Fog;
-    use openbounty_engine::game::{Game, GateDestination};
-    use openbounty_engine::map::Map;
+    use openbounty_engine::game::{ArmyStack, FoeState, Game, GateDestination, GAME_ARMY_SLOTS};
+    use openbounty_engine::map::{Map, Tile};
     use openbounty_engine::resources::Resources;
 
     /// The headless path the playtest runner takes: the game's own pack, a
@@ -2696,6 +2749,67 @@ mod tests {
 
                 assert_eq!(clicked, keyed, "backdrop should equal ESC for {name}");
             }
+        });
+    }
+
+    /// A friendly foe that walks onto the hero opens the free join offer, as C
+    /// does at `step.c:613`. Before the collision was routed the shell dropped
+    /// it, so a roaming army reached the hero with no ask. The offer is not
+    /// resolved until the player answers, so no troop joins here.
+    #[test]
+    fn a_friendly_foe_walking_onto_the_hero_asks_before_joining() {
+        let harness = Harness::load();
+        big_stack(move || {
+            let mut session = harness.start();
+            let mut list = DrawList::new();
+            let mut now = 0.0;
+            to_overworld(&mut session, &mut list, &mut now);
+
+            // A clear grass strip: the hero at (1,0), a friendly foe at (3,0).
+            // Stepping right puts the hero at (2,0) and the foe follows onto
+            // that same tile, which is the collision.
+            session.map =
+                Map::from_tiles(6, 1, vec![Tile::plain_grass(); 6]).expect("a grass strip");
+            session.game.position.zone.copy_from_str("home");
+            session.game.position.x = 1;
+            session.game.position.y = 0;
+            session.game.stats.steps_left_today = 40;
+            // Guarantee the free offer has an empty army slot to land in, so
+            // the foe offers instead of fleeing.
+            session.game.army = [ArmyStack::default(); GAME_ARMY_SLOTS];
+
+            let mut foe = FoeState::default();
+            foe.zone = session.game.position.zone;
+            foe.x = 3;
+            foe.y = 0;
+            foe.placement_id.copy_from_str("friendly0");
+            foe.alive = true;
+            foe.friendly = true;
+            session.game.foes[0] = foe;
+            session.game.foe_count = 1;
+
+            drive(
+                &mut session,
+                &mut list,
+                &[Key::Right],
+                None,
+                false,
+                &mut now,
+            );
+
+            assert!(
+                session.prompt.is_active(),
+                "the roamers must ask before they join"
+            );
+            assert_eq!(session.game.foe_count, 1, "the offer is not resolved yet");
+            assert!(
+                session
+                    .game
+                    .army
+                    .iter()
+                    .all(|stack| stack.id.is_empty() || stack.count == 0),
+                "no troop joins until the player accepts"
+            );
         });
     }
 }

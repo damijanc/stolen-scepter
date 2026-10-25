@@ -171,8 +171,8 @@ impl Walk {
 }
 
 /// Whether a walked step's result ends the walk: anything but a plain move.
-/// The collision stop reads the result directly because the shell shows
-/// nothing for a collision yet (engine-sweep GAP 4).
+/// A collision ends it too, so the shell can open the foe's join prompt or
+/// battle before the hero keeps moving.
 pub fn stops_walk(result: &StepResult) -> bool {
     match result {
         StepResult::Moved {
