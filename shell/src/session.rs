@@ -2040,7 +2040,7 @@ mod tests {
     use crate::audio::Silent;
     use crate::dialog::Dialog;
     use crate::draw::DrawList;
-    use crate::hud::OVERWORLD_ACTIONS;
+    use crate::hud::{Hud, OVERWORLD_ACTIONS, PANEL_COUNT};
     use crate::input::{Key, Keys};
     use crate::layout::Layout;
     use crate::palette::Palette;
@@ -2409,6 +2409,39 @@ mod tests {
                     (by_click.game.position.x, by_click.game.position.y),
                     pos_before,
                     "panel {panel} must not walk"
+                );
+            }
+        });
+    }
+
+    /// Guards the frame's hit order: the HUD publishes its `HudPanel` regions
+    /// (chrome -> map -> hud -> overlay), and the spellbook's full-screen
+    /// `ViewBack` is pushed after them, so it must win. The spellbook panel
+    /// also paints over the sidebar, so no HUD panel is visible while it is
+    /// up. This locks the ordering in place; it does not reproduce a bug.
+    #[test]
+    fn a_click_on_a_hud_panel_while_the_spellbook_is_up_is_never_a_hud_panel() {
+        let harness = Harness::load();
+        big_stack(move || {
+            let mut session = harness.start();
+            let mut list = DrawList::new();
+            let mut now = 0.0;
+            to_overworld(&mut session, &mut list, &mut now);
+            session.views.set(ViewKind::Spells);
+
+            // Draw a frame so the HUD and the spellbook both publish regions.
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+
+            for index in 0..PANEL_COUNT {
+                let rect = Hud::panel_rect(session.ctx.layout, index);
+                let (cx, cy) = (rect.x + rect.w / 2, rect.y + rect.h / 2);
+                let target = session.hits.hit(cx, cy);
+                assert!(
+                    matches!(
+                        target,
+                        Some(HitTarget::ViewBack) | Some(HitTarget::Spell(_))
+                    ),
+                    "a click on HUD panel {index} while the spellbook is up resolved to {target:?}"
                 );
             }
         });
