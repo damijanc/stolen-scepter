@@ -119,6 +119,15 @@ fn truncate_chars(text: &str, max: usize) -> String {
     text.chars().take(max).collect()
 }
 
+/// The panel the sidebar-covering views fill: the map plus the sidebar, from
+/// the map origin down the map's height. C's `FULL_VIEW_X` / `FULL_VIEW_W` /
+/// `VIEW_Y` / `VIEW_H` (`views_render.c`). `draw_character`, `draw_gate` and
+/// the army view all use exactly this; the spellbook reuses it (widened by
+/// [`crate::layout::FRAME_RIGHT_W`] so the longest shipped name fits).
+fn full_view_rect(layout: &Layout) -> Rect {
+    Rect::new(MAP_X, MAP_Y, layout.map_w + layout.sidebar_w, layout.map_h)
+}
+
 /// Which overlay is on top of the stack.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewKind {
@@ -1786,30 +1795,31 @@ impl Views {
         resources: &Resources,
         game: &Game,
     ) {
-        list.rect(
-            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
-            palette.clr(Pal::DGrey),
-        );
-        list.rect_lines(
-            Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h),
-            palette.clr(Pal::DRed),
-        );
+        // DIVERGENCE, deliberate: C draws the spells view in the map-width
+        // view rect (`VIEW_W`) and its `%-12s` clips any name over 12 glyphs
+        // (e.g. "Raise Control"). This port widens the panel to the
+        // sidebar-covering rect `draw_character` uses, plus the right frame's
+        // strip, so the two equal columns are 18 glyphs each and every shipped
+        // name fits untruncated. `full_view_rect` alone leaves 17 glyphs a
+        // column in legacy -- one short -- so the frame's 16px is borrowed.
+        let base = full_view_rect(layout);
+        let vx = base.x;
+        let vy = base.y;
+        let vw = base.w + FRAME_RIGHT_W;
+        let vh = base.h;
+        list.rect(Rect::new(vx, vy, vw, vh), palette.clr(Pal::DGrey));
+        list.rect_lines(Rect::new(vx, vy, vw, vh), palette.clr(Pal::DRed));
 
         let title = banner::text(resources, "spells_view", "title", DEFAULT_SV_TITLE);
-        list.text_centered(
-            title,
-            MAP_X + layout.map_w / 2,
-            MAP_Y + VIEW_PAD,
-            palette.clr(Pal::Yellow),
-        );
+        list.text_centered(title, vx + vw / 2, vy + VIEW_PAD, palette.clr(Pal::Yellow));
 
-        let head_y = MAP_Y + VIEW_PAD + font::GLYPH_H + 4;
+        let head_y = vy + VIEW_PAD + font::GLYPH_H + 4;
         // Two equal columns with a one-glyph gap, inset by VIEW_PAD, so both
-        // columns fit inside the map rect whatever the pack's geometry. In
-        // legacy 320x200 this is 14 glyphs per column.
+        // columns fit inside the full panel whatever the pack's geometry. In
+        // legacy 320x200 this is 18 glyphs per column.
         let gap = font::GLYPH_W;
-        let col_w = (layout.map_w - 2 * VIEW_PAD - gap) / 2;
-        let col_l = MAP_X + VIEW_PAD;
+        let col_w = (vw - 2 * VIEW_PAD - gap) / 2;
+        let col_l = vx + VIEW_PAD;
         let col_r = col_l + col_w + gap;
         // D2 note: the Left/Right column switch is a keyboard-cursor concept
         // only -- the A-G keys address whichever column `spells_column` names,
@@ -1876,12 +1886,13 @@ impl Views {
                 );
             }
             if let Some(spell) = adventure {
-                // DIVERGENCE, deliberate: C formats this row `"%c %-12s %2d"`,
-                // so a name longer than 12 glyphs (e.g. "Raise Control")
-                // pushes the count past the map's right edge and into the
-                // sidebar. Right-align the count to the column's right edge
-                // and truncate the name instead, so the whole row stays inside
-                // its column.
+                // C formats this row `"%c %-12s %2d"`; the `%-12s` clips the
+                // name and a longer one (e.g. "Raise Control") pushes the count
+                // past the map's right edge and into the sidebar. This port
+                // left-aligns the name in the widened column and right-aligns
+                // the count after it, so the whole row stays inside its column
+                // and the name is clipped only when a pack ships one longer
+                // than the column.
                 let label = format!(
                     "{} {:<width$} {:2}",
                     char::from(b'A' + i as u8),
@@ -1907,12 +1918,10 @@ impl Views {
         layout: &Layout,
         palette: &Palette,
     ) {
-        let vx = MAP_X;
-        let vw = layout.map_w + layout.sidebar_w;
-        let vy = MAP_Y;
-        let vh = layout.map_h;
-        list.rect(Rect::new(vx, vy, vw, vh), palette.clr(Pal::DGrey));
-        list.rect_lines(Rect::new(vx, vy, vw, vh), palette.clr(Pal::DRed));
+        let base = full_view_rect(layout);
+        let (vx, vy, vw, vh) = (base.x, base.y, base.w, base.h);
+        list.rect(base, palette.clr(Pal::DGrey));
+        list.rect_lines(base, palette.clr(Pal::DRed));
 
         let title = if self.gate_is_town {
             "Town Gate"
@@ -2602,10 +2611,11 @@ fn draw_character(
     resources: &Resources,
     game: &Game,
 ) {
-    let vx = MAP_X;
-    let vw = layout.map_w + layout.sidebar_w;
-    let view_y = MAP_Y;
-    let view_h = layout.map_h;
+    let base = full_view_rect(layout);
+    let vx = base.x;
+    let vw = base.w;
+    let view_y = base.y;
+    let view_h = base.h;
 
     // Full content width (covers the sidebar), solid grey background.
     list.rect(Rect::new(vx, view_y, vw, view_h), palette.clr(Pal::DGrey));
@@ -2964,13 +2974,11 @@ fn draw_army(
 ) {
     // Troops tick-animate at ~8 Hz, matching C's `GetTime() * 8.0`.
     let tick = (time * 8.0) as i32;
-    let vx = MAP_X;
-    let vw = layout.map_w + layout.sidebar_w;
-    let view_y = MAP_Y;
-    let view_h = layout.map_h;
+    let base = full_view_rect(layout);
+    let (vx, view_y, vw) = (base.x, base.y, base.w);
 
-    list.rect(Rect::new(vx, view_y, vw, view_h), palette.clr(Pal::DGrey));
-    list.rect_lines(Rect::new(vx, view_y, vw, view_h), palette.clr(Pal::DRed));
+    list.rect(base, palette.clr(Pal::DGrey));
+    list.rect_lines(base, palette.clr(Pal::DRed));
 
     let row_h = 34;
     let pad = 2;
@@ -4530,10 +4538,16 @@ mod tests {
     /// The two spell columns, derived the same way `draw_spells` does.
     fn spell_columns(layout: &Layout) -> (i32, i32, i32) {
         let gap = font::GLYPH_W;
-        let col_w = (layout.map_w - 2 * VIEW_PAD - gap) / 2;
+        let vw = layout.map_w + layout.sidebar_w + FRAME_RIGHT_W;
+        let col_w = (vw - 2 * VIEW_PAD - gap) / 2;
         let col_l = MAP_X + VIEW_PAD;
         let col_r = col_l + col_w + gap;
         (col_l, col_r, col_w)
+    }
+
+    /// The right edge of the widened spellbook panel.
+    fn spellbook_right(layout: &Layout) -> i32 {
+        MAP_X + layout.map_w + layout.sidebar_w + FRAME_RIGHT_W
     }
 
     #[test]
@@ -4601,7 +4615,7 @@ mod tests {
         let (list, _) = draw_spellbook(&resources, &layout, &catalog, &game);
 
         let (col_l, col_r, _) = spell_columns(&layout);
-        let map_right = MAP_X + layout.map_w;
+        let panel_right = spellbook_right(&layout);
 
         let mut rows = 0;
         for cmd in list.as_slice() {
@@ -4614,8 +4628,8 @@ mod tests {
             rows += 1;
             let width = font::measure_width(text.as_str());
             assert!(
-                x + width <= map_right,
-                "row {text:?} overflows the map rect"
+                x + width <= panel_right,
+                "row {text:?} overflows the widened panel"
             );
             if *x == col_l {
                 assert!(
@@ -4628,6 +4642,20 @@ mod tests {
             rows >= 14,
             "expected at least the 14 spell rows, drew {rows}"
         );
+
+        // No shipped name is truncated: every drawn row contains its spell's
+        // full name. The pack's longest is "Raise Control" (13 glyphs), which
+        // the widened 18-glyph column holds.
+        for index in 0..14 {
+            let name = resources
+                .spell_by_index(index)
+                .map(|spell| spell.name.as_str())
+                .unwrap_or_default();
+            assert!(
+                list.has_text_containing(name),
+                "shipped spell {index} {name:?} must appear untruncated"
+            );
+        }
     }
 
     #[test]
@@ -4653,7 +4681,7 @@ mod tests {
         assert!(list.has_text_containing("Extremely"));
 
         let (col_l, col_r, _) = spell_columns(&layout);
-        let map_right = MAP_X + layout.map_w;
+        let panel_right = spellbook_right(&layout);
         for cmd in list.as_slice() {
             let DrawCmd::Text { text, x, .. } = cmd else {
                 continue;
@@ -4662,7 +4690,7 @@ mod tests {
                 continue;
             }
             let width = font::measure_width(text.as_str());
-            assert!(x + width <= map_right);
+            assert!(x + width <= panel_right);
             if *x == col_l {
                 assert!(x + width <= col_r);
             }
@@ -4745,7 +4773,7 @@ mod tests {
 
         // ...and every row still fits its column.
         let (col_l, col_r, _) = spell_columns(&layout);
-        let map_right = MAP_X + layout.map_w;
+        let panel_right = spellbook_right(&layout);
         for cmd in list.as_slice() {
             let DrawCmd::Text { text, x, .. } = cmd else {
                 continue;
@@ -4754,7 +4782,7 @@ mod tests {
                 continue;
             }
             let width = font::measure_width(text.as_str());
-            assert!(x + width <= map_right);
+            assert!(x + width <= panel_right);
             if *x == col_l {
                 assert!(x + width <= col_r);
             }
