@@ -112,6 +112,13 @@ const DEFAULT_CV_CASTLE_UNKNOWN: &str = "Unknown";
 const DEFAULT_CV_FEATURES_HEADER: &str = "Distinguishing Features:";
 const DEFAULT_CV_CRIMES_HEADER: &str = "Crimes:";
 
+/// Truncate a name to at most `max` glyphs, the C shell's `%.*s` precision.
+/// The font is fixed-pitch and pack strings are ASCII, so one `char` is one
+/// glyph.
+fn truncate_chars(text: &str, max: usize) -> String {
+    text.chars().take(max).collect()
+}
+
 /// Which overlay is on top of the stack.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewKind {
@@ -1797,8 +1804,13 @@ impl Views {
         );
 
         let head_y = MAP_Y + VIEW_PAD + font::GLYPH_H + 4;
-        let col_l = MAP_X + VIEW_PAD + 4;
-        let col_r = MAP_X + layout.map_w / 2 + 4;
+        // Two equal columns with a one-glyph gap, inset by VIEW_PAD, so both
+        // columns fit inside the map rect whatever the pack's geometry. In
+        // legacy 320x200 this is 14 glyphs per column.
+        let gap = font::GLYPH_W;
+        let col_w = (layout.map_w - 2 * VIEW_PAD - gap) / 2;
+        let col_l = MAP_X + VIEW_PAD;
+        let col_r = col_l + col_w + gap;
         // D2 note: the Left/Right column switch is a keyboard-cursor concept
         // only -- the A-G keys address whichever column `spells_column` names,
         // but a click names a spell cell by index directly (`spells_click`),
@@ -1823,21 +1835,30 @@ impl Views {
 
         let row_y = head_y + font::GLYPH_H + 4;
         let row_h = font::GLYPH_H + 1;
-        let col_w = layout.map_w / 2 - VIEW_PAD - 8;
+        // Fixed overhead per row is five glyphs in both columns -- the count
+        // (2), the letter key (1) and their separating spaces (2) -- leaving
+        // the rest of the column for the spell name.
+        let name_chars = ((col_w / font::GLYPH_W) as usize).saturating_sub(5);
         for i in 0..7 {
             let combat = resources.spell_by_index(i);
             let adventure = resources.spell_by_index(i + 7);
             let cc = game.spells.counts[i as usize];
             let ca = game.spells.counts[(i + 7) as usize];
+            // DIVERGENCE, deliberate: C dims a zero-charge row with
+            // `PAL_CLR(DGREY)` on a `DGREY` panel, so an empty spellbook
+            // (all counts 0) draws grey text on grey and the whole list is
+            // invisible. Dim with `Pal::Grey` -- the read-anyway footer grey
+            // -- instead, so an uncharged spell stays visibly dimmed rather
+            // than vanishing.
             let lc = if cc > 0 {
                 palette.clr(Pal::White)
             } else {
-                palette.clr(Pal::DGrey)
+                palette.clr(Pal::Grey)
             };
             let rc = if ca > 0 {
                 palette.clr(Pal::White)
             } else {
-                palette.clr(Pal::DGrey)
+                palette.clr(Pal::Grey)
             };
 
             if let Some(spell) = combat {
@@ -1845,7 +1866,7 @@ impl Views {
                     "{:2} {} {}",
                     cc,
                     char::from(b'A' + i as u8),
-                    spell.name.as_str()
+                    truncate_chars(spell.name.as_str(), name_chars)
                 );
                 list.text(&label, col_l, row_y + i * row_h, lc);
                 // Same rect, one line apart: one cell per row per column.
@@ -1855,11 +1876,18 @@ impl Views {
                 );
             }
             if let Some(spell) = adventure {
+                // DIVERGENCE, deliberate: C formats this row `"%c %-12s %2d"`,
+                // so a name longer than 12 glyphs (e.g. "Raise Control")
+                // pushes the count past the map's right edge and into the
+                // sidebar. Right-align the count to the column's right edge
+                // and truncate the name instead, so the whole row stays inside
+                // its column.
                 let label = format!(
-                    "{} {:<12} {:2}",
+                    "{} {:<width$} {:2}",
                     char::from(b'A' + i as u8),
-                    spell.name.as_str(),
-                    ca
+                    truncate_chars(spell.name.as_str(), name_chars),
+                    ca,
+                    width = name_chars
                 );
                 list.text(&label, col_r, row_y + i * row_h, rc);
                 hits.push(
@@ -4457,6 +4485,280 @@ mod tests {
         );
         assert!(!views.is_active());
         assert_eq!(views.active(), None);
+    }
+
+    /// Load the game's own pack headlessly, so the spellbook is drawn against
+    /// the real spell names ("Turn Undead", "Raise Control", ...).
+    fn shipped_spellbook() -> (Resources, Layout, SpriteCatalog) {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+        let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+        let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        (resources, layout, catalog)
+    }
+
+    /// Draw the spellbook over a trivial map and return the recording.
+    fn draw_spellbook(
+        resources: &Resources,
+        layout: &Layout,
+        catalog: &SpriteCatalog,
+        game: &Game,
+    ) -> (DrawList, HitList) {
+        let mut views = Views::new();
+        views.set(ViewKind::Spells);
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            layout,
+            &Palette::fallback(),
+            resources,
+            catalog,
+            &map,
+            &fog,
+            game,
+            &present,
+            0.0,
+        );
+        (list, hits)
+    }
+
+    /// The two spell columns, derived the same way `draw_spells` does.
+    fn spell_columns(layout: &Layout) -> (i32, i32, i32) {
+        let gap = font::GLYPH_W;
+        let col_w = (layout.map_w - 2 * VIEW_PAD - gap) / 2;
+        let col_l = MAP_X + VIEW_PAD;
+        let col_r = col_l + col_w + gap;
+        (col_l, col_r, col_w)
+    }
+
+    #[test]
+    fn an_uncharged_spell_is_dimmed_but_not_hidden_against_the_panel() {
+        let (resources, layout, catalog) = shipped_spellbook();
+        let game = Game::default(); // every spell count is 0
+        let (list, _) = draw_spellbook(&resources, &layout, &catalog, &game);
+
+        let palette = Palette::fallback();
+        let panel = palette.clr(Pal::DGrey);
+        let dim = palette.clr(Pal::Grey);
+        let bright = palette.clr(Pal::White);
+
+        assert_ne!(dim, panel, "the dim colour must read against the panel");
+        assert_ne!(
+            dim, bright,
+            "an uncharged spell must differ from a charged one"
+        );
+
+        let mut saw_dim = false;
+        for cmd in list.as_slice() {
+            if let DrawCmd::Text { color, .. } = cmd {
+                assert_ne!(*color, panel, "no spellbook text may vanish into the panel");
+                if *color == dim {
+                    saw_dim = true;
+                }
+            }
+        }
+        assert!(
+            saw_dim,
+            "the empty spellbook dims its rows rather than hiding them"
+        );
+    }
+
+    #[test]
+    fn a_charged_spell_is_white_and_distinct_from_the_dim() {
+        let (resources, layout, catalog) = shipped_spellbook();
+        let mut game = Game::default();
+        game.spells.counts[0] = 2; // combat row 0: Clone
+        game.spells.counts[7] = 1; // adventure row 0: Bridge
+        let (list, _) = draw_spellbook(&resources, &layout, &catalog, &game);
+
+        let palette = Palette::fallback();
+        let bright = palette.clr(Pal::White);
+        let dim = palette.clr(Pal::Grey);
+
+        let color_of = |needle: &str| -> Color {
+            list.as_slice()
+                .iter()
+                .find_map(|cmd| match cmd {
+                    DrawCmd::Text { text, color, .. } if text.contains(needle) => Some(*color),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{needle} not drawn"))
+        };
+        assert_eq!(color_of("Clone"), bright);
+        assert_eq!(color_of("Bridge"), bright);
+        assert_ne!(bright, dim);
+    }
+
+    #[test]
+    fn every_shipped_spell_row_stays_inside_its_column() {
+        let (resources, layout, catalog) = shipped_spellbook();
+        let game = Game::default();
+        let (list, _) = draw_spellbook(&resources, &layout, &catalog, &game);
+
+        let (col_l, col_r, _) = spell_columns(&layout);
+        let map_right = MAP_X + layout.map_w;
+
+        let mut rows = 0;
+        for cmd in list.as_slice() {
+            let DrawCmd::Text { text, x, .. } = cmd else {
+                continue;
+            };
+            if *x != col_l && *x != col_r {
+                continue; // the centred title
+            }
+            rows += 1;
+            let width = font::measure_width(text.as_str());
+            assert!(
+                x + width <= map_right,
+                "row {text:?} overflows the map rect"
+            );
+            if *x == col_l {
+                assert!(
+                    x + width <= col_r,
+                    "left-column row {text:?} crosses into the right column"
+                );
+            }
+        }
+        assert!(
+            rows >= 14,
+            "expected at least the 14 spell rows, drew {rows}"
+        );
+    }
+
+    #[test]
+    fn long_spell_names_are_truncated_to_the_column_width() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+                "spells": [
+                  {"id":"s0","name":"Supercalifragilisticexpialidocious","kind":"combat","cost":1},
+                  {},{},{},{},{},{},
+                  {"id":"s7","name":"Extremely Long Adventure Spell Name","kind":"adventure","cost":1}
+                ]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let game = Game::default();
+        let (list, _) = draw_spellbook(&resources, &layout, &catalog, &game);
+
+        // The whole name is never drawn; a column-width prefix is.
+        assert!(!list.has_text_containing("Supercalifragilisticexpialidocious"));
+        assert!(list.has_text_containing("Supercali"));
+        assert!(!list.has_text_containing("Extremely Long Adventure Spell Name"));
+        assert!(list.has_text_containing("Extremely"));
+
+        let (col_l, col_r, _) = spell_columns(&layout);
+        let map_right = MAP_X + layout.map_w;
+        for cmd in list.as_slice() {
+            let DrawCmd::Text { text, x, .. } = cmd else {
+                continue;
+            };
+            if *x != col_l && *x != col_r {
+                continue;
+            }
+            let width = font::measure_width(text.as_str());
+            assert!(x + width <= map_right);
+            if *x == col_l {
+                assert!(x + width <= col_r);
+            }
+        }
+    }
+
+    #[test]
+    fn spell_hit_regions_contain_their_text_and_columns_do_not_overlap() {
+        let (resources, layout, catalog) = shipped_spellbook();
+        let game = Game::default();
+        let (list, hits) = draw_spellbook(&resources, &layout, &catalog, &game);
+
+        let regions: Vec<_> = hits
+            .regions()
+            .iter()
+            .filter(|region| matches!(region.target, HitTarget::Spell(_)))
+            .copied()
+            .collect();
+        assert_eq!(regions.len(), 14, "one hit region per shipped spell");
+
+        for region in &regions {
+            // The cell's text is drawn at exactly the region's top-left corner.
+            let text = list
+                .as_slice()
+                .iter()
+                .find_map(|cmd| match cmd {
+                    DrawCmd::Text { x, y, text, .. }
+                        if *x == region.rect.x && *y == region.rect.y =>
+                    {
+                        Some(text.as_str())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("no text drawn at {:?}", region.rect));
+            assert!(
+                font::measure_width(text) <= region.rect.w,
+                "text {text:?} is wider than its hit region"
+            );
+        }
+
+        // The two columns' regions never overlap.
+        for left in regions
+            .iter()
+            .filter(|r| matches!(r.target, HitTarget::Spell(i) if i < 7))
+        {
+            for right in regions
+                .iter()
+                .filter(|r| matches!(r.target, HitTarget::Spell(i) if i >= 7))
+            {
+                assert!(
+                    left.rect.right() <= right.rect.x,
+                    "columns overlap: {:?} vs {:?}",
+                    left.rect,
+                    right.rect
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_spellbook_scales_with_a_modern_pack() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "modern", "tile_w": 96, "tile_h": 96, "tiles_w": 7, "tiles_h": 7},
+                "troops": [],
+                "spells": [
+                  {"id":"s0","name":"Turn Undead","kind":"combat","cost":1},
+                  {},{},{},{},{},{},
+                  {"id":"s7","name":"Raise Control","kind":"adventure","cost":1}
+                ]}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let game = Game::default();
+        let (list, _) = draw_spellbook(&resources, &layout, &catalog, &game);
+
+        // A modern pack's wider map leaves the full names untruncated...
+        assert!(list.has_text_containing("Turn Undead"));
+        assert!(list.has_text_containing("Raise Control"));
+
+        // ...and every row still fits its column.
+        let (col_l, col_r, _) = spell_columns(&layout);
+        let map_right = MAP_X + layout.map_w;
+        for cmd in list.as_slice() {
+            let DrawCmd::Text { text, x, .. } = cmd else {
+                continue;
+            };
+            if *x != col_l && *x != col_r {
+                continue;
+            }
+            let width = font::measure_width(text.as_str());
+            assert!(x + width <= map_right);
+            if *x == col_l {
+                assert!(x + width <= col_r);
+            }
+        }
     }
 
     fn gate_dest(name: &str) -> GateDestination {
