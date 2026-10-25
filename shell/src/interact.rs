@@ -678,6 +678,11 @@ const DEFAULT_TOWN_SPELL_CAN_LEARN: &str = "Room for %LEFT% more spell%S%.";
 const DEFAULT_TOWN_SIEGE_ALREADY: &str = "You have siege weapons!";
 const DEFAULT_TOWN_SIEGE_PURCHASED: &str = "Siege weapons purchased.";
 
+/// Shown when the hero steps onto a hostile castle gate without owning siege
+/// weapons. The original DOS KB silently bounces the hero back; this shell
+/// still bounces but tells the player why.
+const DEFAULT_CASTLE_NEED_SIEGE: &str = "You need siege weapons\nto attack this castle.";
+
 /// Castle screen defaults, porting `load_banner_defaults` and the `ui` block.
 const DEFAULT_BODY_HOME_CASTLE: &str = "1. Recruit Soldiers\n2. Audience with the King";
 const DEFAULT_OWN_CASTLE_MODE_GARRISON: &str = "Garrison troops (Space=Remove)";
@@ -1553,6 +1558,23 @@ pub fn siege_villain_prompt(
     )
 }
 
+/// The "you need siege weapons" message, shown when the hero steps onto a
+/// hostile castle gate without owning any. A castle without siege weapons
+/// cannot be attacked; the step bounces the hero back, and this says why.
+pub fn castle_need_siege(resources: &Resources, castle_id: &str) -> (String, String) {
+    let name = castle_display_name(resources, castle_id);
+    (
+        format!("Castle {name}"),
+        banner::text(
+            resources,
+            "banners",
+            "castle_need_siege",
+            DEFAULT_CASTLE_NEED_SIEGE,
+        )
+        .to_owned(),
+    )
+}
+
 /// The villain-siege "Capture" dialog, porting the inline message in
 /// `flow_apply_siege_villain`. `None` for a repelled siege or a missing castle.
 pub fn capture_message(
@@ -2220,6 +2242,17 @@ mod tests {
         let (header, body) = siege_villain_prompt(&resources, &game, "castle0");
         assert_eq!(header, "Castle Darkstone");
         assert!(body.contains("Varn"));
+    }
+
+    #[test]
+    fn castle_need_siege_names_the_castle_and_the_requirement() {
+        let resources = town_resources();
+        let (header, body) = castle_need_siege(&resources, "castle0");
+        assert_eq!(header, "Castle Darkstone");
+        assert!(body.contains("siege weapons"));
+
+        let (header, _body) = castle_need_siege(&resources, "nope");
+        assert_eq!(header, "Castle nope");
     }
 
     #[test]

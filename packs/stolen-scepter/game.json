@@ -5766,6 +5766,7 @@
    "town_spell_can_learn": "Room for %LEFT% more spell%S%.",
    "town_siege_already": "You already own siege engines!",
    "town_siege_purchased": "The siege engines are yours.",
+   "castle_need_siege": "You need siege engines\nto storm this castle.",
    "spell_time_stop": "Time stands still for %STEPS% steps.",
    "spell_find_villain_no_contract": "You hold no contract.",
    "spell_find_villain_success": "The villain hides in %CASTLE%!",

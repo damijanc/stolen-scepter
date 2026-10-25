@@ -1169,9 +1169,12 @@ impl<'r> Session<'r> {
                                         };
                                     }
                                 }
+                            } else {
+                                let (header, body) = interact::castle_need_siege(resources, id);
+                                dialog.open(&header, &body);
                             }
-                            // Without siege weapons the hero stays on the gate;
-                            // C bounces them back, but this engine never bounces.
+                            // Without siege weapons the hero stays on the gate
+                            // and is told why; C silently bounces them back.
                         }
                         StepInteraction::Foe { id, friendly } => {
                             let (foe_x, foe_y) = game.foes[..game.foe_count]
@@ -2060,9 +2063,10 @@ mod tests {
     use crate::startup::{StartupAction, StartupChoice};
     use crate::views::ViewKind;
     use openbounty_engine::fog::Fog;
-    use openbounty_engine::game::{Game, GateDestination};
+    use openbounty_engine::game::{CastleOwnerKind, Game, GateDestination};
     use openbounty_engine::map::Map;
     use openbounty_engine::resources::Resources;
+    use openbounty_engine::tile::Interact;
 
     /// The headless path the playtest runner takes: the game's own pack, a
     /// new game, real key frames. A step moves the hero and the frame says so.
@@ -2120,6 +2124,125 @@ mod tests {
         frame(&mut session, Keys::default(), 3.0);
         assert_ne!((session.game.position.x, session.game.position.y), start);
         assert!(raster::texts(&list).iter().any(|t| t.contains("Days")));
+    }
+
+    /// Reaching a hostile castle gate with no siege weapons must say why the
+    /// hero cannot attack, instead of silently doing nothing.
+    #[test]
+    fn a_hostile_castle_gate_with_no_siege_weapons_says_so() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+        let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+        let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let palette = Palette::fallback();
+        let saves = std::env::temp_dir().join("openbounty-siege-message-test");
+        let save_paths = SavePaths::with_override(&saves.display().to_string());
+        let ctx = Context {
+            resources: &resources,
+            layout: &layout,
+            catalog: &catalog,
+            palette: &palette,
+            save_paths: &save_paths,
+        };
+        let choice = StartupChoice {
+            action: StartupAction::New,
+            slot: 0,
+            class_id: "knight".into(),
+            name: "Tester".into(),
+            difficulty: 0,
+        };
+        let mut session = Session::start(
+            ctx,
+            Present::for_layout(&layout),
+            Box::new(Silent),
+            &choice,
+            7,
+        )
+        .expect("a new game starts");
+        let mut list = DrawList::new();
+        let mut frame = |session: &mut Session, keys: Keys, n: f64| {
+            let input = FrameInput {
+                keys: &keys,
+                pointer_at: None,
+                left: false,
+                right: false,
+            };
+            session.frame(&input, n / 60.0, &mut list)
+        };
+
+        // Dismiss the post-init message.
+        frame(&mut session, Keys::default(), 0.0);
+        frame(&mut session, Keys::pressed(&[Key::Enter]), 1.0);
+
+        // Find a hostile (monster or villain) castle gate in the active zone.
+        let mut gate = None;
+        for castle in session.game.castles.iter() {
+            if castle.id.is_empty() || castle.owner_kind == CastleOwnerKind::Player {
+                continue;
+            }
+            if !matches!(
+                castle.owner_kind,
+                CastleOwnerKind::Monsters | CastleOwnerKind::Villain
+            ) {
+                continue;
+            }
+            if resources
+                .castle_by_id(castle.id.as_str())
+                .is_some_and(|c| c.is_home())
+            {
+                continue;
+            }
+            'scan: for y in 0..session.map.height {
+                for x in 0..session.map.width {
+                    let Some(tile) = session.map.tile(x, y) else {
+                        continue;
+                    };
+                    if tile.interactive == Interact::CastleGate
+                        && tile.id.as_str() == castle.id.as_str()
+                    {
+                        gate = Some((x as i32, y as i32));
+                        break 'scan;
+                    }
+                }
+            }
+            if gate.is_some() {
+                break;
+            }
+        }
+        let (gx, gy) = gate.expect("a hostile castle gate is on the active map");
+
+        // Approach the gate from any walkable neighbour and step onto it.
+        let dirs = [
+            (0, 1, Key::Down),
+            (0, -1, Key::Up),
+            (1, 0, Key::Right),
+            (-1, 0, Key::Left),
+        ];
+        let mut approach = None;
+        for (dx, dy, key) in dirs {
+            let (ax, ay) = (gx - dx, gy - dy);
+            if session
+                .map
+                .tile_i32(ax, ay)
+                .is_some_and(|tile| !tile.blocks_foot)
+            {
+                approach = Some((ax, ay, key));
+                break;
+            }
+        }
+        let (ax, ay, key) = approach.expect("a walkable approach to the gate");
+
+        session.game.stats.siege_weapons = 0;
+        session.game.position.x = ax;
+        session.game.position.y = ay;
+        frame(&mut session, Keys::pressed(&[key]), 2.0);
+
+        let texts = raster::texts(&list);
+        assert!(
+            texts.iter().any(|t| t.contains("siege")),
+            "expected the siege-weapons message, got {texts:?}"
+        );
     }
 
     fn finished() -> Game {
