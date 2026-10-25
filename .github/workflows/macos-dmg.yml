@@ -1,25 +1,25 @@
-name: Build macOS DMG
+name: Release macOS DMG
 
-# Preview builds only, for now: an ad-hoc signed app in a DMG, uploaded as a
-# workflow artifact. The stable channel (Developer ID signing, notarization,
-# a GitHub Release on a `v*` tag) is added once the Apple secrets exist; see
+# A pushed `v*` tag is the only way a DMG is built: quality first, then the
+# Developer ID signed, notarized Apple Silicon app and DMG, then the GitHub
+# Release. Local preview builds use tools/make_dmg.sh directly; see
 # specs/publish-plan.md, Phase 3.
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "App version, for example 0.1.0 (default: the shell crate's)"
-        required: false
-        type: string
+  push:
+    tags:
+      - "v*"
 
 concurrency:
   group: macos-dmg-${{ github.ref }}
-  cancel-in-progress: true
+  # A half-finished release is worse than a late one.
+  cancel-in-progress: false
 
 jobs:
-  # No build goes out on a red tree: the same checks every push runs.
+  # No release goes out on a red tree: the same checks every push runs.
   quality:
     name: Quality
+    permissions:
+      contents: read
     uses: ./.github/workflows/quality.yml
 
   build:
@@ -32,6 +32,59 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      # A tag may only ship the version the crate declares, so a bump that was
+      # never committed cannot ride along under the old tag's number.
+      - name: Resolve version from tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          crate_version="$(sed -n 's/^version = "\(.*\)"/\1/p' shell/Cargo.toml | head -1)"
+          if [[ -z "${version}" || "${version}" == "${TAG}" ]]; then
+            echo "Tag ${TAG} is not a vX.Y.Z release tag."
+            exit 1
+          fi
+          if [[ "${version}" != "${crate_version}" ]]; then
+            echo "Tag ${TAG} says ${version}, but shell/Cargo.toml says ${crate_version}."
+            exit 1
+          fi
+          echo "VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "TAG=${TAG}" >> "${GITHUB_ENV}"
+
+      # Presence only: neither a value nor a length is ever printed. This runs
+      # before any build work so a missing credential fails fast and clearly.
+      - name: Check release credentials
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_TEAM_ID \
+            APPLE_API_ISSUER \
+            APPLE_API_KEY \
+            APPLE_API_KEY_CONTENT; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("${name}")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required release secret: %s\n' "${missing[@]}"
+            echo "A release cannot proceed without every signing credential."
+            exit 1
+          fi
+          echo "All required release credentials are present."
 
       - name: Set up Rust
         run: |
@@ -51,24 +104,269 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-cargo-release-
 
-      - name: Build app and DMG
+      # The certificate exists only for this job: the keychain is created from
+      # the secret, selected for codesign, and deleted in the cleanup step.
+      - name: Import Developer ID certificate
         env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: tools/make_dmg.sh "${INPUT_VERSION}" preview
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="${RUNNER_TEMP}/app-signing.keychain-db"
+          password="$(openssl rand -hex 16)"
+          p12="${RUNNER_TEMP}/certificate.p12"
+          printf '%s' "${APPLE_CERTIFICATE}" | base64 --decode > "${p12}"
+          security create-keychain -p "${password}" "${keychain}"
+          security set-keychain-settings -lut 21600 "${keychain}"
+          security unlock-keychain -p "${password}" "${keychain}"
+          security import "${p12}" -P "${APPLE_CERTIFICATE_PASSWORD}" \
+            -A -t cert -f pkcs12 -k "${keychain}"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "${password}" "${keychain}" >/dev/null
+          security list-keychains -d user -s "${keychain}"
+          rm -f "${p12}"
+          echo "KEYCHAIN_PATH=${keychain}" >> "${GITHUB_ENV}"
 
-      - name: Verify bundle
+      # --app-only stops after the bundle: the app must be notarized and
+      # stapled before it is packed into the DMG, or the image ships an
+      # unstapled copy that fails the verification gate.
+      - name: Build and sign app
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: tools/make_dmg.sh "${VERSION}" stable --app-only
+
+      # An ad-hoc signature would pass codesign --verify, so assert the two
+      # things only a real Developer ID hardened-runtime signature has.
+      - name: Check app signature
         run: |
           set -euo pipefail
           app="dist/Stolen Scepter.app"
-          dmg="$(find dist -name '*.dmg' -print -quit)"
+          # Captured rather than piped: grep -q would close the pipe early and
+          # codesign would die of SIGPIPE, which pipefail reports as failure.
+          signature="$(codesign -dvvv "${app}" 2>&1)"
+          grep -q '^Authority=Developer ID Application' <<<"${signature}"
+          grep -q 'flags=.*runtime' <<<"${signature}"
+
+      # Written to the runner temp directory, never into the workspace, so it
+      # cannot be picked up by a later glob and uploaded.
+      - name: Write App Store Connect API key
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          set -euo pipefail
+          key_path="${RUNNER_TEMP}/apple-api-key.p8"
+          if [[ "${APPLE_API_KEY_CONTENT}" == -----BEGIN* ]]; then
+            printf '%s\n' "${APPLE_API_KEY_CONTENT}" > "${key_path}"
+          else
+            printf '%s' "${APPLE_API_KEY_CONTENT}" | base64 --decode > "${key_path}"
+          fi
+          chmod 600 "${key_path}"
+          if [[ ! -s "${key_path}" ]]; then
+            echo "APPLE_API_KEY_CONTENT did not produce a key file."
+            exit 1
+          fi
+          echo "APPLE_API_KEY_PATH=${key_path}" >> "${GITHUB_ENV}"
+
+      - name: Notarize and staple app
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          zip="${RUNNER_TEMP}/Stolen Scepter.zip"
+          ditto -c -k --keepParent "dist/Stolen Scepter.app" "${zip}"
+
+          set +e
+          result="$(xcrun notarytool submit "${zip}" \
+            --key "${APPLE_API_KEY_PATH}" \
+            --key-id "${APPLE_API_KEY}" \
+            --issuer "${APPLE_API_ISSUER}" \
+            --output-format json \
+            --wait)"
+          submit_status=$?
+          set -e
+
+          echo "${result}"
+          submission_id="$(printf '%s' "${result}" | jq -r '.id // empty')"
+          notarization_status="$(printf '%s' "${result}" | jq -r '.status // empty')"
+
+          if [[ ${submit_status} -ne 0 || "${notarization_status}" != "Accepted" ]]; then
+            echo "App notarization failed with status: ${notarization_status:-unknown}"
+            if [[ -n "${submission_id}" ]]; then
+              # The log names the offending binary and contains no secrets, so
+              # the failure is diagnosable without re-running.
+              xcrun notarytool log "${submission_id}" \
+                --key "${APPLE_API_KEY_PATH}" \
+                --key-id "${APPLE_API_KEY}" \
+                --issuer "${APPLE_API_ISSUER}" || true
+            fi
+            exit 1
+          fi
+
+          xcrun stapler staple "dist/Stolen Scepter.app"
+          rm -f "${zip}"
+
+      # --dmg-only packs the stapled app unchanged, so its signature and ticket
+      # travel inside the image.
+      - name: Build DMG
+        run: tools/make_dmg.sh "${VERSION}" stable --dmg-only
+
+      - name: Sign DMG
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          dmg="$(find dist -maxdepth 1 -name '*.dmg' -print -quit)"
+          if [[ -z "${dmg}" ]]; then
+            echo "No DMG was produced."
+            exit 1
+          fi
+          codesign --force --timestamp --sign "${APPLE_SIGNING_IDENTITY}" "${dmg}"
+
+      # A notarized app inside an unstapled image still shows a Gatekeeper
+      # dialog on a machine that cannot reach Apple's OCSP responder.
+      - name: Notarize and staple DMG
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          dmg="$(find dist -maxdepth 1 -name '*.dmg' -print -quit)"
+          if [[ -z "${dmg}" ]]; then
+            echo "No DMG was produced."
+            exit 1
+          fi
+
+          set +e
+          result="$(xcrun notarytool submit "${dmg}" \
+            --key "${APPLE_API_KEY_PATH}" \
+            --key-id "${APPLE_API_KEY}" \
+            --issuer "${APPLE_API_ISSUER}" \
+            --output-format json \
+            --wait)"
+          submit_status=$?
+          set -e
+
+          echo "${result}"
+          submission_id="$(printf '%s' "${result}" | jq -r '.id // empty')"
+          notarization_status="$(printf '%s' "${result}" | jq -r '.status // empty')"
+
+          if [[ ${submit_status} -ne 0 || "${notarization_status}" != "Accepted" ]]; then
+            echo "DMG notarization failed with status: ${notarization_status:-unknown}"
+            if [[ -n "${submission_id}" ]]; then
+              xcrun notarytool log "${submission_id}" \
+                --key "${APPLE_API_KEY_PATH}" \
+                --key-id "${APPLE_API_KEY}" \
+                --issuer "${APPLE_API_ISSUER}" || true
+            fi
+            exit 1
+          fi
+
+          xcrun stapler staple "${dmg}"
+
+      - name: Verify release
+        run: |
+          set -euo pipefail
+          app="dist/Stolen Scepter.app"
+          dmg="$(find dist -maxdepth 1 -name '*.dmg' -print -quit)"
+          if [[ -z "${dmg}" ]]; then
+            echo "No DMG was produced."
+            exit 1
+          fi
+
           codesign --verify --deep --strict --verbose=2 "${app}"
+          spctl --assess --type execute -vv "${app}"
+          spctl --assess --type open --context context:primary-signature -vv "${dmg}"
+
+          xcrun stapler validate "${app}"
+          xcrun stapler validate "${dmg}"
           hdiutil verify "${dmg}"
+
           test -f "${app}/Contents/Resources/packs/stolen-scepter/game.json"
-          echo "Preview build: ad-hoc signed, not notarized."
+          echo "Developer ID signed, notarized and stapled."
+
+      - name: Remove signing key and keychain
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "${RUNNER_TEMP}/apple-api-key.p8" "${RUNNER_TEMP}/certificate.p12"
+          if [[ -n "${KEYCHAIN_PATH:-}" && -f "${KEYCHAIN_PATH}" ]]; then
+            security delete-keychain "${KEYCHAIN_PATH}" || true
+            security list-keychains -d user -s login.keychain-db || true
+          fi
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Stolen-Scepter-macOS-arm64-preview-DMG
+          name: Stolen-Scepter-macOS-arm64-DMG
           path: dist/*.dmg
           if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: Stolen-Scepter-macOS-arm64-DMG
+          path: release-artifacts
+
+      - name: Build release notes from commit history
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          prev_tag="$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)"
+          if [[ -n "${prev_tag}" ]]; then
+            range="${prev_tag}..${TAG}"
+            echo "Generating notes for range ${range}"
+          else
+            range="${TAG}"
+            echo "No previous tag found; using all commits up to ${TAG}"
+          fi
+          {
+            if [[ -n "${prev_tag}" ]]; then
+              echo "## What's Changed since ${prev_tag}"
+            else
+              echo "## What's Changed"
+            fi
+            echo ""
+            git log "${range}" --no-merges --pretty='- %s'
+          } > release-notes.md
+          echo "Release notes:"
+          cat release-notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          dmg="$(find release-artifacts -name '*.dmg' -print -quit)"
+          if [[ -z "${dmg}" ]]; then
+            echo "No DMG was downloaded."
+            exit 1
+          fi
+          args=(
+            --repo "${GH_REPO}"
+            --title "The Quest for a Stolen Scepter ${version}"
+            --notes-file release-notes.md
+          )
+          # A tag with a suffix is a candidate, not a final release.
+          if [[ "${TAG}" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${TAG}" "${dmg}" "${args[@]}"

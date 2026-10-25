@@ -97,10 +97,17 @@ it against what the shell reads.
 
 ## Release
 
-- `make_dmg.sh [VERSION] [CHANNEL]`: builds `dist/Stolen Scepter.app` and its
-  DMG (preview: ad-hoc signed). Run outside a sandbox: `iconutil` and
-  `hdiutil` need the system temp directory. Used by
-  `.github/workflows/macos-dmg.yml`.
+- `make_dmg.sh [VERSION] [CHANNEL] [MODE]`: builds
+  `dist/Stolen Scepter.app` and its DMG. `CHANNEL` is `preview` (default) or
+  `stable`; `MODE` is `--all` (default), `--app-only` (build, assemble and
+  sign the app, then stop) or `--dmg-only` (pack an existing signed app,
+  without rebuilding or re-signing). A preview is ad-hoc signed; setting
+  `CODESIGN_IDENTITY` signs the inner binary and then the bundle with that
+  Developer ID, the hardened runtime and a timestamp. The stable DMG drops
+  the channel from its name: `Stolen-Scepter-<VERSION>-macos-arm64.dmg`. Run
+  outside a sandbox: `iconutil` and `hdiutil` need the system temp directory.
+  `.github/workflows/macos-dmg.yml` is the only caller of the stable path,
+  and it runs only on a pushed `v*` tag.
 - `gen_icon.py`: the app icon, written as a macOS iconset.
 
 ## Development

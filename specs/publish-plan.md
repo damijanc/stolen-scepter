@@ -122,13 +122,14 @@ Tasks, in order:
 
 Adapted from `damaian-client/.github/workflows/macos-dmg.yml`, minus Tauri.
 
-Kept: tag (`v*`) and manual triggers with preview/stable channels; a quality
-gate (`cargo fmt --check`, `cargo test --workspace`) before any build; the
-up-front check for Apple secrets (same names: `APPLE_CERTIFICATE`,
-`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_TEAM_ID`,
-`APPLE_API_ISSUER`, `APPLE_API_KEY`, `APPLE_API_KEY_CONTENT`); the API key in
-the runner temp dir; DMG notarize-and-staple with `notarytool log` on failure;
-the `codesign` / `stapler` / `spctl` / `hdiutil verify` checks; the
+Kept: the `v*` tag trigger as the only one -- no branch, pull request or
+manual build produces a DMG; a quality gate (`cargo fmt --check`,
+`cargo test --workspace`) before any build; the up-front check for Apple
+secrets (same names: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
+`APPLE_SIGNING_IDENTITY`, `APPLE_TEAM_ID`, `APPLE_API_ISSUER`,
+`APPLE_API_KEY`, `APPLE_API_KEY_CONTENT`); the API key in the runner temp
+dir; app and DMG notarize-and-staple with `notarytool log` on failure; the
+`codesign` / `stapler` / `spctl` / `hdiutil verify` checks; the
 `publish-release` job with notes from the commit log.
 
 New, because Tauri did it there:
@@ -140,22 +141,33 @@ New, because Tauri did it there:
 3. Shell change: discover a pack inside its own bundle (`shell/src/pack.rs`)
    -- done in Phase 2, task 7: the pack goes in `Contents/Resources/packs/`.
 4. Temporary keychain from `APPLE_CERTIFICATE`; `codesign --options runtime
-   --timestamp` for the app.
-5. Zip and notarize the `.app`, staple it.
+   --timestamp` for the app. Done: the workflow imports the certificate into
+   a throwaway keychain, and `tools/make_dmg.sh --app-only` signs the inner
+   binary and then the bundle when `CODESIGN_IDENTITY` is set.
+5. Zip and notarize the `.app`, staple it. Done.
 6. `hdiutil create` the DMG, sign, notarize and staple it (the existing step).
+   Done: `--dmg-only` packs the already-stapled app, so its ticket stays
+   inside the image.
 
 Dropped for now: the Tauri updater, the changelog commit, the website dispatch.
 
-Progress: the preview channel is built. `tools/make_dmg.sh [VERSION]
-[CHANNEL]` builds the release binary, assembles `dist/Stolen Scepter.app`
+Progress: both channels are built. `tools/make_dmg.sh [VERSION] [CHANNEL]
+[MODE]` builds the release binary, assembles `dist/Stolen Scepter.app`
 (`Info.plist`, an icon from `tools/gen_icon.py`, the pack under
-`Contents/Resources/packs/`), signs it ad hoc and wraps it in a DMG with an
-Applications link and the licence; `.github/workflows/macos-dmg.yml` runs it
-by hand (`workflow_dispatch`) after the quality checks and uploads the DMG
-as an artifact. The window now takes its title from the pack that will load
-(`pack::launch_title`), since macroquad cannot retitle an open window.
-Still to do for stable: steps 4-6 above, the secrets check, the `v*` tag
-trigger and the `publish-release` job.
+`Contents/Resources/packs/`), signs it ad hoc for preview or with a Developer
+ID when `CODESIGN_IDENTITY` is set, and wraps it in a DMG with an
+Applications link and the licence; `--app-only` and `--dmg-only` split
+assembly from packing so the workflow can notarize the app in between. On a
+pushed `v*` tag, `.github/workflows/macos-dmg.yml` runs the quality checks,
+checks the seven Apple secrets, imports the certificate into a throwaway
+keychain, signs, notarizes and staples the app, packs and signs the DMG,
+notarizes and staples that, verifies both, and lets `publish-release` create
+the GitHub Release with the DMG. The window now takes its title from the pack
+that will load (`pack::launch_title`), since macroquad cannot retitle an open
+window.
+
+To cut a release: bump `shell/Cargo.toml`, commit, tag `vX.Y.Z`, push the
+tag.
 
 ## Phase 4 — Go public
 
