@@ -517,6 +517,82 @@ def spread(rng, candidates, count, min_dist, taken, keep_off=1):
     return chosen
 
 
+def castle_walls(castles):
+    """The six tiles a castle stamps, gate included: stepping onto the gate
+    bounces the hero back, so none of them can be walked through."""
+    return {(x + dx, y + dy) for x, y in castles
+            for dx, dy in ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0))}
+
+
+def walk_components(grid, blocked):
+    """8-connected walkable regions, matching how the hero moves."""
+    seen, out = set(), []
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if (x, y) in seen or (x, y) in blocked or grid[y][x] not in WALKABLE:
+                continue
+            comp, q = [], deque([(x, y)])
+            seen.add((x, y))
+            while q:
+                px, py = q.popleft()
+                comp.append((px, py))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        if dx == dy == 0:
+                            continue
+                        n = (px + dx, py + dy)
+                        if 0 <= n[0] < SIZE and 0 <= n[1] < SIZE and n not in seen \
+                                and n not in blocked and grid[n[1]][n[0]] in WALKABLE:
+                            seen.add(n)
+                            q.append(n)
+            out.append(comp)
+    return out
+
+
+def severs_walkable(grid, castles):
+    """Whether these castles' walls split any walkable region in two."""
+    blocked = castle_walls(castles)
+    if not blocked:
+        return False
+    owner = {t: i for i, comp in enumerate(walk_components(grid, blocked)) for t in comp}
+    for comp in walk_components(grid, set()):
+        if len({owner[t] for t in comp if t not in blocked}) > 1:
+            return True
+    return False
+
+
+def spread_castles(rng, candidates, count, min_dist, grid):
+    """`spread`, but a candidate is skipped when its walls would sever the
+    walkable land. Skipping is what lets a castle stand against a wall: the
+    originals do, and only the corridor-pinching sites are refused."""
+    pool = list(candidates)
+    rng.shuffle(pool)
+    chosen = []
+    while pool and len(chosen) < count:
+        if not chosen:
+            order = pool
+        else:
+            def to_chosen(c):
+                return min(abs(c[0] - p[0]) + abs(c[1] - p[1]) for p in chosen)
+
+            order = sorted(pool, key=lambda c: -to_chosen(c))
+            if to_chosen(order[0]) < min_dist:
+                break
+        pick = None
+        for cand in order:
+            if chosen and min(abs(cand[0] - p[0]) + abs(cand[1] - p[1])
+                              for p in chosen) < min_dist:
+                continue
+            if not severs_walkable(grid, chosen + [cand]):
+                pick = cand
+                break
+        if pick is None:
+            break
+        chosen.append(pick)
+        pool = [c for c in pool if abs(c[0] - pick[0]) + abs(c[1] - pick[1]) >= min_dist]
+    return chosen
+
+
 def place(cfg, grid, rng):
     water = sea(grid)
     land = components(grid, WALKABLE)
@@ -543,7 +619,10 @@ def place(cfg, grid, rng):
 
     # Castles: a 3x2 grass block (gate at the bottom middle) with the tile
     # below the gate reachable. The castle's own tiles carry their grass, so
-    # it may stand against a wall, as the originals' castles do.
+    # it may stand against a wall, as the originals' castles do -- but a
+    # castle dropped into a two-wide path would seal the land on both sides,
+    # so each site is taken only if its footprint leaves every walkable
+    # region whole.
     sites = []
     for x, y in home_land:
         block = [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0)]
@@ -551,7 +630,7 @@ def place(cfg, grid, rng):
         if all(at(grid, *c) == GRASS for c in block) and below in home_land \
                 and at(grid, *below) == GRASS:
             sites.append((x, y))
-    castles = spread(rng, sites, cfg["castles"], 7, taken, keep_off=2)
+    castles = spread_castles(rng, sites, cfg["castles"], 7, grid)
     if len(castles) < cfg["castles"]:
         raise RuntimeError(f"room for {len(castles)} of {cfg['castles']} castles")
     if cfg["home"]:

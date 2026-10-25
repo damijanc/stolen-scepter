@@ -22,6 +22,7 @@ import json
 import os
 import re
 import sys
+from collections import deque
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PACK = os.path.join(ROOT, "packs", "stolen-scepter")
@@ -327,6 +328,37 @@ def build():
     return pack
 
 
+def land_components(rows, codes, blocked):
+    """8-connected grass/desert regions the hero can walk, minus `blocked`."""
+    height, width = len(rows), len(rows[0])
+
+    def walkable(x, y):
+        if (x, y) in blocked:
+            return False
+        code = codes.get(rows[y][x], {})
+        return not code.get("blocks_foot") and code.get("terrain") in ("grass", "desert")
+
+    seen, out = set(), []
+    for y in range(height):
+        for x in range(width):
+            if (x, y) in seen or not walkable(x, y):
+                continue
+            comp, q = [], deque([(x, y)])
+            seen.add((x, y))
+            while q:
+                px, py = q.popleft()
+                comp.append((px, py))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        n = (px + dx, py + dy)
+                        if 0 <= n[0] < width and 0 <= n[1] < height \
+                                and n not in seen and walkable(*n):
+                            seen.add(n)
+                            q.append(n)
+            out.append(comp)
+    return out
+
+
 def check(pack):
     problems = []
     strings = pack["strings"]
@@ -364,9 +396,22 @@ def check(pack):
             rows = [r for r in fh.read().split("\n") if r]
         if len(rows) != z["height"] or any(len(r) != z["width"] for r in rows):
             problems.append(f"{z['map']}: not {z['width']}x{z['height']}")
+            continue
         bad = {ch for r in rows for ch in r if ch not in codes}
         if bad:
             problems.append(f"{z['map']}: codes not in the legend: {sorted(bad)}")
+            continue
+        # A castle's walls block the hero and its gate bounces them back, so a
+        # site in a one-tile pass would seal the land behind it. Every walkable
+        # region must survive the footprints whole.
+        walls = {(c["x"] + dx, c["y"] + dy) for c in z["castles"]
+                 for dx, dy in ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0))}
+        owner = {tile: i for i, comp in enumerate(land_components(rows, pack["tile_codes"], walls))
+                 for tile in comp}
+        for comp in land_components(rows, pack["tile_codes"], set()):
+            if len({owner[t] for t in comp if t not in walls}) > 1:
+                problems.append(f"{z['id']}: castle walls sever the walkable land")
+                break
     return problems
 
 

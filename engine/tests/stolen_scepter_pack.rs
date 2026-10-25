@@ -4,6 +4,8 @@
 //! Built by `tools/gen_maps.py` + `tools/build_pack.py`; see
 //! `specs/publish-plan.md`, Phase 2.
 
+use std::collections::{HashMap, HashSet};
+
 use openbounty_engine::combat::CombatResult;
 use openbounty_engine::game::{Game, VillainSiegeOutcome};
 use openbounty_engine::map::Map;
@@ -54,6 +56,107 @@ fn every_zone_map_loads_and_its_placements_sit_on_usable_tiles() {
                 Terrain::Water,
                 "{id}: town {} has a dry dock",
                 town.id.as_str()
+            );
+        }
+    }
+}
+
+/// A castle's five walls block the hero and its gate bounces them back, so a
+/// castle dropped into a one-tile pass would wall off everything behind it.
+/// The pack's generator refuses those sites; this checks the shipped maps, so
+/// a hand-edited placement cannot reintroduce the trap.
+#[test]
+fn no_castle_footprint_severs_a_zones_walkable_land() {
+    const FOOTPRINT: [(i32, i32); 6] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0)];
+
+    fn walk_components(
+        map: &Map,
+        footprint: &HashSet<(i32, i32)>,
+        block: bool,
+    ) -> Vec<Vec<(i32, i32)>> {
+        let walkable = |x: i32, y: i32| {
+            let Some(tile) = map.tile_i32(x, y) else {
+                return false;
+            };
+            if footprint.contains(&(x, y)) {
+                // The stamped tiles sit on grass; only the stamp blocks them.
+                return !block;
+            }
+            tile.is_bridge || (!tile.blocks_foot && tile.terrain.walkable())
+        };
+        let (width, height) = (map.width as i32, map.height as i32);
+        let mut seen = HashSet::new();
+        let mut out = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                if seen.contains(&(x, y)) || !walkable(x, y) {
+                    continue;
+                }
+                let mut comp = Vec::new();
+                let mut stack = vec![(x, y)];
+                seen.insert((x, y));
+                while let Some((cx, cy)) = stack.pop() {
+                    comp.push((cx, cy));
+                    for dx in -1..=1 {
+                        for dy in -1..=1 {
+                            if dx == 0 && dy == 0 {
+                                continue;
+                            }
+                            let next = (cx + dx, cy + dy);
+                            if next.0 < 0
+                                || next.1 < 0
+                                || next.0 >= width
+                                || next.1 >= height
+                                || seen.contains(&next)
+                                || !walkable(next.0, next.1)
+                            {
+                                continue;
+                            }
+                            seen.insert(next);
+                            stack.push(next);
+                        }
+                    }
+                }
+                out.push(comp);
+            }
+        }
+        out
+    }
+
+    let resources = resources();
+    for index in 0..resources.zone_count() {
+        let zone = resources.zone_by_index(index).expect("zone");
+        let id = zone.id.as_str();
+        let map = Map::load_zone(&resources, id).unwrap_or_else(|e| panic!("{id}: {e}"));
+
+        let mut footprint = HashSet::new();
+        for castle_index in 0..resources.castle_count() {
+            let castle = resources.castle_by_index(castle_index).expect("castle");
+            if castle.zone.as_str() != id {
+                continue;
+            }
+            for (dx, dy) in FOOTPRINT {
+                footprint.insert((castle.x + dx, castle.y + dy));
+            }
+        }
+
+        let owner: HashMap<(i32, i32), usize> = walk_components(&map, &footprint, true)
+            .iter()
+            .enumerate()
+            .flat_map(|(i, comp)| comp.iter().map(move |tile| (*tile, i)))
+            .collect();
+        for comp in walk_components(&map, &footprint, false) {
+            // The castle tiles themselves can vanish; everything else on the
+            // landmass must still connect to the same region.
+            let regions: HashSet<usize> = comp
+                .iter()
+                .filter(|tile| !footprint.contains(tile))
+                .map(|tile| owner[tile])
+                .collect();
+            assert_eq!(
+                regions.len(),
+                1,
+                "{id}: a castle footprint severs the walkable land"
             );
         }
     }
