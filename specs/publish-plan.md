@@ -159,15 +159,15 @@ ID when `CODESIGN_IDENTITY` is set, and wraps it in a DMG with an
 Applications link and the licence; `--app-only` and `--dmg-only` split
 assembly from packing so the workflow can notarize the app in between. On a
 pushed `v*` tag, `.github/workflows/macos-dmg.yml` runs the quality checks,
-checks the seven Apple secrets, imports the certificate into a throwaway
-keychain, signs, notarizes and staples the app, packs and signs the DMG,
-notarizes and staples that, verifies both, and lets `publish-release` create
-the GitHub Release with the DMG. The window now takes its title from the pack
-that will load (`pack::launch_title`), since macroquad cannot retitle an open
-window.
+stamps the tag's version into `shell/Cargo.toml`, checks the seven Apple
+secrets, imports the certificate into a throwaway keychain, signs, notarizes
+and staples the app, packs and signs the DMG, notarizes and staples that,
+verifies both, and lets `publish-release` create the GitHub Release with the
+DMG. The window now takes its title from the pack that will load
+(`pack::launch_title`), since macroquad cannot retitle an open window.
 
-To cut a release: bump `shell/Cargo.toml`, commit, tag `vX.Y.Z`, push the
-tag.
+To cut a release: tag `vX.Y.Z` and push the tag; the workflow stamps that
+version into `shell/Cargo.toml`, so no version bump is committed.
 
 ## Phase 4 — Go public
 

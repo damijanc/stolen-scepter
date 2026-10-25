@@ -33,21 +33,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      # A tag may only ship the version the crate declares, so a bump that was
-      # never committed cannot ride along under the old tag's number.
-      - name: Resolve version from tag
+      # The tag is the only source of the version: the workflow stamps the
+      # crate from it, so cutting a release never needs a committed bump.
+      - name: Stamp release version
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          crate_version="$(sed -n 's/^version = "\(.*\)"/\1/p' shell/Cargo.toml | head -1)"
-          if [[ -z "${version}" || "${version}" == "${TAG}" ]]; then
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
             echo "Tag ${TAG} is not a vX.Y.Z release tag."
             exit 1
           fi
-          if [[ "${version}" != "${crate_version}" ]]; then
-            echo "Tag ${TAG} says ${version}, but shell/Cargo.toml says ${crate_version}."
+          sed -i '' "s/^version = \"[^\"]*\"/version = \"${version}\"/" shell/Cargo.toml
+          if ! grep -qx "version = \"${version}\"" shell/Cargo.toml; then
+            echo "Failed to stamp ${version} into shell/Cargo.toml."
             exit 1
           fi
           echo "VERSION=${version}" >> "${GITHUB_ENV}"
@@ -103,6 +103,11 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-cargo-release-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-cargo-release-
+
+      # The stamped manifest must reach Cargo.lock before the build. -p keeps
+      # every other locked dependency exactly as the quality job tested it.
+      - name: Refresh Cargo lock for stamped version
+        run: cargo update -p openbounty-shell
 
       # The certificate exists only for this job: the keychain is created from
       # the secret, selected for codesign, and deleted in the cleanup step.

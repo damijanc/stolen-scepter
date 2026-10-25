@@ -107,7 +107,8 @@ it against what the shell reads.
   the channel from its name: `Stolen-Scepter-<VERSION>-macos-arm64.dmg`. Run
   outside a sandbox: `iconutil` and `hdiutil` need the system temp directory.
   `.github/workflows/macos-dmg.yml` is the only caller of the stable path,
-  and it runs only on a pushed `v*` tag.
+  and it runs only on a pushed `v*` tag, stamping that version into
+  `shell/Cargo.toml` before it builds.
 - `gen_icon.py`: the app icon, written as a macOS iconset.
 
 ## Development
