@@ -22,6 +22,12 @@ pub const DEFAULT_DAYS_LEFT: &str = " Options / Controls / Days Left:%DAYS% ";
 pub const DEFAULT_TIME_STOP: &str = " Options / Controls / Time Stop:%STEPS% ";
 pub const DEFAULT_WORLDMAP_YOUR_MAP: &str = "ESC close / SPACE own map";
 pub const DEFAULT_WORLDMAP_WHOLE_MAP: &str = "ESC close / SPACE full map";
+/// The idle overworld's discoverability cue, shown in place of the
+/// " Options / Controls " key hint until the hero action menu has been opened
+/// once this session. Shortened from the design's "Click hero for actions" so
+/// the full line (hint + the Days / Time Stop part) fits the legacy status
+/// bar's 36 glyphs.
+pub const DEFAULT_HERO_MENU_HINT: &str = "Click hero for menu";
 
 /// What the status bar says. Three modes, in priority order.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -48,6 +54,11 @@ pub struct Chrome<'a> {
     pub resources: &'a Resources,
     pub game: &'a Game,
     pub mode: StatusMode,
+    /// True while the hero action menu has not been opened once this session:
+    /// the idle overworld status line swaps its " Options / Controls " key
+    /// hint for a discoverability cue. Session state, not saved. Only the
+    /// [`StatusMode::Adventure`] branch reads it.
+    pub hero_menu_hint: bool,
 }
 
 impl Chrome<'_> {
@@ -141,7 +152,7 @@ impl Chrome<'_> {
             StatusMode::Adventure => {
                 // A banked time stop replaces the day count entirely: the
                 // clock is not running, so days left would be misleading.
-                if self.game.stats.time_stop > 0 {
+                let line = if self.game.stats.time_stop > 0 {
                     banner::formatted(
                         self.resources,
                         "banners",
@@ -157,7 +168,24 @@ impl Chrome<'_> {
                         DEFAULT_DAYS_LEFT,
                         &[("DAYS", &self.game.stats.days_left.to_string())],
                     )
+                };
+                // The discoverability cue replaces the " Options / Controls "
+                // prefix only, keeping the " / Days:400 " (or time stop) part.
+                // Strip the prefix WITHOUT its trailing space so the slash
+                // keeps the space before it. A pack that rewords the line
+                // without that prefix keeps its own wording.
+                if self.hero_menu_hint {
+                    if let Some(rest) = line.strip_prefix(" Options / Controls") {
+                        let hint = banner::text(
+                            self.resources,
+                            "hints",
+                            "hero_menu",
+                            DEFAULT_HERO_MENU_HINT,
+                        );
+                        return format!("{hint}{rest}");
+                    }
                 }
+                line
             }
         }
     }
@@ -208,6 +236,7 @@ mod tests {
             resources,
             game,
             mode,
+            hero_menu_hint: false,
         }
     }
 
@@ -443,5 +472,128 @@ mod tests {
             StatusMode::Worldmap { whole_map: true },
         );
         assert_eq!(chrome.status_text(), DEFAULT_WORLDMAP_YOUR_MAP);
+    }
+
+    /// The discoverability cue swaps only the " Options / Controls " prefix of
+    /// the idle overworld line, keeping the Days part.
+    #[test]
+    fn the_hero_menu_hint_replaces_the_key_hint_and_keeps_the_days() {
+        let (layout, palette, resources, mut game) = parts("");
+        game.stats.days_left = 400;
+        let chrome = Chrome {
+            layout: &layout,
+            palette: &palette,
+            resources: &resources,
+            game: &game,
+            mode: StatusMode::Adventure,
+            hero_menu_hint: true,
+        };
+        assert_eq!(chrome.status_text(), "Click hero for menu / Days Left:400 ");
+        // Days are still there, not swallowed by the hint.
+        assert!(chrome.status_text().contains("Days Left:400"));
+
+        // Without the flag the line is unchanged.
+        let chrome = chrome_of(&layout, &palette, &resources, &game, StatusMode::Adventure);
+        assert_eq!(chrome.status_text(), " Options / Controls / Days Left:400 ");
+    }
+
+    /// The hint also replaces the time-stop line's key hint.
+    #[test]
+    fn the_hero_menu_hint_replaces_the_time_stop_key_hint_too() {
+        let (layout, palette, resources, mut game) = parts("");
+        game.stats.time_stop = 7;
+        let chrome = Chrome {
+            layout: &layout,
+            palette: &palette,
+            resources: &resources,
+            game: &game,
+            mode: StatusMode::Adventure,
+            hero_menu_hint: true,
+        };
+        assert_eq!(chrome.status_text(), "Click hero for menu / Time Stop:7 ");
+    }
+
+    /// The hint must never cover a status mode that already owns the bar.
+    #[test]
+    fn the_hero_menu_hint_never_appears_in_another_status_mode() {
+        let (layout, palette, resources, game) = parts("");
+        for mode in [
+            StatusMode::FastQuit,
+            StatusMode::ExitHint,
+            StatusMode::Worldmap { whole_map: false },
+            StatusMode::Combat {
+                title: " Options / Militia M5".to_owned(),
+            },
+            StatusMode::Custom(" Options / Controls "),
+        ] {
+            let chrome = Chrome {
+                layout: &layout,
+                palette: &palette,
+                resources: &resources,
+                game: &game,
+                mode: mode.clone(),
+                hero_menu_hint: true,
+            };
+            assert!(
+                !chrome.status_text().contains("Click hero"),
+                "{mode:?} must not show the hero hint"
+            );
+        }
+    }
+
+    /// The whole hinted line fits the legacy status bar's width.
+    #[test]
+    fn the_hero_menu_hint_fits_the_legacy_status_bar() {
+        let (layout, palette, resources, mut game) = parts("");
+        game.stats.days_left = 400;
+        let chrome = Chrome {
+            layout: &layout,
+            palette: &palette,
+            resources: &resources,
+            game: &game,
+            mode: StatusMode::Adventure,
+            hero_menu_hint: true,
+        };
+        let width = crate::font::measure_width(&chrome.status_text());
+        assert!(
+            width <= layout.status_w(),
+            "hint line {width}px overflows {}px",
+            layout.status_w()
+        );
+    }
+
+    /// The hint default may be overridden under `strings.hints.hero_menu`.
+    #[test]
+    fn the_pack_may_reword_the_hero_menu_hint() {
+        let (layout, palette, resources, mut game) =
+            parts(r#", "strings": {"hints": {"hero_menu": "Tap the hero"}}"#);
+        game.stats.days_left = 12;
+        let chrome = Chrome {
+            layout: &layout,
+            palette: &palette,
+            resources: &resources,
+            game: &game,
+            mode: StatusMode::Adventure,
+            hero_menu_hint: true,
+        };
+        assert_eq!(chrome.status_text(), "Tap the hero / Days Left:12 ");
+    }
+
+    /// A pack that rewords the status line without the " Options / Controls "
+    /// prefix keeps its own wording rather than forcing the hint in.
+    #[test]
+    fn a_reworded_status_line_keeps_its_own_wording_under_the_hint() {
+        let (layout, palette, resources, mut game) =
+            parts(r#", "strings": {"banners": {"status_days_left": "%DAYS% days"}}"#);
+        game.stats.days_left = 12;
+        let chrome = Chrome {
+            layout: &layout,
+            palette: &palette,
+            resources: &resources,
+            game: &game,
+            mode: StatusMode::Adventure,
+            hero_menu_hint: true,
+        };
+        assert_eq!(chrome.status_text(), "12 days");
     }
 }

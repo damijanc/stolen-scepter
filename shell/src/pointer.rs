@@ -9,6 +9,7 @@
 
 use crate::combat::CombatAction;
 use crate::draw::Rect;
+use crate::input::Action;
 use crate::views::TownRow;
 
 /// The buttons the shell reads. Right is ESC in combat (it backs out of a
@@ -63,6 +64,16 @@ pub enum HitTarget {
     CombatBack,
     /// An overworld map tile in the viewport, by MAP coordinates.
     MapTile(i32, i32),
+    /// A sidebar panel (`hud.rs`), by panel index. Panel 1 (siege) is
+    /// deliberately never published: it has no single-key equivalent, so it
+    /// stays inert.
+    HudPanel(i32),
+    /// A row of the hero's overworld action menu, carrying the exact `Action`
+    /// its key would produce. Routed into `session.rs`'s `match input.action`.
+    OverworldAction(Action),
+    /// The map around the hero action menu: a click there closes the menu and
+    /// never commits, mirroring `CombatBack`.
+    OverworldMenuClose,
 }
 
 /// One actionable rectangle, in logical coordinates.

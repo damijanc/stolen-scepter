@@ -92,6 +92,14 @@ impl MapScene<'_> {
         )
     }
 
+    /// The hero's own cell in logical pixels, what `draw_hero` blits onto and
+    /// what a click on the hero tile hits. Used by the hero action menu (to
+    /// sit beside it) and by the hero-tile hover highlight.
+    pub fn hero_cell_rect(&self) -> Rect {
+        let (cam_x, cam_y) = self.camera();
+        self.cell_rect(self.game.position.x - cam_x, self.game.position.y - cam_y)
+    }
+
     /// The viewport's click regions, for click-to-move (`walk.rs`): one per
     /// in-map cell, labelled with MAP coordinates. Unseen tiles are published
     /// too: an adjacent click into fog is a plain step, as its key is, and the

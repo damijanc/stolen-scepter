@@ -15,13 +15,13 @@ use crate::combat::{combat_render, combat_view_input, CombatLoop, CombatStatus, 
 use crate::cursor::Shape;
 use crate::dialog::Dialog;
 use crate::draw::{self, DrawList};
-use crate::hud::Hud;
+use crate::hud::{action_menu, panel_action, Hud};
 use crate::input::{self, Action, InputState, Key, KeySource, DIGITS};
 use crate::interact;
 use crate::layout::Layout;
 use crate::map_render::MapScene;
 use crate::menu::{self, Menu, MenuAction, PickerPurpose};
-use crate::palette::Palette;
+use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
 use crate::present::Present;
 use crate::prompt::{Prompt, PromptResult};
@@ -128,8 +128,16 @@ pub struct Session<'r> {
     /// `PendingFlow`, which ports C's `pending_flow`; this answer needs the
     /// save paths, which `dispatch_answer` does not have.
     pending_overwrite: Option<usize>,
-    /// The pointer the frame just drawn asks for; see [`Session::pointer_shape`].
+    /// The pointer the frame just drew asks for; see [`Session::pointer_shape`].
     pointer_shape: Shape,
+    /// The hero action menu is open over the overworld. Session state, not
+    /// saved; it only ever opens and closes in the overworld input branch.
+    hero_menu_open: bool,
+    /// The hero action menu has been opened at least once this session. While
+    /// false the idle status line shows a discoverability cue (see
+    /// `Chrome::hero_menu_hint`). Session state, not saved, reset on new game
+    /// and on load.
+    hero_menu_opened_once: bool,
 }
 
 impl<'r> Session<'r> {
@@ -281,6 +289,8 @@ impl<'r> Session<'r> {
             walk,
             pending_overwrite,
             pointer_shape: Shape::Arrow,
+            hero_menu_open: false,
+            hero_menu_opened_once: false,
         })
     }
 
@@ -321,6 +331,8 @@ impl<'r> Session<'r> {
             walk,
             pending_overwrite,
             pointer_shape,
+            hero_menu_open,
+            hero_menu_opened_once,
             ..
         } = self;
         // C pushes the toggles every frame because the Controls panel changes
@@ -773,6 +785,11 @@ impl<'r> Session<'r> {
                                         *menu_picker = None;
                                         *walk = None;
                                         *pending_overwrite = None;
+                                        // The hint cue is session state: a
+                                        // loaded game starts fresh, as a new
+                                        // one does.
+                                        *hero_menu_open = false;
+                                        *hero_menu_opened_once = false;
                                         dialog.open("", &post_init_message(game, true));
                                     }
                                     Err(err) => {
@@ -849,18 +866,66 @@ impl<'r> Session<'r> {
             // click may start a new one. A walked step is fed in as the same
             // move value an arrow key produces, never as a fake key.
             // Read the buttons, not `clicked`: a click on the sidebar, which
-            // publishes no region, must stop the hero too.
+            // publishes no map region, must stop the hero too.
             if keys.any_pressed() || frame_in.left || frame_in.right {
                 *walk = None;
             }
-            if let Some(HitTarget::MapTile(x, y)) = clicked {
-                match walk::click(game, map, fog, (x, y), now) {
-                    walk::ClickMove::Step(dx, dy) => {
-                        input.dx = dx;
-                        input.dy = dy;
+
+            // The hero action menu takes the pointer and the keys first,
+            // mirroring combat's action menu (`combat.rs::player_action`).
+            // A row pick is exactly its key; ESC closes it without acting (so
+            // it does not also open the Game Menu); any other key closes it
+            // and then does what it always does -- combat's "any other key
+            // closes it and then does what it always does". A click off the
+            // panel (the map backdrop, or a sidebar panel) closes it without
+            // acting. Right-click is not bound here: the overworld uses it
+            // only to cancel a walk.
+            let mut click = clicked;
+            if *hero_menu_open {
+                match click {
+                    Some(HitTarget::OverworldAction(action)) => {
+                        *hero_menu_open = false;
+                        input.action = action;
+                        click = None;
                     }
-                    walk::ClickMove::Route(route) => *walk = Some(route),
-                    walk::ClickMove::Nothing => {}
+                    Some(_) => {
+                        *hero_menu_open = false;
+                        click = None;
+                    }
+                    None => {
+                        if keys.pressed(Key::Escape) {
+                            *hero_menu_open = false;
+                            input.action = Action::None;
+                        } else if keys.any_pressed() {
+                            *hero_menu_open = false;
+                        }
+                    }
+                }
+            }
+
+            // Sidebar panels are shortcuts: each is the one key that opens its
+            // view, resolved through the same `match input.action` below.
+            if let Some(HitTarget::HudPanel(index)) = click {
+                if let Some(action) = panel_action(index) {
+                    input.action = action;
+                }
+            }
+
+            // A map click walks; the hero's own tile opens the action menu
+            // (what `walk::click` would report as `Nothing`).
+            if let Some(HitTarget::MapTile(x, y)) = click {
+                if (x, y) == (game.position.x, game.position.y) {
+                    *hero_menu_open = true;
+                    *hero_menu_opened_once = true;
+                } else {
+                    match walk::click(game, map, fog, (x, y), now) {
+                        walk::ClickMove::Step(dx, dy) => {
+                            input.dx = dx;
+                            input.dy = dy;
+                        }
+                        walk::ClickMove::Route(route) => *walk = Some(route),
+                        walk::ClickMove::Nothing => {}
+                    }
                 }
             }
             if input == InputState::default() {
@@ -1225,6 +1290,7 @@ impl<'r> Session<'r> {
                 resources: resources,
                 game: game,
                 mode: StatusMode::Combat { title },
+                hero_menu_hint: false,
             }
             .draw(list);
             combat_render(
@@ -1265,6 +1331,7 @@ impl<'r> Session<'r> {
                 } else {
                     StatusMode::Adventure
                 },
+                hero_menu_hint: !*hero_menu_opened_once,
             }
             .draw(list);
             let scene = MapScene {
@@ -1280,18 +1347,38 @@ impl<'r> Session<'r> {
             };
             scene.draw(list);
             scene.publish_hits(hits);
+            let hero_rect = scene.hero_cell_rect();
             // The sidebar panels, drawn over the map and under the views --
             // `shell_frame.c`'s chrome -> map -> hud -> overlay order. A view
             // that covers the sidebar must paint over these.
-            Hud {
+            let hud = Hud {
                 layout: layout,
                 palette: palette,
                 catalog: catalog,
                 resources: resources,
                 game: game,
                 time: now,
+            };
+            hud.draw(list);
+            hud.publish_hits(hits);
+
+            // The hero's own tile reads as a button under the pointer: the
+            // same 1px highlight colour the clickable rows use.
+            if matches!(hovered, Some(HitTarget::MapTile(x, y)) if (x, y) == (game.position.x, game.position.y))
+            {
+                list.rect_lines(hero_rect, palette.clr(Pal::Yellow));
             }
-            .draw(list);
+
+            // The hero action menu draws over the map and the sidebar while it
+            // is open; the menu only opens from the overworld, so no view,
+            // dialog or prompt is ever up here.
+            if *hero_menu_open {
+                let hover = match hovered {
+                    Some(HitTarget::OverworldAction(action)) => Some(action),
+                    _ => None,
+                };
+                action_menu(list, hits, layout, palette, resources, hero_rect, hover);
+            }
 
             // A view covers the map area while the overworld keeps running
             // below. Each view derives its own animation clock from the wall
@@ -1949,16 +2036,24 @@ fn run_town_row(game: &mut Game, resources: &Resources, views: &mut Views, row: 
 mod tests {
     use super::{game_over_quits, Context, FrameInput, FrameStatus, Session};
     use crate::audio::Silent;
+    use crate::dialog::Dialog;
     use crate::draw::DrawList;
+    use crate::hud::OVERWORLD_ACTIONS;
     use crate::input::{Key, Keys};
     use crate::layout::Layout;
     use crate::palette::Palette;
+    use crate::pointer::HitTarget;
     use crate::present::Present;
+    use crate::prompt::Prompt;
     use crate::raster;
     use crate::savepath::SavePaths;
     use crate::sprites::SpriteCatalog;
     use crate::startup::{StartupAction, StartupChoice};
+    use crate::views::ViewKind;
+    use openbounty_engine::fog::Fog;
     use openbounty_engine::game::Game;
+    use openbounty_engine::map::Map;
+    use openbounty_engine::resources::Resources;
 
     /// The headless path the playtest runner takes: the game's own pack, a
     /// new game, real key frames. A step moves the hero and the frame says so.
@@ -2058,5 +2153,416 @@ mod tests {
         let mut game = Game::default();
         game.stats.days_left = 0;
         assert!(game_over_quits(&game, &Keys::pressed(&[Key::A])));
+    }
+
+    /// The game's own pack, held alive for the whole test, plus the context a
+    /// session borrows from it. Loading it once per test keeps the 34-session
+    /// dispatch loop from re-reading the pack.
+    struct Harness {
+        _pack: crate::pack::Pack,
+        resources: Resources,
+        layout: Layout,
+        catalog: SpriteCatalog,
+        palette: Palette,
+        save_paths: SavePaths,
+    }
+
+    impl Harness {
+        fn load() -> Self {
+            let dir =
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+            let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+            let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+            let layout = Layout::from_resources(&resources).expect("lays out");
+            let catalog = SpriteCatalog::from_resources(&resources);
+            let palette = Palette::fallback();
+            let saves = std::env::temp_dir().join("openbounty-session-test");
+            let save_paths = SavePaths::with_override(saves.display().to_string());
+            Self {
+                _pack: pack,
+                resources,
+                layout,
+                catalog,
+                palette,
+                save_paths,
+            }
+        }
+
+        fn ctx(&self) -> Context<'_> {
+            Context {
+                resources: &self.resources,
+                layout: &self.layout,
+                catalog: &self.catalog,
+                palette: &self.palette,
+                save_paths: &self.save_paths,
+            }
+        }
+
+        fn start(&self) -> Session<'_> {
+            let choice = StartupChoice {
+                action: StartupAction::New,
+                slot: 0,
+                class_id: "knight".into(),
+                name: "Tester".into(),
+                difficulty: 0,
+            };
+            Session::start(
+                self.ctx(),
+                Present::for_layout(&self.layout),
+                Box::new(Silent),
+                &choice,
+                7,
+            )
+            .expect("a new game starts")
+        }
+    }
+
+    /// One frame with the given keys, pointer and left-button state.
+    fn drive(
+        session: &mut Session,
+        list: &mut DrawList,
+        keys: &[Key],
+        pointer_at: Option<(i32, i32)>,
+        left: bool,
+        now: &mut f64,
+    ) -> FrameStatus {
+        let keys = Keys::pressed(keys);
+        let input = FrameInput {
+            keys: &keys,
+            pointer_at,
+            left,
+            right: false,
+        };
+        *now += 1.0;
+        session.frame(&input, *now / 60.0, list)
+    }
+
+    /// Dismiss the post-init message so the overworld owns the input.
+    fn to_overworld(session: &mut Session, list: &mut DrawList, now: &mut f64) {
+        drive(session, list, &[], None, false, now);
+        drive(session, list, &[Key::Enter], None, false, now);
+    }
+
+    /// The centre of the region published for `target`, from the frame just
+    /// drawn (the one-frame-latency HitList).
+    fn region_center(session: &Session, target: HitTarget) -> (i32, i32) {
+        let region = session
+            .hits
+            .regions()
+            .iter()
+            .find(|r| r.target == target)
+            .unwrap_or_else(|| panic!("region {target:?} published"));
+        (
+            region.rect.x + region.rect.w / 2,
+            region.rect.y + region.rect.h / 2,
+        )
+    }
+
+    /// A point inside the hero action menu's backdrop but not over any row.
+    fn backdrop_point(session: &Session) -> (i32, i32) {
+        let map = session
+            .hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::OverworldMenuClose)
+            .map(|r| r.rect)
+            .expect("menu backdrop published");
+        for y in map.y..map.y + map.h {
+            for x in map.x..map.x + map.w {
+                if session.hits.hit(x, y) == Some(HitTarget::OverworldMenuClose) {
+                    return (x, y);
+                }
+            }
+        }
+        panic!("the menu covers the whole map");
+    }
+
+    /// The observable result of an action, for key/click equivalence.
+    fn snap(session: &Session) -> (Game, Map, Fog, Option<ViewKind>, Prompt, Dialog) {
+        (
+            session.game,
+            session.map.clone(),
+            session.fog,
+            session.views.active(),
+            session.prompt.clone(),
+            session.dialog.clone(),
+        )
+    }
+
+    /// Run `f` on a thread with room for two whole sessions plus their
+    /// snapshots: `Game`, `Map` and `Fog` are large fixed-size structs, and an
+    /// equivalence comparison holds two of each, which overflows a test
+    /// thread's default stack in a debug build (the same reason combat's
+    /// equivalence tests run on a 64 MB thread).
+    fn big_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(64 << 20)
+            .spawn(f)
+            .expect("spawns")
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+    }
+
+    /// Clicking a menu row is exactly its key: the click sets the same
+    /// `Action` and falls into the one `match input.action`, so the whole game
+    /// state converges for all 17 rows.
+    #[test]
+    fn the_action_menu_dispatches_each_row_like_its_key() {
+        let harness = Harness::load();
+        big_stack(move || {
+            for (action, key, _, _) in OVERWORLD_ACTIONS {
+                let mut by_key = harness.start();
+                let mut key_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_key, &mut key_list, &mut now);
+                drive(&mut by_key, &mut key_list, &[key], None, false, &mut now);
+                let keyed = snap(&by_key);
+
+                let mut by_click = harness.start();
+                let mut click_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_click, &mut click_list, &mut now);
+                let hero = (by_click.game.position.x, by_click.game.position.y);
+                let (hx, hy) = region_center(&by_click, HitTarget::MapTile(hero.0, hero.1));
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((hx, hy)),
+                    false,
+                    &mut now,
+                );
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((hx, hy)),
+                    true,
+                    &mut now,
+                );
+                assert!(by_click.hero_menu_open, "menu opens for {action:?}");
+                let (rx, ry) = region_center(&by_click, HitTarget::OverworldAction(action));
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((rx, ry)),
+                    false,
+                    &mut now,
+                );
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((rx, ry)),
+                    true,
+                    &mut now,
+                );
+                let clicked = snap(&by_click);
+
+                assert_eq!(clicked, keyed, "row {action:?} should equal key {key:?}");
+            }
+        });
+    }
+
+    /// Clicking a sidebar panel is its key, and never starts a walk.
+    #[test]
+    fn clicking_a_sidebar_panel_matches_its_key_and_does_not_walk() {
+        let harness = Harness::load();
+        big_stack(move || {
+            for (panel, key) in [(0, Key::I), (2, Key::U), (3, Key::P), (4, Key::V)] {
+                let mut by_key = harness.start();
+                let mut key_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_key, &mut key_list, &mut now);
+                drive(&mut by_key, &mut key_list, &[key], None, false, &mut now);
+                let keyed = snap(&by_key);
+
+                let mut by_click = harness.start();
+                let mut click_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_click, &mut click_list, &mut now);
+                let pos_before = (by_click.game.position.x, by_click.game.position.y);
+                let (px, py) = region_center(&by_click, HitTarget::HudPanel(panel));
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((px, py)),
+                    false,
+                    &mut now,
+                );
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((px, py)),
+                    true,
+                    &mut now,
+                );
+                let clicked = snap(&by_click);
+
+                assert_eq!(clicked, keyed, "panel {panel} should match key {key:?}");
+                assert_eq!(
+                    (by_click.game.position.x, by_click.game.position.y),
+                    pos_before,
+                    "panel {panel} must not walk"
+                );
+            }
+        });
+    }
+
+    #[test]
+    fn clicking_the_hero_opens_the_menu_and_a_click_off_closes_it_without_acting() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+
+        let hero = (session.game.position.x, session.game.position.y);
+        let pos_before = (session.game.position.x, session.game.position.y);
+        let days_before = session.game.stats.days_left;
+        let (hx, hy) = region_center(&session, HitTarget::MapTile(hero.0, hero.1));
+
+        drive(
+            &mut session,
+            &mut list,
+            &[],
+            Some((hx, hy)),
+            false,
+            &mut now,
+        );
+        drive(&mut session, &mut list, &[], Some((hx, hy)), true, &mut now);
+        assert!(session.hero_menu_open);
+
+        // A click off the panel closes it: no action, no step.
+        let (bx, by) = backdrop_point(&session);
+        drive(
+            &mut session,
+            &mut list,
+            &[],
+            Some((bx, by)),
+            false,
+            &mut now,
+        );
+        drive(&mut session, &mut list, &[], Some((bx, by)), true, &mut now);
+        assert!(!session.hero_menu_open);
+        assert_eq!(
+            (session.game.position.x, session.game.position.y),
+            pos_before,
+            "no step"
+        );
+        assert_eq!(session.game.stats.days_left, days_before, "no days spent");
+        assert_eq!(session.views.active(), None, "no view opened");
+        assert!(!session.prompt.is_active(), "no prompt opened");
+    }
+
+    /// A key while the menu is open closes it and then does what it always
+    /// does, matching combat's action menu (combat.rs `player_action`).
+    #[test]
+    fn a_key_while_the_menu_is_open_closes_it_and_acts() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+
+        let hero = (session.game.position.x, session.game.position.y);
+        let (hx, hy) = region_center(&session, HitTarget::MapTile(hero.0, hero.1));
+        drive(
+            &mut session,
+            &mut list,
+            &[],
+            Some((hx, hy)),
+            false,
+            &mut now,
+        );
+        drive(&mut session, &mut list, &[], Some((hx, hy)), true, &mut now);
+        assert!(session.hero_menu_open);
+
+        // S closes the menu and also arms the Search prompt.
+        drive(&mut session, &mut list, &[Key::S], None, false, &mut now);
+        assert!(!session.hero_menu_open);
+        assert!(session.prompt.is_active(), "S acts while closing the menu");
+    }
+
+    /// ESC while the menu is open closes it and does not open the Game Menu,
+    /// exactly as combat's ESC backs out of its action menu without acting.
+    #[test]
+    fn escape_while_the_menu_is_open_closes_it_without_opening_the_game_menu() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+
+        let hero = (session.game.position.x, session.game.position.y);
+        let (hx, hy) = region_center(&session, HitTarget::MapTile(hero.0, hero.1));
+        drive(
+            &mut session,
+            &mut list,
+            &[],
+            Some((hx, hy)),
+            false,
+            &mut now,
+        );
+        drive(&mut session, &mut list, &[], Some((hx, hy)), true, &mut now);
+        assert!(session.hero_menu_open);
+
+        drive(
+            &mut session,
+            &mut list,
+            &[Key::Escape],
+            None,
+            false,
+            &mut now,
+        );
+        assert!(!session.hero_menu_open);
+        assert_eq!(session.views.active(), None, "no Game Menu opened");
+    }
+
+    /// The discoverability cue shows on a fresh session and clears the first
+    /// time the menu opens, without ever dropping the Days counter.
+    #[test]
+    fn the_hero_menu_hint_shows_until_the_menu_first_opens() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+
+        let texts = raster::texts(&list);
+        assert!(
+            texts.iter().any(|t| t.contains("Click hero")),
+            "fresh session shows the cue: {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("Days")),
+            "days kept: {texts:?}"
+        );
+
+        let hero = (session.game.position.x, session.game.position.y);
+        let (hx, hy) = region_center(&session, HitTarget::MapTile(hero.0, hero.1));
+        drive(
+            &mut session,
+            &mut list,
+            &[],
+            Some((hx, hy)),
+            false,
+            &mut now,
+        );
+        drive(&mut session, &mut list, &[], Some((hx, hy)), true, &mut now);
+        assert!(session.hero_menu_open);
+
+        let texts = raster::texts(&list);
+        assert!(
+            !texts.iter().any(|t| t.contains("Click hero")),
+            "cue clears on first open: {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("Days")),
+            "days kept: {texts:?}"
+        );
     }
 }
