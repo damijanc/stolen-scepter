@@ -1905,6 +1905,13 @@ fn dispatch_answer(
             }
         }
         PendingFlow::Dwelling { troop_id } => {
+            // C dismisses VIEW_DWELLING the moment the recruit answer lands
+            // (`player_io.c`: `pres.dismiss_view = VIEW_DWELLING`), on any
+            // answer. Without this the info panel lingers after the purchase,
+            // still showing "Hire how many" with no input handler behind it.
+            if views.active() == Some(ViewKind::Dwelling) {
+                views.dismiss();
+            }
             if answer == PromptResult::Yes {
                 let requested = prompt.text_input_value();
                 let zone = game.position.zone.as_str().to_owned();
@@ -2697,5 +2704,105 @@ mod tests {
                 assert_eq!(clicked, keyed, "backdrop should equal ESC for {name}");
             }
         });
+    }
+
+    /// C dismisses VIEW_DWELLING the moment the recruit answer lands
+    /// (`player_io.c`: `pres.dismiss_view = VIEW_DWELLING`), on any answer.
+    /// Without that the info panel lingers after the purchase, still asking
+    /// "Hire how many" with no input handler behind it -- the "two recruit
+    /// screens" bug. This steps onto a dwelling, buys, and checks the view is
+    /// gone.
+    #[test]
+    fn a_dwelling_recruit_dismisses_the_dwelling_view() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+
+        let zone = session.game.position.zone.as_str().to_owned();
+        let dw = (0..session.game.dwelling_count)
+            .map(|i| session.game.dwellings[i])
+            .find(|d| d.zone.as_str() == zone && d.count > 0)
+            .expect("a stocked dwelling in the home zone");
+
+        // Stand on a neighbour and step onto the dwelling; one of the four
+        // directions is walkable.
+        let mut reached = false;
+        for (ox, oy, key) in [
+            (1, 0, Key::Left),
+            (-1, 0, Key::Right),
+            (0, 1, Key::Up),
+            (0, -1, Key::Down),
+        ] {
+            let sx = dw.x + ox;
+            let sy = dw.y + oy;
+            if sx < 0 || sy < 0 {
+                continue;
+            }
+            session.game.position.x = sx;
+            session.game.position.y = sy;
+            session.game.position.last_x = sx;
+            session.game.position.last_y = sy;
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            drive(&mut session, &mut list, &[key], None, false, &mut now);
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            if session.views.active() == Some(ViewKind::Dwelling) && session.prompt.is_active() {
+                reached = true;
+                break;
+            }
+        }
+        assert!(
+            reached,
+            "stepping onto the dwelling opens its view and prompt"
+        );
+
+        // The interaction screen is the prompt on top of the dwelling info
+        // panel, exactly as C layers them.
+        let texts = raster::texts(&list);
+        assert!(
+            texts.iter().any(|t| t.contains("Hire how many")),
+            "{texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("Enter to confirm")),
+            "{texts:?}"
+        );
+
+        let gold_before = session.game.stats.gold;
+        drive(
+            &mut session,
+            &mut list,
+            &[Key::Digit5],
+            None,
+            false,
+            &mut now,
+        );
+        drive(
+            &mut session,
+            &mut list,
+            &[Key::Enter],
+            None,
+            false,
+            &mut now,
+        );
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+
+        assert!(
+            session.game.stats.gold < gold_before,
+            "the purchase went through"
+        );
+        assert!(!session.prompt.is_active(), "the recruit prompt closed");
+        assert_eq!(
+            session.views.active(),
+            None,
+            "the dwelling view is dismissed, not left lingering"
+        );
+        assert!(
+            !raster::texts(&list)
+                .iter()
+                .any(|t| t.contains("Hire how many")),
+            "the lingering 'Hire how many' panel is gone"
+        );
     }
 }
