@@ -107,21 +107,16 @@ pub fn tunes_for_step(result: &StepResult, absorbed: bool) -> [Option<Tune>; 2] 
     match result {
         StepResult::NoDirection => [None, None],
         StepResult::BlockedEdge | StepResult::BlockedTerrain { .. } => [Some(Tune::Bump), None],
-        StepResult::Moved { interaction, .. } => {
+        StepResult::Moved {
+            interaction,
+            bounced,
+            ..
+        } => {
             let chest = matches!(interaction, StepInteraction::TreasureChest { .. });
-            // The interactions C sets `bounce_back` on. A bounced step skips
-            // `GameOnStep`, and with it the walk tune.
-            let bounced = match interaction {
-                StepInteraction::Town { .. }
-                | StepInteraction::CastleGate { .. }
-                | StepInteraction::Dwelling { .. }
-                | StepInteraction::Alcove => true,
-                StepInteraction::Foe { friendly, .. } => !friendly,
-                _ => false,
-            };
+            // A bounced step skips `GameOnStep`, and with it the walk tune.
             [
                 chest.then_some(Tune::Chest),
-                if bounced {
+                if *bounced {
                     None
                 } else {
                     on_step_tune(absorbed)
@@ -266,12 +261,17 @@ mod tests {
     use openbounty_engine::tile::{Interact, Terrain};
 
     fn moved(interaction: StepInteraction) -> StepResult {
+        moved_bounced(interaction, false)
+    }
+
+    fn moved_bounced(interaction: StepInteraction, bounced: bool) -> StepResult {
         StepResult::Moved {
             terrain: Terrain::Grass,
             move_cost: 1,
             advance: StepAdvance::default(),
             interaction,
             collision: None,
+            bounced,
         }
     }
 
@@ -328,7 +328,7 @@ mod tests {
 
     /// Towns, castle gates, dwellings, the alcove and a hostile foe set
     /// `bounce_back`, and a bounced step never calls `GameOnStep`, so C plays
-    /// no walk tune. This engine does not bounce, but the tune follows C.
+    /// no walk tune.
     #[test]
     fn a_step_c_bounces_plays_no_walk_tune() {
         for interaction in [
@@ -351,7 +351,7 @@ mod tests {
             },
         ] {
             assert_eq!(
-                tunes_for_step(&moved(interaction.clone()), false),
+                tunes_for_step(&moved_bounced(interaction.clone(), true), false),
                 [None, None],
                 "{interaction:?}"
             );
