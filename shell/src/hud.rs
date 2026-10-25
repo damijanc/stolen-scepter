@@ -258,15 +258,23 @@ pub fn action_menu(
     let h = rows_per_col * row_h + 2 * pad;
     let w = cols * col_w;
 
-    // Right of the hero, or left when that would leave the map, then clamped
-    // to the map -- the same placement `combat_action_menu` uses.
-    let (cx, cy) = (hero_rect.x, hero_rect.y);
-    let mut x = cx + hero_rect.w;
-    if x + w > map.x + map.w {
-        x = cx - w;
-    }
-    let x = x.max(map.x);
-    let y = cy.min(map.y + map.h - h).max(map.y);
+    // The menu sits in the half of the map the hero is NOT in (above or below),
+    // centred horizontally and clamped inside the map rect, so it does not
+    // cover the hero's tile when it fits. Slice 1 placed it beside the hero
+    // like combat's menu does, which covered the hero in legacy -- there the
+    // menu is nearly as wide as the map, so a horizontal neighbour always
+    // overlaps.
+    let hero_cx = hero_rect.x + hero_rect.w / 2;
+    let hero_cy = hero_rect.y + hero_rect.h / 2;
+    let x = (hero_cx - w / 2).clamp(map.x, map.x + (map.w - w).max(0));
+    let y = if hero_cy < map.y + map.h / 2 {
+        // Hero in the top half: menu below.
+        hero_rect.y + hero_rect.h
+    } else {
+        // Hero in the bottom half (or dead centre): menu above.
+        hero_rect.y - h
+    };
+    let y = y.clamp(map.y, map.y + (map.h - h).max(0));
 
     hits.push(map, HitTarget::OverworldMenuClose);
     list.rect(Rect::new(x, y, w, h), palette.clr(Pal::DBlue));
@@ -722,6 +730,72 @@ mod tests {
             .rect;
         assert_eq!(army.y, end_week.y, "column 2 starts at the same height");
         assert!(army.x < end_week.x, "the two columns sit side by side");
+    }
+
+    /// The menu's panel rect, reconstructed from the row regions it published:
+    /// the rows sit `pad` inside the panel, so widen the bounding box by that
+    /// on the top and bottom edges.
+    fn menu_panel_rect(hits: &HitList) -> Rect {
+        let mut x0 = i32::MAX;
+        let mut y0 = i32::MAX;
+        let mut x1 = i32::MIN;
+        let mut y1 = i32::MIN;
+        for region in hits.regions() {
+            if matches!(region.target, HitTarget::OverworldAction(_)) {
+                x0 = x0.min(region.rect.x);
+                y0 = y0.min(region.rect.y);
+                x1 = x1.max(region.rect.x + region.rect.w);
+                y1 = y1.max(region.rect.y + region.rect.h);
+            }
+        }
+        const PAD: i32 = 4;
+        Rect::new(x0, y0 - PAD, x1 - x0, (y1 - y0) + 2 * PAD)
+    }
+
+    /// Slice 2's fix: the menu sits in the half of the map the hero is NOT in,
+    /// so it never covers the hero's tile when that is possible. In legacy the
+    /// centred (middle) hero leaves 68px above and below, less than the menu's
+    /// 98px height, so a full clearance there is geometrically impossible and
+    /// the menu merely overlaps the hero's edge; the top and bottom rows --
+    /// where a camera clamp can actually push the hero off centre -- clear it.
+    #[test]
+    fn the_action_menu_does_not_cover_the_hero_tile_when_it_fits() {
+        let (resources, layout, _) = fixtures();
+        let palette = Palette::fallback();
+        let map = Rect::new(MAP_X, MAP_Y, layout.map_w, layout.map_h);
+
+        let hero_at = |row: i32| {
+            Rect::new(
+                MAP_X + 2 * layout.tile_w,
+                MAP_Y + row * layout.tile_h,
+                layout.tile_w,
+                layout.tile_h,
+            )
+        };
+
+        for row in [0, 4] {
+            let hero = hero_at(row);
+            let mut list = DrawList::new();
+            let mut hits = HitList::new();
+            action_menu(
+                &mut list, &mut hits, &layout, &palette, &resources, hero, None,
+            );
+
+            let panel = menu_panel_rect(&hits);
+            assert!(
+                panel.x >= map.x && panel.x + panel.w <= map.x + map.w,
+                "menu stays inside the map (x)"
+            );
+            assert!(
+                panel.y >= map.y && panel.y + panel.h <= map.y + map.h,
+                "menu stays inside the map (y)"
+            );
+            let overlaps = panel.x < hero.x + hero.w
+                && panel.x + panel.w > hero.x
+                && panel.y < hero.y + hero.h
+                && panel.y + panel.h > hero.y;
+            assert!(!overlaps, "menu must not cover the hero at row {row}");
+        }
     }
 
     /// In a tall modern map one column fits, so the menu does not split.

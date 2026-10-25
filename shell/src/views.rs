@@ -647,10 +647,22 @@ impl Views {
     }
 
     /// Resolve a pointer hit to the same [`SpellsInput`] the keyboard
-    /// produces: a spell cell casts that spell, anything else is a plain
-    /// dismiss, as any non-letter key is.
+    /// produces: a spell cell casts that spell, the backdrop is ESC, and
+    /// anything else is a plain dismiss, as any non-letter key is.
+    ///
+    /// A spell cell casts by index regardless of `spells_column`: the A-G
+    /// keys are the only thing the column cursor addresses, so a click user
+    /// never needs to switch columns. There are deliberately no column tabs --
+    /// the Left/Right branch of `spells_update` is a keyboard-cursor concept
+    /// with no click counterpart (see the D2 note in `draw_spells`).
     pub fn spells_click(&mut self, target: HitTarget) -> SpellsInput {
         match target {
+            // The backdrop is the view's ESC: leave cast mode and dismiss.
+            HitTarget::ViewBack => {
+                self.spells_cast_mode = false;
+                self.dismiss();
+                SpellsInput::Handled
+            }
             HitTarget::Spell(index) if self.spells_cast_mode && (0..14).contains(&index) => {
                 self.dismiss();
                 SpellsInput::Cast(index)
@@ -767,9 +779,14 @@ impl Views {
     }
 
     /// Resolve a pointer hit to the confirmation `gate_update` reports for
-    /// Enter on that row: set the cursor and chosen index, then dismiss.
+    /// Enter on that row: set the cursor and chosen index, then dismiss. The
+    /// backdrop is ESC, which cancels without choosing.
     pub fn gate_click(&mut self, target: HitTarget) -> bool {
         match target {
+            HitTarget::ViewBack => {
+                self.dismiss();
+                false
+            }
             HitTarget::GateRow(index) if index < self.gate_count => {
                 self.gate_cursor = index;
                 self.gate_chosen = index as i32;
@@ -877,9 +894,20 @@ impl Views {
 
     /// Resolve a pointer hit to the same outcome `town_update` returns for the
     /// equivalent keypress. The pointer must never reach a transaction the
-    /// keyboard cannot, so this maps onto the existing vocabulary only.
+    /// keyboard cannot, so this maps onto the existing vocabulary only. The
+    /// backdrop is ESC: it clears the info overlay when one is up, and
+    /// otherwise dismisses the view.
     pub fn town_click(&mut self, target: HitTarget) -> TownInput {
         match target {
+            HitTarget::ViewBack => {
+                if self.town_info_active {
+                    self.town_info_active = false;
+                    TownInput::Handled
+                } else {
+                    self.dismiss();
+                    TownInput::Dismissed
+                }
+            }
             HitTarget::DialogDismiss if self.town_info_active => {
                 self.town_info_active = false;
                 TownInput::Handled
@@ -913,8 +941,10 @@ impl Views {
     }
 
     /// Resolve a pointer hit to the same action `home_castle_key` returns.
+    /// The backdrop is ESC: dismiss.
     pub fn home_castle_click(&self, target: HitTarget) -> HomeCastleAction {
         match target {
+            HitTarget::ViewBack => HomeCastleAction::Dismiss,
             HitTarget::HomeCastleRow(0) => HomeCastleAction::Recruit,
             HitTarget::HomeCastleRow(1) => HomeCastleAction::Audience,
             _ => HomeCastleAction::None,
@@ -961,9 +991,12 @@ impl Views {
         OwnCastleAction::None
     }
 
-    /// Resolve a pointer hit to the same action `own_castle_key` returns.
+    /// Resolve a pointer hit to the same action `own_castle_key` returns. The
+    /// backdrop is ESC (dismiss); the mode line is Space (toggle).
     pub fn own_castle_click(&self, target: HitTarget) -> OwnCastleAction {
         match target {
+            HitTarget::ViewBack => OwnCastleAction::Dismiss,
+            HitTarget::OwnCastleToggle => OwnCastleAction::Toggle,
             HitTarget::OwnCastleSlot(slot) if slot < GAME_ARMY_SLOTS => OwnCastleAction::Slot(slot),
             _ => OwnCastleAction::None,
         }
@@ -1139,13 +1172,32 @@ impl Views {
 
     /// Resolve a pointer hit on a troop row to the same selection the A-E keys
     /// make: set the chosen slot and its max. Only phase 0 selects; a click in
-    /// the count phase (or on an out-of-leadership troop) does nothing.
+    /// the count phase (or on an out-of-leadership troop) does nothing. The
+    /// backdrop is the view's ESC, whichever phase owns the screen: it clears
+    /// the error popup, dismisses from the row pick, and backs out of the count
+    /// entry without buying.
     pub fn recruit_click(
         &mut self,
         game: &mut Game,
         resources: &Resources,
         target: HitTarget,
     ) -> bool {
+        if target == HitTarget::ViewBack {
+            if !self.recruit_error.is_empty() {
+                // DIVERGENCE, deliberate: the keyboard's `recruit_error_just_set`
+                // is a held-key anti-repeat guard with no click counterpart, so
+                // a click clears the popup outright (what "any key" does once
+                // the sticky frame has passed).
+                self.recruit_error.clear();
+                self.recruit_error_just_set = false;
+            } else if self.recruit_whom == 0 {
+                return true;
+            } else {
+                self.recruit_whom = 0;
+                self.recruit_input.clear();
+            }
+            return false;
+        }
         if !self.recruit_error.is_empty() || self.recruit_whom != 0 {
             return false;
         }
@@ -1215,6 +1267,29 @@ impl Views {
             self.cartoon_started = time;
         }
         self.cartoon_was_active = cartoon_active;
+
+        // Menu views publish a full-screen ESC backdrop BEFORE their rows (D2),
+        // so a row wins and a click anywhere else walks the view back. The
+        // backdrop maps to exactly what ESC does on that surface -- dismiss or
+        // cancel, never a commit -- and each view's `*_click` resolves
+        // `HitTarget::ViewBack` with the same guard order as its key path.
+        if matches!(
+            self.active(),
+            Some(
+                ViewKind::Town
+                    | ViewKind::HomeCastle
+                    | ViewKind::OwnCastle
+                    | ViewKind::RecruitSoldiers
+                    | ViewKind::Gate
+                    | ViewKind::Spells
+                    | ViewKind::Controls
+            )
+        ) {
+            hits.push(
+                Rect::new(0, 0, layout.screen_w, layout.screen_h),
+                HitTarget::ViewBack,
+            );
+        }
 
         match self.active() {
             Some(ViewKind::Character) => draw_character(list, layout, palette, resources, game),
@@ -1724,6 +1799,10 @@ impl Views {
         let head_y = MAP_Y + VIEW_PAD + font::GLYPH_H + 4;
         let col_l = MAP_X + VIEW_PAD + 4;
         let col_r = MAP_X + layout.map_w / 2 + 4;
+        // D2 note: the Left/Right column switch is a keyboard-cursor concept
+        // only -- the A-G keys address whichever column `spells_column` names,
+        // but a click names a spell cell by index directly (`spells_click`),
+        // so a click user never needs to switch columns. No column tabs here.
         list.text(
             banner::text(resources, "spells_view", "combat_col", DEFAULT_SV_COMBAT),
             col_l,
@@ -2071,6 +2150,12 @@ impl Views {
 
         let mode = crate::interact::own_castle_mode_label(resources, self.own_castle_garrison_mode);
         list.text(&mode, tx, ty, palette.clr(Pal::White));
+        // The mode line names the toggle ("... (Space=...)"), so its own band
+        // is the clickable Space region -- one affordance, key and click alike.
+        hits.push(
+            Rect::new(tx, ty, w - 2 * PANEL_PAD_X, row_h),
+            HitTarget::OwnCastleToggle,
+        );
         ty += row_h + 1;
 
         for slot in 0..GAME_ARMY_SLOTS {
@@ -5110,5 +5195,221 @@ mod tests {
         assert!(!list
             .blits_of(Sprite::Backdrop(crate::draw::Backdrop::Plains))
             .is_empty());
+    }
+
+    // --- Slice 2: menu-view backdrops and toggles ---
+
+    /// Every menu view publishes its full-screen ESC backdrop FIRST, before
+    /// any row, so a row wins (`HitList::hit` scans in reverse) and a click
+    /// anywhere else is the view's ESC.
+    #[test]
+    fn the_menu_views_publish_a_full_screen_backdrop_before_their_rows() {
+        let (resources, layout, catalog) = spells_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+        let palette = Palette::fallback();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+
+        let open = |name: &str, views: &mut Views| match name {
+            "town" => views.town_open("Ashford", "town0", 3, 4),
+            "home" => views.home_castle_open(),
+            "own" => views.own_castle_open("castle0"),
+            "recruit" => views.recruit_soldiers_open(&resources, &game),
+            "gate" => views.gate_open(&[gate_dest("Avalon")], false),
+            "spells" => {
+                views.spells_set_cast_mode(true);
+                views.set(ViewKind::Spells);
+            }
+            "controls" => views.set(ViewKind::Controls),
+            _ => unreachable!(),
+        };
+
+        for name in [
+            "town", "home", "own", "recruit", "gate", "spells", "controls",
+        ] {
+            let mut views = Views::new();
+            open(name, &mut views);
+            let mut list = DrawList::new();
+            let mut hits = HitList::new();
+            views.draw(
+                &mut list, &mut hits, &layout, &palette, &resources, &catalog, &map, &fog, &game,
+                &present, 0.0,
+            );
+            assert_eq!(
+                hits.regions().first().map(|r| r.target),
+                Some(HitTarget::ViewBack),
+                "{name} publishes its backdrop first"
+            );
+            assert_eq!(
+                hits.regions().first().map(|r| r.rect),
+                Some(Rect::new(0, 0, layout.screen_w, layout.screen_h)),
+                "{name} backdrop is full screen"
+            );
+        }
+    }
+
+    /// Anti-drift: the own-castle toggle region is the band the mode line drew
+    /// on, so the clickable Space region and the drawn "(Space=...)" text
+    /// cannot drift.
+    #[test]
+    fn the_own_castle_toggle_region_is_the_mode_line_it_draws_on() {
+        let (resources, layout, catalog) = castle_fixtures();
+        let mut game = Game::default();
+        game.castles[0].id.copy_from_str("castle0");
+        let mut views = Views::new();
+        views.own_castle_open("castle0");
+
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        let present = Present::new();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &game,
+            &present,
+            0.0,
+        );
+
+        let region = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::OwnCastleToggle)
+            .expect("toggle published");
+        let mode = crate::interact::own_castle_mode_label(&resources, false);
+        let (tx, ty, _) = list
+            .texts()
+            .into_iter()
+            .find(|(_, _, t)| *t == mode)
+            .expect("mode line drawn");
+        assert!(tx >= region.rect.x && tx < region.rect.x + region.rect.w);
+        assert!(ty >= region.rect.y && ty < region.rect.y + region.rect.h);
+        assert_eq!(
+            hits.hit(
+                region.rect.x + region.rect.w / 2,
+                region.rect.y + region.rect.h / 2
+            ),
+            Some(HitTarget::OwnCastleToggle)
+        );
+    }
+
+    /// The backdrop click is the view's ESC, view by view. Controls is handled
+    /// in `session.rs` (there is no `controls_click` that returns an action),
+    /// so it is covered in the session tests.
+    #[test]
+    fn clicking_the_backdrop_matches_escape_in_each_menu_view() {
+        let destinations = [gate_dest("Avalon")];
+
+        let mut by_key = Views::new();
+        by_key.town_open("Ashford", "town0", 3, 4);
+        let keyed = by_key.town_update(&Keys::pressed(&[Key::Escape]));
+        let mut by_click = Views::new();
+        by_click.town_open("Ashford", "town0", 3, 4);
+        let clicked = by_click.town_click(HitTarget::ViewBack);
+        assert_eq!(clicked, keyed);
+        assert_eq!(clicked, TownInput::Dismissed);
+        assert_eq!(by_click.active(), by_key.active());
+
+        let mut by_key = Views::new();
+        by_key.home_castle_open();
+        let keyed = by_key.home_castle_key(&Keys::pressed(&[Key::Escape]));
+        let mut by_click = Views::new();
+        by_click.home_castle_open();
+        let clicked = by_click.home_castle_click(HitTarget::ViewBack);
+        assert_eq!(clicked, keyed);
+        assert_eq!(clicked, HomeCastleAction::Dismiss);
+
+        let mut by_key = Views::new();
+        by_key.own_castle_open("castle0");
+        let keyed = by_key.own_castle_key(&Keys::pressed(&[Key::Escape]));
+        let mut by_click = Views::new();
+        by_click.own_castle_open("castle0");
+        let clicked = by_click.own_castle_click(HitTarget::ViewBack);
+        assert_eq!(clicked, keyed);
+        assert_eq!(clicked, OwnCastleAction::Dismiss);
+
+        let mut by_key = Views::new();
+        by_key.gate_open(&destinations, false);
+        let keyed = by_key.gate_update(&Keys::pressed(&[Key::Escape]));
+        let mut by_click = Views::new();
+        by_click.gate_open(&destinations, false);
+        let clicked = by_click.gate_click(HitTarget::ViewBack);
+        assert_eq!(clicked, keyed);
+        assert!(!by_click.is_active());
+
+        let mut by_key = Views::new();
+        by_key.spells_set_cast_mode(true);
+        by_key.set(ViewKind::Spells);
+        let keyed = by_key.spells_update(&Keys::pressed(&[Key::Escape]));
+        let mut by_click = Views::new();
+        by_click.spells_set_cast_mode(true);
+        by_click.set(ViewKind::Spells);
+        let clicked = by_click.spells_click(HitTarget::ViewBack);
+        assert_eq!(clicked, keyed);
+        assert!(!by_click.is_active());
+    }
+
+    #[test]
+    fn clicking_the_own_castle_toggle_matches_space() {
+        let views = Views::new();
+        assert_eq!(
+            views.own_castle_key(&Keys::pressed(&[Key::Space])),
+            OwnCastleAction::Toggle
+        );
+        assert_eq!(
+            views.own_castle_click(HitTarget::OwnCastleToggle),
+            OwnCastleAction::Toggle
+        );
+    }
+
+    /// A backdrop click clears the recruit error popup exactly as any key
+    /// does, without dismissing the view.
+    #[test]
+    fn the_recruit_backdrop_clears_the_error_popup() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+        views.recruit_error = "No gold".to_owned();
+        views.recruit_error_just_set = true;
+
+        let close = views.recruit_click(&mut game, &resources, HitTarget::ViewBack);
+        assert!(!close, "clearing the popup does not dismiss the view");
+        assert!(views.recruit_error.is_empty());
+        assert_eq!(views.active(), Some(ViewKind::RecruitSoldiers));
+    }
+
+    /// In the count-entry phase (phase 1) the backdrop is ESC: it backs out of
+    /// the count without buying, leaving gold and the army untouched.
+    #[test]
+    fn the_recruit_backdrop_backs_out_of_the_count_without_buying() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+        game.stats.gold = 5000;
+        game.position.home_castle.copy_from_str("castle0");
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+
+        // Select the first (militia) row to enter the count phase.
+        views.recruit_click(&mut game, &resources, HitTarget::RecruitRow(0));
+        assert_eq!(views.recruit_whom, 1);
+        let gold_before = game.stats.gold;
+        let army_before = game.army;
+
+        let close = views.recruit_click(&mut game, &resources, HitTarget::ViewBack);
+        assert!(!close, "backing out of the count does not dismiss the view");
+        assert_eq!(views.recruit_whom, 0);
+        assert!(views.recruit_input.is_empty());
+        assert_eq!(game.stats.gold, gold_before, "no gold spent");
+        assert_eq!(game.army, army_before, "no troop bought");
     }
 }

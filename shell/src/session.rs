@@ -541,11 +541,13 @@ impl<'r> Session<'r> {
             if count > 0 {
                 let cur = views.controls_cursor() as usize;
                 // A click selects (and advances) a row, exactly as its digit
-                // key does.
+                // key does; the backdrop is the view's ESC/C.
                 let click_row = clicked
                     .and_then(|target| views.controls_click(target))
                     .filter(|row| *row < count);
-                if let Some(row) = click_row {
+                if clicked == Some(HitTarget::ViewBack) {
+                    views.dismiss();
+                } else if let Some(row) = click_row {
                     views.controls_set_cursor(row as i32);
                     if row == scale_row {
                         present.advance_scale();
@@ -580,7 +582,7 @@ impl<'r> Session<'r> {
                         }
                     }
                 }
-            } else if keys.any_pressed() {
+            } else if keys.any_pressed() || clicked == Some(HitTarget::ViewBack) {
                 views.dismiss();
             }
         } else if views.active() == Some(ViewKind::Spells) {
@@ -2051,7 +2053,7 @@ mod tests {
     use crate::startup::{StartupAction, StartupChoice};
     use crate::views::ViewKind;
     use openbounty_engine::fog::Fog;
-    use openbounty_engine::game::Game;
+    use openbounty_engine::game::{Game, GateDestination};
     use openbounty_engine::map::Map;
     use openbounty_engine::resources::Resources;
 
@@ -2564,5 +2566,136 @@ mod tests {
             texts.iter().any(|t| t.contains("Days")),
             "days kept: {texts:?}"
         );
+    }
+
+    /// A point over the full-screen `ViewBack` backdrop the frame just drew.
+    fn view_backdrop_point(session: &Session) -> (i32, i32) {
+        for y in 0..session.ctx.layout.screen_h {
+            for x in 0..session.ctx.layout.screen_w {
+                if session.hits.hit(x, y) == Some(HitTarget::ViewBack) {
+                    return (x, y);
+                }
+            }
+        }
+        panic!("a menu view publishes a ViewBack backdrop");
+    }
+
+    /// Open one menu view directly on the session, as the views tests do.
+    fn open_view(session: &mut Session, name: &str) {
+        let resources = session.ctx.resources;
+        match name {
+            "town" => session.views.town_open("Ashford", "town0", 3, 4),
+            "home" => session.views.home_castle_open(),
+            "own" => session.views.own_castle_open("castle0"),
+            "recruit" => session
+                .views
+                .recruit_soldiers_open(resources, &session.game),
+            "gate" => session
+                .views
+                .gate_open(&[GateDestination::default()], false),
+            "spells" => {
+                session.views.spells_set_cast_mode(true);
+                session.views.set(ViewKind::Spells);
+            }
+            "controls" => session.views.set(ViewKind::Controls),
+            _ => unreachable!(),
+        }
+    }
+
+    /// D2's hard rule: a backdrop click walks a menu view back without
+    /// committing. For every menu view the Game, Map, Fog and hero position
+    /// are untouched, no prompt or dialog opens, and the view is dismissed.
+    #[test]
+    fn a_backdrop_click_never_commits_and_never_walks() {
+        let harness = Harness::load();
+        big_stack(move || {
+            for name in [
+                "town", "home", "own", "recruit", "gate", "spells", "controls",
+            ] {
+                let mut session = harness.start();
+                let mut list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut session, &mut list, &mut now);
+
+                open_view(&mut session, name);
+                let before = (session.game, session.map.clone(), session.fog);
+                let pos_before = (session.game.position.x, session.game.position.y);
+
+                // Draw a frame so the view publishes its backdrop, then click it.
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                let (bx, by) = view_backdrop_point(&session);
+                drive(&mut session, &mut list, &[], Some((bx, by)), true, &mut now);
+
+                assert_eq!(
+                    session.views.active(),
+                    None,
+                    "{name} dismisses on the backdrop"
+                );
+                assert_eq!(
+                    (session.game, session.map.clone(), session.fog),
+                    before,
+                    "{name} backdrop never commits"
+                );
+                assert_eq!(
+                    (session.game.position.x, session.game.position.y),
+                    pos_before,
+                    "{name} backdrop never walks"
+                );
+                assert!(
+                    !session.prompt.is_active(),
+                    "{name} backdrop opens no prompt"
+                );
+                assert!(
+                    !session.dialog.is_active(),
+                    "{name} backdrop opens no dialog"
+                );
+            }
+        });
+    }
+
+    /// Clicking the backdrop is exactly ESC, snapshot for snapshot: the Game,
+    /// Map, Fog, active view, prompt and dialog converge for every menu view.
+    #[test]
+    fn clicking_the_backdrop_matches_escape_snapshot_for_snapshot() {
+        let harness = Harness::load();
+        big_stack(move || {
+            for name in [
+                "town", "home", "own", "recruit", "gate", "spells", "controls",
+            ] {
+                let mut by_key = harness.start();
+                let mut key_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_key, &mut key_list, &mut now);
+                open_view(&mut by_key, name);
+                drive(
+                    &mut by_key,
+                    &mut key_list,
+                    &[Key::Escape],
+                    None,
+                    false,
+                    &mut now,
+                );
+                let keyed = snap(&by_key);
+
+                let mut by_click = harness.start();
+                let mut click_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_click, &mut click_list, &mut now);
+                open_view(&mut by_click, name);
+                drive(&mut by_click, &mut click_list, &[], None, false, &mut now);
+                let (bx, by) = view_backdrop_point(&by_click);
+                drive(
+                    &mut by_click,
+                    &mut click_list,
+                    &[],
+                    Some((bx, by)),
+                    true,
+                    &mut now,
+                );
+                let clicked = snap(&by_click);
+
+                assert_eq!(clicked, keyed, "backdrop should equal ESC for {name}");
+            }
+        });
     }
 }

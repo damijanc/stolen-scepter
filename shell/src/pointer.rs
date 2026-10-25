@@ -74,6 +74,14 @@ pub enum HitTarget {
     /// The map around the hero action menu: a click there closes the menu and
     /// never commits, mirroring `CombatBack`.
     OverworldMenuClose,
+    /// The full-screen backdrop a menu view publishes BEFORE its rows (D2):
+    /// a click there is exactly that view's ESC -- dismiss or cancel, never a
+    /// commit. One variant serves every menu view, resolved on the view it
+    /// arrived on in the `*_click` methods.
+    ViewBack,
+    /// The own-castle mode subtitle ("Remove troops (Space=Garrison)" and its
+    /// inverse): a click there toggles garrison/remove, exactly as Space does.
+    OwnCastleToggle,
 }
 
 /// One actionable rectangle, in logical coordinates.
