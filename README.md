@@ -8,6 +8,10 @@ reimplementation of King's Bounty. `engine/` holds the game rules and is
 render-free. `shell/` is the playable macroquad front end. Contributors and
 agents should read `AGENTS.md` first.
 
+[![Watch the gameplay video](presentation-assets/09-gameplay.png)](https://youtu.be/Ozc0ysCaF0c)
+
+*Click the image to watch a 72-second gameplay video on YouTube.*
+
 **Status: work in progress.** The engine and shell are complete, but the game
 still needs a content pack. Our own pack -- art, maps, text and music made for
 this game, with nothing from the original -- is being built
