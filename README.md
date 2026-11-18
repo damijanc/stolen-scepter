@@ -2,67 +2,25 @@
 
 A turn-based fantasy strategy game: recruit an army, hunt down the realm's
 villains under royal contract, and recover the stolen scepter before time runs
-out. It is built on a parity-first Rust port of
-[OpenBounty](https://github.com/dannyheskett/openbounty), the MIT-licensed C
-reimplementation of King's Bounty. `engine/` holds the game rules and is
-render-free. `shell/` is the playable macroquad front end. Contributors and
-agents should read `AGENTS.md` first.
+out.
 
 [![Watch the gameplay video](presentation-assets/09-gameplay.png)](https://youtu.be/Ozc0ysCaF0c)
 
 *Click the image to watch a 72-second gameplay video on YouTube.*
 
-**Status: work in progress.** The engine and shell are complete, but the game
-still needs a content pack. Our own pack -- art, maps, text and music made for
-this game, with nothing from the original -- is being built
-(`specs/publish-plan.md`); until it lands, the game plays only with a pack you
-supply yourself, as described below. A signed macOS DMG will follow.
+**Status: stable.** The game is complete and ships with its own content pack
+(`packs/stolen-scepter/`): art, maps, text and music made for this game, with
+nothing from the original. The game is MIT-licensed (`LICENSE`).
 
-No original King's Bounty assets live in this repository, and CI checks every
-change for them (`tools/check_independent.py`, `NOTICES.md`). The licence is
-MIT (`LICENSE`), keeping OpenBounty's copyright notice.
+## Installing
 
-## Setting up a machine
+Download the latest `Stolen-Scepter-<version>-macos-arm64.dmg` from
+[GitHub Releases](https://github.com/damijanc/stolen-scepter/releases/latest),
+open it and drag **Stolen Scepter** into Applications. The app is signed with
+a Developer ID and notarized by Apple, so it opens without a Gatekeeper
+warning. It needs an Apple Silicon Mac running macOS 11 or later.
 
-1. Install a Rust toolchain with [rustup](https://rustup.rs).
-2. Clone this repository.
-3. Clone OpenBounty into `reference/`, at the commit this port is verified
-   against:
-
-   ```sh
-   git clone https://github.com/dannyheskett/openbounty.git reference
-   git -C reference checkout e674817
-   ```
-
-   The stock pack is `reference/assets/kings-bounty/`: `game.json`, maps, art,
-   audio and palettes. If you would rather build the pack from your own copy
-   of the game, use OpenBounty's extractor (`--extract /path/to/KB.EXE`, see
-   its README) and pass the result to `--pack`.
-
-`game-assets/` (the manuals and the original DOS and Amiga releases) is also
-gitignored. It is needed only to cross-check behaviour against the manual or
-the original binary, not to play. Copy it between machines privately and never
-commit it.
-
-## Running
-
-```sh
-cargo run -p openbounty-shell --release -- --pack reference/assets/kings-bounty
-```
-
-Flags:
-
-| Flag | Meaning |
-|---|---|
-| `--pack <dir \| file.openbounty \| name>` | The game pack to load. Without it, one discovered pack loads silently and two or more open a picker. |
-| `--seed <n>` | Fixed world seed. Without it, the seed comes from time, name and class, so every run is a new world. Use a fixed seed to reproduce a bug. |
-| `--save-dir <dir>` | Keep save slots in `<dir>` instead of the user-data directory. Useful for throwaway test saves. |
-
-A reproducible test session:
-
-```sh
-cargo run -p openbounty-shell --release -- --seed 1 --save-dir /tmp/kb-play --pack reference/assets/kings-bounty
-```
+Saves are kept in your user-data directory and survive updates.
 
 ## Playing
 
@@ -75,20 +33,53 @@ cargo run -p openbounty-shell --release -- --seed 1 --save-dir /tmp/kb-play --pa
   `D` dismiss a troop.
 - ESC closes whatever is open. On the bare overworld it opens the Game Menu
   (Save / Load / Quit). `Q` saves to slot 0 and shows a confirmation, and Ctrl+Q quits.
-- F10 opens the debug menu, for setting up scenarios: `G` +50000 gold,
-  `V` +100 leadership, `M` spell power, `U` +1 of every spell, `S` siege
-  weapons, `F` flight, `N` next continent, `O` clear the fog, `W` win,
-  `L` lose screen.
 - Rest is numpad 5 only, as in the original, so it cannot be used on a
   keyboard without a numpad.
 
-## Verifying behaviour
+## Building from source
+
+Only needed if you want to work on the game. Contributors and agents should
+read `AGENTS.md` first.
+
+1. Install a Rust toolchain with [rustup](https://rustup.rs).
+2. Clone this repository.
+3. Run the game with its own pack:
+
+   ```sh
+   cargo run -p openbounty-shell --release -- --pack packs/stolen-scepter
+   ```
+
+A local, unsigned DMG can be built with `tools/make_dmg.sh`; signed releases
+are cut by pushing a `vX.Y.Z` tag, which runs `.github/workflows/macos-dmg.yml`.
+
+### Flags
+
+| Flag | Meaning |
+|---|---|
+| `--pack <dir \| file.openbounty \| name>` | The game pack to load. Without it, one discovered pack loads silently and two or more open a picker. |
+| `--seed <n>` | Fixed world seed. Without it, the seed comes from time, name and class, so every run is a new world. Use a fixed seed to reproduce a bug. |
+| `--save-dir <dir>` | Keep save slots in `<dir>` instead of the user-data directory. Useful for throwaway test saves. |
+
+A reproducible test session:
+
+```sh
+cargo run -p openbounty-shell --release -- --seed 1 --save-dir /tmp/kb-play --pack packs/stolen-scepter
+```
+
+### Debug menu
+
+F10 opens the debug menu, for setting up scenarios: `G` +50000 gold,
+`V` +100 leadership, `M` spell power, `U` +1 of every spell, `S` siege
+weapons, `F` flight, `N` next continent, `O` clear the fog, `W` win,
+`L` lose screen.
+
+### Verifying behaviour
 
 `specs/play-verification.md` describes the game section by section, with
 scenarios to check in play. Results go into
 `specs/play-verification-findings.md`.
 
-## Tests
+### Tests
 
 ```sh
 cargo fmt --all --check

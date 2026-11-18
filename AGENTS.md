@@ -67,9 +67,12 @@ will be selected only after headless engine parity is solid.
   must use our own names and words. One deliberate divergence it caused:
   `ResWorld::default().starting_zone` is "home", not C's original continent id.
 - `reference/`: local, ignored clone of OpenBounty. Read it for source parity;
-  never commit it.
+  never commit it. Set it up at the commit this port is verified against:
+  `git clone https://github.com/dannyheskett/openbounty.git reference` then
+  `git -C reference checkout e674817`.
 - `game-assets/`: local, ignored manuals and game binaries. Use as secondary
-  evidence only; do not commit assets or binaries.
+  evidence only; do not commit assets or binaries. Copy it between machines
+  privately; it is never needed to play.
 - `NOTICES.md`: licensing and asset policy. Preserve OpenBounty attribution.
 
 ## Current Engine State
