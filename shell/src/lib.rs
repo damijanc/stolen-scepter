@@ -19,6 +19,7 @@ pub mod interact;
 pub mod layout;
 pub mod map_render;
 pub mod menu;
+pub mod numpad;
 pub mod pack;
 pub mod pack_select;
 pub mod palette;

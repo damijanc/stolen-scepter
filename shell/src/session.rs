@@ -2111,6 +2111,7 @@ mod tests {
     use crate::hud::{Hud, OVERWORLD_ACTIONS, PANEL_COUNT};
     use crate::input::{Key, Keys};
     use crate::layout::Layout;
+    use crate::numpad::PadKey;
     use crate::palette::Palette;
     use crate::pointer::HitTarget;
     use crate::present::Present;
@@ -2965,14 +2966,9 @@ mod tests {
         });
     }
 
-    #[test]
-    fn a_dwelling_recruit_dismisses_the_dwelling_view() {
-        let harness = Harness::load();
-        let mut session = harness.start();
-        let mut list = DrawList::new();
-        let mut now = 0.0;
-        to_overworld(&mut session, &mut list, &mut now);
-
+    /// Stand next to a stocked home-zone dwelling and step onto it, leaving
+    /// its view and "how many" prompt up.
+    fn step_onto_dwelling(session: &mut Session, list: &mut DrawList, now: &mut f64) {
         let zone = session.game.position.zone.as_str().to_owned();
         let dw = (0..session.game.dwelling_count)
             .map(|i| session.game.dwellings[i])
@@ -2997,9 +2993,9 @@ mod tests {
             session.game.position.y = sy;
             session.game.position.last_x = sx;
             session.game.position.last_y = sy;
-            drive(&mut session, &mut list, &[], None, false, &mut now);
-            drive(&mut session, &mut list, &[key], None, false, &mut now);
-            drive(&mut session, &mut list, &[], None, false, &mut now);
+            drive(session, list, &[], None, false, now);
+            drive(session, list, &[key], None, false, now);
+            drive(session, list, &[], None, false, now);
             if session.views.active() == Some(ViewKind::Dwelling) && session.prompt.is_active() {
                 reached = true;
                 break;
@@ -3009,6 +3005,63 @@ mod tests {
             reached,
             "stepping onto the dwelling opens its view and prompt"
         );
+    }
+
+    /// MAX then OK on the count strip buys what typing the cap and pressing
+    /// Enter buys.
+    #[test]
+    fn tapping_max_and_ok_at_a_dwelling_matches_typing_the_cap() {
+        big_stack(|| {
+            let harness = Harness::load();
+            let run = |by_click: bool| {
+                let mut session = harness.start();
+                let mut list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut session, &mut list, &mut now);
+                step_onto_dwelling(&mut session, &mut list, &mut now);
+                if by_click {
+                    for key in [PadKey::Max, PadKey::Ok] {
+                        let at = region_center(&session, HitTarget::Pad(key));
+                        drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+                        drive(&mut session, &mut list, &[], None, false, &mut now);
+                    }
+                } else {
+                    let mut probe = session.prompt.clone();
+                    probe.click(HitTarget::Pad(PadKey::Max));
+                    let cap = probe.text_input_value();
+                    assert!(cap > 0, "the hero can afford at least one");
+                    for ch in cap.to_string().chars() {
+                        let key = crate::input::DIGITS[ch.to_digit(10).unwrap() as usize];
+                        drive(&mut session, &mut list, &[key], None, false, &mut now);
+                    }
+                    drive(
+                        &mut session,
+                        &mut list,
+                        &[Key::Enter],
+                        None,
+                        false,
+                        &mut now,
+                    );
+                    drive(&mut session, &mut list, &[], None, false, &mut now);
+                }
+                snap(&session)
+            };
+            let keyed = run(false);
+            let clicked = run(true);
+            assert!(!keyed.4.is_active(), "the prompt closed");
+            assert_eq!(clicked, keyed);
+        });
+    }
+
+    #[test]
+    fn a_dwelling_recruit_dismisses_the_dwelling_view() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+
+        step_onto_dwelling(&mut session, &mut list, &mut now);
 
         // The interaction screen is the prompt on top of the dwelling info
         // panel, exactly as C layers them.
@@ -3017,10 +3070,7 @@ mod tests {
             texts.iter().any(|t| t.contains("Hire how many")),
             "{texts:?}"
         );
-        assert!(
-            texts.iter().any(|t| t.contains("Enter to confirm")),
-            "{texts:?}"
-        );
+        assert!(texts.iter().any(|t| t == "MAX"), "{texts:?}");
 
         let gold_before = session.game.stats.gold;
         drive(

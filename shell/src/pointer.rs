@@ -40,6 +40,10 @@ pub enum HitTarget {
     /// a numbered prompt, A (0) or B (1) on an A/B one. Resolves through the
     /// same `index_result` the digit and letter keys use.
     PromptPick(usize),
+    /// A key of the count strip (`numpad.rs`). One variant serves both count
+    /// surfaces -- a dwelling's prompt and the castle recruit box -- resolved
+    /// by whichever is active, the way `ViewBack` is.
+    Pad(crate::numpad::PadKey),
     /// A Game Menu entry, by drawn index.
     MenuEntry(usize),
     /// The screen around the Game Menu panel: a click there is ESC.

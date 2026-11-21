@@ -25,6 +25,7 @@ use crate::draw::{DrawList, Rect};
 use crate::font;
 use crate::input::{Key, KeySource, DIGITS, NUMPAD_DIGITS};
 use crate::layout::{Layout, PANEL_COLS, PANEL_H, PANEL_PAD_X};
+use crate::numpad::{self, PadKey};
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
 
@@ -55,7 +56,6 @@ enum Kind {
 
 /// Hint strings C compiles in, used when the pack declares none. The pack's
 /// overrides live under `strings.prompts` (see `resources.c`).
-pub const DEFAULT_TEXT_HINT: &str = "(Enter to confirm / ESC cancel)";
 pub const DEFAULT_YES_NO_HINT: &str = "(y/n)?";
 
 /// One modal prompt. A zero-value `Prompt` has no prompt active.
@@ -172,8 +172,54 @@ impl Prompt {
                 self.dismiss();
                 index_result(i)
             }
+            (Kind::TextInput, HitTarget::Pad(key)) => match key {
+                PadKey::Digit(d) => {
+                    self.type_digit(d);
+                    PromptResult::None
+                }
+                PadKey::Del => {
+                    self.backspace();
+                    PromptResult::None
+                }
+                PadKey::Max => {
+                    self.fill_max();
+                    PromptResult::None
+                }
+                PadKey::Ok => self.commit(),
+            },
             _ => PromptResult::None,
         }
+    }
+
+    /// Type one digit into the count box. A digit that would overrun the
+    /// length or the value cap is rejected without being typed.
+    fn type_digit(&mut self, d: u8) {
+        if self.buffer.len() >= self.max_digits as usize {
+            return;
+        }
+        let candidate = format!("{}{}", self.buffer, d);
+        if candidate.parse::<i32>().unwrap_or(i32::MAX) > self.max_value {
+            return;
+        }
+        self.buffer.push(char::from(b'0' + d));
+    }
+
+    fn backspace(&mut self) {
+        self.buffer.pop();
+    }
+
+    /// Fill the count box with the value cap, cut to the length cap.
+    fn fill_max(&mut self) {
+        let mut max = self.max_value.max(0).to_string();
+        max.truncate(self.max_digits as usize);
+        self.buffer = max;
+    }
+
+    /// Commit by kind only, leaving the buffer readable through
+    /// `text_input_value()`; the next open zeroes it.
+    fn commit(&mut self) -> PromptResult {
+        self.kind = Kind::None;
+        PromptResult::Yes
     }
 
     /// Poll one frame of input. Returns [`PromptResult::None`] while still
@@ -228,31 +274,18 @@ impl Prompt {
                 PromptResult::None
             }
             Kind::TextInput => {
-                // One digit per frame. A digit that would overrun the length
-                // or the value cap is rejected without being typed.
-                for d in 0..10usize {
-                    let pressed = keys.pressed(DIGITS[d]) || keys.pressed(NUMPAD_DIGITS[d]);
-                    if !pressed {
-                        continue;
-                    }
-                    if self.buffer.len() >= self.max_digits as usize {
+                // One digit per frame.
+                for d in 0..10u8 {
+                    if keys.pressed(DIGITS[d as usize]) || keys.pressed(NUMPAD_DIGITS[d as usize]) {
+                        self.type_digit(d);
                         break;
                     }
-                    let candidate = format!("{}{}", self.buffer, d);
-                    if candidate.parse::<i32>().unwrap_or(i32::MAX) > self.max_value {
-                        break;
-                    }
-                    self.buffer.push((b'0' + d as u8) as char);
-                    break;
                 }
-                if keys.pressed(Key::Backspace) && !self.buffer.is_empty() {
-                    self.buffer.pop();
+                if keys.pressed(Key::Backspace) {
+                    self.backspace();
                 }
                 if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) {
-                    // Commit by kind only, leaving the buffer readable through
-                    // text_input_value(); the next open zeroes it.
-                    self.kind = Kind::None;
-                    return PromptResult::Yes;
+                    return self.commit();
                 }
                 PromptResult::None
             }
@@ -343,8 +376,9 @@ impl Prompt {
                     y + h - row_h * 2 - 2,
                     palette.clr(Pal::White),
                 );
-                let hint = banner::text(resources, "prompts", "text_hint", DEFAULT_TEXT_HINT);
-                list.text_centered(hint, x + w / 2, y + h - row_h - 2, palette.clr(Pal::Yellow));
+                // DIVERGENCE: the tappable count strip takes C's hint row.
+                let strip = Rect::new(x + pad, y + h - row_h - 2, w - 2 * pad, row_h);
+                numpad::draw(list, hits, strip, palette);
             }
             Kind::Numeric => {
                 let labels: Vec<String> = (1..=self.max_choice).map(|n| n.to_string()).collect();
@@ -810,7 +844,7 @@ mod tests {
     }
 
     #[test]
-    fn a_text_input_draws_the_typed_value_with_a_caret_and_its_hint() {
+    fn a_text_input_draws_the_typed_value_with_a_caret_and_the_count_strip() {
         let resources = pack("{}");
         let layout = legacy_layout(&resources);
         let palette = Palette::fallback();
@@ -823,7 +857,10 @@ mod tests {
         prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("2_"));
-        assert!(list.has_text_containing("(Enter to confirm / ESC cancel)"));
+        // DIVERGENCE: the count strip takes C's "(Enter to confirm / ESC
+        // cancel)" row; its OK and < name what Enter and Backspace do.
+        assert!(list.has_text_containing("OK"));
+        assert!(!list.has_text_containing("Enter to confirm"));
     }
 
     #[test]
@@ -1078,5 +1115,91 @@ mod tests {
                 .iter()
                 .all(|r| r.rect.y + r.rect.h <= body_y || r.rect.y > body_y));
         }
+    }
+
+    fn pad(key: crate::numpad::PadKey) -> HitTarget {
+        HitTarget::Pad(key)
+    }
+
+    #[test]
+    fn pad_clicks_type_the_same_count_as_keys() {
+        use crate::numpad::PadKey::*;
+        let mut prompt = Prompt::default();
+        prompt.text_input("h", "b", 3, 50);
+        assert_eq!(prompt.click(pad(Digit(4))), PromptResult::None);
+        assert_eq!(prompt.click(pad(Digit(2))), PromptResult::None);
+        assert_eq!(prompt.text_input_value(), 42);
+        // 429 > 50: rejected exactly as the key path rejects it.
+        prompt.click(pad(Digit(9)));
+        assert_eq!(prompt.text_input_value(), 42);
+        prompt.click(pad(Del));
+        assert_eq!(prompt.text_input_value(), 4);
+        assert_eq!(prompt.click(pad(Ok)), PromptResult::Yes);
+        assert!(!prompt.is_active());
+        assert_eq!(prompt.text_input_value(), 4);
+
+        let mut keyed = Prompt::default();
+        keyed.text_input("h", "b", 3, 50);
+        for key in [Key::Digit4, Key::Digit2, Key::Digit9, Key::Backspace] {
+            keyed.update(&Keys::pressed(&[key]));
+        }
+        assert_eq!(
+            keyed.update(&Keys::pressed(&[Key::Enter])),
+            PromptResult::Yes
+        );
+        assert_eq!(keyed, prompt);
+    }
+
+    #[test]
+    fn pad_max_fills_the_value_cap() {
+        use crate::numpad::PadKey::*;
+        let mut prompt = Prompt::default();
+        prompt.text_input("h", "b", 4, 137);
+        prompt.click(pad(Digit(5)));
+        prompt.click(pad(Max));
+        assert_eq!(prompt.click(pad(Ok)), PromptResult::Yes);
+        assert_eq!(prompt.text_input_value(), 137);
+    }
+
+    #[test]
+    fn pad_regions_are_published_only_for_text_input() {
+        let resources = pack("{}");
+        let layout = legacy_layout(&resources);
+        let panel = Rect::new(
+            layout.panel_x(),
+            layout.panel_y(),
+            layout.panel_w(),
+            PANEL_H,
+        );
+        let count = |hits: &HitList| {
+            hits.regions()
+                .iter()
+                .filter(|r| matches!(r.target, HitTarget::Pad(_)))
+                .inspect(|r| {
+                    assert!(r.rect.x >= panel.x && r.rect.x + r.rect.w <= panel.x + panel.w);
+                    assert!(r.rect.y >= panel.y && r.rect.y + r.rect.h <= panel.y + panel.h);
+                })
+                .count()
+        };
+        let mut prompt = Prompt::default();
+        prompt.text_input("Hire", "Hire how many?", 4, 900);
+        assert_eq!(count(&drawn(&prompt, &resources).1), 13);
+        prompt.yes_no("h", "b");
+        assert_eq!(count(&drawn(&prompt, &resources).1), 0);
+        prompt.numeric("h", "b", 3);
+        assert_eq!(count(&drawn(&prompt, &resources).1), 0);
+        prompt.ab("", "A) x\nB) y");
+        assert_eq!(count(&drawn(&prompt, &resources).1), 0);
+    }
+
+    #[test]
+    fn pad_keys_do_nothing_on_other_prompts() {
+        let mut prompt = Prompt::default();
+        prompt.yes_no("h", "b");
+        assert_eq!(
+            prompt.click(pad(crate::numpad::PadKey::Ok)),
+            PromptResult::None
+        );
+        assert!(prompt.is_active());
     }
 }
