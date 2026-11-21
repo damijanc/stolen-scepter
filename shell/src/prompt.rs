@@ -56,9 +56,7 @@ enum Kind {
 /// Hint strings C compiles in, used when the pack declares none. The pack's
 /// overrides live under `strings.prompts` (see `resources.c`).
 pub const DEFAULT_TEXT_HINT: &str = "(Enter to confirm / ESC cancel)";
-pub const DEFAULT_NUMERIC_RANGE_HINT: &str = "(1-%COUNT% or ESC)";
 pub const DEFAULT_YES_NO_HINT: &str = "(y/n)?";
-pub const DEFAULT_NUMERIC_5_HINT: &str = "(1-5 or ESC)";
 
 /// One modal prompt. A zero-value `Prompt` has no prompt active.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -163,12 +161,17 @@ impl Prompt {
     /// kinds have no clickable affordance, so no regions are published for
     /// them and their clicks resolve to [`PromptResult::None`].
     pub fn click(&mut self, target: HitTarget) -> PromptResult {
-        if self.kind != Kind::YesNo {
-            return PromptResult::None;
-        }
-        match target {
-            HitTarget::PromptYes => self.yes_no_answer(true),
-            HitTarget::PromptNo => self.yes_no_answer(false),
+        match (self.kind, target) {
+            (Kind::YesNo, HitTarget::PromptYes) => self.yes_no_answer(true),
+            (Kind::YesNo, HitTarget::PromptNo) => self.yes_no_answer(false),
+            (Kind::Numeric, HitTarget::PromptPick(i)) if i < self.max_choice as usize => {
+                self.dismiss();
+                index_result(i)
+            }
+            (Kind::AbChoice, HitTarget::PromptPick(i)) if i < 2 => {
+                self.dismiss();
+                index_result(i)
+            }
             _ => PromptResult::None,
         }
     }
@@ -278,13 +281,21 @@ impl Prompt {
         let h = PANEL_H;
         let max_chars = PANEL_COLS as usize;
 
+        // An A/B body that lists its options as "A) ..." / "B) ..." lines is
+        // tapped on those lines; one that does not gets a two-cell strip.
+        let ab_lines = self.kind == Kind::AbChoice
+            && self
+                .body
+                .lines()
+                .any(|line| banner::choice_index(line).is_some());
+
         // Rows reserved at the bottom for the hint chrome, rendered after the
-        // body: two for a text input (typed value + hint), one for a
-        // yes/no or numeric hint, none for an A/B choice whose body names the
-        // keys.
+        // body: two for a text input (typed value + hint), one for a yes/no
+        // hint or a choice strip, none for an A/B choice whose body names
+        // (and is tapped on) its options.
         let bottom_rows = match self.kind {
             Kind::TextInput => 2,
-            Kind::AbChoice => 0,
+            Kind::AbChoice if ab_lines => 0,
             _ => 1,
         };
 
@@ -303,9 +314,23 @@ impl Prompt {
         let mut cursor = self.body.as_str();
         let body_step = font::GLYPH_H;
         let body_floor = y + h - pad - bottom_rows * row_h;
+        // The option a wrapped line belongs to: set by its "A)" / "B)" line and
+        // carried onto the continuation lines below it.
+        let mut option = None;
         while !cursor.is_empty() && ty + body_step <= body_floor {
             let line = take_line(&mut cursor, max_chars);
             list.text(&line, x + pad, ty, palette.clr(Pal::White));
+            if ab_lines {
+                if let Some(choice) = banner::choice_index(&line) {
+                    option = Some(choice);
+                }
+                if let Some(choice) = option {
+                    hits.push(
+                        Rect::new(x, ty, w, body_step),
+                        HitTarget::PromptPick(choice),
+                    );
+                }
+            }
             ty += body_step;
         }
 
@@ -321,33 +346,33 @@ impl Prompt {
                 let hint = banner::text(resources, "prompts", "text_hint", DEFAULT_TEXT_HINT);
                 list.text_centered(hint, x + w / 2, y + h - row_h - 2, palette.clr(Pal::Yellow));
             }
-            Kind::Numeric if self.max_choice != 5 => {
-                let hint = banner::formatted(
-                    resources,
-                    "prompts",
-                    "numeric_range_hint",
-                    DEFAULT_NUMERIC_RANGE_HINT,
-                    &[("COUNT", &self.max_choice.to_string())],
-                );
-                list.text_centered(
-                    &hint,
-                    x + w / 2,
+            Kind::Numeric => {
+                let labels: Vec<String> = (1..=self.max_choice).map(|n| n.to_string()).collect();
+                choice_strip(
+                    list,
+                    hits,
+                    x + pad,
                     y + h - row_h - 2,
-                    palette.clr(Pal::Yellow),
+                    w - 2 * pad,
+                    &labels,
+                    palette,
+                );
+            }
+            Kind::AbChoice if !ab_lines => {
+                let labels = ["A".to_owned(), "B".to_owned()];
+                choice_strip(
+                    list,
+                    hits,
+                    x + pad,
+                    y + h - row_h - 2,
+                    w - 2 * pad,
+                    &labels,
+                    palette,
                 );
             }
             Kind::AbChoice => {}
             _ => {
-                let hint = if self.kind == Kind::YesNo {
-                    banner::text(resources, "prompts", "yes_no_hint", DEFAULT_YES_NO_HINT)
-                } else {
-                    banner::text(
-                        resources,
-                        "prompts",
-                        "numeric_5_hint",
-                        DEFAULT_NUMERIC_5_HINT,
-                    )
-                };
+                let hint = banner::text(resources, "prompts", "yes_no_hint", DEFAULT_YES_NO_HINT);
                 list.text_centered(hint, x + w / 2, y + h - row_h - 2, palette.clr(Pal::Yellow));
             }
         }
@@ -362,6 +387,37 @@ impl Prompt {
                 HitTarget::PromptNo,
             );
         }
+    }
+}
+
+/// A row of equal cells, one per label, each published as
+/// `PromptPick(index)`. The numbered picker and a bare A/B prompt answer here:
+/// the labels name the keys, so the strip doubles as the keyboard hint.
+fn choice_strip(
+    list: &mut DrawList,
+    hits: &mut HitList,
+    x: i32,
+    y: i32,
+    w: i32,
+    labels: &[String],
+    palette: &Palette,
+) {
+    let n = labels.len() as i32;
+    if n == 0 {
+        return;
+    }
+    for (i, label) in labels.iter().enumerate() {
+        let left = x + w * i as i32 / n;
+        let right = x + w * (i as i32 + 1) / n;
+        let rect = Rect::new(left, y, right - left, font::GLYPH_H + 1);
+        list.rect_lines(rect, palette.clr(Pal::Yellow));
+        list.text_centered(
+            label,
+            left + (right - left) / 2,
+            y,
+            palette.clr(Pal::Yellow),
+        );
+        hits.push(rect, HitTarget::PromptPick(i));
     }
 }
 
@@ -740,34 +796,17 @@ mod tests {
         assert_eq!(take_line(&mut text, 30), "world");
     }
 
+    /// DIVERGENCE: C draws a "(1-N or ESC)" hint under a numbered picker.
+    /// The tappable digit strip takes that row instead; its labels name the
+    /// keys, and ESC (Android Back) still cancels.
     #[test]
-    fn the_numeric_range_hint_carries_the_ceiling() {
+    fn the_numeric_strip_replaces_the_key_hint() {
         let resources = pack("{}");
-        let layout = legacy_layout(&resources);
-        let palette = Palette::fallback();
         let mut prompt = Prompt::default();
         prompt.numeric("Go to which continent?", "1 a 2 b 3 c", 3);
-
-        let mut list = DrawList::new();
-        let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
-
-        assert!(list.has_text_containing("(1-3 or ESC)"));
-    }
-
-    #[test]
-    fn a_full_five_numeric_picker_uses_the_five_hint() {
-        let resources = pack("{}");
-        let layout = legacy_layout(&resources);
-        let palette = Palette::fallback();
-        let mut prompt = Prompt::default();
-        prompt.numeric("Dismiss Army", "1 militia", 5);
-
-        let mut list = DrawList::new();
-        let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
-
-        assert!(list.has_text_containing("(1-5 or ESC)"));
+        let (list, hits) = drawn(&prompt, &resources);
+        assert!(!list.has_text_containing("or ESC"));
+        assert_eq!(picks(&hits).len(), 3);
     }
 
     #[test]
@@ -882,5 +921,162 @@ mod tests {
             hits.hit(no.rect.x + 1, no.rect.y + 1),
             Some(HitTarget::PromptNo)
         );
+    }
+
+    fn drawn(prompt: &Prompt, resources: &Resources) -> (DrawList, HitList) {
+        let layout = legacy_layout(resources);
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        prompt.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            resources,
+        );
+        (list, hits)
+    }
+
+    fn picks(hits: &HitList) -> Vec<(Rect, usize)> {
+        hits.regions()
+            .iter()
+            .filter_map(|r| match r.target {
+                HitTarget::PromptPick(i) => Some((r.rect, i)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The shipped chest body, with its numbers filled in.
+    const CHEST_BODY: &str = "Beneath an old stone you\nfind a buried hoard.\nYou may:\nA) Keep the 400 gold.\nB) Share it with the local\nfolk, which raises your\nleadership by 40.";
+
+    #[test]
+    fn numeric_pick_click_equals_digit_key() {
+        for max in 1..=5 {
+            for i in 0..max as usize {
+                let mut by_key = Prompt::default();
+                by_key.numeric("h", "b", max);
+                let keyed = by_key.update(&Keys::pressed(&[DIGITS[i + 1]]));
+                let mut by_click = Prompt::default();
+                by_click.numeric("h", "b", max);
+                assert_eq!(by_click.click(HitTarget::PromptPick(i)), keyed);
+                assert!(!by_click.is_active());
+            }
+            let mut beyond = Prompt::default();
+            beyond.numeric("h", "b", max);
+            assert_eq!(
+                beyond.click(HitTarget::PromptPick(max as usize)),
+                PromptResult::None
+            );
+            assert!(beyond.is_active());
+        }
+    }
+
+    #[test]
+    fn ab_pick_click_equals_a_and_b_keys() {
+        for (i, key) in [(0, Key::A), (1, Key::B)] {
+            let mut by_key = Prompt::default();
+            by_key.ab("", CHEST_BODY);
+            let keyed = by_key.update(&Keys::pressed(&[key]));
+            let mut by_click = Prompt::default();
+            by_click.ab("", CHEST_BODY);
+            assert_eq!(by_click.click(HitTarget::PromptPick(i)), keyed);
+            assert!(!by_click.is_active());
+        }
+    }
+
+    #[test]
+    fn numeric_strip_has_one_cell_per_choice_left_to_right() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.numeric("Dismiss", "Dismiss which troop?", 3);
+        let (list, hits) = drawn(&prompt, &resources);
+        let cells = picks(&hits);
+        assert_eq!(cells.iter().map(|c| c.1).collect::<Vec<_>>(), vec![0, 1, 2]);
+        let layout = legacy_layout(&resources);
+        let panel = Rect::new(
+            layout.panel_x(),
+            layout.panel_y(),
+            layout.panel_w(),
+            PANEL_H,
+        );
+        for (i, (rect, _)) in cells.iter().enumerate() {
+            assert!(rect.x >= panel.x && rect.x + rect.w <= panel.x + panel.w);
+            assert!(rect.y >= panel.y && rect.y + rect.h <= panel.y + panel.h);
+            let digit = (i + 1).to_string();
+            assert!(list.as_slice().iter().any(|cmd| matches!(cmd,
+                DrawCmd::Text { text, x, .. } if *text == digit && *x >= rect.x && *x < rect.x + rect.w)));
+        }
+    }
+
+    #[test]
+    fn ab_choice_lines_are_the_tap_targets() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.ab("", CHEST_BODY);
+        let (list, hits) = drawn(&prompt, &resources);
+        let line_y = |needle: &str| {
+            list.as_slice()
+                .iter()
+                .find_map(|cmd| match cmd {
+                    DrawCmd::Text { text, y, .. } if text.starts_with(needle) => Some(*y),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{needle} drawn"))
+        };
+        let at = |y: i32| hits.hit(hits.regions()[0].rect.x + 1, y + 1);
+        assert_eq!(at(line_y("Beneath")), None);
+        assert_eq!(at(line_y("You may")), None);
+        assert_eq!(at(line_y("A) Keep")), Some(HitTarget::PromptPick(0)));
+        assert_eq!(at(line_y("B) Share")), Some(HitTarget::PromptPick(1)));
+        assert_eq!(at(line_y("leadership by")), Some(HitTarget::PromptPick(1)));
+    }
+
+    #[test]
+    fn ab_body_without_choice_lines_gets_a_strip() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.ab("", "Take the gold or the glory?");
+        let (_, hits) = drawn(&prompt, &resources);
+        let cells = picks(&hits);
+        assert_eq!(cells.iter().map(|c| c.1).collect::<Vec<_>>(), vec![0, 1]);
+        assert_eq!(cells[0].0.y, cells[1].0.y, "two halves of one row");
+    }
+
+    #[test]
+    fn shipped_chest_body_fits() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.ab("", CHEST_BODY);
+        let (list, _) = drawn(&prompt, &resources);
+        for line in CHEST_BODY.lines() {
+            assert!(list.has_text_containing(line), "{line:?} drawn");
+        }
+    }
+
+    #[test]
+    fn yes_no_and_numeric_publish_nothing_over_the_body() {
+        let resources = pack("{}");
+        for numeric in [false, true] {
+            let mut prompt = Prompt::default();
+            if numeric {
+                prompt.numeric("h", "A) not a choice here", 2);
+            } else {
+                prompt.yes_no("h", "A) not a choice here");
+            }
+            let (list, hits) = drawn(&prompt, &resources);
+            let body_y = list
+                .as_slice()
+                .iter()
+                .find_map(|cmd| match cmd {
+                    DrawCmd::Text { text, y, .. } if text.starts_with("A)") => Some(*y),
+                    _ => None,
+                })
+                .expect("body drawn");
+            assert!(hits
+                .regions()
+                .iter()
+                .all(|r| r.rect.y + r.rect.h <= body_y || r.rect.y > body_y));
+        }
     }
 }

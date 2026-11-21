@@ -36,6 +36,10 @@ pub enum HitTarget {
     DialogDismiss,
     PromptYes,
     PromptNo,
+    /// A choice on a numbered (1-5) or A/B prompt, 0-based: choice `i + 1` on
+    /// a numbered prompt, A (0) or B (1) on an A/B one. Resolves through the
+    /// same `index_result` the digit and letter keys use.
+    PromptPick(usize),
     /// A Game Menu entry, by drawn index.
     MenuEntry(usize),
     /// The screen around the Game Menu panel: a click there is ESC.

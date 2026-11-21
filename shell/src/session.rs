@@ -2928,6 +2928,43 @@ mod tests {
     /// "Hire how many" with no input handler behind it -- the "two recruit
     /// screens" bug. This steps onto a dwelling, buys, and checks the view is
     /// gone.
+    /// A tap on the numbered strip's first cell dismisses the same stack as
+    /// pressing 1: the whole game converges.
+    #[test]
+    fn tapping_a_dismiss_choice_matches_its_digit_key() {
+        big_stack(|| {
+            let harness = Harness::load();
+            let run = |by_click: bool| {
+                let mut session = harness.start();
+                let mut list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut session, &mut list, &mut now);
+                drive(&mut session, &mut list, &[Key::D], None, false, &mut now);
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                assert_eq!(session.prompt.kind_str(), "numeric");
+                if by_click {
+                    let at = region_center(&session, HitTarget::PromptPick(0));
+                    drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+                } else {
+                    drive(
+                        &mut session,
+                        &mut list,
+                        &[Key::Digit1],
+                        None,
+                        false,
+                        &mut now,
+                    );
+                }
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                snap(&session)
+            };
+            let keyed = run(false);
+            let clicked = run(true);
+            assert!(!keyed.4.is_active() || keyed.4.kind_str() != "numeric");
+            assert_eq!(clicked, keyed);
+        });
+    }
+
     #[test]
     fn a_dwelling_recruit_dismisses_the_dwelling_view() {
         let harness = Harness::load();

@@ -2126,7 +2126,7 @@ impl Views {
             // Only the choice lines are clickable, keyed by the choice they
             // name: the body is pack text, and a title or blank line above
             // the choices must not shift which line recruits.
-            if let Some(choice) = home_castle_choice(line) {
+            if let Some(choice) = crate::banner::choice_index(line) {
                 hits.push(
                     Rect::new(x + PANEL_PAD_X, ty, w - 2 * PANEL_PAD_X, row_h),
                     HitTarget::HomeCastleRow(choice),
@@ -2427,20 +2427,6 @@ impl Views {
 
 /// Whether the hero owns the crystal orb for the current continent. Ports
 /// `worldmap_has_orb`, including its `zi < GAME_CONTINENTS` guard.
-/// Which home-castle choice a body line names: `Some(0)` for a line opening
-/// with `A)`, `A.`, `1)` or `1.` (Recruit), `Some(1)` for `B` / `2` (Audience),
-/// `None` for anything else. Matches both the shipped pack's lettered body and
-/// the compiled default's numbered one.
-fn home_castle_choice(line: &str) -> Option<usize> {
-    let mut chars = line.trim_start().chars();
-    let choice = match chars.next()?.to_ascii_uppercase() {
-        'A' | '1' => 0,
-        'B' | '2' => 1,
-        _ => return None,
-    };
-    matches!(chars.next(), Some(')' | '.')).then_some(choice)
-}
-
 pub fn worldmap_has_orb(game: &Game, resources: &Resources) -> bool {
     let Some(zone_index) = resources.zone_index_by_id(game.position.zone.as_str()) else {
         return false;
@@ -5251,17 +5237,6 @@ mod tests {
             let cy = region.rect.y + region.rect.h / 2;
             assert_eq!(hits.hit(cx, cy), Some(HitTarget::HomeCastleRow(row)));
         }
-    }
-
-    #[test]
-    fn home_castle_choice_reads_letter_and_number_prefixes() {
-        assert_eq!(home_castle_choice("A) Recruit soldiers"), Some(0));
-        assert_eq!(home_castle_choice("  b) Speak with the King"), Some(1));
-        assert_eq!(home_castle_choice("1. Recruit Soldiers"), Some(0));
-        assert_eq!(home_castle_choice("2. Audience"), Some(1));
-        assert_eq!(home_castle_choice("The Royal Hall"), None);
-        assert_eq!(home_castle_choice("Bravely onward"), None);
-        assert_eq!(home_castle_choice(""), None);
     }
 
     /// The shipped pack puts a title and a blank line above the choices, so

@@ -73,9 +73,35 @@ pub fn formatted(
     format(text(resources, group, key, default), vars)
 }
 
+/// Which choice a menu line in pack text names: `Some(0)` for a line opening
+/// with `A)`, `A.`, `1)` or `1.`, `Some(1)` for `B` / `2`, `None` otherwise.
+/// Pack bodies list their options this way (the home castle's lettered and
+/// numbered bodies, a chest's A/B), and the tap targets follow the option
+/// lines rather than line numbers, so a title above the options shifts nothing.
+pub fn choice_index(line: &str) -> Option<usize> {
+    let mut chars = line.trim_start().chars();
+    let choice = match chars.next()?.to_ascii_uppercase() {
+        'A' | '1' => 0,
+        'B' | '2' => 1,
+        _ => return None,
+    };
+    matches!(chars.next(), Some(')' | '.')).then_some(choice)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn choice_index_reads_letter_and_number_prefixes() {
+        assert_eq!(choice_index("A) Recruit soldiers"), Some(0));
+        assert_eq!(choice_index("  b) Speak with the King"), Some(1));
+        assert_eq!(choice_index("1. Recruit Soldiers"), Some(0));
+        assert_eq!(choice_index("2. Audience"), Some(1));
+        assert_eq!(choice_index("The Royal Hall"), None);
+        assert_eq!(choice_index("Bravely onward"), None);
+        assert_eq!(choice_index(""), None);
+    }
 
     fn pack(strings: &str) -> Resources {
         Resources::from_json_str(&format!(r#"{{"troops": [], "strings": {strings}}}"#))
