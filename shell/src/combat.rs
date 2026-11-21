@@ -1278,7 +1278,14 @@ impl CombatLoop {
             if combat_in_bounds(x, y) {
                 self.cursor_x = x;
                 self.cursor_y = y;
-                return self.cursor_passes(resources, out_x, out_y);
+                if self.cursor_passes(resources, out_x, out_y) {
+                    return true;
+                }
+                // DIVERGENCE: a tap on a cell the filter refuses cancels, as
+                // Esc does. The keyboard keeps the picker armed, but a touch
+                // player has no other way out -- and none at all when no
+                // cell passes.
+                *out_cancelled = true;
             }
             return false;
         }
@@ -1522,7 +1529,9 @@ pub fn combat_view_input(
     present: &mut Present,
 ) {
     if let Some(target) = clicked {
-        if target == HitTarget::ViewDismiss {
+        // A read-only view's tap anywhere, or Controls' backdrop: both are
+        // that view's Esc.
+        if target == HitTarget::ViewDismiss || target == HitTarget::ViewBack {
             views.dismiss();
         } else if let Some(row) = views.controls_click(target) {
             let vis = controls_visible(resources);
@@ -2603,20 +2612,65 @@ mod tests {
         assert_same(ai_turn, &[], &[click(HitTarget::CombatCell(4, 4))]);
     }
 
-    /// While a picker is armed a click is the arrows to that cell, then
-    /// Enter; a cell the filter refuses only moves the ring, as Enter does.
+    /// DIVERGENCE: on the keyboard a refused target leaves the picker armed.
+    /// A touch player has no Esc, so a tap on a cell the filter refuses
+    /// cancels the pick, exactly as moving the ring there and pressing Esc
+    /// does -- no shot, no spent turn.
     #[test]
-    fn an_armed_picker_takes_a_click_as_aim_and_enter() {
+    fn invalid_target_tap_cancels_without_acting() {
         assert_same(
             no_setup,
-            &[Key::S, Key::Right, Key::Right, Key::Enter],
+            &[Key::S, Key::Right, Key::Right, Key::Escape],
             &[
                 click(HitTarget::CombatCell(0, 0)),
                 click(HitTarget::CombatAction(CombatAction::Shoot)),
                 click(HitTarget::CombatCell(2, 0)),
             ],
         );
-        // And a cell that passes: the shot resolves.
+    }
+
+    /// The same for a spell's target pick, including one with no valid
+    /// target on the field: the charge is kept.
+    #[test]
+    fn a_spell_target_pick_cancels_on_a_refused_tap() {
+        let letter = COMBAT_SPELL_KEYS[COMBAT_SPELL_CLONE as usize];
+        assert_same(
+            mage,
+            &[Key::U, letter, Key::Right, Key::Right, Key::Escape],
+            &[
+                click(HitTarget::CombatCell(0, 0)),
+                click(HitTarget::CombatAction(CombatAction::Cast)),
+                click(HitTarget::CombatSpell(COMBAT_SPELL_CLONE as usize)),
+                click(HitTarget::CombatCell(2, 0)),
+            ],
+        );
+    }
+
+    /// Controls opened in a fight closes on its backdrop tap, as Esc does.
+    #[test]
+    fn combat_controls_close_on_view_back() {
+        let (resources, _, _, _) = fixtures();
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let mut present = Present::new();
+        let mut game = Game::default();
+        let mut views = Views::new();
+        views.set(ViewKind::Controls);
+        combat_view_input(
+            &mut views,
+            &Keys::pressed(&[]),
+            Some(HitTarget::ViewBack),
+            &mut game,
+            &resources,
+            &layout,
+            &mut present,
+        );
+        assert_eq!(views.active(), None);
+    }
+
+    /// While a picker is armed a click on a cell that passes is the arrows to
+    /// that cell, then Enter: the shot resolves.
+    #[test]
+    fn an_armed_picker_takes_a_click_as_aim_and_enter() {
         assert_same(
             no_setup,
             &[
