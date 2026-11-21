@@ -2118,16 +2118,20 @@ impl Views {
         let body = crate::interact::home_castle_body(resources);
         let row_h = font::GLYPH_H + 1;
         let mut ty = y + PANEL_PAD_X;
-        for (row, line) in body.split('\n').enumerate() {
+        for line in body.split('\n') {
             if ty + row_h > y + h - PANEL_PAD_X {
                 break;
             }
             list.text(line, x + PANEL_PAD_X, ty, palette.clr(Pal::White));
-            // Same rect, one line apart: one clickable band per menu line.
-            hits.push(
-                Rect::new(x + PANEL_PAD_X, ty, w - 2 * PANEL_PAD_X, row_h),
-                HitTarget::HomeCastleRow(row),
-            );
+            // Only the choice lines are clickable, keyed by the choice they
+            // name: the body is pack text, and a title or blank line above
+            // the choices must not shift which line recruits.
+            if let Some(choice) = home_castle_choice(line) {
+                hits.push(
+                    Rect::new(x + PANEL_PAD_X, ty, w - 2 * PANEL_PAD_X, row_h),
+                    HitTarget::HomeCastleRow(choice),
+                );
+            }
             ty += row_h;
         }
     }
@@ -2423,6 +2427,20 @@ impl Views {
 
 /// Whether the hero owns the crystal orb for the current continent. Ports
 /// `worldmap_has_orb`, including its `zi < GAME_CONTINENTS` guard.
+/// Which home-castle choice a body line names: `Some(0)` for a line opening
+/// with `A)`, `A.`, `1)` or `1.` (Recruit), `Some(1)` for `B` / `2` (Audience),
+/// `None` for anything else. Matches both the shipped pack's lettered body and
+/// the compiled default's numbered one.
+fn home_castle_choice(line: &str) -> Option<usize> {
+    let mut chars = line.trim_start().chars();
+    let choice = match chars.next()?.to_ascii_uppercase() {
+        'A' | '1' => 0,
+        'B' | '2' => 1,
+        _ => return None,
+    };
+    matches!(chars.next(), Some(')' | '.')).then_some(choice)
+}
+
 pub fn worldmap_has_orb(game: &Game, resources: &Resources) -> bool {
     let Some(zone_index) = resources.zone_index_by_id(game.position.zone.as_str()) else {
         return false;
@@ -5233,6 +5251,69 @@ mod tests {
             let cy = region.rect.y + region.rect.h / 2;
             assert_eq!(hits.hit(cx, cy), Some(HitTarget::HomeCastleRow(row)));
         }
+    }
+
+    #[test]
+    fn home_castle_choice_reads_letter_and_number_prefixes() {
+        assert_eq!(home_castle_choice("A) Recruit soldiers"), Some(0));
+        assert_eq!(home_castle_choice("  b) Speak with the King"), Some(1));
+        assert_eq!(home_castle_choice("1. Recruit Soldiers"), Some(0));
+        assert_eq!(home_castle_choice("2. Audience"), Some(1));
+        assert_eq!(home_castle_choice("The Royal Hall"), None);
+        assert_eq!(home_castle_choice("Bravely onward"), None);
+        assert_eq!(home_castle_choice(""), None);
+    }
+
+    /// The shipped pack puts a title and a blank line above the choices, so
+    /// the clickable rows must follow the "A)" / "B)" lines, not line numbers.
+    #[test]
+    fn home_castle_rows_sit_on_the_choice_lines_of_the_shipped_body() {
+        let resources = Resources::from_json_str(
+            r#"{"render": {"mode": "legacy"}, "troops": [],
+               "strings": {"banners": {"body_home_castle":
+                 "The Royal Hall\n\nA) Recruit soldiers\nB) Speak with the King"}}}"#,
+        )
+        .expect("fixture parses");
+        let layout = Layout::from_resources(&resources).expect("lays out");
+        let catalog = SpriteCatalog::from_resources(&resources);
+        let mut views = Views::new();
+        views.home_castle_open();
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        let (map, fog) = map_and_fog();
+        views.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            &catalog,
+            &map,
+            &fog,
+            &Game::default(),
+            &Present::new(),
+            0.0,
+        );
+
+        let text_y = |needle: &str| {
+            list.as_slice()
+                .iter()
+                .find_map(|cmd| match cmd {
+                    DrawCmd::Text { text, y, .. } if text.starts_with(needle) => Some(*y),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{needle} drawn"))
+        };
+        let rows: Vec<_> = hits
+            .regions()
+            .iter()
+            .filter(|r| matches!(r.target, HitTarget::HomeCastleRow(_)))
+            .collect();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].target, HitTarget::HomeCastleRow(0));
+        assert_eq!(rows[0].rect.y, text_y("A)"));
+        assert_eq!(rows[1].target, HitTarget::HomeCastleRow(1));
+        assert_eq!(rows[1].rect.y, text_y("B)"));
     }
 
     #[test]
