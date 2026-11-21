@@ -601,14 +601,16 @@ pub fn adventure_cast_message(
 
 /// The bridge-cast prompt, shown while the shell waits for a direction. The
 /// charge is NOT spent here; the caller spends it once a bridge is built.
-pub fn bridge_prompt(resources: &Resources) -> (String, String) {
+pub fn bridge_prompt(resources: &Resources, touch: bool) -> (String, String) {
     (
         spell_header(resources, "bridge", "Bridge"),
-        banner::text(
+        banner::text_on(
             resources,
+            touch,
             "banners",
             "spell_bridge_prompt",
             DEFAULT_SPELL_BRIDGE_PROMPT,
+            MOBILE_SPELL_BRIDGE_PROMPT,
         )
         .to_owned(),
     )
@@ -685,6 +687,12 @@ const DEFAULT_CASTLE_NEED_SIEGE: &str = "You need siege weapons\nto attack this 
 
 /// Castle screen defaults, porting `load_banner_defaults` and the `ui` block.
 const DEFAULT_BODY_HOME_CASTLE: &str = "1. Recruit Soldiers\n2. Audience with the King";
+// Mobile wording (spec decision 9): no key names on a touch build.
+const MOBILE_SPELL_BRIDGE_PROMPT: &str = "Raise a bridge which way?\nTap a tile next to you.";
+const MOBILE_ASTROLOGY_BODY: &str = "Astrologers proclaim:\nWeek of the %TROOP%\n\n\
+    All %TROOP% dwellings are\nrepopulated.         (tap)";
+const MOBILE_OWN_CASTLE_MODE_GARRISON: &str = "Leave troops";
+const MOBILE_OWN_CASTLE_MODE_REMOVE: &str = "Take troops";
 const DEFAULT_OWN_CASTLE_MODE_GARRISON: &str = "Garrison troops (Space=Remove)";
 const DEFAULT_OWN_CASTLE_MODE_REMOVE: &str = "Remove troops (Space=Garrison)";
 const DEFAULT_CANNOT_GARRISON_LAST: &str = "You cannot garrison your\nlast army!";
@@ -1062,21 +1070,25 @@ pub fn home_castle_body(resources: &Resources) -> String {
 }
 
 /// The own-castle mode subtitle, porting the `own_castle_mode_*` UI strings.
-pub fn own_castle_mode_label(resources: &Resources, garrison_mode: bool) -> String {
+pub fn own_castle_mode_label(resources: &Resources, garrison_mode: bool, touch: bool) -> String {
     if garrison_mode {
-        banner::text(
+        banner::text_on(
             resources,
+            touch,
             "ui",
             "own_castle_mode_garrison",
             DEFAULT_OWN_CASTLE_MODE_GARRISON,
+            MOBILE_OWN_CASTLE_MODE_GARRISON,
         )
         .to_owned()
     } else {
-        banner::text(
+        banner::text_on(
             resources,
+            touch,
             "ui",
             "own_castle_mode_remove",
             DEFAULT_OWN_CASTLE_MODE_REMOVE,
+            MOBILE_OWN_CASTLE_MODE_REMOVE,
         )
         .to_owned()
     }
@@ -1355,6 +1367,7 @@ pub fn astrology_message(
     resources: &Resources,
     week_id: i32,
     troop_name: &str,
+    touch: bool,
 ) -> (String, String) {
     let week = week_id.to_string();
     let header = banner::formatted(
@@ -1364,11 +1377,13 @@ pub fn astrology_message(
         DEFAULT_ASTROLOGY_HEADER,
         &[("WEEK", &week)],
     );
-    let body = banner::formatted(
+    let body = banner::formatted_on(
         resources,
+        touch,
         "banners",
         "astrology_body",
         DEFAULT_ASTROLOGY_BODY,
+        MOBILE_ASTROLOGY_BODY,
         &[("TROOP", troop_name)],
     );
     (header, body)
@@ -1610,6 +1625,16 @@ pub fn capture_message(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_bridge_prompt_says_tap_on_mobile() {
+        let resources = Resources::from_json_str(r#"{"troops": []}"#).expect("fixture parses");
+        let (_, desktop) = bridge_prompt(&resources, false);
+        let (_, mobile) = bridge_prompt(&resources, true);
+        assert!(desktop.contains("arrows"));
+        assert!(mobile.contains("Tap"), "{mobile}");
+        assert!(!mobile.to_ascii_lowercase().contains("arrow"));
+    }
     use openbounty_engine::game::{ChestOutcome, ChestRoll, Game, GarrisonOutcome};
     use openbounty_engine::step::StepInteraction;
     use openbounty_engine::tables::FixedStr;
@@ -1987,7 +2012,7 @@ mod tests {
     fn the_bridge_messages_use_the_bridge_header() {
         let resources = spell_resources();
 
-        let (header, body) = bridge_prompt(&resources);
+        let (header, body) = bridge_prompt(&resources, false);
         assert_eq!(header, "Bridge");
         assert!(body.contains("direction"));
 
@@ -2105,8 +2130,8 @@ mod tests {
     fn the_home_castle_body_and_mode_labels_are_pack_text() {
         let resources = town_resources();
         assert!(home_castle_body(&resources).contains("Recruit"));
-        assert!(own_castle_mode_label(&resources, true).contains("Garrison"));
-        assert!(own_castle_mode_label(&resources, false).contains("Remove"));
+        assert!(own_castle_mode_label(&resources, true, false).contains("Garrison"));
+        assert!(own_castle_mode_label(&resources, false, false).contains("Remove"));
     }
 
     #[test]
@@ -2317,7 +2342,7 @@ mod tests {
     #[test]
     fn the_astrology_message_names_the_week_and_troop() {
         let resources = town_resources();
-        let (header, body) = astrology_message(&resources, 3, "Sprites");
+        let (header, body) = astrology_message(&resources, 3, "Sprites", false);
         assert_eq!(header, "Week #3");
         assert!(body.contains("Week of the Sprites"));
     }

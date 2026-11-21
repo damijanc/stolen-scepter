@@ -73,6 +73,43 @@ pub fn formatted(
     format(text(resources, group, key, default), vars)
 }
 
+/// [`text`] for a build that may be mobile. On a touch build the mobile
+/// mirror `mobile_<group>.<key>` wins, then `mobile_default`: never the
+/// desktop text, which may name keys a phone does not have (spec decision 9).
+/// Desktop reads exactly what [`text`] reads.
+pub fn text_on<'a>(
+    resources: &'a Resources,
+    touch: bool,
+    group: &str,
+    key: &str,
+    default: &'a str,
+    mobile_default: &'a str,
+) -> &'a str {
+    if touch {
+        resources
+            .string(&format!("mobile_{group}"), key)
+            .unwrap_or(mobile_default)
+    } else {
+        text(resources, group, key, default)
+    }
+}
+
+/// [`formatted`] for a build that may be mobile, as [`text_on`].
+pub fn formatted_on(
+    resources: &Resources,
+    touch: bool,
+    group: &str,
+    key: &str,
+    default: &str,
+    mobile_default: &str,
+    vars: &[Var<'_>],
+) -> String {
+    format(
+        text_on(resources, touch, group, key, default, mobile_default),
+        vars,
+    )
+}
+
 /// Which choice a menu line in pack text names: `Some(0)` for a line opening
 /// with `A)`, `A.`, `1)` or `1.`, `Some(1)` for `B` / `2`, `None` otherwise.
 /// Pack bodies list their options this way (the home castle's lettered and
@@ -91,6 +128,84 @@ pub fn choice_index(line: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_on_prefers_the_mobile_mirror_only_on_touch() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [], "strings": {
+                "ui": {"a": "Press ESC", "b": "ESC close"},
+                "mobile_ui": {"a": "Tap to leave"}}}"#,
+        )
+        .expect("fixture parses");
+        assert_eq!(
+            text_on(&resources, false, "ui", "a", "d", "md"),
+            "Press ESC"
+        );
+        assert_eq!(
+            text_on(&resources, true, "ui", "a", "d", "md"),
+            "Tap to leave"
+        );
+        // No mirror: the mobile default, never the desktop text.
+        assert_eq!(text_on(&resources, true, "ui", "b", "d", "md"), "md");
+        assert_eq!(text_on(&resources, true, "ui", "missing", "d", "md"), "md");
+        assert_eq!(text_on(&resources, false, "ui", "missing", "d", "md"), "d");
+        assert_eq!(
+            formatted_on(
+                &resources,
+                true,
+                "ui",
+                "missing",
+                "%N%",
+                "N=%N%",
+                &[("N", "3")]
+            ),
+            "N=3"
+        );
+    }
+
+    /// Decision 9: no keyboard traces on mobile. Every pack string that names
+    /// a key has a mobile version that does not.
+    #[test]
+    fn every_key_naming_string_shown_on_mobile_has_a_mobile_version() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../packs/stolen-scepter/game.json");
+        let pack: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).expect("pack reads"))
+                .expect("json");
+        let strings = pack["strings"].as_object().expect("strings");
+        let names_a_key = |s: &str| {
+            let lower = s.to_ascii_lowercase();
+            lower.contains("(y/n)")
+                || lower.contains("arrow key")
+                || lower
+                    .split(|c: char| !c.is_ascii_alphanumeric())
+                    .any(|w| matches!(w, "esc" | "enter" | "space" | "ctrl" | "key" | "keys"))
+        };
+        let mut missing = Vec::new();
+        for (group, entries) in strings {
+            if group.starts_with("mobile_") {
+                continue;
+            }
+            let Some(entries) = entries.as_object() else {
+                continue;
+            };
+            for (key, value) in entries {
+                let Some(text) = value.as_str() else { continue };
+                if !names_a_key(text) {
+                    continue;
+                }
+                match strings
+                    .get(&format!("mobile_{group}"))
+                    .and_then(|g| g.get(key))
+                    .and_then(|v| v.as_str())
+                {
+                    Some(mobile) if !names_a_key(mobile) => {}
+                    other => missing.push(format!("{group}.{key} -> {other:?}")),
+                }
+            }
+        }
+        assert!(missing.is_empty(), "no mobile version: {missing:#?}");
+    }
 
     #[test]
     fn choice_index_reads_letter_and_number_prefixes() {

@@ -22,6 +22,10 @@ pub const DEFAULT_DAYS_LEFT: &str = " Options / Controls / Days Left:%DAYS% ";
 pub const DEFAULT_TIME_STOP: &str = " Options / Controls / Time Stop:%STEPS% ";
 pub const DEFAULT_WORLDMAP_YOUR_MAP: &str = "ESC close / SPACE own map";
 pub const DEFAULT_WORLDMAP_WHOLE_MAP: &str = "ESC close / SPACE full map";
+/// Mobile wording (spec decision 9): no key names on a touch build.
+pub const MOBILE_QUIT_PROMPT: &str = " Quit without saving? ";
+pub const MOBILE_EXIT_HINT: &str = " Back to leave ";
+pub const MOBILE_WORLDMAP_HINT: &str = " Tap to close ";
 /// The idle overworld's discoverability cue, shown in place of the
 /// " Options / Controls " key hint until the hero action menu has been opened
 /// once this session. Shortened from the design's "Click hero for actions" so
@@ -111,40 +115,55 @@ impl Chrome<'_> {
         );
     }
 
+    /// "Press ESC to exit", or its mobile wording.
+    fn exit_hint(&self) -> String {
+        banner::text_on(
+            self.resources,
+            self.layout.touch,
+            "ui",
+            "press_esc_to_exit",
+            DEFAULT_EXIT_HINT,
+            MOBILE_EXIT_HINT,
+        )
+        .to_owned()
+    }
+
     /// The status line for the current mode.
     pub fn status_text(&self) -> String {
         match self.mode {
             StatusMode::Custom(text) => text.to_owned(),
             StatusMode::Combat { ref title } => title.clone(),
-            StatusMode::FastQuit => banner::text(
+            StatusMode::FastQuit => banner::text_on(
                 self.resources,
+                self.layout.touch,
                 "ui",
                 "quit_to_dos_prompt",
                 DEFAULT_QUIT_PROMPT,
+                MOBILE_QUIT_PROMPT,
             )
             .to_owned(),
-            StatusMode::ExitHint => {
-                banner::text(self.resources, "ui", "press_esc_to_exit", DEFAULT_EXIT_HINT)
-                    .to_owned()
-            }
+            StatusMode::ExitHint => self.exit_hint(),
             StatusMode::Worldmap { whole_map } => {
                 if !worldmap_has_orb(self.game, self.resources) {
-                    banner::text(self.resources, "ui", "press_esc_to_exit", DEFAULT_EXIT_HINT)
-                        .to_owned()
+                    self.exit_hint()
                 } else if whole_map {
-                    banner::text(
+                    banner::text_on(
                         self.resources,
+                        self.layout.touch,
                         "ui",
                         "worldmap_hint_your_map",
                         DEFAULT_WORLDMAP_YOUR_MAP,
+                        MOBILE_WORLDMAP_HINT,
                     )
                     .to_owned()
                 } else {
-                    banner::text(
+                    banner::text_on(
                         self.resources,
+                        self.layout.touch,
                         "ui",
                         "worldmap_hint_whole_map",
                         DEFAULT_WORLDMAP_WHOLE_MAP,
+                        MOBILE_WORLDMAP_HINT,
                     )
                     .to_owned()
                 }
@@ -616,6 +635,22 @@ mod tests {
             hero_menu_hint: true,
         };
         assert_eq!(chrome.status_text(), "12 days");
+    }
+
+    /// The world-map status line names no keys on mobile.
+    #[test]
+    fn the_worldmap_hint_names_no_keys_on_mobile() {
+        let (mut layout, palette, resources, game) = parts("");
+        layout.touch = true;
+        let chrome = chrome_of(
+            &layout,
+            &palette,
+            &resources,
+            &game,
+            StatusMode::Worldmap { whole_map: false },
+        );
+        let text = chrome.status_text();
+        assert!(!text.contains("ESC") && !text.contains("SPACE"), "{text}");
     }
 
     /// The quit confirm draws its question, without the "(y/n)" the buttons

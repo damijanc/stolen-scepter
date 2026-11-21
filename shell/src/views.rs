@@ -2225,7 +2225,11 @@ impl Views {
         );
         ty += row_h;
 
-        let mode = crate::interact::own_castle_mode_label(resources, self.own_castle_garrison_mode);
+        let mode = crate::interact::own_castle_mode_label(
+            resources,
+            self.own_castle_garrison_mode,
+            layout.touch,
+        );
         list.text(&mode, tx, ty, palette.clr(Pal::White));
         // The mode line names the toggle ("... (Space=...)"), so its own band
         // is the clickable Space region -- one affordance, key and click alike.
@@ -5843,7 +5847,7 @@ mod tests {
             .iter()
             .find(|r| r.target == HitTarget::OwnCastleToggle)
             .expect("toggle published");
-        let mode = crate::interact::own_castle_mode_label(&resources, false);
+        let mode = crate::interact::own_castle_mode_label(&resources, false, false);
         let (tx, ty, _) = list
             .texts()
             .into_iter()

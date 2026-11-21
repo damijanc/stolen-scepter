@@ -369,7 +369,7 @@ impl<'r> Session<'r> {
             && !prompt.is_active()
             && !views.is_active()
         {
-            pump_week_end(pending_week, game, resources, dialog);
+            pump_week_end(pending_week, game, resources, dialog, layout.touch);
         }
 
         // The win cutscene yields to the win screen when it runs out of frames.
@@ -400,6 +400,7 @@ impl<'r> Session<'r> {
         if cheat_owns_frame {
             // Nothing else reads input this frame.
         } else if let Some(session) = combat.as_mut() {
+            session.combat.touch = layout.touch;
             if views.is_active() {
                 // A view is open over the battlefield and the fight is paused:
                 // no step, so no AI and no animation tick. ESC closes it, C/O
@@ -614,6 +615,7 @@ impl<'r> Session<'r> {
                         pending,
                         bridge_waiting,
                         views,
+                        layout.touch,
                     );
                 }
                 SpellsInput::Handled => {}
@@ -1077,11 +1079,13 @@ impl<'r> Session<'r> {
                             eprintln!("save failed: {err:?}");
                         }
                     }
-                    let body = banner::text(
+                    let body = banner::text_on(
                         resources,
+                        layout.touch,
                         "banners",
                         "body_save_confirm",
                         DEFAULT_BODY_SAVE_CONFIRM,
+                        MOBILE_BODY_SAVE_CONFIRM,
                     );
                     dialog.open("", body);
                 }
@@ -1574,6 +1578,7 @@ const DEFAULT_TEMP_DEATH: &str = "After being disgraced on the\n\
     issues your commission and\n\
     sends you on your way.";
 const DEFAULT_BODY_SAVE_CONFIRM: &str = "Ctrl-Q quits; any other\nkey returns to the game.";
+const MOBILE_BODY_SAVE_CONFIRM: &str = "Your game is saved.\nTap to return to the game.";
 
 /// Which battle a combat session is resolving.
 enum CombatFlow {
@@ -1877,6 +1882,7 @@ fn pump_week_end(
     game: &Game,
     resources: &Resources,
     dialog: &mut Dialog,
+    touch: bool,
 ) {
     let Some(week) = pending.take() else {
         return;
@@ -1892,7 +1898,7 @@ fn pump_week_end(
                 .map(|troop| troop.name.as_str())
                 .filter(|name| !name.is_empty())
                 .unwrap_or("Peasants");
-            let (header, body) = interact::astrology_message(resources, week_id, name);
+            let (header, body) = interact::astrology_message(resources, week_id, name, touch);
             dialog.open(&header, &body);
             *pending = Some(WeekEnd::Budget { week_id, paid });
         }
@@ -2081,6 +2087,7 @@ fn dispatch_spell(
     pending: &mut PendingFlow,
     bridge_waiting: &mut bool,
     views: &mut Views,
+    touch: bool,
 ) {
     match game.dispatch_adventure_spell(resources, spell_idx) {
         SpellCast::NotKnown => {
@@ -2107,7 +2114,7 @@ fn dispatch_spell(
         }
         SpellCast::Applied(cast) => match &cast {
             AdventureCast::BridgeArmed => {
-                let (header, body) = interact::bridge_prompt(resources);
+                let (header, body) = interact::bridge_prompt(resources, touch);
                 dialog.open(&header, &body);
                 *bridge_waiting = true;
             }

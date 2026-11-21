@@ -31,6 +31,9 @@ const DEFAULT_SAVE_PICKER_NEW_GAME: &str = "New game";
 const DEFAULT_CONTROLS_HINT: &str = "UP/DN choose  ENTER select  ESC quit";
 const DEFAULT_NEW_GAME_TABLE_HEADER: &str = "   Difficulty   Days  Score";
 const DEFAULT_NEW_GAME_SELECT_HINT: &str = "Up/Down to choose, Enter to accept";
+/// Mobile wording (spec decision 9): no key names on a touch build.
+const MOBILE_CONTROLS_HINT: &str = "Tap a game, or Back";
+const MOBILE_NEW_GAME_SELECT_HINT: &str = "Tap a difficulty";
 const DEFAULT_DIFFICULTY_LABELS: [&str; 4] = ["Easy", "Normal", "Hard", "Impossible?"];
 const DEFAULT_DIFFICULTY_SCORES: [&str; 4] = ["x.5", " x1", " x2", " x4"];
 const DEFAULT_NEW_GAME_INTRO: &str = "%NAME% the %CLASS%,\n\
@@ -594,11 +597,13 @@ impl Startup {
                             "save_picker_new_game",
                             DEFAULT_SAVE_PICKER_NEW_GAME,
                         );
-                        let hint = banner::text(
+                        let hint = banner::text_on(
                             resources,
+                            layout.touch,
                             "startup",
                             "controls_hint",
                             DEFAULT_CONTROLS_HINT,
+                            MOBILE_CONTROLS_HINT,
                         );
                         self.picker.draw(
                             list, hits, layout, palette, resources, title, new_label, hint,
@@ -901,11 +906,13 @@ impl Startup {
                 y + GLYPH_H * (5 + self.difficulty),
                 palette.clr(Pal::White),
             );
-            let hint = banner::text(
+            let hint = banner::text_on(
                 resources,
+                layout.touch,
                 "startup",
                 "new_game_select_hint",
                 DEFAULT_NEW_GAME_SELECT_HINT,
+                MOBILE_NEW_GAME_SELECT_HINT,
             );
             list.text(hint, x + GLYPH_W, y + GLYPH_H * 10, palette.clr(Pal::White));
         }

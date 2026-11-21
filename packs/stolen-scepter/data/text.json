@@ -165,6 +165,34 @@
   "copyright": ["The Quest for a Stolen Scepter", "MIT License", "Free to play and share"]
  },
  "strings": {
+  "mobile_banners": {
+   "spell_bridge_prompt": "Raise a bridge which way?\nTap a tile next to you.",
+   "astrology_body": "The stargazers say:\nThe week of %TROOP%\n\nEvery %TROOP% dwelling\nfills up again.      (tap)",
+   "combat_give_up_header": "Give up?",
+   "body_save_confirm": "Your game is saved.\nTap to return to the game."
+  },
+  "mobile_combat_log": {
+   "give_up_prompt": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?",
+   "exit_hint": "Back to leave"
+  },
+  "mobile_ui": {
+   "press_esc_to_exit": "Back to leave",
+   "quit_to_dos_prompt": " Quit without saving? ",
+   "worldmap_hint_your_map": "Tap to close",
+   "worldmap_hint_whole_map": "Tap to close",
+   "own_castle_mode_garrison": "Leave troops",
+   "own_castle_mode_remove": "Take troops"
+  },
+  "mobile_startup": {
+   "controls_hint": "Tap a game, or Back",
+   "new_game_select_hint": "Tap a difficulty"
+  },
+  "mobile_prompts": {
+   "text_hint": "",
+   "numeric_range_hint": "",
+   "yes_no_hint": "",
+   "numeric_5_hint": ""
+  },
   "win": {
    "header": "",
    "body": "Victory!\nThe Scepter is home\nand the villains are\nin chains. Peace\nreturns to the four\ncontinents.\n\nSongs will be sung\nof %NAME%, the\n%RANK% who\nbrought it back.\n\nThe castles are\nyours to keep, and\nthe King triples\nyour pay.\n\nFinal Score:\n%SCORE%",

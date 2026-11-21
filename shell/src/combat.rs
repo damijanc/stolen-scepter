@@ -75,6 +75,9 @@ const DEFAULT_CL_CAST_TURN_UNDEAD: &str = "Turn Undead!";
 /// The give-up confirm, ported from the `combat_give_up_*` banners (which the
 /// shipped pack leaves at their defaults).
 const DEFAULT_GIVE_UP_HEADER: &str = "Press ESC to exit";
+/// Mobile wording (spec decision 9): no key names on a touch build.
+const MOBILE_GIVE_UP_HEADER: &str = "Give up?";
+const MOBILE_PICK_HINT: &str = " Tap a target; tap away to cancel";
 const DEFAULT_GIVE_UP_BODY: &str =
     "Giving up will forfeit your\narmies and send you back to\nthe King. Give up";
 
@@ -465,6 +468,8 @@ fn field_rect() -> Rect {
 /// end-of-combat dialog, which arrive with the flow wiring.
 pub struct CombatLoop {
     pub combat: Combat,
+    /// A touch build: the session sets it each frame, for mobile wording.
+    pub touch: bool,
     picker_active: bool,
     cursor_x: i32,
     cursor_y: i32,
@@ -530,6 +535,7 @@ impl CombatLoop {
             pick_filter: PickFilter::Any,
             pick_reason: PickReason::None,
             cast_phase: CastPhase::None,
+            touch: false,
             cast_spell_idx: -1,
             pick_t1_side: 0,
             pick_t1_slot: 0,
@@ -557,10 +563,18 @@ impl CombatLoop {
             return self.banner.clone();
         }
         if self.picker_active {
-            return banner::text(resources, "combat_log", "pick_hint", DEFAULT_PICK_HINT)
-                .to_owned();
+            return banner::text_on(
+                resources,
+                self.touch,
+                "combat_log",
+                "pick_hint",
+                DEFAULT_PICK_HINT,
+                MOBILE_PICK_HINT,
+            )
+            .to_owned();
         }
-        if self.player_turn() && (self.now / TIP_SECONDS) as i64 % 2 == 1 {
+        // The key tips name keys, so a touch build never shows them.
+        if !self.touch && self.player_turn() && (self.now / TIP_SECONDS) as i64 % 2 == 1 {
             return banner::text(resources, "combat_log", "key_tips", DEFAULT_KEY_TIPS).to_owned();
         }
         combat_title(&self.combat, resources)
@@ -1085,11 +1099,13 @@ impl CombatLoop {
 
     /// G: ask whether to forfeit.
     fn give_up(&mut self, resources: &Resources, prompt: &mut Prompt) {
-        let header = banner::text(
+        let header = banner::text_on(
             resources,
+            self.touch,
             "banners",
             "combat_give_up_header",
             DEFAULT_GIVE_UP_HEADER,
+            MOBILE_GIVE_UP_HEADER,
         );
         let body = banner::text(
             resources,
@@ -1826,6 +1842,7 @@ mod tests {
             pick_filter: PickFilter::Any,
             pick_reason: PickReason::None,
             cast_phase: CastPhase::None,
+            touch: false,
             cast_spell_idx: -1,
             pick_t1_side: 0,
             pick_t1_slot: 0,
