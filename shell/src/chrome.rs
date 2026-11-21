@@ -199,16 +199,37 @@ impl Chrome<'_> {
         // The two modal lines are centred; the rest sit against the left of
         // the bar, one pixel in from its corner.
         match self.mode {
-            StatusMode::FastQuit | StatusMode::ExitHint | StatusMode::Worldmap { .. } => list
-                .text_centered(
-                    &text,
-                    STATUS_X + self.layout.status_w() / 2,
-                    STATUS_Y + 1,
-                    white,
-                ),
+            StatusMode::FastQuit => {
+                // DIVERGENCE: the question sits left and two framed buttons
+                // take the place of its "(y/n)", so a tap has a visible
+                // target; their labels keep the keys for the keyboard.
+                let question = text.replace("(y/n)", "");
+                list.text(question.trim(), STATUS_X + 2, STATUS_Y + 1, white);
+                let (yes, no) = fast_quit_buttons(self.layout);
+                for (rect, label) in [(yes, "Y:YES"), (no, "N:NO")] {
+                    list.button(rect, label, self.palette.clr(Pal::Black), white);
+                }
+            }
+            StatusMode::ExitHint | StatusMode::Worldmap { .. } => list.text_centered(
+                &text,
+                STATUS_X + self.layout.status_w() / 2,
+                STATUS_Y + 1,
+                white,
+            ),
             _ => list.text(&text, STATUS_X + 1, STATUS_Y + 1, white),
         }
     }
+}
+
+/// The quit confirm's Yes and No buttons, right-aligned in the status bar.
+/// The chrome draws them and the session publishes them as tap targets, so
+/// both read this one function.
+pub fn fast_quit_buttons(layout: &Layout) -> (Rect, Rect) {
+    let glyph = crate::font::GLYPH_W as i32;
+    let right = STATUS_X + layout.status_w() - 2;
+    let no = Rect::new(right - 6 * glyph, STATUS_Y, 6 * glyph, STATUS_H);
+    let yes = Rect::new(no.x - 2 - 7 * glyph, STATUS_Y, 7 * glyph, STATUS_H);
+    (yes, no)
 }
 
 #[cfg(test)]
@@ -595,5 +616,46 @@ mod tests {
             hero_menu_hint: true,
         };
         assert_eq!(chrome.status_text(), "12 days");
+    }
+
+    /// The quit confirm draws its question, without the "(y/n)" the buttons
+    /// now carry, and two framed buttons whose labels keep the keys.
+    #[test]
+    fn the_quit_confirm_draws_yes_and_no_buttons() {
+        let (layout, palette, resources, game) =
+            parts(r#", "strings": {"ui": {"quit_to_dos_prompt": " Quit without saving (y/n) "}}"#);
+        let mut list = DrawList::new();
+        chrome_of(&layout, &palette, &resources, &game, StatusMode::FastQuit).draw(&mut list);
+        let (yes, no) = fast_quit_buttons(&layout);
+        let bar = Rect::new(STATUS_X, STATUS_Y, layout.status_w(), STATUS_H);
+        for button in [yes, no] {
+            assert!(button.x >= bar.x && button.x + button.w <= bar.x + bar.w);
+            assert!(button.y >= bar.y && button.y + button.h <= bar.y + bar.h);
+        }
+        assert!(yes.x + yes.w <= no.x, "Yes left of No");
+        let texts: Vec<(String, i32)> = list
+            .as_slice()
+            .iter()
+            .filter_map(|cmd| match cmd {
+                DrawCmd::Text { text, x, .. } => Some((text.clone(), *x)),
+                _ => None,
+            })
+            .collect();
+        let at = |needle: &str| {
+            texts
+                .iter()
+                .find(|(t, _)| t.contains(needle))
+                .map(|(_, x)| *x)
+        };
+        let question = at("Quit without saving").expect("question drawn");
+        assert!(!texts.iter().any(|(t, _)| t.contains("(y/n)")));
+        assert!(
+            question + 19 * crate::font::GLYPH_W as i32 <= yes.x,
+            "question clear of the buttons"
+        );
+        let yes_x = at("Y:YES").expect("yes label");
+        let no_x = at("N:NO").expect("no label");
+        assert!(yes_x >= yes.x && yes_x < yes.x + yes.w);
+        assert!(no_x >= no.x && no_x < no.x + no.w);
     }
 }

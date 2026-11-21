@@ -600,6 +600,24 @@ pub fn android_init() {
     }
 }
 
+/// Close the app: `activity.finishAndRemoveTask()`, so a quit returns to the
+/// launcher instead of leaving a black window.
+#[cfg(target_os = "android")]
+pub fn android_finish() {
+    use macroquad::miniquad::native::android::{attach_jni_env, ACTIVITY};
+    unsafe {
+        let env = attach_jni_env();
+        let class = ((**env).GetObjectClass.unwrap())(env, ACTIVITY);
+        let method = ((**env).GetMethodID.unwrap())(
+            env,
+            class,
+            c"finishAndRemoveTask".as_ptr(),
+            c"()V".as_ptr(),
+        );
+        ((**env).CallVoidMethod.unwrap())(env, ACTIVITY, method);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

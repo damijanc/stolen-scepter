@@ -63,14 +63,14 @@ click 37 185
 expect Dismiss it?
 # No (right half): the army stays.
 click 230 185
-# Game Menu -> Quit, answered No on the status bar's right half...
+# Game Menu -> Quit, answered on the status bar's N:NO button...
 click 136 107
 click 170 100
 expect Game Menu
 click 100 108
-click 250 12
+click 278 12
 expect Days:595
-# ...and reopened. Yes (the left half) quits on that frame, which ends the
+# ...and reopened. Y:YES quits on that frame, which ends the
 # script, so the session test fast_quit_halves_answer_like_y_and_n covers it.
 click 136 107
 click 170 100

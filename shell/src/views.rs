@@ -1245,6 +1245,10 @@ impl Views {
                 HitTarget::Pad(PadKey::Del) => self.recruit_backspace(),
                 HitTarget::Pad(PadKey::Max) => self.recruit_fill_max(),
                 HitTarget::Pad(PadKey::Ok) => self.recruit_commit(game, resources),
+                HitTarget::Pad(PadKey::Esc) => {
+                    self.recruit_whom = 0;
+                    self.recruit_input.clear();
+                }
                 _ => {}
             }
             return false;
@@ -2373,7 +2377,7 @@ impl Views {
             );
             // DIVERGENCE: the tappable count strip, along the panel's bottom
             // row under the troop list.
-            let strip = Rect::new(tx, y + h - row_h, w - 2 * PANEL_PAD_X, row_h);
+            let strip = Rect::new(tx, y + h - row_h - 1, w - 2 * PANEL_PAD_X, row_h);
             crate::numpad::draw(list, hits, strip, palette);
         }
     }
@@ -5633,6 +5637,32 @@ mod tests {
         assert!(clicked.recruit_input.is_empty());
     }
 
+    /// The castle strip's ESC backs out of the count, as the Esc key does.
+    #[test]
+    fn recruit_pad_esc_backs_out_like_escape() {
+        let (resources, _, _) = recruit_fixtures();
+        let mut keyed_game = recruit_game();
+        let mut keyed = Views::new();
+        keyed.recruit_soldiers_open(&resources, &keyed_game);
+        for key in [Key::A, Key::Digit3, Key::Escape] {
+            keyed.recruit_soldiers_update(&mut keyed_game, &resources, &Keys::pressed(&[key]));
+        }
+        let mut game = recruit_game();
+        let mut clicked = Views::new();
+        clicked.recruit_soldiers_open(&resources, &game);
+        for target in [
+            HitTarget::RecruitRow(0),
+            HitTarget::Pad(crate::numpad::PadKey::Digit(3)),
+            HitTarget::Pad(crate::numpad::PadKey::Esc),
+        ] {
+            assert!(!clicked.recruit_click(&mut game, &resources, target));
+        }
+        assert_eq!(clicked.recruit_whom, 0);
+        assert!(clicked.recruit_input.is_empty());
+        assert_eq!(clicked.recruit_whom, keyed.recruit_whom);
+        assert_eq!(game.army, keyed_game.army);
+    }
+
     #[test]
     fn recruit_pad_max_then_ok_buys_recruit_max() {
         use crate::numpad::PadKey::*;
@@ -5680,7 +5710,7 @@ mod tests {
         assert!(pads(&mut views, &game).is_empty());
         views.recruit_click(&mut game, &resources, HitTarget::RecruitRow(0));
         let rects = pads(&mut views, &game);
-        assert_eq!(rects.len(), 13);
+        assert_eq!(rects.len(), crate::numpad::PAD_KEYS.len());
         let panel = Rect::new(
             layout.panel_x(),
             layout.panel_y(),
@@ -5688,8 +5718,9 @@ mod tests {
             PANEL_H,
         );
         for r in rects {
-            assert!(r.x >= panel.x && r.x + r.w <= panel.x + panel.w, "{r:?}");
-            assert!(r.y >= panel.y && r.y + r.h <= panel.y + panel.h, "{r:?}");
+            // Inside the 1px border, not on it.
+            assert!(r.x > panel.x && r.x + r.w < panel.x + panel.w, "{r:?}");
+            assert!(r.y > panel.y && r.y + r.h < panel.y + panel.h, "{r:?}");
         }
     }
 

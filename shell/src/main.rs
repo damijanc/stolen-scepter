@@ -43,8 +43,16 @@ fn logical_pointer(
 /// Draw the shell's own pointer last, over everything, and hide the OS arrow
 /// exactly where it shows. See `cursor.rs` for why it exists.
 fn finish_pointer(list: &mut DrawList, backend: &Backend, at: Option<(i32, i32)>) {
-    cursor::push_pointer(list, at);
+    if draws_pointer() {
+        cursor::push_pointer(list, at);
+    }
     backend.set_os_cursor_visible(at.is_none());
+}
+
+/// A touch screen has no pointer to show: the drawn arrow would sit wherever
+/// the last finger lifted.
+fn draws_pointer() -> bool {
+    present::Target::native() != present::Target::Mobile
 }
 
 /// The command line, read by both `window_conf` and `main`.
@@ -201,6 +209,14 @@ pub extern "C" fn quad_main() {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    run().await;
+    // miniquad never finishes the Android activity, so a quit would leave a
+    // black, still-running app behind. Ask Android to close it.
+    #[cfg(target_os = "android")]
+    backend::android_finish();
+}
+
+async fn run() {
     let launch = LaunchArgs::parse(std::env::args().skip(1));
     let save_paths = launch.save_paths();
     let LaunchArgs {
@@ -329,7 +345,9 @@ async fn main() {
         if session.frame(&input, get_time(), &mut list) == FrameStatus::Quit {
             return;
         }
-        cursor::push_shape(&mut list, pointer_at, session.pointer_shape());
+        if draws_pointer() {
+            cursor::push_shape(&mut list, pointer_at, session.pointer_shape());
+        }
         backend.set_os_cursor_visible(pointer_at.is_none());
         backend.execute(&list, &catalog, &layout, &session.present);
         next_frame().await;

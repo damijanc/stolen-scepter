@@ -268,11 +268,12 @@ impl Startup {
                 let choice = self.picker.click(target)?;
                 self.apply_slot_choice(choice)
             }
-            // The name grid: a letter types (capital first, then lower
-            // case, as a name is written), delete and OK are Backspace and
-            // Enter.
+            // The name grid: a letter types (a capital to start each word,
+            // lower case after, as a name is written), delete and OK are
+            // Backspace and Enter.
             (Screen::CreateGame, HitTarget::NameKey(ch)) if !self.has_name => {
-                let ch = if self.name.is_empty() {
+                let word_start = self.name.is_empty() || self.name.ends_with(' ');
+                let ch = if word_start {
                     ch.to_ascii_uppercase()
                 } else {
                     ch.to_ascii_lowercase()
@@ -1611,6 +1612,18 @@ mod tests {
         }
         assert_eq!(by_click.name, "Sir");
         assert_eq!(by_click, by_key);
+    }
+
+    /// Each word starts with a capital, as names are written.
+    #[test]
+    fn the_name_grid_capitalises_each_word() {
+        let resources = resources();
+        let paths = paths("name-grid-words");
+        let mut startup = at_name(&resources, &paths);
+        for ch in ['S', 'I', 'R', ' ', 'L', 'A', 'N'] {
+            startup.click(HitTarget::NameKey(ch), &resources, &paths, 0.0);
+        }
+        assert_eq!(startup.name, "Sir Lan");
     }
 
     #[test]

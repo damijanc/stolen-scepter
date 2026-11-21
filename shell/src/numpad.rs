@@ -1,4 +1,4 @@
-//! The tappable digit strip for a typed count: `0`-`9`, delete, max and OK in
+//! The tappable digit strip for a typed count: `0`-`9`, delete, max, OK and ESC in
 //! one row. A dwelling's "how many" prompt and the castle's recruit box both
 //! draw it, so a touch player can enter any count in a few taps.
 //!
@@ -21,10 +21,12 @@ pub enum PadKey {
     Max,
     /// Confirm the count (Enter).
     Ok,
+    /// Cancel the count (Escape). Its label is the keyboard hint, too.
+    Esc,
 }
 
 /// The keys left to right.
-pub const PAD_KEYS: [PadKey; 13] = [
+pub const PAD_KEYS: [PadKey; 14] = [
     PadKey::Digit(0),
     PadKey::Digit(1),
     PadKey::Digit(2),
@@ -38,9 +40,10 @@ pub const PAD_KEYS: [PadKey; 13] = [
     PadKey::Del,
     PadKey::Max,
     PadKey::Ok,
+    PadKey::Esc,
 ];
 
-/// Width units per key: a digit is one, a word key two (16 in all).
+/// Width units per key: a digit is one, a word key two (18 in all).
 fn units(key: PadKey) -> i32 {
     match key {
         PadKey::Digit(_) => 1,
@@ -54,12 +57,13 @@ fn label(key: PadKey) -> String {
         PadKey::Del => "<".to_owned(),
         PadKey::Max => "MAX".to_owned(),
         PadKey::Ok => "OK".to_owned(),
+        PadKey::Esc => "ESC".to_owned(),
     }
 }
 
-/// Split `strip` into the 13 key cells, left to right, with no gaps; the
+/// Split `strip` into the 14 key cells, left to right, with no gaps; the
 /// rounding remainder lands on the last cell.
-pub fn cells(strip: Rect) -> [(Rect, PadKey); 13] {
+pub fn cells(strip: Rect) -> [(Rect, PadKey); 14] {
     let total: i32 = PAD_KEYS.iter().map(|k| units(*k)).sum();
     let mut before = 0;
     PAD_KEYS.map(|key| {
@@ -73,11 +77,10 @@ pub fn cells(strip: Rect) -> [(Rect, PadKey); 13] {
 /// Draw the strip and publish `HitTarget::Pad(key)` for each cell.
 pub fn draw(list: &mut DrawList, hits: &mut HitList, strip: Rect, palette: &Palette) {
     for (rect, key) in cells(strip) {
-        list.rect_lines(rect, palette.clr(Pal::Yellow));
-        list.text_centered(
+        list.button(
+            rect,
             &label(key),
-            rect.x + rect.w / 2,
-            rect.y,
+            palette.clr(Pal::Blue),
             palette.clr(Pal::Yellow),
         );
         hits.push(rect, HitTarget::Pad(key));
@@ -93,8 +96,8 @@ mod tests {
         let strip = Rect::new(10, 100, 237, 9);
         let c = cells(strip);
         assert_eq!(c[0].0.x, 10);
-        assert_eq!(c[12].0.x + c[12].0.w, 10 + 237);
-        for k in 1..13 {
+        assert_eq!(c[13].0.x + c[13].0.w, 10 + 237);
+        for k in 1..14 {
             assert_eq!(c[k].0.x, c[k - 1].0.x + c[k - 1].0.w);
             assert_eq!((c[k].0.y, c[k].0.h), (100, 9));
         }
@@ -103,9 +106,10 @@ mod tests {
 
     #[test]
     fn word_keys_are_twice_as_wide_as_digits() {
-        let c = cells(Rect::new(0, 0, 160, 9));
+        let c = cells(Rect::new(0, 0, 180, 9));
         assert_eq!(c[0].0.w, 10);
         assert_eq!(c[10].0.w, 20);
+        assert_eq!(c.len(), 14);
     }
 
     #[test]
@@ -116,7 +120,7 @@ mod tests {
         draw(&mut list, &mut hits, strip, &Palette::fallback());
         let targets: Vec<_> = hits.regions().iter().map(|r| r.target).collect();
         assert_eq!(targets, PAD_KEYS.map(HitTarget::Pad).to_vec());
-        for label in ["0", "9", "<", "MAX", "OK"] {
+        for label in ["0", "9", "<", "MAX", "OK", "ESC"] {
             assert!(list.has_text_containing(label), "{label} drawn");
         }
     }

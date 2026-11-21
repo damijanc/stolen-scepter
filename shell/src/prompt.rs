@@ -18,8 +18,6 @@
 //! word-wrap are testable headlessly. The input comes from the same
 //! [`crate::input::KeySource`] the overworld uses.
 
-use openbounty_engine::resources::Resources;
-
 use crate::banner;
 use crate::draw::{DrawList, Rect};
 use crate::font;
@@ -53,10 +51,6 @@ enum Kind {
     AbChoice,
     TextInput,
 }
-
-/// Hint strings C compiles in, used when the pack declares none. The pack's
-/// overrides live under `strings.prompts` (see `resources.c`).
-pub const DEFAULT_YES_NO_HINT: &str = "(y/n)?";
 
 /// One modal prompt. A zero-value `Prompt` has no prompt active.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -172,6 +166,10 @@ impl Prompt {
                 self.dismiss();
                 index_result(i)
             }
+            (Kind::Numeric | Kind::AbChoice, HitTarget::PromptCancel) => {
+                self.dismiss();
+                PromptResult::Cancel
+            }
             (Kind::TextInput, HitTarget::Pad(key)) => match key {
                 PadKey::Digit(d) => {
                     self.type_digit(d);
@@ -186,6 +184,10 @@ impl Prompt {
                     PromptResult::None
                 }
                 PadKey::Ok => self.commit(),
+                PadKey::Esc => {
+                    self.dismiss();
+                    PromptResult::Cancel
+                }
             },
             _ => PromptResult::None,
         }
@@ -208,11 +210,11 @@ impl Prompt {
         self.buffer.pop();
     }
 
-    /// Fill the count box with the value cap, cut to the length cap.
+    /// Fill the count box with the most it can take: the value cap, or all
+    /// nines when the cap is wider than the box.
     fn fill_max(&mut self) {
-        let mut max = self.max_value.max(0).to_string();
-        max.truncate(self.max_digits as usize);
-        self.buffer = max;
+        let box_max = 10_i64.pow(self.max_digits as u32) - 1;
+        self.buffer = i64::from(self.max_value).clamp(0, box_max).to_string();
     }
 
     /// Commit by kind only, leaving the buffer readable through
@@ -321,7 +323,6 @@ impl Prompt {
         hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
-        resources: &Resources,
     ) {
         if self.kind == Kind::None {
             return;
@@ -371,6 +372,10 @@ impl Prompt {
             let line = take_line(&mut cursor, max_chars);
             list.text(&line, x + pad, ty, palette.clr(Pal::White));
             if ab_lines {
+                if line.trim().is_empty() {
+                    // A blank line closes the option above it.
+                    option = None;
+                }
                 if let Some(choice) = banner::choice_index(&line) {
                     option = Some(choice);
                 }
@@ -423,20 +428,35 @@ impl Prompt {
             }
             Kind::AbChoice => {}
             _ => {
-                let hint = banner::text(resources, "prompts", "yes_no_hint", DEFAULT_YES_NO_HINT);
-                list.text_centered(hint, x + w / 2, y + h - row_h - 2, palette.clr(Pal::Yellow));
+                // DIVERGENCE: C draws a "(y/n)?" hint here. The row is two
+                // framed buttons instead, Yes on the left and No on the right
+                // in that order; each fills its half, so a tap has a large,
+                // visible target, and the labels keep the keys.
+                let hint_y = y + h - row_h - 2;
+                let left = x + pad;
+                let mid = x + w / 2;
+                let right = x + w - pad;
+                for (rect, label, target) in [
+                    (
+                        Rect::new(left, hint_y, mid - 1 - left, row_h),
+                        "Y:YES",
+                        HitTarget::PromptYes,
+                    ),
+                    (
+                        Rect::new(mid + 1, hint_y, right - mid - 1, row_h),
+                        "N:NO",
+                        HitTarget::PromptNo,
+                    ),
+                ] {
+                    list.button(
+                        rect,
+                        label,
+                        palette.clr(Pal::Blue),
+                        palette.clr(Pal::Yellow),
+                    );
+                    hits.push(rect, target);
+                }
             }
-        }
-
-        // A yes/no prompt is two clickable halves of its hint row: Yes on the
-        // left, No on the right, matching the "(y/n)?" order.
-        if self.kind == Kind::YesNo {
-            let hint_y = y + h - row_h - 2;
-            hits.push(Rect::new(x, hint_y, w / 2, row_h), HitTarget::PromptYes);
-            hits.push(
-                Rect::new(x + w / 2, hint_y, w - w / 2, row_h),
-                HitTarget::PromptNo,
-            );
         }
     }
 }
@@ -453,22 +473,25 @@ fn choice_strip(
     labels: &[String],
     palette: &Palette,
 ) {
-    let n = labels.len() as i32;
-    if n == 0 {
-        return;
-    }
-    for (i, label) in labels.iter().enumerate() {
+    // One cell per label plus a closing ESC cell, which cancels as the key
+    // does and keeps the "or ESC" hint the row used to carry.
+    let n = labels.len() as i32 + 1;
+    let cells = labels
+        .iter()
+        .enumerate()
+        .map(|(i, label)| (label.as_str(), HitTarget::PromptPick(i)))
+        .chain(std::iter::once(("ESC", HitTarget::PromptCancel)));
+    for (i, (label, target)) in cells.enumerate() {
         let left = x + w * i as i32 / n;
         let right = x + w * (i as i32 + 1) / n;
         let rect = Rect::new(left, y, right - left, font::GLYPH_H + 1);
-        list.rect_lines(rect, palette.clr(Pal::Yellow));
-        list.text_centered(
+        list.button(
+            rect,
             label,
-            left + (right - left) / 2,
-            y,
+            palette.clr(Pal::Blue),
             palette.clr(Pal::Yellow),
         );
-        hits.push(rect, HitTarget::PromptPick(i));
+        hits.push(rect, target);
     }
 }
 
@@ -529,6 +552,7 @@ mod tests {
     use super::*;
     use crate::draw::DrawCmd;
     use crate::input::Keys;
+    use openbounty_engine::resources::Resources;
 
     fn pack(strings: &str) -> Resources {
         Resources::from_json_str(&format!(
@@ -744,7 +768,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
+        prompt.draw(&mut list, &mut hits, &layout, &palette);
 
         assert_eq!(
             list.as_slice()[0],
@@ -782,12 +806,14 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
+        prompt.draw(&mut list, &mut hits, &layout, &palette);
 
         assert!(list.has_text_containing("Search..."));
         assert!(list.has_text_containing("It will take"));
-        // The hint line for a yes/no prompt is the pack's or the default.
-        assert!(list.has_text_containing("(y/n)?"));
+        // DIVERGENCE: the yes/no row is two framed buttons whose labels keep
+        // the keys, in place of C's "(y/n)?" hint.
+        assert!(list.has_text_containing("Y:YES"));
+        assert!(list.has_text_containing("N:NO"));
 
         // Header is drawn in yellow, the body in white.
         let texts: Vec<_> = list
@@ -816,13 +842,13 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
+        prompt.draw(&mut list, &mut hits, &layout, &palette);
 
         let body: Vec<_> = list
             .texts()
             .into_iter()
             .filter(|(_, _, t)| *t != "h")
-            .filter(|(_, _, t)| *t != "(y/n)?")
+            .filter(|(_, _, t)| *t != "Y:YES" && *t != "N:NO")
             .map(|(_, _, t)| t.to_owned())
             .collect();
         // Every wrapped line stays within the panel's column budget.
@@ -871,7 +897,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
+        prompt.draw(&mut list, &mut hits, &layout, &palette);
 
         assert!(list.has_text_containing("2_"));
         // DIVERGENCE: the count strip takes C's "(Enter to confirm / ESC
@@ -890,25 +916,35 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
+        prompt.draw(&mut list, &mut hits, &layout, &palette);
 
         assert!(!list.has_text_containing("(y/n)?"));
         assert!(!list.has_text_containing("(1-5 or ESC)"));
     }
 
+    /// The yes/no buttons are framed and fill their halves of the row, so
+    /// each is a large, visible tap target; the region is the frame drawn.
     #[test]
-    fn the_pack_may_reword_the_hints() {
-        let resources =
-            pack(r#"{"prompts": {"yes_no_hint": "yes?"}, "dialog_titles": {"search": "Dig?"}}"#);
-        let layout = legacy_layout(&resources);
-        let palette = Palette::fallback();
+    fn the_yes_no_row_is_two_buttons() {
+        let resources = pack("{}");
         let mut prompt = Prompt::default();
         prompt.yes_no("Search...", "body");
-
-        let mut list = DrawList::new();
-        let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
-        assert!(list.has_text_containing("yes?"));
+        let (list, hits) = drawn(&prompt, &resources);
+        for target in [HitTarget::PromptYes, HitTarget::PromptNo] {
+            let rect = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == target)
+                .map(|r| r.rect)
+                .expect("button region");
+            assert!(
+                list.as_slice()
+                    .iter()
+                    .any(|cmd| matches!(cmd, DrawCmd::Rect { rect: r, .. } if *r == Rect::new(rect.x + 1, rect.y, rect.w - 2, rect.h))),
+                "{target:?} is drawn where it is tapped"
+            );
+        }
+        assert!(!list.has_text_containing("(y/n)"));
     }
 
     #[test]
@@ -920,7 +956,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
+        prompt.draw(&mut list, &mut hits, &layout, &palette);
         assert!(list.is_empty());
     }
 
@@ -947,13 +983,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(
-            &mut list,
-            &mut hits,
-            &layout,
-            &Palette::fallback(),
-            &resources,
-        );
+        prompt.draw(&mut list, &mut hits, &layout, &Palette::fallback());
 
         let yes = hits
             .regions()
@@ -981,13 +1011,7 @@ mod tests {
         let layout = legacy_layout(resources);
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(
-            &mut list,
-            &mut hits,
-            &layout,
-            &Palette::fallback(),
-            resources,
-        );
+        prompt.draw(&mut list, &mut hits, &layout, &Palette::fallback());
         (list, hits)
     }
 
@@ -1198,6 +1222,35 @@ mod tests {
         assert_eq!(prompt.text_input_value(), 137);
     }
 
+    /// A cap wider than the box fills the box with nines: the most the
+    /// player can type, never more than the cap.
+    #[test]
+    fn pad_max_fills_a_narrow_box_with_nines() {
+        let mut prompt = Prompt::default();
+        prompt.text_input("h", "b", 4, 12345);
+        prompt.click(pad(crate::numpad::PadKey::Max));
+        prompt.click(pad(crate::numpad::PadKey::Ok));
+        assert_eq!(prompt.text_input_value(), 9999);
+    }
+
+    /// An option's tap area ends at a blank line, so closing prose is not B.
+    #[test]
+    fn ab_option_areas_end_at_a_blank_line() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.ab("", "A) Keep it.\nB) Give it.\n\nChoose wisely.");
+        let (list, hits) = drawn(&prompt, &resources);
+        let y = list
+            .as_slice()
+            .iter()
+            .find_map(|cmd| match cmd {
+                DrawCmd::Text { text, y, .. } if text.starts_with("Choose") => Some(*y),
+                _ => None,
+            })
+            .expect("drawn");
+        assert_eq!(hits.hit(hits.regions()[0].rect.x + 1, y + 1), None);
+    }
+
     #[test]
     fn pad_regions_are_published_only_for_text_input() {
         let resources = pack("{}");
@@ -1220,7 +1273,10 @@ mod tests {
         };
         let mut prompt = Prompt::default();
         prompt.text_input("Hire", "Hire how many?", 4, 900);
-        assert_eq!(count(&drawn(&prompt, &resources).1), 13);
+        assert_eq!(
+            count(&drawn(&prompt, &resources).1),
+            crate::numpad::PAD_KEYS.len()
+        );
         prompt.yes_no("h", "b");
         assert_eq!(count(&drawn(&prompt, &resources).1), 0);
         prompt.numeric("h", "b", 3);
@@ -1238,5 +1294,40 @@ mod tests {
             PromptResult::None
         );
         assert!(prompt.is_active());
+    }
+
+    /// The strips end in an ESC cell: a tap cancels exactly as Esc does, and
+    /// its label is the keyboard hint the strip's row used to carry.
+    #[test]
+    fn every_strip_ends_in_an_esc_cell_that_cancels_like_escape() {
+        let resources = pack("{}");
+        let open = |kind: usize, p: &mut Prompt| match kind {
+            0 => p.numeric("h", "b", 3),
+            1 => p.ab("", "Take the gold or the glory?"),
+            _ => p.text_input("h", "b", 3, 50),
+        };
+        for kind in 0..3 {
+            let mut prompt = Prompt::default();
+            open(kind, &mut prompt);
+            let (list, hits) = drawn(&prompt, &resources);
+            assert!(list.has_text_containing("ESC"), "kind {kind} shows ESC");
+            let cancel = hits
+                .regions()
+                .iter()
+                .find(|r| {
+                    matches!(
+                        r.target,
+                        HitTarget::PromptCancel | HitTarget::Pad(PadKey::Esc)
+                    )
+                })
+                .map(|r| r.target)
+                .expect("an ESC cell");
+            let mut keyed = Prompt::default();
+            open(kind, &mut keyed);
+            let by_key = keyed.update(&Keys::pressed(&[Key::Escape]));
+            assert_eq!(prompt.click(cancel), by_key);
+            assert_eq!(by_key, PromptResult::Cancel);
+            assert!(!prompt.is_active());
+        }
     }
 }

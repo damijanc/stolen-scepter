@@ -402,6 +402,16 @@ impl DrawList {
         self.text(text, crate::font::centered_x(text, cx), y, color);
     }
 
+    /// A tappable button: a filled block one pixel in from each side, so two
+    /// neighbours read as separate keys, with `label` centred on it. Filled
+    /// rather than outlined: a frame is drawn two pixels thick and would cover
+    /// the top and bottom rows of a label in a one-line-high cell.
+    pub fn button(&mut self, rect: Rect, label: &str, fill: Color, ink: Color) {
+        self.rect(Rect::new(rect.x + 1, rect.y, rect.w - 2, rect.h), fill);
+        let y = rect.y + (rect.h - crate::font::GLYPH_H as i32).max(0) / 2;
+        self.text_centered(label, rect.x + rect.w / 2, y, ink);
+    }
+
     pub fn clip_begin(&mut self, rect: Rect) {
         self.push(DrawCmd::ClipBegin(rect));
     }
@@ -456,6 +466,32 @@ impl DrawList {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A button is a filled block, a pixel in from each side so neighbours
+    /// read apart, with its label centred inside: no outline to cover the
+    /// glyphs' top or bottom row.
+    #[test]
+    fn a_button_is_a_filled_block_with_its_label_inside() {
+        let mut list = DrawList::new();
+        let fill = Color::rgb(0, 0, 255);
+        let ink = Color::rgb(255, 255, 0);
+        list.button(Rect::new(10, 20, 40, 9), "OK", fill, ink);
+        assert_eq!(
+            list.as_slice()[0],
+            DrawCmd::Rect {
+                rect: Rect::new(11, 20, 38, 9),
+                color: fill
+            }
+        );
+        assert!(list
+            .as_slice()
+            .iter()
+            .all(|cmd| !matches!(cmd, DrawCmd::RectLines { .. })));
+        let (x, y, text) = list.texts()[0];
+        assert_eq!(text, "OK");
+        assert!(x > 10 && x + 2 * crate::font::GLYPH_W as i32 <= 50);
+        assert_eq!(y, 20);
+    }
 
     #[test]
     fn a_packed_pack_colour_unpacks_the_way_chrome_reads_it() {

@@ -1430,20 +1430,9 @@ impl<'r> Session<'r> {
             // wins where they overlap.
             let status_bar = Rect::new(STATUS_X, STATUS_Y, layout.status_w(), STATUS_H);
             if *fast_quit {
-                let half = status_bar.w / 2;
-                hits.push(
-                    Rect::new(status_bar.x, status_bar.y, half, status_bar.h),
-                    HitTarget::FastQuitYes,
-                );
-                hits.push(
-                    Rect::new(
-                        status_bar.x + half,
-                        status_bar.y,
-                        status_bar.w - half,
-                        status_bar.h,
-                    ),
-                    HitTarget::FastQuitNo,
-                );
+                let (yes, no) = crate::chrome::fast_quit_buttons(layout);
+                hits.push(yes, HitTarget::FastQuitYes);
+                hits.push(no, HitTarget::FastQuitNo);
             }
             match views.active() {
                 Some(ViewKind::Worldmap) if worldmap_has_orb(game, resources) => {
@@ -1469,7 +1458,7 @@ impl<'r> Session<'r> {
         // covers a prompt that is up at the same time, exactly as C's overlay
         // orders them.
         if prompt.is_active() {
-            prompt.draw(list, hits, layout, palette, resources);
+            prompt.draw(list, hits, layout, palette);
         }
         if dialog.is_active() {
             dialog.draw(list, hits, layout, palette);
@@ -3316,6 +3305,7 @@ mod tests {
             to_overworld(&mut session, &mut list, &mut now);
             let (x, y) = bridge_ready(&mut session, &mut list, &mut now);
             let before = session.map.clone();
+            let mut probed = 0;
             for (tx, ty) in [(x + 2, y), (x + 1, y + 1), (x, y)] {
                 let Some(region) = session
                     .hits
@@ -3336,7 +3326,12 @@ mod tests {
                     session.bridge_waiting,
                     "a tap on ({tx},{ty}) builds nothing"
                 );
+                probed += 1;
             }
+            assert!(
+                probed >= 2,
+                "the far and diagonal tiles were on screen to tap"
+            );
             assert_eq!(session.map, before);
         });
     }

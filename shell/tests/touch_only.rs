@@ -21,7 +21,7 @@ fn a_game_plays_by_touch_alone() {
         );
     }
 
-    let out = std::env::temp_dir().join("openbounty-touch-only");
+    let out = std::env::temp_dir().join(format!("openbounty-touch-only-{}", std::process::id()));
     let status = Command::new(env!("CARGO_BIN_EXE_playtest"))
         .arg("--script")
         .arg(&script)
@@ -33,5 +33,6 @@ fn a_game_plays_by_touch_alone() {
         .current_dir(dir.join(".."))
         .status()
         .expect("playtest runs");
+    let _ = std::fs::remove_dir_all(&out);
     assert!(status.success(), "touch-only playthrough failed");
 }
