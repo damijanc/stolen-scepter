@@ -1458,7 +1458,7 @@ impl<'r> Session<'r> {
         // covers a prompt that is up at the same time, exactly as C's overlay
         // orders them.
         if prompt.is_active() {
-            prompt.draw(list, hits, layout, palette);
+            prompt.draw(list, hits, layout, palette, resources);
         }
         if dialog.is_active() {
             dialog.draw(list, hits, layout, palette);

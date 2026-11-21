@@ -1,7 +1,7 @@
 # A game played by left clicks alone (`click` only: no `key`, `type` or
 # `rclick`), as a phone plays it. Coordinates are logical 320x200 pixels.
 # Run: cargo run -p openbounty-shell --bin playtest -- \
-#        --script shell/tests/touch_only.txt --out target/touch-only --seed 7
+#        --script shell/tests/touch_only.txt --out target/touch-only --seed 7 --mobile
 
 # Splashes and credits skip on a tap.
 click 160 100

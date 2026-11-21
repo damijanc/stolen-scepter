@@ -889,7 +889,8 @@ impl Startup {
             }
         }
 
-        if !self.has_name {
+        // The letter grid is the touch build's: desktop types the name.
+        if !self.has_name && layout.touch {
             name_grid(list, hits, layout, palette, y + h + 2);
         }
 
@@ -1424,7 +1425,13 @@ mod tests {
     }
 
     fn drawn_hits(startup: &Startup, resources: &Resources) -> (DrawList, HitList) {
-        let layout = Layout::from_resources(resources).expect("lays out");
+        drawn_hits_on(startup, resources, false)
+    }
+
+    /// Drawn on the touch build (`touch`) or the desktop one.
+    fn drawn_hits_on(startup: &Startup, resources: &Resources, touch: bool) -> (DrawList, HitList) {
+        let mut layout = Layout::from_resources(resources).expect("lays out");
+        layout.touch = touch;
         let mut list = DrawList::new();
         let mut hits = HitList::new();
         startup.draw(
@@ -1657,12 +1664,33 @@ mod tests {
         assert_eq!(by_click, by_key);
     }
 
+    /// Desktop keeps C's name screen: typed, with no letter grid.
+    #[test]
+    fn desktop_name_screen_has_no_letter_grid() {
+        let resources = resources();
+        let paths = paths("name-grid-desktop");
+        let startup = at_name(&resources, &paths);
+        let grid = |hits: &HitList| {
+            hits.regions()
+                .iter()
+                .filter(|r| {
+                    matches!(
+                        r.target,
+                        HitTarget::NameKey(_) | HitTarget::NameDel | HitTarget::NameDone
+                    )
+                })
+                .count()
+        };
+        assert_eq!(grid(&drawn_hits_on(&startup, &resources, false).1), 0);
+        assert_eq!(grid(&drawn_hits_on(&startup, &resources, true).1), 29);
+    }
+
     #[test]
     fn grid_regions_cover_their_glyphs_and_vanish_after_done() {
         let resources = resources();
         let paths = paths("name-grid-draw");
         let mut startup = at_name(&resources, &paths);
-        let (list, hits) = drawn_hits(&startup, &resources);
+        let (list, hits) = drawn_hits_on(&startup, &resources, true);
         let texts = list.texts();
         let keys: Vec<_> = hits
             .regions()

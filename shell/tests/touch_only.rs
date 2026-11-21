@@ -1,4 +1,5 @@
-//! Plays `touch_only.txt` through the real `playtest` binary: a game started,
+//! Plays `touch_only.txt` through the real `playtest` binary as the mobile
+//! build (`--mobile`): a game started,
 //! fought, managed and quit with left clicks alone, as a phone plays it. The
 //! script must stay click-only, which this test also checks.
 
@@ -29,7 +30,7 @@ fn a_game_plays_by_touch_alone() {
         .arg(&out)
         .arg("--save-dir")
         .arg(out.join("saves"))
-        .args(["--seed", "7"])
+        .args(["--seed", "7", "--mobile"])
         .current_dir(dir.join(".."))
         .status()
         .expect("playtest runs");

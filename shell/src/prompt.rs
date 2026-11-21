@@ -26,6 +26,7 @@ use crate::layout::{Layout, PANEL_COLS, PANEL_H, PANEL_PAD_X};
 use crate::numpad::{self, PadKey};
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
+use openbounty_engine::resources::Resources;
 
 /// What a prompt returned once answered. Ports `PromptResult`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -51,6 +52,9 @@ enum Kind {
     AbChoice,
     TextInput,
 }
+
+/// The yes/no hint C compiles in, used on desktop when the pack declares none.
+pub const DEFAULT_YES_NO_HINT: &str = "(y/n)?";
 
 /// One modal prompt. A zero-value `Prompt` has no prompt active.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -323,6 +327,7 @@ impl Prompt {
         hits: &mut HitList,
         layout: &Layout,
         palette: &Palette,
+        resources: &Resources,
     ) {
         if self.kind == Kind::None {
             return;
@@ -427,6 +432,18 @@ impl Prompt {
                 );
             }
             Kind::AbChoice => {}
+            _ if !layout.touch => {
+                // Desktop keeps C's line: the pack's hint, centred, whose two
+                // halves are Yes and No for the mouse.
+                let hint = banner::text(resources, "prompts", "yes_no_hint", DEFAULT_YES_NO_HINT);
+                let hint_y = y + h - row_h - 2;
+                list.text_centered(hint, x + w / 2, hint_y, palette.clr(Pal::Yellow));
+                hits.push(Rect::new(x, hint_y, w / 2, row_h), HitTarget::PromptYes);
+                hits.push(
+                    Rect::new(x + w / 2, hint_y, w - w / 2, row_h),
+                    HitTarget::PromptNo,
+                );
+            }
             _ => {
                 // DIVERGENCE: C draws a "(y/n)?" hint here. The row is two
                 // framed buttons instead, Yes on the left and No on the right
@@ -768,7 +785,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette);
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert_eq!(
             list.as_slice()[0],
@@ -806,14 +823,12 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette);
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("Search..."));
         assert!(list.has_text_containing("It will take"));
-        // DIVERGENCE: the yes/no row is two framed buttons whose labels keep
-        // the keys, in place of C's "(y/n)?" hint.
-        assert!(list.has_text_containing("Y:YES"));
-        assert!(list.has_text_containing("N:NO"));
+        // The hint line for a yes/no prompt is the pack's or the default.
+        assert!(list.has_text_containing("(y/n)?"));
 
         // Header is drawn in yellow, the body in white.
         let texts: Vec<_> = list
@@ -842,13 +857,13 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette);
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         let body: Vec<_> = list
             .texts()
             .into_iter()
             .filter(|(_, _, t)| *t != "h")
-            .filter(|(_, _, t)| *t != "Y:YES" && *t != "N:NO")
+            .filter(|(_, _, t)| *t != "(y/n)?")
             .map(|(_, _, t)| t.to_owned())
             .collect();
         // Every wrapped line stays within the panel's column budget.
@@ -897,7 +912,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette);
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(list.has_text_containing("2_"));
         // DIVERGENCE: the count strip takes C's "(Enter to confirm / ESC
@@ -916,20 +931,20 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette);
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
 
         assert!(!list.has_text_containing("(y/n)?"));
         assert!(!list.has_text_containing("(1-5 or ESC)"));
     }
 
-    /// The yes/no buttons are framed and fill their halves of the row, so
-    /// each is a large, visible tap target; the region is the frame drawn.
+    /// On the touch build the yes/no buttons fill their halves of the row,
+    /// so each is a visible tap target; the region is the block drawn.
     #[test]
-    fn the_yes_no_row_is_two_buttons() {
+    fn touch_yes_no_row_is_two_buttons() {
         let resources = pack("{}");
         let mut prompt = Prompt::default();
         prompt.yes_no("Search...", "body");
-        let (list, hits) = drawn(&prompt, &resources);
+        let (list, hits) = drawn_on(&prompt, &resources, true);
         for target in [HitTarget::PromptYes, HitTarget::PromptNo] {
             let rect = hits
                 .regions()
@@ -947,6 +962,37 @@ mod tests {
         assert!(!list.has_text_containing("(y/n)"));
     }
 
+    /// Desktop keeps C's yes/no line: the pack's hint, centred, and its two
+    /// halves clickable as Yes and No, with no button drawn.
+    #[test]
+    fn desktop_yes_no_shows_the_hint_with_halves() {
+        let resources =
+            pack(r#"{"prompts": {"yes_no_hint": "yes?"}, "dialog_titles": {"search": "Dig?"}}"#);
+        let mut prompt = Prompt::default();
+        prompt.yes_no("Search...", "body");
+        let (list, hits) = drawn(&prompt, &resources);
+        assert!(list.has_text_containing("yes?"));
+        assert!(!list.has_text_containing("Y:YES"));
+        let yes = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::PromptYes)
+            .expect("yes");
+        let no = hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::PromptNo)
+            .expect("no");
+        let layout = legacy_layout(&resources);
+        assert_eq!(yes.rect.x, layout.panel_x());
+        assert_eq!(yes.rect.w, layout.panel_w() / 2);
+        assert_eq!(no.rect.x, layout.panel_x() + layout.panel_w() / 2);
+        assert!(!list
+            .as_slice()
+            .iter()
+            .any(|cmd| matches!(cmd, DrawCmd::Rect { rect, .. } if rect.y == yes.rect.y)));
+    }
+
     #[test]
     fn an_inactive_prompt_draws_nothing() {
         let resources = pack("{}");
@@ -956,7 +1002,7 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &palette);
+        prompt.draw(&mut list, &mut hits, &layout, &palette, &resources);
         assert!(list.is_empty());
     }
 
@@ -983,7 +1029,13 @@ mod tests {
 
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &Palette::fallback());
+        prompt.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+        );
 
         let yes = hits
             .regions()
@@ -1008,10 +1060,22 @@ mod tests {
     }
 
     fn drawn(prompt: &Prompt, resources: &Resources) -> (DrawList, HitList) {
-        let layout = legacy_layout(resources);
+        drawn_on(prompt, resources, false)
+    }
+
+    /// Drawn on the touch build (`touch`) or the desktop one.
+    fn drawn_on(prompt: &Prompt, resources: &Resources, touch: bool) -> (DrawList, HitList) {
+        let mut layout = legacy_layout(resources);
+        layout.touch = touch;
         let mut list = DrawList::new();
         let mut hits = HitList::new();
-        prompt.draw(&mut list, &mut hits, &layout, &Palette::fallback());
+        prompt.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            resources,
+        );
         (list, hits)
     }
 
