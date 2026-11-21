@@ -282,6 +282,15 @@ pub enum DrawCmd {
         y: i32,
         color: Color,
     },
+    /// Text with every glyph drawn `scale` times its size: the mobile choice
+    /// sheet's finger-sized labels. Plain [`DrawCmd::Text`] is scale 1.
+    BigText {
+        text: String,
+        x: i32,
+        y: i32,
+        color: Color,
+        scale: i32,
+    },
     /// Clip everything after this to `rect`, until [`DrawCmd::ClipEnd`].
     /// C's `BeginScissorMode`, which does not nest and is used exactly once,
     /// for the map viewport.
@@ -397,6 +406,23 @@ impl DrawList {
         });
     }
 
+    /// Text at `scale` times the glyph size.
+    pub fn big_text(&mut self, text: &str, x: i32, y: i32, color: Color, scale: i32) {
+        self.push(DrawCmd::BigText {
+            text: text.to_owned(),
+            x,
+            y,
+            color,
+            scale,
+        });
+    }
+
+    /// Big text centred on `cx`.
+    pub fn big_text_centered(&mut self, text: &str, cx: i32, y: i32, color: Color, scale: i32) {
+        let w = text.chars().count() as i32 * crate::font::GLYPH_W as i32 * scale;
+        self.big_text(text, cx - w / 2, y, color, scale);
+    }
+
     /// Text centred on `cx`, porting `bfont_draw_centered`.
     pub fn text_centered(&mut self, text: &str, cx: i32, y: i32, color: Color) {
         self.text(text, crate::font::centered_x(text, cx), y, color);
@@ -427,7 +453,9 @@ impl DrawList {
         self.cmds
             .iter()
             .filter_map(|cmd| match cmd {
-                DrawCmd::Text { text, x, y, .. } => Some((*x, *y, text.as_str())),
+                DrawCmd::Text { text, x, y, .. } | DrawCmd::BigText { text, x, y, .. } => {
+                    Some((*x, *y, text.as_str()))
+                }
                 _ => None,
             })
             .collect()
@@ -470,6 +498,18 @@ mod tests {
     /// A button is a filled block, a pixel in from each side so neighbours
     /// read apart, with its label centred inside: no outline to cover the
     /// glyphs' top or bottom row.
+    #[test]
+    fn big_text_is_listed_with_the_other_text() {
+        let mut list = DrawList::new();
+        list.big_text_centered("Yes", 100, 50, Color::rgb(255, 255, 0), 2);
+        // Three glyphs at 16px each, centred on x=100.
+        assert_eq!(list.texts(), vec![(100 - 3 * 8, 50, "Yes")]);
+        assert!(matches!(
+            list.as_slice()[0],
+            DrawCmd::BigText { scale: 2, .. }
+        ));
+    }
+
     #[test]
     fn a_button_is_a_filled_block_with_its_label_inside() {
         let mut list = DrawList::new();

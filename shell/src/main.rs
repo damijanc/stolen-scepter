@@ -237,13 +237,15 @@ async fn run() {
             return;
         }
     };
-    let layout = match Layout::from_resources(&resources) {
+    let mut layout = match Layout::from_resources(&resources) {
         Ok(layout) => layout,
         Err(err) => {
             eprintln!("pack {pack_path} has no usable render geometry: {err:?}");
             return;
         }
     };
+    // The touch build draws the mobile UI (specs/mobile-ui-design.md).
+    layout.touch = present::Target::native() == present::Target::Mobile;
 
     // A picker launch opened the window at the legacy default before the
     // pack was known; grow it to what this pack wants, or an HD (or modern)

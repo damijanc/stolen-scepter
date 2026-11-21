@@ -228,7 +228,14 @@ impl Canvas {
                 };
                 self.blit(image, ox * s, oy * s, w, h, *flip_x, *tint);
             }
-            DrawCmd::Text { text, x, y, color } => self.text(images, text, *x, *y, *color),
+            DrawCmd::Text { text, x, y, color } => self.text(images, text, *x, *y, *color, 1),
+            DrawCmd::BigText {
+                text,
+                x,
+                y,
+                color,
+                scale,
+            } => self.text(images, text, *x, *y, *color, *scale),
             DrawCmd::ClipBegin(rect) => {
                 let (x, y, w, h) = self.rect_px(*rect);
                 self.clip = (x.max(0), y.max(0), (x + w).min(self.w), (y + h).min(self.h));
@@ -304,18 +311,19 @@ impl Canvas {
     }
 
     /// One glyph per byte from the font strip, advancing a fixed cell.
-    fn text(&mut self, images: &Images, text: &str, x: i32, y: i32, color: Color) {
+    /// `gs` is the glyph scale: 1 for normal text, more for big text.
+    fn text(&mut self, images: &Images, text: &str, x: i32, y: i32, color: Color, gs: i32) {
         let Some(strip) = images.font.as_ref() else {
             return;
         };
         let glyph_w = (strip.w / font::GLYPH_COUNT as i32).max(1);
         let s = self.scale;
-        let (cell_w, cell_h) = (font::GLYPH_W * s, font::GLYPH_H * s);
+        let (cell_w, cell_h) = (font::GLYPH_W * gs * s, font::GLYPH_H * gs * s);
         let (mut cx, mut cy) = (x, y);
         for byte in text.as_bytes() {
             if *byte == b'\n' {
                 cx = x;
-                cy += font::line_height();
+                cy += font::line_height() * gs;
                 continue;
             }
             let gx = font::glyph_index(*byte) as i32 * glyph_w;
@@ -331,7 +339,7 @@ impl Canvas {
                     self.blend(cx * s + dx, cy * s + dy, rgba);
                 }
             }
-            cx += font::GLYPH_W;
+            cx += font::GLYPH_W * gs;
         }
     }
 }
@@ -342,7 +350,7 @@ pub fn texts(list: &DrawList) -> Vec<String> {
     list.as_slice()
         .iter()
         .filter_map(|cmd| match cmd {
-            DrawCmd::Text { text, .. } => Some(text.clone()),
+            DrawCmd::Text { text, .. } | DrawCmd::BigText { text, .. } => Some(text.clone()),
             _ => None,
         })
         .collect()
@@ -388,6 +396,47 @@ mod tests {
         canvas.paint(&list, &empty_catalog(), &Images::default());
         assert_eq!(pixel(&canvas, 4, 4), [255, 255, 255, 255]);
         assert_eq!(pixel(&canvas, 5, 4), [0, 0, 0, 255]);
+    }
+
+    /// A solid-white font strip: every glyph is an 8x8 block of ink.
+    fn solid_font() -> Images {
+        let w = 8 * crate::font::GLYPH_COUNT as i32;
+        Images {
+            font: Some(Image {
+                w,
+                h: 8,
+                px: vec![255; (w * 8 * 4) as usize],
+            }),
+            ..Images::default()
+        }
+    }
+
+    fn ink_box(canvas: &Canvas) -> (i32, i32) {
+        let mut max = (0, 0);
+        for y in 0..canvas.h {
+            for x in 0..canvas.w {
+                if pixel(canvas, x, y)[0] > 0 {
+                    max = (max.0.max(x + 1), max.1.max(y + 1));
+                }
+            }
+        }
+        max
+    }
+
+    #[test]
+    fn big_text_paints_each_glyph_at_its_scale() {
+        let images = solid_font();
+        let mut small = Canvas::new(40, 40, 1);
+        let mut list = DrawList::new();
+        list.text("A", 0, 0, Color::WHITE);
+        small.paint(&list, &empty_catalog(), &images);
+        let mut big = Canvas::new(40, 40, 1);
+        let mut list = DrawList::new();
+        list.big_text("A", 0, 0, Color::WHITE, 2);
+        big.paint(&list, &empty_catalog(), &images);
+        assert_eq!(ink_box(&small), (8, 8));
+        assert_eq!(ink_box(&big), (16, 16));
+        assert_eq!(texts(&list), vec!["A".to_owned()]);
     }
 
     #[test]

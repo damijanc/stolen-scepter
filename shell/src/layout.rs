@@ -126,6 +126,9 @@ pub struct Layout {
     /// indistinguishable from the build before render modes existed, so
     /// anything new is gated on this.
     pub is_modern: bool,
+    /// A touch build (Android): draw the mobile UI. Never read from the pack;
+    /// the host sets it after `from_resources` (false there).
+    pub touch: bool,
     /// The pack's art pixel multiple, at least 1. The shell presents at a
     /// window scale no lower than this, so art authored `N` times the logical
     /// size is never sampled below 1:1. `1` is the DOS original and leaves the
@@ -186,6 +189,7 @@ impl Layout {
             // it would exceed 1080p -- so it opens 1:1 and the user scales up.
             default_scale: if is_modern { 1 } else { render.scale.max(2) },
             is_modern,
+            touch: false,
             pixel_scale: render.scale,
         })
     }

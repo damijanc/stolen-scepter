@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! cargo run -p openbounty-shell --bin playtest -- --script s.txt --out shots/
-//!     [--pack <name|path>] [--seed N] [--scale S] [--save-dir DIR]
+//!     [--pack <name|path>] [--seed N] [--scale S] [--save-dir DIR] [--mobile]
 //! ```
 //!
 //! `--script -` reads stdin. One command per line, `#` starts a comment:
@@ -58,6 +58,8 @@ struct Args {
     seed: i32,
     scale: i32,
     save_dir: Option<PathBuf>,
+    /// Draw the mobile UI (`Layout::touch`), as the Android build does.
+    mobile: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -68,6 +70,7 @@ fn parse_args() -> Result<Args, String> {
         seed: 1,
         scale: 2,
         save_dir: None,
+        mobile: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -79,6 +82,7 @@ fn parse_args() -> Result<Args, String> {
             "--seed" => args.seed = value()?.parse().map_err(|_| "bad --seed")?,
             "--scale" => args.scale = value()?.parse().map_err(|_| "bad --scale")?,
             "--save-dir" => args.save_dir = Some(PathBuf::from(value()?)),
+            "--mobile" => args.mobile = true,
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -302,7 +306,8 @@ fn run() -> Result<(), String> {
     };
     let pack = pack::Pack::open(&pack::pack_location(&pack_path)).map_err(|e| e.to_string())?;
     let resources = pack::load_resources(&pack)?;
-    let layout = Layout::from_resources(&resources).map_err(|e| format!("{e:?}"))?;
+    let mut layout = Layout::from_resources(&resources).map_err(|e| format!("{e:?}"))?;
+    layout.touch = args.mobile;
     let catalog = SpriteCatalog::from_resources(&resources);
     let images = Images::load(&resources, &catalog, &pack);
     if !images.missing.is_empty() {

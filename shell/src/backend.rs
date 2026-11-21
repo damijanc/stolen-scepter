@@ -250,7 +250,14 @@ impl Backend {
                     },
                 );
             }
-            DrawCmd::Text { text, x, y, color } => self.text(text, *x, *y, *color, frame),
+            DrawCmd::Text { text, x, y, color } => self.text(text, *x, *y, *color, 1, frame),
+            DrawCmd::BigText {
+                text,
+                x,
+                y,
+                color,
+                scale,
+            } => self.text(text, *x, *y, *color, *scale, frame),
             DrawCmd::ClipBegin(rect) => {
                 set_clip(Some(framebuffer_clip(
                     frame.rect(*rect),
@@ -262,7 +269,8 @@ impl Backend {
     }
 
     /// One glyph per byte from the 1024x8 strip, advancing a fixed cell.
-    fn text(&self, text: &str, x: i32, y: i32, color: Color, frame: &Frame) {
+    /// `gs` is the glyph scale: 1 for normal text, more for big text.
+    fn text(&self, text: &str, x: i32, y: i32, color: Color, gs: i32, frame: &Frame) {
         let Some(strip) = self.font.as_ref() else {
             return;
         };
@@ -274,15 +282,15 @@ impl Backend {
         let glyph_w = (strip.width() / font::GLYPH_COUNT as f32).max(1.0);
         let glyph_h = strip.height().max(1.0);
         let cell = Vec2::new(
-            font::GLYPH_W as f32 * frame.scale,
-            font::GLYPH_H as f32 * frame.scale,
+            (font::GLYPH_W * gs) as f32 * frame.scale,
+            (font::GLYPH_H * gs) as f32 * frame.scale,
         );
         let mut cx = x;
         let mut cy = y;
         for byte in text.as_bytes() {
             if *byte == b'\n' {
                 cx = x;
-                cy += font::line_height();
+                cy += font::line_height() * gs;
                 continue;
             }
             let glyph = font::glyph_index(*byte) as f32;
@@ -297,7 +305,7 @@ impl Backend {
                     ..Default::default()
                 },
             );
-            cx += font::GLYPH_W;
+            cx += font::GLYPH_W * gs;
         }
     }
 }
