@@ -483,6 +483,10 @@ impl MacroquadKeys {
 
 impl KeySource for MacroquadKeys {
     fn pressed(&self, key: Key) -> bool {
+        // Android's Back button is ESC: every view already exits on it.
+        if cfg!(target_os = "android") && key == Key::Escape && is_key_pressed(KeyCode::Back) {
+            return true;
+        }
         is_key_pressed(Self::code(key))
     }
 
@@ -547,6 +551,53 @@ impl PointerSource for MacroquadPointer {
 
     fn released(&self, button: Button) -> bool {
         is_mouse_button_released(Self::button(button))
+    }
+}
+
+/// A file bundled with the app. On Android that is an APK asset, which has no
+/// filesystem path; elsewhere macroquad reads it as a plain file.
+pub async fn load_bundled(name: &str) -> Option<Vec<u8>> {
+    macroquad::file::load_file(name).await.ok()
+}
+
+/// Android process setup, run once before anything else. miniquad starts the
+/// app (and routes panics to logcat) but leaves two gaps: `ndk-context`
+/// (cpal's AAudio host reads the JavaVM and Activity from it, and panics when
+/// it is empty) and a writable home (the save paths read `HOME`, which
+/// Android does not set).
+#[cfg(target_os = "android")]
+pub fn android_init() {
+    use macroquad::miniquad::native::android::{attach_jni_env, ndk_sys, ACTIVITY};
+    use std::ffi::{c_void, CStr};
+
+    unsafe {
+        let env = attach_jni_env();
+        let mut vm: *mut ndk_sys::JavaVM = std::ptr::null_mut();
+        ((**env).GetJavaVM.unwrap())(env, &mut vm);
+        ndk_context::initialize_android_context(vm as *mut c_void, ACTIVITY as *mut c_void);
+
+        // activity.getFilesDir().getAbsolutePath(): the app's private,
+        // always-writable storage, and where the saves go.
+        let call = (**env).CallObjectMethod.unwrap();
+        let method = |obj: ndk_sys::jobject, name: &CStr, sig: &CStr| {
+            let class = ((**env).GetObjectClass.unwrap())(env, obj);
+            ((**env).GetMethodID.unwrap())(env, class, name.as_ptr(), sig.as_ptr())
+        };
+        let files = call(
+            env,
+            ACTIVITY,
+            method(ACTIVITY, c"getFilesDir", c"()Ljava/io/File;"),
+        );
+        let jpath = call(
+            env,
+            files,
+            method(files, c"getAbsolutePath", c"()Ljava/lang/String;"),
+        );
+        let chars = ((**env).GetStringUTFChars.unwrap())(env, jpath, std::ptr::null_mut());
+        let home = CStr::from_ptr(chars).to_string_lossy().into_owned();
+        ((**env).ReleaseStringUTFChars.unwrap())(env, jpath, chars);
+        // Single-threaded here: no audio or loader thread exists yet.
+        std::env::set_var("HOME", home);
     }
 }
 

@@ -12,3 +12,23 @@ openbounty-engine = { path = "../engine" }
 png = "0.17"
 serde_json = "1"
 zip = { version = "8.6", default-features = false, features = ["deflate"] }
+
+# Android loads the game as a shared library (`System.loadLibrary`), and a
+# bin target cannot be one. This is the same `main.rs` built as a cdylib;
+# the feature keeps every normal build and `cargo test` from compiling it.
+# Built only by tools/build_apk.sh.
+[features]
+android-apk = []
+
+[[example]]
+name = "openbounty_android"
+crate-type = ["cdylib"]
+required-features = ["android-apk"]
+test = false
+doc = false
+
+# cpal's AAudio host reads the JavaVM and Activity from `ndk-context`, which
+# android-activity fills in but miniquad does not. `backend::android_init`
+# fills it in from miniquad's own pointers.
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-context = "0.1"

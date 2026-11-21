@@ -105,23 +105,20 @@ fn window_conf() -> Conf {
     }
 }
 
-#[macroquad::main(window_conf)]
-async fn main() {
-    let launch = LaunchArgs::parse(std::env::args().skip(1));
-    let save_paths = launch.save_paths();
-    let LaunchArgs {
-        explicit_pack,
-        seed_index,
-        ..
-    } = launch;
-
+/// The pack to play, its display path, and whether the picker chose it.
+/// `None` ends the launch quietly (ESC in the picker, or an unreadable pack).
+#[cfg(not(target_os = "android"))]
+async fn open_pack(
+    explicit_pack: Option<String>,
+    save_paths: &SavePaths,
+) -> Option<(pack::Pack, String, bool)> {
     // C's launch policy (`main.c`): an explicit pack must resolve; otherwise
     // none found is fatal, one loads silently, and two or more get a picker.
     // Whether the pack came from the picker, i.e. was unknown when the
     // window opened.
     let mut picked = false;
     let pack_path = match explicit_pack {
-        Some(arg) => match pack::resolve_arg(&arg, &save_paths) {
+        Some(arg) => match pack::resolve_arg(&arg, save_paths) {
             Some(path) => path,
             None => {
                 eprintln!("Could not find a game pack at:\n\n    {arg}\n");
@@ -132,11 +129,11 @@ async fn main() {
             }
         },
         None => {
-            let entries = pack::discover(&save_paths);
+            let entries = pack::discover(save_paths);
             match entries.len() {
                 0 => {
                     eprintln!("OpenBounty cannot start because no game pack was found. Looked in:");
-                    for root in pack::discover_roots(&save_paths) {
+                    for root in pack::discover_roots(save_paths) {
                         // Scanning uses C's "."; the message names it.
                         let shown = std::fs::canonicalize(&root).unwrap_or(root);
                         eprintln!("    {}", shown.display());
@@ -154,7 +151,7 @@ async fn main() {
                         entries.into_iter().nth(index).expect("in range").path
                     }
                     // ESC: load nothing. C returns 0 here.
-                    None => return,
+                    None => return None,
                 },
             }
         }
@@ -169,8 +166,53 @@ async fn main() {
                 "cannot open game pack at {}: {err}",
                 pack_location.display()
             );
-            return;
+            return None;
         }
+    };
+    Some((pack, pack_path, picked))
+}
+
+/// The APK's one bundled pack. An APK asset has no path, so this is the
+/// archive's bytes; discovery, `--pack` and the picker do not apply.
+#[cfg(target_os = "android")]
+async fn open_pack(
+    _explicit_pack: Option<String>,
+    _save_paths: &SavePaths,
+) -> Option<(pack::Pack, String, bool)> {
+    const BUNDLED: &str = "game.openbounty";
+    let bytes = backend::load_bundled(BUNDLED).await;
+    let pack = bytes.and_then(|raw| pack::Pack::from_archive_bytes(&raw).ok());
+    pack.map(|pack| (pack, BUNDLED.to_owned(), false))
+}
+
+/// miniquad's Java activity starts the game by calling this symbol in the
+/// loaded library. `cargo quad-apk` injects the same two lines; we build the
+/// library with plain cargo (tools/build_apk.sh), so it lives here.
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn quad_main() {
+    // miniquad runs the game on a `thread::spawn` thread, which gets Rust's
+    // 2 MB default stack; the desktop main thread has 8 MB, and the engine's
+    // fixed-capacity structs need it. Read once, at the first spawn, which
+    // has not happened yet.
+    std::env::set_var("RUST_MIN_STACK", (16 * 1024 * 1024).to_string());
+    main();
+}
+
+#[macroquad::main(window_conf)]
+async fn main() {
+    let launch = LaunchArgs::parse(std::env::args().skip(1));
+    let save_paths = launch.save_paths();
+    let LaunchArgs {
+        explicit_pack,
+        seed_index,
+        ..
+    } = launch;
+
+    #[cfg(target_os = "android")]
+    backend::android_init();
+    let Some((pack, pack_path, picked)) = open_pack(explicit_pack, &save_paths).await else {
+        return;
     };
     let resources = match pack::load_resources(&pack) {
         Ok(resources) => resources,

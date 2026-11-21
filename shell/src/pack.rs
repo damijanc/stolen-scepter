@@ -49,9 +49,14 @@ impl Pack {
                 root: path.to_path_buf(),
             });
         }
-        let raw = std::fs::read(path)?;
-        let hash = fnv1a64_hex(&raw);
-        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&raw[..]))
+        Self::from_archive_bytes(&std::fs::read(path)?)
+    }
+
+    /// A `.openbounty` archive already in memory -- how Android opens the
+    /// pack bundled in the APK, which has no filesystem path.
+    pub fn from_archive_bytes(raw: &[u8]) -> std::io::Result<Self> {
+        let hash = fnv1a64_hex(raw);
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(raw))
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
 
         let mut entries = HashMap::new();
