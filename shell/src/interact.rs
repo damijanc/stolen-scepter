@@ -191,6 +191,47 @@ pub fn chest_choice(resources: &Resources, roll: &ChestRoll) -> Option<String> {
     ))
 }
 
+/// The two mobile chest buttons, naming the amounts (spec decision 5):
+/// "Keep 400 gold" for A, "Share it (+40 leadership)" for B. Mobile-only
+/// strings, under `mobile_banners`.
+pub fn chest_option_labels(resources: &Resources, roll: &ChestRoll) -> [String; 2] {
+    let gold = roll.pending.pending_gold.to_string();
+    let leadership = roll.pending.pending_leadership.to_string();
+    [
+        banner::formatted(
+            resources,
+            "mobile_banners",
+            "chest_keep",
+            MOBILE_CHEST_KEEP,
+            &[("GOLD", &gold)],
+        ),
+        banner::formatted(
+            resources,
+            "mobile_banners",
+            "chest_share",
+            MOBILE_CHEST_SHARE,
+            &[("LEADERSHIP", &leadership)],
+        ),
+    ]
+}
+
+/// One mobile Dismiss button per filled army stack, in slot order: the
+/// troop's name and count, "Militia x20" (spec decision 7). Stacks sit at the
+/// front of the army, so button `i` is slot `i`.
+pub fn stack_labels(resources: &Resources, game: &Game) -> Vec<String> {
+    game.army
+        .iter()
+        .take_while(|slot| !slot.id.is_empty() && slot.count > 0)
+        .map(|slot| {
+            let name = resources
+                .troop_by_id(slot.id.as_str())
+                .map(|t| t.name.as_str().to_owned())
+                .unwrap_or_else(|| slot.id.as_str().to_owned());
+            format!("{name} x{}", slot.count)
+        })
+        .collect()
+}
+
 /// The message for a chest whose reward is already applied, or `None` for the
 /// deferred gold choice (and the unused `Leadership` variant).
 pub fn chest_message(resources: &Resources, roll: &ChestRoll) -> Option<(String, String)> {
@@ -688,6 +729,8 @@ const DEFAULT_CASTLE_NEED_SIEGE: &str = "You need siege weapons\nto attack this 
 /// Castle screen defaults, porting `load_banner_defaults` and the `ui` block.
 const DEFAULT_BODY_HOME_CASTLE: &str = "1. Recruit Soldiers\n2. Audience with the King";
 // Mobile wording (spec decision 9): no key names on a touch build.
+const MOBILE_CHEST_KEEP: &str = "Keep %GOLD% gold";
+const MOBILE_CHEST_SHARE: &str = "Share it (+%LEADERSHIP% leadership)";
 const MOBILE_SPELL_BRIDGE_PROMPT: &str = "Raise a bridge which way?\nTap a tile next to you.";
 const MOBILE_ASTROLOGY_BODY: &str = "Astrologers proclaim:\nWeek of the %TROOP%\n\n\
     All %TROOP% dwellings are\nrepopulated.         (tap)";
@@ -1786,6 +1829,46 @@ mod tests {
             outcome,
             ..ChestRoll::default()
         }
+    }
+
+    /// The mobile chest buttons name the amounts (spec decision 5).
+    #[test]
+    fn mobile_chest_labels_name_the_amounts() {
+        let resources = resources(zones_fixture());
+        let roll = ChestRoll {
+            outcome: ChestOutcome::Gold,
+            pending: openbounty_engine::game::ChestPending {
+                pending_gold: 400,
+                pending_leadership: 40,
+            },
+            ..ChestRoll::default()
+        };
+        assert_eq!(
+            chest_option_labels(&resources, &roll),
+            [
+                "Keep 400 gold".to_owned(),
+                "Share it (+40 leadership)".to_owned()
+            ]
+        );
+    }
+
+    /// The mobile Dismiss buttons name each filled army stack (decision 7).
+    #[test]
+    fn stack_labels_name_each_filled_stack() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [
+                {"index":0,"id":"militia","name":"Militia","skill_level":1,"hit_points":2,
+                 "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":50,
+                 "spoils_factor":1,"abilities":"","morale_group":"A","dwelling":"castle"}]}"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        game.army[0].id.copy_from_str("militia");
+        game.army[0].count = 20;
+        assert_eq!(
+            stack_labels(&resources, &game),
+            vec!["Militia x20".to_owned()]
+        );
     }
 
     #[test]

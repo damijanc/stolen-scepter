@@ -77,6 +77,8 @@ const DEFAULT_CL_CAST_TURN_UNDEAD: &str = "Turn Undead!";
 const DEFAULT_GIVE_UP_HEADER: &str = "Press ESC to exit";
 /// Mobile wording (spec decision 9): no key names on a touch build.
 const MOBILE_GIVE_UP_HEADER: &str = "Give up?";
+const MOBILE_GIVE_UP_BODY: &str =
+    "Giving up will forfeit your\narmies and send you back to\nthe King. Give up?";
 const MOBILE_PICK_HINT: &str = " Tap a target; tap away to cancel";
 const DEFAULT_GIVE_UP_BODY: &str =
     "Giving up will forfeit your\narmies and send you back to\nthe King. Give up";
@@ -1107,11 +1109,14 @@ impl CombatLoop {
             DEFAULT_GIVE_UP_HEADER,
             MOBILE_GIVE_UP_HEADER,
         );
-        let body = banner::text(
+        // On mobile no "(y/n)?" hint follows the text, so it asks itself.
+        let body = banner::text_on(
             resources,
+            self.touch,
             "banners",
             "combat_give_up_body",
             DEFAULT_GIVE_UP_BODY,
+            MOBILE_GIVE_UP_BODY,
         );
         prompt.yes_no(header, body);
     }
@@ -2949,6 +2954,40 @@ mod tests {
     }
 
     /// The give-up prompt in combat takes its own Yes/No clicks.
+    /// On mobile there is no "(y/n)?" hint after the surrender text, so the
+    /// text itself asks the question.
+    #[test]
+    fn mobile_surrender_text_is_a_question() {
+        big_stack(|| {
+            let (mut l, resources, _) = loop_fixture();
+            l.touch = true;
+            let mut prompt = Prompt::default();
+            l.give_up(&resources, &mut prompt);
+            let mut list = DrawList::new();
+            let mut hits = HitList::new();
+            let mut layout = Layout::from_resources(&resources).expect("lays out");
+            layout.touch = true;
+            prompt.draw(
+                &mut list,
+                &mut hits,
+                &layout,
+                &Palette::fallback(),
+                &resources,
+            );
+            // The body is the normal-size text; the big title is separate.
+            let body: Vec<&str> = list
+                .as_slice()
+                .iter()
+                .filter_map(|cmd| match cmd {
+                    crate::draw::DrawCmd::Text { text, .. } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect();
+            let last = body.last().expect("body drawn");
+            assert!(last.trim_end().ends_with('?'), "{body:?}");
+        });
+    }
+
     #[test]
     fn the_give_up_prompt_answers_a_click_like_its_key() {
         big_stack(|| {

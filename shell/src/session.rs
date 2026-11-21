@@ -1025,7 +1025,12 @@ impl<'r> Session<'r> {
                             "dismiss_army",
                             DEFAULT_DT_DISMISS_ARMY,
                         );
-                        prompt.numeric(header, body, GAME_ARMY_SLOTS as i32);
+                        prompt.numeric_labeled(
+                            header,
+                            body,
+                            GAME_ARMY_SLOTS as i32,
+                            interact::stack_labels(resources, game),
+                        );
                         *pending = PendingFlow::DismissArmy;
                     }
                 }
@@ -1040,7 +1045,12 @@ impl<'r> Session<'r> {
                             dialog.open(&header, &body);
                         } else {
                             let (header, body) = interact::navigate_body(resources, &targets);
-                            prompt.numeric(&header, &body, targets.len() as i32);
+                            prompt.numeric_labeled(
+                                &header,
+                                &body,
+                                targets.len() as i32,
+                                targets.iter().map(|(_, name)| name.clone()).collect(),
+                            );
                             *pending = PendingFlow::Navigate {
                                 zones: targets.into_iter().map(|(id, _)| id).collect(),
                             };
@@ -1125,7 +1135,11 @@ impl<'r> Session<'r> {
                         StepInteraction::Sign { title, body, .. } => dialog.open(title, body),
                         StepInteraction::TreasureChest { roll, .. } => {
                             if let Some(body) = interact::chest_choice(resources, roll) {
-                                prompt.ab("", &body);
+                                prompt.ab_labeled(
+                                    "",
+                                    &body,
+                                    interact::chest_option_labels(resources, roll),
+                                );
                                 *pending = PendingFlow::ChestChoice {
                                     gold: roll.pending.pending_gold,
                                     leadership: roll.pending.pending_leadership,
@@ -3079,6 +3093,94 @@ mod tests {
             reached,
             "stepping onto the dwelling opens its view and prompt"
         );
+    }
+
+    /// On mobile, Dismiss lists the army by name, and tapping the first stack
+    /// does what pressing 1 does.
+    #[test]
+    fn mobile_dismiss_lists_stacks_by_name() {
+        big_stack(|| {
+            let mut harness = Harness::load();
+            harness.layout.touch = true;
+            let harness = harness;
+            let run = |by_click: bool| {
+                let mut session = harness.start();
+                let mut list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut session, &mut list, &mut now);
+                drive(&mut session, &mut list, &[Key::D], None, false, &mut now);
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                let texts = raster::texts(&list);
+                assert!(texts.iter().any(|t| t == "Militia x20"), "{texts:?}");
+                for region in session.hits.regions() {
+                    assert!(region.rect.h >= crate::sheet::MIN_BUTTON_H, "{region:?}");
+                }
+                if by_click {
+                    let at = region_center(&session, HitTarget::PromptPick(0));
+                    drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+                } else {
+                    drive(
+                        &mut session,
+                        &mut list,
+                        &[Key::Digit1],
+                        None,
+                        false,
+                        &mut now,
+                    );
+                }
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                snap(&session)
+            };
+            assert_eq!(run(true), run(false));
+        });
+    }
+
+    /// On mobile the dwelling count is the big keypad: Max then OK buys what
+    /// typing the cap does.
+    #[test]
+    fn mobile_dwelling_count_is_a_keypad() {
+        big_stack(|| {
+            let mut harness = Harness::load();
+            harness.layout.touch = true;
+            let harness = harness;
+            let run = |by_click: bool| {
+                let mut session = harness.start();
+                let mut list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut session, &mut list, &mut now);
+                step_onto_dwelling(&mut session, &mut list, &mut now);
+                for region in session.hits.regions() {
+                    assert!(region.rect.h >= crate::sheet::MIN_BUTTON_H, "{region:?}");
+                }
+                if by_click {
+                    for key in [PadKey::Max, PadKey::Ok] {
+                        let at = region_center(&session, HitTarget::Pad(key));
+                        drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+                        drive(&mut session, &mut list, &[], None, false, &mut now);
+                    }
+                } else {
+                    let mut probe = session.prompt.clone();
+                    probe.click(HitTarget::Pad(PadKey::Max));
+                    for ch in probe.text_input_value().to_string().chars() {
+                        let key = crate::input::DIGITS[ch.to_digit(10).unwrap() as usize];
+                        drive(&mut session, &mut list, &[key], None, false, &mut now);
+                    }
+                    drive(
+                        &mut session,
+                        &mut list,
+                        &[Key::Enter],
+                        None,
+                        false,
+                        &mut now,
+                    );
+                    drive(&mut session, &mut list, &[], None, false, &mut now);
+                }
+                snap(&session)
+            };
+            let keyed = run(false);
+            assert!(!keyed.4.is_active());
+            assert_eq!(run(true), keyed);
+        });
     }
 
     /// MAX then OK on the count strip buys what typing the cap and pressing

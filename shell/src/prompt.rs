@@ -26,6 +26,7 @@ use crate::layout::{Layout, PANEL_COLS, PANEL_H, PANEL_PAD_X};
 use crate::numpad::{self, PadKey};
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
+use crate::sheet::{self, Columns, Sheet, SheetButton};
 use openbounty_engine::resources::Resources;
 
 /// What a prompt returned once answered. Ports `PromptResult`.
@@ -69,12 +70,19 @@ pub struct Prompt {
     max_value: i32,
     /// What has been typed so far into the digit-entry box.
     buffer: String,
+    /// What the mobile sheet's buttons say: a numbered picker's options by
+    /// name (button `i` answers choice `i + 1`), or the A/B choice's two.
+    /// Empty: the buttons fall back to the numbers or letters.
+    labels: Vec<String>,
+    /// The mobile sheet's page, when its options do not fit on one.
+    page: usize,
 }
 
 impl Prompt {
     /// Open a yes/no prompt. `header` is drawn bold/yellow; `body` is the
     /// question, word-wrapped into the panel.
     pub fn yes_no(&mut self, header: &str, body: &str) {
+        self.reset_sheet();
         self.kind = Kind::YesNo;
         self.header = header.to_owned();
         self.body = body.to_owned();
@@ -82,6 +90,7 @@ impl Prompt {
 
     /// Open a 1..5 numeric picker. `max_choice` is clamped to that range.
     pub fn numeric(&mut self, header: &str, body: &str, max_choice: i32) {
+        self.reset_sheet();
         self.kind = Kind::Numeric;
         self.max_choice = max_choice.clamp(1, 5);
         self.header = header.to_owned();
@@ -92,6 +101,7 @@ impl Prompt {
     /// answers [`PromptResult::Two`], so callers can share the numeric
     /// dispatch path.
     pub fn ab(&mut self, header: &str, body: &str) {
+        self.reset_sheet();
         self.kind = Kind::AbChoice;
         self.header = header.to_owned();
         self.body = body.to_owned();
@@ -100,12 +110,39 @@ impl Prompt {
     /// Open a digit-entry prompt. `max_digits` is clamped to 1..6 and
     /// `max_value` is the largest accepted number; typing past it is rejected.
     pub fn text_input(&mut self, header: &str, body: &str, max_digits: i32, max_value: i32) {
+        self.reset_sheet();
         self.kind = Kind::TextInput;
         self.max_digits = max_digits.clamp(1, 6);
         self.max_value = max_value;
         self.buffer.clear();
         self.header = header.to_owned();
         self.body = body.to_owned();
+    }
+
+    /// [`Prompt::numeric`] whose mobile buttons name the options: button `i`
+    /// says `labels[i]` and answers choice `i + 1`, as digit `i + 1` does.
+    /// The keyboard still answers 1..`max_choice`.
+    pub fn numeric_labeled(
+        &mut self,
+        header: &str,
+        body: &str,
+        max_choice: i32,
+        labels: Vec<String>,
+    ) {
+        self.numeric(header, body, max_choice);
+        self.labels = labels;
+        self.labels.truncate(self.max_choice as usize);
+    }
+
+    /// [`Prompt::ab`] whose two mobile buttons say `labels` (A, then B).
+    pub fn ab_labeled(&mut self, header: &str, body: &str, labels: [String; 2]) {
+        self.ab(header, body);
+        self.labels = labels.to_vec();
+    }
+
+    fn reset_sheet(&mut self) {
+        self.labels.clear();
+        self.page = 0;
     }
 
     /// The value typed into the digit-entry box, or 0 when it is empty or the
@@ -169,6 +206,14 @@ impl Prompt {
             (Kind::AbChoice, HitTarget::PromptPick(i)) if i < 2 => {
                 self.dismiss();
                 index_result(i)
+            }
+            (Kind::Numeric | Kind::AbChoice, HitTarget::SheetNext) => {
+                self.page += 1;
+                PromptResult::None
+            }
+            (Kind::Numeric | Kind::AbChoice, HitTarget::SheetPrev) => {
+                self.page = self.page.saturating_sub(1);
+                PromptResult::None
             }
             (Kind::Numeric | Kind::AbChoice, HitTarget::PromptCancel) => {
                 self.dismiss();
@@ -330,6 +375,10 @@ impl Prompt {
         resources: &Resources,
     ) {
         if self.kind == Kind::None {
+            return;
+        }
+        if layout.touch {
+            self.draw_sheet(list, hits, layout, palette);
             return;
         }
 
@@ -509,6 +558,89 @@ fn choice_strip(
             palette.clr(Pal::Yellow),
         );
         hits.push(rect, target);
+    }
+}
+
+impl Prompt {
+    /// The touch build's prompt: a big-button sheet, or the keypad for a
+    /// count (`specs/mobile-ui-design.md`). Every button carries the target
+    /// the desktop strip or halves publish, so `click` answers it unchanged.
+    fn draw_sheet(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+    ) {
+        if self.kind == Kind::TextInput {
+            sheet::keypad(
+                list,
+                hits,
+                layout,
+                palette,
+                &self.header,
+                &self.buffer,
+                Some(self.max_value),
+            );
+            return;
+        }
+        let button = |label: String, target: HitTarget| SheetButton { label, target };
+        let (body, buttons, back) = match self.kind {
+            Kind::YesNo => (
+                self.body.clone(),
+                vec![
+                    button("Yes".to_owned(), HitTarget::PromptYes),
+                    button("No".to_owned(), HitTarget::PromptNo),
+                ],
+                None,
+            ),
+            Kind::Numeric => {
+                let labels: Vec<String> = if self.labels.is_empty() {
+                    (1..=self.max_choice).map(|n| n.to_string()).collect()
+                } else {
+                    self.labels.clone()
+                };
+                let buttons = labels
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, label)| button(label, HitTarget::PromptPick(i)))
+                    .collect();
+                (self.body.clone(), buttons, Some(HitTarget::PromptCancel))
+            }
+            _ => {
+                // The A/B body lists its options as "A) ..." lines; with named
+                // buttons those lines ARE the buttons, so the body stops above
+                // them (spec decision 5: no letter prefixes on mobile).
+                let (body, labels) = if self.labels.len() == 2 {
+                    let intro: Vec<&str> = self
+                        .body
+                        .lines()
+                        .take_while(|line| banner::choice_index(line).is_none())
+                        .collect();
+                    (intro.join("\n"), self.labels.clone())
+                } else {
+                    (self.body.clone(), vec!["A".to_owned(), "B".to_owned()])
+                };
+                let buttons = labels
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, label)| button(label, HitTarget::PromptPick(i)))
+                    .collect();
+                (body, buttons, Some(HitTarget::PromptCancel))
+            }
+        };
+        let sheet = Sheet {
+            key: "prompt",
+            title: self.header.clone(),
+            body,
+            buttons,
+            columns: Columns::One,
+            back,
+        };
+        let page = self
+            .page
+            .min(sheet::page_count(layout, &sheet).saturating_sub(1));
+        sheet::draw(list, hits, layout, palette, &sheet, page);
     }
 }
 
@@ -1393,5 +1525,124 @@ mod tests {
             assert_eq!(by_key, PromptResult::Cancel);
             assert!(!prompt.is_active());
         }
+    }
+
+    fn tap_regions(hits: &HitList) -> Vec<(HitTarget, Rect)> {
+        hits.regions().iter().map(|r| (r.target, r.rect)).collect()
+    }
+
+    fn all_finger_sized(hits: &HitList) {
+        for (target, rect) in tap_regions(hits) {
+            assert!(rect.h >= crate::sheet::MIN_BUTTON_H, "{target:?} {rect:?}");
+        }
+    }
+
+    #[test]
+    fn mobile_yes_no_is_a_sheet_pair() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.yes_no("Search", "It will take some days.");
+        let (list, hits) = drawn_on(&prompt, &resources, true);
+        all_finger_sized(&hits);
+        let targets: Vec<_> = tap_regions(&hits).into_iter().map(|(t, _)| t).collect();
+        assert_eq!(targets, vec![HitTarget::PromptYes, HitTarget::PromptNo]);
+        assert!(list.has_text_containing("Yes") && list.has_text_containing("No"));
+        assert!(!list.has_text_containing("(y/n)"));
+    }
+
+    #[test]
+    fn mobile_numeric_lists_its_labels_and_cancels_with_back() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.numeric_labeled(
+            "Send Troops Home",
+            "Send which troop home?",
+            5,
+            vec!["Militia x20".to_owned(), "Archers x2".to_owned()],
+        );
+        let (list, hits) = drawn_on(&prompt, &resources, true);
+        all_finger_sized(&hits);
+        assert!(list.has_text_containing("Militia x20"));
+        let targets: Vec<_> = tap_regions(&hits).into_iter().map(|(t, _)| t).collect();
+        assert_eq!(
+            targets,
+            vec![
+                HitTarget::PromptPick(0),
+                HitTarget::PromptPick(1),
+                HitTarget::PromptCancel
+            ]
+        );
+        // The keyboard still answers 1-5, unchanged.
+        let mut keyed = prompt.clone();
+        assert_eq!(
+            keyed.update(&Keys::pressed(&[DIGITS[2]])),
+            PromptResult::Two
+        );
+    }
+
+    #[test]
+    fn mobile_chest_shows_its_labels_without_the_letter_lines() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.ab_labeled(
+            "",
+            CHEST_BODY,
+            [
+                "Keep 400 gold".to_owned(),
+                "Share it (+40 leadership)".to_owned(),
+            ],
+        );
+        let (list, hits) = drawn_on(&prompt, &resources, true);
+        all_finger_sized(&hits);
+        assert!(list.has_text_containing("Keep 400 gold"));
+        assert!(list.has_text_containing("Beneath an old stone"));
+        assert!(
+            !list.has_text_containing("A) Keep"),
+            "the letter lines become the buttons"
+        );
+        let mut clicked = prompt.clone();
+        assert_eq!(clicked.click(HitTarget::PromptPick(1)), PromptResult::Two);
+    }
+
+    #[test]
+    fn mobile_count_is_a_keypad() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.text_input("Archers", "Hire how many?", 4, 40);
+        let (list, hits) = drawn_on(&prompt, &resources, true);
+        all_finger_sized(&hits);
+        assert_eq!(hits.regions().len(), crate::numpad::PAD_KEYS.len());
+        assert!(list.has_text_containing("Archers"));
+    }
+
+    #[test]
+    fn a_long_numeric_list_pages() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        let labels: Vec<String> = (0..5).map(|i| format!("Isle number {i}")).collect();
+        prompt.numeric_labeled(
+            "Sail to",
+            "Where to? A long way across the open sea.",
+            5,
+            labels,
+        );
+        let mut seen = Vec::new();
+        for _ in 0..5 {
+            let (_, hits) = drawn_on(&prompt, &resources, true);
+            for (t, _) in tap_regions(&hits) {
+                if let HitTarget::PromptPick(i) = t {
+                    seen.push(i);
+                }
+            }
+            if !tap_regions(&hits)
+                .iter()
+                .any(|(t, _)| *t == HitTarget::SheetNext)
+            {
+                break;
+            }
+            assert_eq!(prompt.click(HitTarget::SheetNext), PromptResult::None);
+        }
+        seen.dedup();
+        assert_eq!(seen, vec![0, 1, 2, 3, 4]);
     }
 }

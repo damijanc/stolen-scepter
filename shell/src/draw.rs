@@ -464,7 +464,7 @@ impl DrawList {
     /// True when some text command contains `needle`.
     pub fn has_text_containing(&self, needle: &str) -> bool {
         self.cmds.iter().any(|cmd| match cmd {
-            DrawCmd::Text { text, .. } => text.contains(needle),
+            DrawCmd::Text { text, .. } | DrawCmd::BigText { text, .. } => text.contains(needle),
             _ => false,
         })
     }

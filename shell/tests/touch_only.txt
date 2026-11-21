@@ -36,10 +36,11 @@ expect Give up
 click 100 110
 click 300 190
 expect Militia
-# Give up from the menu; the yes/no answers on its left (Yes) half.
+# Give up from the menu; the mobile yes/no sheet's Yes button.
 click 40 39
 click 100 70
-click 70 185
+expect Give up?
+click 160 73
 expect Beaten in battle
 click 150 160
 # The hero's own tile opens the action menu.
@@ -55,14 +56,14 @@ click 170 30
 click 150 160
 click 150 160
 expect Days:595
-# Dismiss Army: the stack is picked on the numbered strip.
+# Dismiss Army: the mobile sheet lists the stacks by name.
 click 136 107
 click 170 40
 expect Send which troop home
-click 37 185
+click 160 57
 expect Dismiss it?
-# No (right half): the army stays.
-click 230 185
+# No: the army stays.
+click 160 109
 # Game Menu -> Quit, answered on the status bar's N:NO button...
 click 136 107
 click 170 100

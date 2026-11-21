@@ -169,7 +169,8 @@
    "spell_bridge_prompt": "Raise a bridge which way?\nTap a tile next to you.",
    "astrology_body": "The stargazers say:\nThe week of %TROOP%\n\nEvery %TROOP% dwelling\nfills up again.      (tap)",
    "combat_give_up_header": "Give up?",
-   "body_save_confirm": "Your game is saved.\nTap to return to the game."
+   "body_save_confirm": "Your game is saved.\nTap to return to the game.",
+   "combat_give_up_body": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?"
   },
   "mobile_combat_log": {
    "give_up_prompt": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?",
