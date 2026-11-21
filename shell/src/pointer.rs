@@ -40,6 +40,10 @@ pub enum HitTarget {
     /// a numbered prompt, A (0) or B (1) on an A/B one. Resolves through the
     /// same `index_result` the digit and letter keys use.
     PromptPick(usize),
+    /// A mobile choice sheet's page buttons (`sheet.rs`): handled by whoever
+    /// owns the sheet's `Pager`.
+    SheetPrev,
+    SheetNext,
     /// The ESC cell that ends a numbered or A/B strip: cancels the prompt,
     /// exactly as the Esc key does.
     PromptCancel,

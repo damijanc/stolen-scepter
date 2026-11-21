@@ -29,6 +29,7 @@ pub mod prompt;
 pub mod raster;
 pub mod savepath;
 pub mod session;
+pub mod sheet;
 pub mod slot_picker;
 pub mod sprites;
 pub mod startup;
