@@ -25,6 +25,7 @@ use crate::draw::{Color, DrawList, Dst, Rect, Sprite};
 use crate::font;
 use crate::input::{Key, KeySource};
 use crate::layout::{Layout, FRAME_BOTTOM_H, FRAME_RIGHT_W, MAP_X, MAP_Y, PANEL_H, PANEL_PAD_X};
+use crate::numpad::PadKey;
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
 use crate::present::Present;
@@ -1144,46 +1145,66 @@ impl Views {
                 self.recruit_whom = 0;
                 self.recruit_input.clear();
             } else if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) {
-                let number: i32 = self.recruit_input.parse().unwrap_or(0);
-                let pool_slot = (self.recruit_whom - 1) as usize;
-                let troop_id = self
-                    .recruit_pool
-                    .get(pool_slot)
-                    .and_then(|index| resources.troop_by_index(*index))
-                    .map(|t| t.id.as_str().to_owned());
-                if let Some(troop_id) = troop_id {
-                    let mut count = number;
-                    let max = self.recruit_recompute_max(resources, game, pool_slot);
-                    if count > max {
-                        count = max;
-                    }
-                    if count > 0 {
-                        let outcome = game.buy_troop(resources, &troop_id, count);
-                        if let Some(message) = crate::interact::recruit_refusal(resources, outcome)
-                        {
-                            self.recruit_error = message;
-                            self.recruit_error_just_set = true;
-                        }
-                    }
-                    self.recruit_max = self.recruit_recompute_max(resources, game, pool_slot);
-                }
-                self.recruit_whom = 0;
-                self.recruit_input.clear();
+                self.recruit_commit(game, resources);
             } else if keys.pressed(Key::Backspace) {
-                self.recruit_input.pop();
+                self.recruit_backspace();
             } else {
                 for digit in 0..10u8 {
                     if keys.pressed(crate::input::DIGITS[digit as usize])
                         || keys.pressed(crate::input::NUMPAD_DIGITS[digit as usize])
                     {
-                        if self.recruit_input.len() < 6 {
-                            self.recruit_input.push(char::from(b'0' + digit));
-                        }
+                        self.recruit_type_digit(digit);
                     }
                 }
             }
         }
         false
+    }
+
+    /// Type one digit into the castle's count box: at most six digits, the
+    /// commit clamps to what can be bought.
+    fn recruit_type_digit(&mut self, digit: u8) {
+        if self.recruit_input.len() < 6 {
+            self.recruit_input.push(char::from(b'0' + digit));
+        }
+    }
+
+    fn recruit_backspace(&mut self) {
+        self.recruit_input.pop();
+    }
+
+    /// Fill the count box with the most the hero can take of the chosen troop.
+    fn recruit_fill_max(&mut self) {
+        self.recruit_input = self.recruit_max.max(0).to_string();
+    }
+
+    /// Buy the typed count (clamped to the recomputed max), then return to
+    /// picking a troop. The Enter key and the strip's OK both land here.
+    fn recruit_commit(&mut self, game: &mut Game, resources: &Resources) {
+        let number: i32 = self.recruit_input.parse().unwrap_or(0);
+        let pool_slot = (self.recruit_whom - 1) as usize;
+        let troop_id = self
+            .recruit_pool
+            .get(pool_slot)
+            .and_then(|index| resources.troop_by_index(*index))
+            .map(|t| t.id.as_str().to_owned());
+        if let Some(troop_id) = troop_id {
+            let mut count = number;
+            let max = self.recruit_recompute_max(resources, game, pool_slot);
+            if count > max {
+                count = max;
+            }
+            if count > 0 {
+                let outcome = game.buy_troop(resources, &troop_id, count);
+                if let Some(message) = crate::interact::recruit_refusal(resources, outcome) {
+                    self.recruit_error = message;
+                    self.recruit_error_just_set = true;
+                }
+            }
+            self.recruit_max = self.recruit_recompute_max(resources, game, pool_slot);
+        }
+        self.recruit_whom = 0;
+        self.recruit_input.clear();
     }
 
     /// Resolve a pointer hit on a troop row to the same selection the A-E keys
@@ -1214,7 +1235,18 @@ impl Views {
             }
             return false;
         }
-        if !self.recruit_error.is_empty() || self.recruit_whom != 0 {
+        if !self.recruit_error.is_empty() {
+            return false;
+        }
+        if self.recruit_whom != 0 {
+            // Counting: only the strip acts, through the key path's helpers.
+            match target {
+                HitTarget::Pad(PadKey::Digit(d)) => self.recruit_type_digit(d),
+                HitTarget::Pad(PadKey::Del) => self.recruit_backspace(),
+                HitTarget::Pad(PadKey::Max) => self.recruit_fill_max(),
+                HitTarget::Pad(PadKey::Ok) => self.recruit_commit(game, resources),
+                _ => {}
+            }
             return false;
         }
         if let HitTarget::RecruitRow(i) = target {
@@ -2339,6 +2371,10 @@ impl Views {
                 rby + 3 * row_h,
                 palette.clr(Pal::White),
             );
+            // DIVERGENCE: the tappable count strip, along the panel's bottom
+            // row under the troop list.
+            let strip = Rect::new(tx, y + h - row_h, w - 2 * PANEL_PAD_X, row_h);
+            crate::numpad::draw(list, hits, strip, palette);
         }
     }
 
@@ -5548,6 +5584,113 @@ mod tests {
         assert_eq!(by_key.recruit_whom, 1);
         assert_eq!(by_click.recruit_whom, by_key.recruit_whom);
         assert_eq!(by_click.recruit_max, by_key.recruit_max);
+    }
+
+    fn recruit_game() -> Game {
+        let mut game = Game::default();
+        game.stats.leadership_current = 1000;
+        game.stats.gold = 5000;
+        game.position.home_castle.copy_from_str("castle0");
+        game
+    }
+
+    #[test]
+    fn recruit_pad_commit_buys_what_enter_buys() {
+        use crate::numpad::PadKey::*;
+        let (resources, _, _) = recruit_fixtures();
+        let mut keyed_game = recruit_game();
+        let mut keyed = Views::new();
+        keyed.recruit_soldiers_open(&resources, &keyed_game);
+        for key in [
+            Key::A,
+            Key::Digit1,
+            Key::Digit2,
+            Key::Backspace,
+            Key::Digit4,
+            Key::Enter,
+        ] {
+            keyed.recruit_soldiers_update(&mut keyed_game, &resources, &Keys::pressed(&[key]));
+        }
+
+        let mut clicked_game = recruit_game();
+        let mut clicked = Views::new();
+        clicked.recruit_soldiers_open(&resources, &clicked_game);
+        for target in [
+            HitTarget::RecruitRow(0),
+            HitTarget::Pad(Digit(1)),
+            HitTarget::Pad(Digit(2)),
+            HitTarget::Pad(Del),
+            HitTarget::Pad(Digit(4)),
+            HitTarget::Pad(Ok),
+        ] {
+            assert!(!clicked.recruit_click(&mut clicked_game, &resources, target));
+        }
+
+        assert_eq!(keyed_game.army[0].count, 14);
+        assert_eq!(clicked_game.army, keyed_game.army);
+        assert_eq!(clicked_game.stats.gold, keyed_game.stats.gold);
+        assert_eq!(clicked.recruit_whom, 0);
+        assert!(clicked.recruit_input.is_empty());
+    }
+
+    #[test]
+    fn recruit_pad_max_then_ok_buys_recruit_max() {
+        use crate::numpad::PadKey::*;
+        let (resources, _, _) = recruit_fixtures();
+        let mut game = recruit_game();
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+        views.recruit_click(&mut game, &resources, HitTarget::RecruitRow(0));
+        let max = views.recruit_max;
+        assert!(max > 0);
+        views.recruit_click(&mut game, &resources, HitTarget::Pad(Max));
+        views.recruit_click(&mut game, &resources, HitTarget::Pad(Ok));
+        assert_eq!(game.army[0].count, max);
+    }
+
+    #[test]
+    fn recruit_pad_is_inside_the_panel_and_only_after_a_pick() {
+        let (resources, layout, catalog) = recruit_fixtures();
+        let mut game = recruit_game();
+        let mut views = Views::new();
+        views.recruit_soldiers_open(&resources, &game);
+        let pads = |views: &mut Views, game: &Game| {
+            let mut list = DrawList::new();
+            let mut hits = HitList::new();
+            let (map, fog) = map_and_fog();
+            views.draw(
+                &mut list,
+                &mut hits,
+                &layout,
+                &Palette::fallback(),
+                &resources,
+                &catalog,
+                &map,
+                &fog,
+                game,
+                &Present::new(),
+                0.0,
+            );
+            hits.regions()
+                .iter()
+                .filter(|r| matches!(r.target, HitTarget::Pad(_)))
+                .map(|r| r.rect)
+                .collect::<Vec<_>>()
+        };
+        assert!(pads(&mut views, &game).is_empty());
+        views.recruit_click(&mut game, &resources, HitTarget::RecruitRow(0));
+        let rects = pads(&mut views, &game);
+        assert_eq!(rects.len(), 13);
+        let panel = Rect::new(
+            layout.panel_x(),
+            layout.panel_y(),
+            layout.panel_w(),
+            PANEL_H,
+        );
+        for r in rects {
+            assert!(r.x >= panel.x && r.x + r.w <= panel.x + panel.w, "{r:?}");
+            assert!(r.y >= panel.y && r.y + r.h <= panel.y + panel.h, "{r:?}");
+        }
     }
 
     #[test]
