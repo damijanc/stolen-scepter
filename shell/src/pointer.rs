@@ -44,6 +44,16 @@ pub enum HitTarget {
     /// surfaces -- a dwelling's prompt and the castle recruit box -- resolved
     /// by whichever is active, the way `ViewBack` is.
     Pad(crate::numpad::PadKey),
+    /// The win cartoon: a tap anywhere skips it, as any key does.
+    WinCartoonSkip,
+    /// The quit confirm's halves of the status bar, in "(Y/N)" order.
+    FastQuitYes,
+    FastQuitNo,
+    /// The world map's status bar, with the crystal orb: a tap toggles the
+    /// whole-map view, as Space does.
+    WorldmapToggle,
+    /// The ended game's overworld: a tap anywhere quits, as any key does.
+    GameOverQuit,
     /// A Game Menu entry, by drawn index.
     MenuEntry(usize),
     /// The screen around the Game Menu panel: a click there is ESC.

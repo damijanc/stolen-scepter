@@ -14,11 +14,11 @@ use crate::chrome::{Chrome, StatusMode};
 use crate::combat::{combat_render, combat_view_input, CombatLoop, CombatStatus, PointerInput};
 use crate::cursor::Shape;
 use crate::dialog::Dialog;
-use crate::draw::{self, DrawList};
+use crate::draw::{self, DrawList, Rect};
 use crate::hud::{action_menu, panel_action, Hud};
 use crate::input::{self, Action, InputState, Key, KeySource, DIGITS};
 use crate::interact;
-use crate::layout::Layout;
+use crate::layout::{Layout, STATUS_H, STATUS_X, STATUS_Y};
 use crate::map_render::MapScene;
 use crate::menu::{self, Menu, MenuAction, PickerPurpose};
 use crate::palette::{Pal, Palette};
@@ -447,7 +447,17 @@ impl<'r> Session<'r> {
             if *bridge_waiting {
                 // The bridge prompt owns the dialog: an arrow builds toward
                 // that direction, ESC cancels. Nothing else dismisses.
-                let dir = input::poll(keys);
+                let mut dir = input::poll(keys);
+                // A tap on one of the four tiles beside the hero is that
+                // arrow; any other tap is ignored, as the keyboard has no
+                // way to aim anywhere else.
+                if let Some(HitTarget::MapTile(mx, my)) = clicked {
+                    let (dx, dy) = (mx - game.position.x, my - game.position.y);
+                    if dx.abs() + dy.abs() == 1 {
+                        dir.dx = dx;
+                        dir.dy = dy;
+                    }
+                }
                 if dir.dx != 0 || dir.dy != 0 {
                     *bridge_waiting = false;
                     let built = try_build_bridge(game, map, dir.dx, dir.dy);
@@ -832,7 +842,7 @@ impl<'r> Session<'r> {
         } else if views.active() == Some(ViewKind::WinCartoon) {
             // Any key skips the win cutscene; the frame clock's own end is
             // handled at the top of the loop.
-            if keys.any_pressed() {
+            if keys.any_pressed() || clicked == Some(HitTarget::WinCartoonSkip) {
                 views.finish_win_cartoon();
             }
         } else if views.is_active() {
@@ -840,7 +850,12 @@ impl<'r> Session<'r> {
             // it toggles fog-only vs whole-map; without it SPACE dismisses
             // like any other key. Every other read-only view dismisses on any
             // key, as C does.
-            if views.active() == Some(ViewKind::Worldmap) && keys.pressed(Key::Space) {
+            if views.active() == Some(ViewKind::Worldmap)
+                && clicked == Some(HitTarget::WorldmapToggle)
+            {
+                // Only published with the orb, so this always toggles.
+                views.toggle_whole_map();
+            } else if views.active() == Some(ViewKind::Worldmap) && keys.pressed(Key::Space) {
                 if worldmap_has_orb(game, resources) {
                     views.toggle_whole_map();
                 } else {
@@ -852,14 +867,17 @@ impl<'r> Session<'r> {
         } else if *fast_quit {
             // The prompt is modal: nothing else reads input until it is
             // answered.
-            if keys.pressed(Key::Y) {
+            if keys.pressed(Key::Y) || clicked == Some(HitTarget::FastQuitYes) {
                 return FrameStatus::Quit;
             }
-            if keys.pressed(Key::N) || keys.pressed(Key::Escape) {
+            if keys.pressed(Key::N)
+                || keys.pressed(Key::Escape)
+                || clicked == Some(HitTarget::FastQuitNo)
+            {
                 *fast_quit = false;
             }
         } else if game.is_over() {
-            if game_over_quits(game, keys) {
+            if game_over_quits(game, keys) || clicked == Some(HitTarget::GameOverQuit) {
                 return FrameStatus::Quit;
             }
         } else {
@@ -1407,6 +1425,36 @@ impl<'r> Session<'r> {
             views.draw(
                 list, hits, layout, palette, resources, catalog, map, fog, game, present, now,
             );
+            // DIVERGENCE: tap targets for screens C answers from the keyboard
+            // only. Each is pushed after the view that owns the screen, so it
+            // wins where they overlap.
+            let status_bar = Rect::new(STATUS_X, STATUS_Y, layout.status_w(), STATUS_H);
+            if *fast_quit {
+                let half = status_bar.w / 2;
+                hits.push(
+                    Rect::new(status_bar.x, status_bar.y, half, status_bar.h),
+                    HitTarget::FastQuitYes,
+                );
+                hits.push(
+                    Rect::new(
+                        status_bar.x + half,
+                        status_bar.y,
+                        status_bar.w - half,
+                        status_bar.h,
+                    ),
+                    HitTarget::FastQuitNo,
+                );
+            }
+            match views.active() {
+                Some(ViewKind::Worldmap) if worldmap_has_orb(game, resources) => {
+                    hits.push(status_bar, HitTarget::WorldmapToggle);
+                }
+                Some(ViewKind::WinCartoon) => hits.push(
+                    Rect::new(0, 0, layout.screen_w, layout.screen_h),
+                    HitTarget::WinCartoonSkip,
+                ),
+                _ => {}
+            }
             if views.active() == Some(ViewKind::Menu) {
                 match &*menu_picker {
                     Some((picker, purpose)) => {
@@ -1425,6 +1473,36 @@ impl<'r> Session<'r> {
         }
         if dialog.is_active() {
             dialog.draw(list, hits, layout, palette);
+            // The bridge's direction tiles may sit under the dialog panel
+            // (the one south of the hero always does), so while it waits
+            // the map tiles are published again on top.
+            if *bridge_waiting && combat.is_none() {
+                MapScene {
+                    layout: layout,
+                    catalog: catalog,
+                    palette: palette,
+                    resources: resources,
+                    game: game,
+                    map: map,
+                    fog: fog,
+                    tick: hero_anim.tick(),
+                    moving: hero_anim.moving(),
+                }
+                .publish_hits(hits);
+            }
+        }
+        // The ended game: a tap anywhere quits, once nothing else is up.
+        if combat.is_none()
+            && game.is_over()
+            && !*fast_quit
+            && !views.is_active()
+            && !prompt.is_active()
+            && !dialog.is_active()
+        {
+            hits.push(
+                Rect::new(0, 0, layout.screen_w, layout.screen_h),
+                HitTarget::GameOverQuit,
+            );
         }
 
         // The pointer for what is under it now, hit-tested against the
@@ -3168,5 +3246,195 @@ mod tests {
                 "no troop joins until the player accepts"
             );
         });
+    }
+
+    /// Put the hero on a grass tile of the live map with water to the east,
+    /// and open the bridge's direction prompt as the cast does.
+    fn bridge_ready(session: &mut Session, list: &mut DrawList, now: &mut f64) -> (i32, i32) {
+        use openbounty_engine::tile::Terrain;
+        let map = &session.map;
+        let (x, y) = (0..map.height as i32)
+            .flat_map(|y| (1..map.width as i32 - 2).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                let at = |dx: i32| map.tile_i32(x + dx, y).map(|t| t.terrain);
+                at(0) == Some(Terrain::Grass) && at(1) == Some(Terrain::Water)
+            })
+            .expect("grass beside water somewhere on the home map");
+        session.game.position.x = x;
+        session.game.position.y = y;
+        session.game.position.last_x = x;
+        session.game.position.last_y = y;
+        session.bridge_waiting = true;
+        session.dialog.open("Bridge", "Which way?");
+        drive(session, list, &[], None, false, now);
+        (x, y)
+    }
+
+    #[test]
+    fn bridge_tap_on_a_neighbour_builds_like_the_arrow() {
+        big_stack(|| {
+            let harness = Harness::load();
+            let run = |by_click: bool| {
+                let mut session = harness.start();
+                let mut list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut session, &mut list, &mut now);
+                let (x, y) = bridge_ready(&mut session, &mut list, &mut now);
+                if by_click {
+                    let at = region_center(&session, HitTarget::MapTile(x + 1, y));
+                    assert_eq!(
+                        session.hits.hit(at.0, at.1),
+                        Some(HitTarget::MapTile(x + 1, y))
+                    );
+                    drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+                } else {
+                    drive(
+                        &mut session,
+                        &mut list,
+                        &[Key::Right],
+                        None,
+                        false,
+                        &mut now,
+                    );
+                }
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                assert!(!session.bridge_waiting);
+                assert!(session.map.tile_i32(x + 1, y).expect("tile").is_bridge);
+                snap(&session)
+            };
+            assert_eq!(run(true), run(false));
+        });
+    }
+
+    #[test]
+    fn bridge_tap_far_tile_is_ignored() {
+        big_stack(|| {
+            let harness = Harness::load();
+            let mut session = harness.start();
+            let mut list = DrawList::new();
+            let mut now = 0.0;
+            to_overworld(&mut session, &mut list, &mut now);
+            let (x, y) = bridge_ready(&mut session, &mut list, &mut now);
+            let before = session.map.clone();
+            for (tx, ty) in [(x + 2, y), (x + 1, y + 1), (x, y)] {
+                let Some(region) = session
+                    .hits
+                    .regions()
+                    .iter()
+                    .rev()
+                    .find(|r| r.target == HitTarget::MapTile(tx, ty))
+                else {
+                    continue;
+                };
+                let at = (
+                    region.rect.x + region.rect.w / 2,
+                    region.rect.y + region.rect.h / 2,
+                );
+                drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                assert!(
+                    session.bridge_waiting,
+                    "a tap on ({tx},{ty}) builds nothing"
+                );
+            }
+            assert_eq!(session.map, before);
+        });
+    }
+
+    #[test]
+    fn fast_quit_halves_answer_like_y_and_n() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        session.fast_quit = true;
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        let no = region_center(&session, HitTarget::FastQuitNo);
+        assert_eq!(
+            drive(&mut session, &mut list, &[], Some(no), true, &mut now),
+            FrameStatus::Running
+        );
+        assert!(!session.fast_quit);
+        session.fast_quit = true;
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        let yes = region_center(&session, HitTarget::FastQuitYes);
+        assert!(yes.0 < no.0, "Yes on the left, as \"(Y/N)\" reads");
+        assert_eq!(
+            drive(&mut session, &mut list, &[], Some(yes), true, &mut now),
+            FrameStatus::Quit
+        );
+    }
+
+    #[test]
+    fn worldmap_toggle_needs_the_orb() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        session.views.set(ViewKind::Worldmap);
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        assert!(!session
+            .hits
+            .regions()
+            .iter()
+            .any(|r| r.target == HitTarget::WorldmapToggle));
+
+        let zone = harness
+            .resources
+            .zone_index_by_id(session.game.position.zone.as_str())
+            .expect("home zone");
+        session.game.world.orbs_found[zone] = true;
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        let whole_before = session.views.whole_map();
+        let at = region_center(&session, HitTarget::WorldmapToggle);
+        assert_eq!(
+            session.hits.hit(at.0, at.1),
+            Some(HitTarget::WorldmapToggle)
+        );
+        drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+        assert_eq!(session.views.active(), Some(ViewKind::Worldmap));
+        assert_eq!(session.views.whole_map(), !whole_before);
+    }
+
+    #[test]
+    fn win_cartoon_skip_equals_any_key() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        session.views.win_cartoon_open(&harness.resources, "Won");
+        assert_eq!(session.views.active(), Some(ViewKind::WinCartoon));
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        let at = region_center(&session, HitTarget::WinCartoonSkip);
+        drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+        assert_eq!(session.views.active(), Some(ViewKind::Win));
+    }
+
+    #[test]
+    fn game_over_tap_quits_like_a_key() {
+        let harness = Harness::load();
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        session.game.stats.days_left = 0;
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        // Whatever ending screen is up first, tap through it.
+        for _ in 0..4 {
+            if !session.views.is_active() && !session.dialog.is_active() {
+                break;
+            }
+            drive(&mut session, &mut list, &[], Some((1, 1)), true, &mut now);
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+        }
+        assert!(session.game.is_over());
+        let at = region_center(&session, HitTarget::GameOverQuit);
+        assert_eq!(
+            drive(&mut session, &mut list, &[], Some(at), true, &mut now),
+            FrameStatus::Quit
+        );
     }
 }
