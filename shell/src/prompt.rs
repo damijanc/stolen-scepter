@@ -292,6 +292,27 @@ impl Prompt {
         }
     }
 
+    /// Whether both A and B begin a line of the body as it will be drawn
+    /// (wrapped, and cut at the panel floor with no rows reserved). Only then
+    /// can each be tapped on its own line; otherwise the A/B strip is used.
+    fn ab_options_start_drawn_lines(&self, y: i32, h: i32) -> bool {
+        let mut ty = y + PANEL_PAD_X;
+        if !self.header.is_empty() {
+            ty += font::GLYPH_H + 1 + 2;
+        }
+        let floor = y + h - PANEL_PAD_X;
+        let mut cursor = self.body.as_str();
+        let mut seen = [false; 2];
+        while !cursor.is_empty() && ty + font::GLYPH_H <= floor {
+            let line = take_line(&mut cursor, PANEL_COLS as usize);
+            if let Some(choice) = banner::choice_index(&line) {
+                seen[choice] = true;
+            }
+            ty += font::GLYPH_H;
+        }
+        seen == [true, true]
+    }
+
     /// Draw the prompt panel into `list`, porting `prompt_draw`. Does nothing
     /// when no prompt is active.
     pub fn draw(
@@ -316,11 +337,7 @@ impl Prompt {
 
         // An A/B body that lists its options as "A) ..." / "B) ..." lines is
         // tapped on those lines; one that does not gets a two-cell strip.
-        let ab_lines = self.kind == Kind::AbChoice
-            && self
-                .body
-                .lines()
-                .any(|line| banner::choice_index(line).is_some());
+        let ab_lines = self.kind == Kind::AbChoice && self.ab_options_start_drawn_lines(y, h);
 
         // Rows reserved at the bottom for the hint chrome, rendered after the
         // body: two for a text input (typed value + hint), one for a yes/no
@@ -1078,6 +1095,26 @@ mod tests {
         let cells = picks(&hits);
         assert_eq!(cells.iter().map(|c| c.1).collect::<Vec<_>>(), vec![0, 1]);
         assert_eq!(cells[0].0.y, cells[1].0.y, "two halves of one row");
+    }
+
+    /// Line taps need BOTH options to start a drawn line; otherwise one of
+    /// them would have no target, so the strip is used instead.
+    #[test]
+    fn ab_lines_fall_back_to_the_strip_unless_both_options_start_a_drawn_line() {
+        let resources = pack("{}");
+        let long = format!("{}A) Keep it.\nB) Give it away.", "Filler line\n".repeat(7));
+        for body in ["A) gold  B) leadership", long.as_str()] {
+            let mut prompt = Prompt::default();
+            prompt.ab("", body);
+            let (_, hits) = drawn(&prompt, &resources);
+            let cells = picks(&hits);
+            assert_eq!(
+                cells.iter().map(|c| c.1).collect::<Vec<_>>(),
+                vec![0, 1],
+                "{body:?}"
+            );
+            assert_eq!(cells[0].0.y, cells[1].0.y, "a two-cell strip for {body:?}");
+        }
     }
 
     #[test]

@@ -1572,6 +1572,7 @@ mod tests {
     use crate::draw::DrawCmd;
     use openbounty_engine::combat::{
         CombatUnit, COMBAT_SIDE_AI, COMBAT_SIDE_PLAYER, COMBAT_SPELL_CLONE,
+        COMBAT_SPELL_TURN_UNDEAD,
     };
 
     fn fixtures() -> (Resources, SpriteCatalog, Palette, Combat) {
@@ -2644,6 +2645,48 @@ mod tests {
                 click(HitTarget::CombatCell(2, 0)),
             ],
         );
+    }
+
+    /// The soft-lock this divergence exists for: Turn Undead with no undead
+    /// on the field has no cell that passes, so before it a touch player was
+    /// stuck in the pick. A tap anywhere now cancels it, keeping the charge
+    /// and the turn, as Esc does.
+    #[test]
+    fn a_spell_with_no_valid_target_cancels_on_any_tap() {
+        fn necromancer(_: &mut CombatLoop, game: &mut Game) {
+            game.stats.knows_magic = true;
+            game.spells.counts[COMBAT_SPELL_TURN_UNDEAD as usize] = 1;
+        }
+        let letter = COMBAT_SPELL_KEYS[COMBAT_SPELL_TURN_UNDEAD as usize];
+        let taps = [
+            click(HitTarget::CombatCell(0, 0)),
+            click(HitTarget::CombatAction(CombatAction::Cast)),
+            click(HitTarget::CombatSpell(COMBAT_SPELL_TURN_UNDEAD as usize)),
+            click(HitTarget::CombatCell(4, 4)),
+        ];
+        let keys = [
+            Key::U,
+            letter,
+            Key::PageDown,
+            Key::PageDown,
+            Key::PageDown,
+            Key::PageDown,
+            Key::Escape,
+        ];
+        assert_same(necromancer, &keys, &taps);
+        big_stack(move || {
+            let (mut l, resources, mut game) = loop_fixture();
+            necromancer(&mut l, &mut game);
+            let mut prompt = Prompt::default();
+            for (i, input) in taps.iter().enumerate() {
+                by_pointer(&mut l, &mut game, &resources, &mut prompt, *input);
+                if i == 2 {
+                    assert_eq!(l.cast_phase, CastPhase::PickTarget, "the pick is armed");
+                }
+            }
+            assert_eq!(l.cast_phase, CastPhase::None);
+            assert_eq!(game.spells.counts[COMBAT_SPELL_TURN_UNDEAD as usize], 1);
+        });
     }
 
     /// Controls opened in a fight closes on its backdrop tap, as Esc does.
