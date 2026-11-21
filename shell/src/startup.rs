@@ -232,7 +232,6 @@ impl Startup {
     }
 
     /// A click, resolved to what the matching key does on the current screen.
-    /// Name entry has no click affordance; it stays keyboard.
     pub fn click(
         &mut self,
         target: HitTarget,
@@ -268,6 +267,26 @@ impl Startup {
             (Screen::SavePicker, target) => {
                 let choice = self.picker.click(target)?;
                 self.apply_slot_choice(choice)
+            }
+            // The name grid: a letter types (capital first, then lower
+            // case, as a name is written), delete and OK are Backspace and
+            // Enter.
+            (Screen::CreateGame, HitTarget::NameKey(ch)) if !self.has_name => {
+                let ch = if self.name.is_empty() {
+                    ch.to_ascii_uppercase()
+                } else {
+                    ch.to_ascii_lowercase()
+                };
+                self.name_type(ch);
+                None
+            }
+            (Screen::CreateGame, HitTarget::NameDel) if !self.has_name => {
+                self.name_backspace();
+                None
+            }
+            (Screen::CreateGame, HitTarget::NameDone) if !self.has_name => {
+                self.name_confirm(resources);
+                None
             }
             // A difficulty row is "select it, then Enter".
             (Screen::CreateGame, HitTarget::Difficulty(row))
@@ -447,36 +466,51 @@ impl Startup {
             return None;
         }
         if keys.pressed(Key::Enter) || keys.pressed(Key::KpEnter) {
-            if self.name.is_empty() {
-                let default = resources.world.default_name.as_str();
-                self.name = if default.is_empty() {
-                    "Hero".to_owned()
-                } else {
-                    default.to_owned()
-                };
-            }
-            // C uppercases the first character only.
-            let mut chars: Vec<char> = self.name.chars().collect();
-            if let Some(first) = chars.first_mut() {
-                *first = first.to_ascii_uppercase();
-            }
-            self.name = chars.into_iter().collect();
-            self.has_name = true;
+            self.name_confirm(resources);
             return None;
         }
         if keys.pressed(Key::Backspace) {
-            self.name.pop();
+            self.name_backspace();
             return None;
         }
         for ch in keys.chars_pressed() {
-            if self.name.chars().count() >= NAME_MAX {
-                break;
-            }
-            if ch.is_ascii_alphanumeric() || ch == ' ' {
-                self.name.push(ch);
-            }
+            self.name_type(ch);
         }
         None
+    }
+
+    /// Type one character into the name: letters, digits and space only, up
+    /// to `NAME_MAX`. The keyboard and the letter grid both land here.
+    fn name_type(&mut self, ch: char) {
+        if self.name.chars().count() >= NAME_MAX {
+            return;
+        }
+        if ch.is_ascii_alphanumeric() || ch == ' ' {
+            self.name.push(ch);
+        }
+    }
+
+    fn name_backspace(&mut self) {
+        self.name.pop();
+    }
+
+    /// Accept the name: an empty one takes the pack's default, and C
+    /// uppercases the first character only.
+    fn name_confirm(&mut self, resources: &Resources) {
+        if self.name.is_empty() {
+            let default = resources.world.default_name.as_str();
+            self.name = if default.is_empty() {
+                "Hero".to_owned()
+            } else {
+                default.to_owned()
+            };
+        }
+        let mut chars: Vec<char> = self.name.chars().collect();
+        if let Some(first) = chars.first_mut() {
+            *first = first.to_ascii_uppercase();
+        }
+        self.name = chars.into_iter().collect();
+        self.has_name = true;
     }
 
     fn update_intro(&mut self, keys: &dyn KeySource, time: f64) -> Option<StartupChoice> {
@@ -854,6 +888,10 @@ impl Startup {
             }
         }
 
+        if !self.has_name {
+            name_grid(list, hits, layout, palette, y + h + 2);
+        }
+
         if self.has_name {
             list.text(
                 ">",
@@ -921,6 +959,55 @@ impl Startup {
 /// Substitute `%VERSION%` in a credits line, porting `expand_version`.
 fn expand_version(src: &str, version: i32) -> String {
     src.replace("%VERSION%", &version.to_string())
+}
+
+/// The hero-name letter grid, drawn in its own box under the create-game
+/// panel while the name is being typed: three rows of ten cells, A-J, K-T,
+/// then U-Z, space, delete and a double-width OK.
+///
+/// DIVERGENCE: C types the name from the keyboard only. A phone has none.
+fn name_grid(
+    list: &mut DrawList,
+    hits: &mut HitList,
+    layout: &Layout,
+    palette: &Palette,
+    top: i32,
+) {
+    const COLS: i32 = 10;
+    let cell_w = 2 * GLYPH_W;
+    let cell_h = GLYPH_H + 3;
+    let w = COLS * cell_w;
+    let x = (layout.screen_w - w) / 2;
+    let box_rect = Rect::new(x - 2, top, w + 4, 3 * cell_h + 4);
+    list.rect(box_rect, palette.clr(Pal::DBlue));
+    list.rect_lines(box_rect, palette.clr(Pal::Yellow));
+
+    let mut keys: Vec<(HitTarget, String, i32)> = ('A'..='Z')
+        .map(|c| (HitTarget::NameKey(c), c.to_string(), 1))
+        .collect();
+    keys.push((HitTarget::NameKey(' '), "_".to_owned(), 1));
+    keys.push((HitTarget::NameDel, "<".to_owned(), 1));
+    keys.push((HitTarget::NameDone, "OK".to_owned(), 2));
+
+    let mut slot = 0;
+    for (target, label, span) in keys {
+        let col = slot % COLS;
+        let row = slot / COLS;
+        let rect = Rect::new(
+            x + col * cell_w,
+            top + 2 + row * cell_h,
+            span * cell_w,
+            cell_h,
+        );
+        list.text_centered(
+            &label,
+            rect.x + rect.w / 2,
+            rect.y + 2,
+            palette.clr(Pal::White),
+        );
+        hits.push(rect, target);
+        slot += span;
+    }
 }
 
 #[cfg(test)]
@@ -1499,6 +1586,107 @@ mod tests {
         startup.update(&Keys::pressed(&[Key::Enter]), resources, paths, 0.0);
         assert!(startup.has_name);
         startup
+    }
+
+    /// On the create-game screen, typing the name.
+    fn at_name(resources: &Resources, paths: &SavePaths) -> Startup {
+        let mut startup = Startup::default();
+        startup.update(&Keys::pressed(&[Key::A]), resources, paths, 0.0);
+        assert_eq!(startup.screen, Screen::CreateGame);
+        assert!(!startup.has_name);
+        startup
+    }
+
+    #[test]
+    fn clicking_letters_types_like_the_keyboard() {
+        let resources = resources();
+        let paths = paths("name-grid-type");
+        let mut by_key = at_name(&resources, &paths);
+        for ch in ['S', 'i', 'r'] {
+            by_key.update(&Keys::default().with_chars(&[ch]), &resources, &paths, 0.0);
+        }
+        let mut by_click = at_name(&resources, &paths);
+        for ch in ['S', 'I', 'R'] {
+            by_click.click(HitTarget::NameKey(ch), &resources, &paths, 0.0);
+        }
+        assert_eq!(by_click.name, "Sir");
+        assert_eq!(by_click, by_key);
+    }
+
+    #[test]
+    fn name_grid_keeps_the_cap_and_del_and_done() {
+        let resources = resources();
+        let paths = paths("name-grid-cap");
+        let mut startup = at_name(&resources, &paths);
+        for _ in 0..12 {
+            startup.click(HitTarget::NameKey('Z'), &resources, &paths, 0.0);
+        }
+        assert_eq!(startup.name.chars().count(), NAME_MAX);
+        startup.click(HitTarget::NameDel, &resources, &paths, 0.0);
+        assert_eq!(startup.name.chars().count(), NAME_MAX - 1);
+
+        let mut by_key = startup.clone();
+        by_key.update(&Keys::pressed(&[Key::Enter]), &resources, &paths, 0.0);
+        startup.click(HitTarget::NameDone, &resources, &paths, 0.0);
+        assert!(startup.has_name);
+        assert_eq!(startup, by_key);
+    }
+
+    #[test]
+    fn empty_done_uses_the_default_name() {
+        let resources = resources();
+        let paths = paths("name-grid-default");
+        let mut by_key = at_name(&resources, &paths);
+        by_key.update(&Keys::pressed(&[Key::Enter]), &resources, &paths, 0.0);
+        let mut by_click = at_name(&resources, &paths);
+        by_click.click(HitTarget::NameDone, &resources, &paths, 0.0);
+        assert!(!by_click.name.is_empty());
+        assert_eq!(by_click, by_key);
+    }
+
+    #[test]
+    fn grid_regions_cover_their_glyphs_and_vanish_after_done() {
+        let resources = resources();
+        let paths = paths("name-grid-draw");
+        let mut startup = at_name(&resources, &paths);
+        let (list, hits) = drawn_hits(&startup, &resources);
+        let texts = list.texts();
+        let keys: Vec<_> = hits
+            .regions()
+            .iter()
+            .filter(|r| {
+                matches!(
+                    r.target,
+                    HitTarget::NameKey(_) | HitTarget::NameDel | HitTarget::NameDone
+                )
+            })
+            .collect();
+        assert_eq!(keys.len(), 29, "26 letters, space, delete, done");
+        for letter in ['A', 'M', 'Z'] {
+            let r = keys
+                .iter()
+                .find(|r| r.target == HitTarget::NameKey(letter))
+                .expect("letter published")
+                .rect;
+            let (tx, ty, _) = texts
+                .iter()
+                .find(|(x, y, t)| {
+                    *t == letter.to_string()
+                        && *x >= r.x
+                        && *x < r.x + r.w
+                        && *y >= r.y
+                        && *y < r.y + r.h
+                })
+                .copied()
+                .unwrap_or_else(|| panic!("{letter} drawn inside its cell"));
+            assert_eq!(hits.hit(tx, ty), Some(HitTarget::NameKey(letter)));
+        }
+        startup.click(HitTarget::NameDone, &resources, &paths, 0.0);
+        let (_, hits) = drawn_hits(&startup, &resources);
+        assert!(hits.regions().iter().all(|r| !matches!(
+            r.target,
+            HitTarget::NameKey(_) | HitTarget::NameDel | HitTarget::NameDone
+        )));
     }
 
     /// The anti-drift test for the difficulty table: each row's region holds

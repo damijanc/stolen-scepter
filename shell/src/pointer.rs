@@ -54,6 +54,12 @@ pub enum HitTarget {
     WorldmapToggle,
     /// The ended game's overworld: a tap anywhere quits, as any key does.
     GameOverQuit,
+    /// A letter (`'A'..='Z'`) or space on the hero-name grid.
+    NameKey(char),
+    /// The name grid's delete key (Backspace).
+    NameDel,
+    /// The name grid's OK (Enter).
+    NameDone,
     /// A Game Menu entry, by drawn index.
     MenuEntry(usize),
     /// The screen around the Game Menu panel: a click there is ESC.
