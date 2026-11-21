@@ -1,6 +1,10 @@
 # Click-Everything Design: every action by left mouse button alone
 
-Status: proposal. Read `AGENTS.md`, `specs/mouse-support-design.md`,
+Status: slices 1-4 and 6 shipped; slice 5 (pack picker) open. Slices 3, 4
+and 6 landed through `specs/touch-complete-plan.md` (2026-11-21), which
+records where they depart from this design (one `Pad` target for both count
+surfaces, A/B taps on the body's option lines, a tapped non-target cancels a
+combat pick). `shell/tests/touch_only.rs` plays a game by clicks alone. Read `AGENTS.md`, `specs/mouse-support-design.md`,
 `specs/combat-mouse-design.md`, `specs/overworld-click-to-move-design.md`,
 `specs/ingame-menu-design.md` first; their rules all apply.
 

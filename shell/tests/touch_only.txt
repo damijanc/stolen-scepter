@@ -1,0 +1,78 @@
+# A game played by left clicks alone (`click` only: no `key`, `type` or
+# `rclick`), as a phone plays it. Coordinates are logical 320x200 pixels.
+# Run: cargo run -p openbounty-shell --bin playtest -- \
+#        --script shell/tests/touch_only.txt --out target/touch-only --seed 7
+
+# Splashes and credits skip on a tap.
+click 160 100
+click 160 100
+click 160 100
+expect Pick a hero
+
+# Class A, then the name on the letter grid: A, D, A, OK.
+click 52 100
+expect Name
+click 88 157
+click 136 157
+click 88 157
+click 224 179
+expect Ada
+
+# Normal difficulty, then a tap skips the intro and one closes the welcome.
+click 160 104
+click 160 100
+click 150 160
+expect Days
+
+# Walk by tapping toward the chest two tiles south; the archers by the
+# road catch the hero first and the fight starts.
+click 136 175
+wait 1s
+expect Militia
+# Tap the acting militia for its action menu.
+click 40 39
+expect Give up
+# Controls from the menu, closed by a tap on its backdrop.
+click 100 110
+click 300 190
+expect Militia
+# Give up from the menu; the yes/no answers on its left (Yes) half.
+click 40 39
+click 100 70
+click 70 185
+expect Beaten in battle
+click 150 160
+# The hero's own tile opens the action menu.
+click 136 107
+expect End Week
+# The world map, closed by a tap.
+click 60 70
+click 200 100
+expect Days
+# End the week; its astrology and budget screens close on taps.
+click 136 107
+click 170 30
+click 150 160
+click 150 160
+expect Days:595
+# Dismiss Army: the stack is picked on the numbered strip.
+click 136 107
+click 170 40
+expect Send which troop home
+click 37 185
+expect Dismiss it?
+# No (right half): the army stays.
+click 230 185
+# Game Menu -> Quit, answered No on the status bar's right half...
+click 136 107
+click 170 100
+expect Game Menu
+click 100 108
+click 250 12
+expect Days:595
+# ...and reopened. Yes (the left half) quits on that frame, which ends the
+# script, so the session test fast_quit_halves_answer_like_y_and_n covers it.
+click 136 107
+click 170 100
+click 100 108
+expect Quit without saving

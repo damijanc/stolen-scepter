@@ -22,7 +22,8 @@ will be selected only after headless engine parity is solid.
   animation clock, `chrome.rs` the frame and status bar, `hud.rs` the five
   sidebar panels (`hud.c`), `banner.rs` pack text and its `%VAR%`
   substitution, `startup.rs` the pre-game wizard,
-  `savepath.rs` the save-slot locations, `slot_picker.rs` the shared save
+  `savepath.rs` the save-slot locations, `numpad.rs` the tappable count
+  strip a dwelling prompt and the castle recruit box share, `slot_picker.rs` the shared save
   slot picker and load recipe, `menu.rs` the ESC Game Menu, `cheats.rs` the
   F10 debug menu, `audio.rs` the audio policy (`audio.c`'s decisions, no
   library), `pack.rs` the pack reader and discovery (`pack.c`),
@@ -292,7 +293,8 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 366 engine unit tests, 502 shell unit tests, 25 combat digest
+Test coverage is 366 engine unit tests, 585 shell unit tests, a click-only
+playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`), 25 combat digest
 goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
