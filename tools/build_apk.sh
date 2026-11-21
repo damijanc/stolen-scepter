@@ -96,6 +96,13 @@ cat > "$WORK/AndroidManifest.xml" <<EOF
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
     <application android:label="Stolen Scepter" android:hasCode="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <!-- Android 16 ignores screenOrientation on large screens (tablets,
+             foldables) for apps targeting SDK 36, which runs the game in a
+             band across a portrait tablet. This opts back out so the
+             landscape lock holds. Google has said the opt-out goes away in a
+             later SDK; at that point the game must lay out in portrait. -->
+        <property android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+            android:value="true" />
         <activity android:name=".MainActivity" android:exported="true"
             android:screenOrientation="userLandscape"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|keyboard">
