@@ -174,12 +174,11 @@ impl Backend {
 
         let win_w = screen_width() as i32;
         let win_h = screen_height() as i32;
-        let scale = present.scale(layout, win_w, win_h, Target::Desktop);
-        let viewport = present.blit_rect(layout, win_w, win_h, Target::Desktop);
+        let at = present.placement(layout, win_w, win_h, Target::native());
         let frame = Frame {
-            origin_x: viewport.x as f32,
-            origin_y: viewport.y as f32,
-            scale: scale as f32,
+            origin_x: at.x,
+            origin_y: at.y,
+            scale: at.scale,
         };
 
         for cmd in list.as_slice() {

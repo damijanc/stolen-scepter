@@ -57,9 +57,36 @@ EOF
 # pins, with its template names filled in and its plugin hooks emptied.
 MQ="$(cargo metadata --format-version 1 --filter-platform aarch64-linux-android \
   | python3 -c 'import json,sys; print(next(p["manifest_path"] for p in json.load(sys.stdin)["packages"] if p["name"]=="miniquad").rsplit("/",1)[0])')"
-mkdir -p "$WORK/java/$(echo "$PACKAGE" | tr . /)" "$WORK/java/quad_native"
-sed -e "s/TARGET_PACKAGE_NAME/$PACKAGE/" -e "s/LIBRARY_NAME/$LIB/" -e 's#^ *//%.*$##' \
-  "$MQ/java/MainActivity.java" > "$WORK/java/$(echo "$PACKAGE" | tr . /)/MainActivity.java"
+#
+# Back is the game's ESC (`MacroquadKeys` maps KEYCODE_BACK to it). miniquad
+# hands Back to Android instead, which closes the game: `onBackPressed`
+# calls super, and an app targeting SDK 36 gets predictive back, where Back
+# never arrives as a key event at all. Both paths are redirected to send the
+# key down and up to the native side, so the game sees one ESC press.
+ACTIVITY_DIR="$WORK/java/$(echo "$PACKAGE" | tr . /)"
+mkdir -p "$ACTIVITY_DIR" "$WORK/java/quad_native"
+python3 - "$MQ/java/MainActivity.java" "$ACTIVITY_DIR/MainActivity.java" "$PACKAGE" "$LIB" <<'EOF'
+import re, sys
+src, out, package, lib = sys.argv[1:]
+java = open(src).read()
+java = java.replace("TARGET_PACKAGE_NAME", package).replace("LIBRARY_NAME", lib)
+back = "QuadNative.surfaceOnKeyDown(4); QuadNative.surfaceOnKeyUp(4);"
+for old, new in [
+    ("//% MAIN_ACTIVITY_ON_CREATE",
+     "if (Build.VERSION.SDK_INT >= 33) {\n"
+     "            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(\n"
+     "                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,\n"
+     "                new android.window.OnBackInvokedCallback() {\n"
+     "                    @Override public void onBackInvoked() { " + back + " }\n"
+     "                });\n"
+     "        }"),
+    ("super.onBackPressed();", back),
+]:
+    assert java.count(old) == 1, f"miniquad's MainActivity changed: {old!r}"
+    java = java.replace(old, new)
+java = re.sub(r"(?m)^ *//%.*$", "", java)
+open(out, "w").write(java)
+EOF
 cp "$MQ/java/QuadNative.java" "$WORK/java/quad_native/"
 
 cat > "$WORK/AndroidManifest.xml" <<EOF

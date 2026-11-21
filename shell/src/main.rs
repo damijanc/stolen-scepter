@@ -36,7 +36,7 @@ fn logical_pointer(
 ) -> Option<(i32, i32)> {
     let (win_w, win_h) = backend.window_size();
     pointer.position().and_then(|(px, py)| {
-        present.window_to_logical(layout, win_w, win_h, present::Target::Desktop, px, py)
+        present.window_to_logical(layout, win_w, win_h, present::Target::native(), px, py)
     })
 }
 

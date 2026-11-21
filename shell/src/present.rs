@@ -16,20 +16,46 @@ use crate::layout::{Layout, SCALE_MAX, SCALE_MAX_WEB, SCALE_MIN};
 
 /// Which ceiling applies. A browser tab is one window among many, so it gets
 /// the tighter one.
+///
+/// DIVERGENCE: `Mobile` has no C counterpart. A phone screen is the whole
+/// display, and an integer scale wastes most of it -- a 2424x1080 phone fits
+/// a 320x200 HD pack at 5x, which the art-multiple snap takes down to 4x,
+/// filling about half the width. `Mobile` fills the shorter axis at a
+/// fractional scale instead ([`Present::placement`]).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Target {
     #[default]
     Desktop,
     Web,
+    Mobile,
 }
 
 impl Target {
+    /// The target this build runs on.
+    pub const fn native() -> Self {
+        if cfg!(target_os = "android") {
+            Self::Mobile
+        } else {
+            Self::Desktop
+        }
+    }
+
     pub fn scale_ceiling(self) -> i32 {
         match self {
-            Self::Desktop => SCALE_MAX,
+            Self::Desktop | Self::Mobile => SCALE_MAX,
             Self::Web => SCALE_MAX_WEB,
         }
     }
+}
+
+/// Where the design space lands in the window: its top-left corner and the
+/// window pixels per logical pixel. The scale is whole on every target except
+/// [`Target::Mobile`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Placement {
+    pub x: f32,
+    pub y: f32,
+    pub scale: f32,
 }
 
 /// The display-scale preference and the arithmetic that applies it.
@@ -167,13 +193,38 @@ impl Present {
         Rect::new((win_w - w) / 2, (win_h - h) / 2, w, h)
     }
 
-    /// The inverse of [`Present::blit_rect`]: a window pixel to a logical one.
+    /// What a backend draws with. Desktop and web are exactly
+    /// [`Present::scale`] and [`Present::blit_rect`]. Mobile fills the window's
+    /// shorter axis at whatever fractional scale that takes, centred on the
+    /// longer one, on a whole-pixel origin. It ignores the scale override: the
+    /// Scale row sizes a window, and a phone has none to size.
+    pub fn placement(&self, layout: &Layout, win_w: i32, win_h: i32, target: Target) -> Placement {
+        if target == Target::Mobile {
+            let scale =
+                (win_w as f32 / layout.screen_w as f32).min(win_h as f32 / layout.screen_h as f32);
+            if scale > 0.0 {
+                return Placement {
+                    x: ((win_w as f32 - layout.screen_w as f32 * scale) / 2.0).floor(),
+                    y: ((win_h as f32 - layout.screen_h as f32 * scale) / 2.0).floor(),
+                    scale,
+                };
+            }
+        }
+        let rect = self.blit_rect(layout, win_w, win_h, target);
+        Placement {
+            x: rect.x as f32,
+            y: rect.y as f32,
+            scale: self.scale(layout, win_w, win_h, target) as f32,
+        }
+    }
+
+    /// The inverse of [`Present::placement`]: a window pixel to a logical one.
     ///
     /// `None` when the point is outside the game's rectangle -- the letterbox.
-    /// Note the division is `div_euclid`, not `/`: when the target overhangs
-    /// the window `blit_rect` returns a NEGATIVE origin, and truncating
-    /// division would fold the first `scale - 1` pixels left of the edge onto
-    /// logical 0 instead of rejecting them.
+    /// Note the division FLOORS rather than truncating: when the target
+    /// overhangs the window `blit_rect` returns a NEGATIVE origin, and
+    /// truncating division would fold the first `scale - 1` pixels left of the
+    /// edge onto logical 0 instead of rejecting them.
     pub fn window_to_logical(
         &self,
         layout: &Layout,
@@ -183,13 +234,12 @@ impl Present {
         px: i32,
         py: i32,
     ) -> Option<(i32, i32)> {
-        let scale = self.scale(layout, win_w, win_h, target);
-        if scale <= 0 {
+        let at = self.placement(layout, win_w, win_h, target);
+        if at.scale <= 0.0 {
             return None;
         }
-        let rect = self.blit_rect(layout, win_w, win_h, target);
-        let lx = (px - rect.x).div_euclid(scale);
-        let ly = (py - rect.y).div_euclid(scale);
+        let lx = ((px as f32 - at.x) / at.scale).floor() as i32;
+        let ly = ((py as f32 - at.y) / at.scale).floor() as i32;
         if lx < 0 || ly < 0 || lx >= layout.screen_w || ly >= layout.screen_h {
             return None;
         }
@@ -453,5 +503,34 @@ mod tests {
             .expect("window origin is over the game");
         assert!(got.0 > 0 && got.1 > 0);
         assert!(got.0 < layout.screen_w && got.1 < layout.screen_h);
+    }
+
+    /// The HD pack on a 2424x1080 phone: desktop rules give 4x (1280x800),
+    /// mobile fills the height at 5.4x (1728x1080), centred across.
+    #[test]
+    fn mobile_fills_the_shorter_axis_at_a_fractional_scale() {
+        let layout = layout_for(r#"{"mode": "legacy", "scale": 4}"#);
+        let present = Present::new();
+        assert_eq!(present.scale(&layout, 2424, 1080, Target::Desktop), 4);
+
+        let at = present.placement(&layout, 2424, 1080, Target::Mobile);
+        assert_eq!(at.scale, 5.4);
+        assert_eq!((at.x, at.y), (348.0, 0.0));
+
+        // Taps invert it: logical (10, 20) spans window x 402..407.4.
+        let tap = |px, py| present.window_to_logical(&layout, 2424, 1080, Target::Mobile, px, py);
+        assert_eq!(tap(403, 110), Some((10, 20)));
+        assert_eq!(tap(347, 500), None, "left letterbox");
+        assert_eq!(tap(348 + 1728, 500), None, "right letterbox");
+        assert_eq!(tap(348 + 1727, 1079), Some((319, 199)));
+    }
+
+    #[test]
+    fn desktop_placement_is_the_integer_blit() {
+        let layout = legacy_layout();
+        let present = Present::new();
+        let rect = present.blit_rect(&layout, 1000, 700, Target::Desktop);
+        let at = present.placement(&layout, 1000, 700, Target::Desktop);
+        assert_eq!((at.x, at.y, at.scale), (rect.x as f32, rect.y as f32, 3.0));
     }
 }
