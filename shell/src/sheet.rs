@@ -153,6 +153,8 @@ struct Plan {
     pages: Vec<Vec<(usize, Rect)>>,
     /// Each button's wrapped label.
     lines: Vec<Vec<String>>,
+    /// The title, wrapped to the area like a label (at most two lines).
+    title: Vec<String>,
     title_y: i32,
     body: Vec<String>,
     body_y: i32,
@@ -165,8 +167,13 @@ fn plan(layout: &Layout, sheet: &Sheet) -> Plan {
     let w = a.w - 2 * PAD;
     let mut y = a.y + PAD;
     let title_y = y;
-    if !sheet.title.is_empty() {
-        y += LABEL_H + 2 * GAP;
+    let title = if sheet.title.is_empty() {
+        Vec::new()
+    } else {
+        label_lines(&sheet.title, (w / LABEL_W).max(1) as usize)
+    };
+    if !title.is_empty() {
+        y += title.len() as i32 * LABEL_H + 2 * GAP;
     }
     let body = if sheet.body.is_empty() {
         Vec::new()
@@ -217,6 +224,7 @@ fn plan(layout: &Layout, sheet: &Sheet) -> Plan {
     Plan {
         pages,
         lines,
+        title,
         title_y,
         body,
         body_y,
@@ -279,11 +287,11 @@ pub fn draw(
     let a = backdrop(list, layout, palette);
     let plan = plan(layout, sheet);
     let page = page.min(plan.pages.len() - 1);
-    if !sheet.title.is_empty() {
+    for (i, line) in plan.title.iter().enumerate() {
         list.big_text_centered(
-            &sheet.title,
+            line,
             a.x + a.w / 2,
-            plan.title_y,
+            plan.title_y + i as i32 * LABEL_H,
             palette.clr(Pal::Yellow),
             LABEL_SCALE,
         );
@@ -508,6 +516,30 @@ mod tests {
         assert!(lines[1].ends_with(".."), "{lines:?}");
         assert!(first.h > MIN_BUTTON_H);
         assert!(second.y >= first.y + first.h, "the next button sits below");
+    }
+
+    /// A title too long for one big line wraps, and stays inside the area.
+    #[test]
+    fn a_long_title_wraps_inside_the_area() {
+        let mut sheet = sheet_of(&["Yes", "No"], false);
+        sheet.title = "Quit without saving the game?".to_owned();
+        let (list, hits) = drawn(&sheet, 0);
+        let area = area(&layout());
+        let title_lines: Vec<_> = list
+            .as_slice()
+            .iter()
+            .filter_map(|cmd| match cmd {
+                DrawCmd::BigText { text, x, y, .. } if *y < hits.regions()[0].rect.y => {
+                    Some((text.clone(), *x))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(title_lines.len(), 2, "{title_lines:?}");
+        for (text, x) in title_lines {
+            let w = text.chars().count() as i32 * LABEL_W;
+            assert!(x >= area.x && x + w <= area.x + area.w, "{text:?} at {x}");
+        }
     }
 
     #[test]

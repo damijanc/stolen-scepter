@@ -17,6 +17,7 @@ use crate::input::{Key, KeySource, DIGITS};
 use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
+use crate::sheet::{self, Columns, Sheet, SheetButton};
 use crate::slot_picker::{LoadError, SlotPicker};
 
 pub const ENTRY_COUNT: usize = 3;
@@ -126,9 +127,30 @@ impl Menu {
         palette: &Palette,
         resources: &Resources,
     ) {
+        let title = banner::text(resources, "menu", "title", DEFAULT_TITLE);
+        if layout.touch {
+            // The touch build: the entries as big buttons, Back for ESC.
+            let buttons = DEFAULT_ENTRIES
+                .iter()
+                .enumerate()
+                .map(|(index, (key, default))| SheetButton {
+                    label: banner::text(resources, "menu", key, default).to_owned(),
+                    target: HitTarget::MenuEntry(index),
+                })
+                .collect();
+            let sheet = Sheet {
+                key: "game_menu",
+                title: title.to_owned(),
+                body: String::new(),
+                buttons,
+                columns: Columns::One,
+                back: Some(HitTarget::MenuClose),
+            };
+            sheet::draw(list, hits, layout, palette, &sheet, 0);
+            return;
+        }
         let pad = 6;
         let row_h = GLYPH_H + 2;
-        let title = banner::text(resources, "menu", "title", DEFAULT_TITLE);
         let hint = banner::text_on(
             resources,
             layout.touch,
@@ -617,5 +639,36 @@ mod tests {
         let (_, io) = save_failed_message(&resources, false);
         assert!(no_dir.contains("save folder"), "{no_dir}");
         assert!(io.contains("could not be written"), "{io}");
+    }
+
+    #[test]
+    fn mobile_game_menu_is_a_list() {
+        let resources = Resources::from_json_str(r#"{"render": {"mode": "legacy"}, "troops": []}"#)
+            .expect("fixture parses");
+        let mut layout = Layout::from_resources(&resources).expect("lays out");
+        layout.touch = true;
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        Menu::new().draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+        );
+        let targets: Vec<_> = hits.regions().iter().map(|r| r.target).collect();
+        assert_eq!(
+            targets,
+            vec![
+                HitTarget::MenuEntry(0),
+                HitTarget::MenuEntry(1),
+                HitTarget::MenuEntry(2),
+                HitTarget::MenuClose
+            ]
+        );
+        for r in hits.regions() {
+            assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+        }
+        assert!(!list.has_text_containing("ESC"));
     }
 }

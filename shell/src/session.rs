@@ -133,6 +133,8 @@ pub struct Session<'r> {
     /// The hero action menu is open over the overworld. Session state, not
     /// saved; it only ever opens and closes in the overworld input branch.
     hero_menu_open: bool,
+    /// The mobile sheets' page (the hero actions page).
+    pager: crate::sheet::Pager,
     /// The hero action menu has been opened at least once this session. While
     /// false the idle status line shows a discoverability cue (see
     /// `Chrome::hero_menu_hint`). Session state, not saved, reset on new game
@@ -290,6 +292,7 @@ impl<'r> Session<'r> {
             pending_overwrite,
             pointer_shape: Shape::Arrow,
             hero_menu_open: false,
+            pager: crate::sheet::Pager::default(),
             hero_menu_opened_once: false,
         })
     }
@@ -332,6 +335,7 @@ impl<'r> Session<'r> {
             pending_overwrite,
             pointer_shape,
             hero_menu_open,
+            pager,
             hero_menu_opened_once,
             ..
         } = self;
@@ -905,6 +909,15 @@ impl<'r> Session<'r> {
             let mut click = clicked;
             if *hero_menu_open {
                 match click {
+                    // The mobile sheet's pages: the menu stays open.
+                    Some(HitTarget::SheetNext) => {
+                        pager.next();
+                        click = None;
+                    }
+                    Some(HitTarget::SheetPrev) => {
+                        pager.prev();
+                        click = None;
+                    }
                     Some(HitTarget::OverworldAction(action)) => {
                         *hero_menu_open = false;
                         input.action = action;
@@ -938,6 +951,8 @@ impl<'r> Session<'r> {
             if let Some(HitTarget::MapTile(x, y)) = click {
                 if (x, y) == (game.position.x, game.position.y) {
                     *hero_menu_open = true;
+                    // A fresh menu starts on its first page.
+                    *pager = crate::sheet::Pager::default();
                     *hero_menu_opened_once = true;
                 } else {
                     match walk::click(game, map, fog, (x, y), now) {
@@ -1434,7 +1449,13 @@ impl<'r> Session<'r> {
                     Some(HitTarget::OverworldAction(action)) => Some(action),
                     _ => None,
                 };
-                action_menu(list, hits, layout, palette, resources, hero_rect, hover);
+                if layout.touch {
+                    let sheet = crate::hud::action_sheet(resources);
+                    let page = pager.page_for(layout, &sheet);
+                    crate::sheet::draw(list, hits, layout, palette, &sheet, page);
+                } else {
+                    action_menu(list, hits, layout, palette, resources, hero_rect, hover);
+                }
             }
 
             // A view covers the map area while the overworld keeps running
@@ -1447,14 +1468,32 @@ impl<'r> Session<'r> {
             // only. Each is pushed after the view that owns the screen, so it
             // wins where they overlap.
             let status_bar = Rect::new(STATUS_X, STATUS_Y, layout.status_w(), STATUS_H);
-            if *fast_quit {
+            if *fast_quit && !layout.touch {
                 let (yes, no) = crate::chrome::fast_quit_buttons(layout);
                 hits.push(yes, HitTarget::FastQuitYes);
                 hits.push(no, HitTarget::FastQuitNo);
             }
             match views.active() {
                 Some(ViewKind::Worldmap) if worldmap_has_orb(game, resources) => {
-                    hits.push(status_bar, HitTarget::WorldmapToggle);
+                    if layout.touch {
+                        // A finger-sized button across the top, over the
+                        // frame and status bar.
+                        let label = if views.whole_map() {
+                            MOBILE_SHOW_MY_MAP
+                        } else {
+                            MOBILE_SHOW_WHOLE_MAP
+                        };
+                        crate::sheet::big_button(
+                            list,
+                            hits,
+                            palette,
+                            Rect::new(STATUS_X, 0, layout.status_w(), crate::sheet::MIN_BUTTON_H),
+                            &[label.to_owned()],
+                            HitTarget::WorldmapToggle,
+                        );
+                    } else {
+                        hits.push(status_bar, HitTarget::WorldmapToggle);
+                    }
                 }
                 Some(ViewKind::WinCartoon) => hits.push(
                     Rect::new(0, 0, layout.screen_w, layout.screen_h),
@@ -1469,6 +1508,36 @@ impl<'r> Session<'r> {
                     }
                     None => menu.draw(list, hits, layout, palette, resources),
                 }
+            }
+            // The touch build's quit confirm: a Yes / No sheet over everything,
+            // the same targets the desktop status-bar buttons publish.
+            if *fast_quit && layout.touch {
+                let title = banner::text_on(
+                    resources,
+                    true,
+                    "ui",
+                    "quit_to_dos_prompt",
+                    crate::chrome::DEFAULT_QUIT_PROMPT,
+                    crate::chrome::MOBILE_QUIT_PROMPT,
+                );
+                let sheet = crate::sheet::Sheet {
+                    key: "quit",
+                    title: title.trim().to_owned(),
+                    body: String::new(),
+                    buttons: vec![
+                        crate::sheet::SheetButton {
+                            label: "Yes".to_owned(),
+                            target: HitTarget::FastQuitYes,
+                        },
+                        crate::sheet::SheetButton {
+                            label: "No".to_owned(),
+                            target: HitTarget::FastQuitNo,
+                        },
+                    ],
+                    columns: crate::sheet::Columns::One,
+                    back: None,
+                };
+                crate::sheet::draw(list, hits, layout, palette, &sheet, 0);
             }
         }
 
@@ -1592,6 +1661,8 @@ const DEFAULT_TEMP_DEATH: &str = "After being disgraced on the\n\
     issues your commission and\n\
     sends you on your way.";
 const DEFAULT_BODY_SAVE_CONFIRM: &str = "Ctrl-Q quits; any other\nkey returns to the game.";
+const MOBILE_SHOW_WHOLE_MAP: &str = "Show whole map";
+const MOBILE_SHOW_MY_MAP: &str = "Show my map";
 const MOBILE_BODY_SAVE_CONFIRM: &str = "Your game is saved.\nTap to return to the game.";
 
 /// Which battle a combat session is resolving.
@@ -2197,6 +2268,7 @@ mod tests {
     use crate::dialog::Dialog;
     use crate::draw::DrawList;
     use crate::hud::{Hud, OVERWORLD_ACTIONS, PANEL_COUNT};
+    use crate::input::Action;
     use crate::input::{Key, Keys};
     use crate::layout::Layout;
     use crate::numpad::PadKey;
@@ -2644,6 +2716,145 @@ mod tests {
                 assert_eq!(clicked, keyed, "row {action:?} should equal key {key:?}");
             }
         });
+    }
+
+    /// Tap the hero on a touch session, opening the big-button action sheet.
+    fn open_mobile_hero_menu(session: &mut Session, list: &mut DrawList, now: &mut f64) {
+        let hero = (session.game.position.x, session.game.position.y);
+        let at = region_center(session, HitTarget::MapTile(hero.0, hero.1));
+        drive(session, list, &[], Some(at), true, now);
+        assert!(session.hero_menu_open);
+    }
+
+    /// Tap `target` on the mobile hero sheet, paging forward until it shows.
+    fn tap_through_pages(
+        session: &mut Session,
+        list: &mut DrawList,
+        now: &mut f64,
+        target: HitTarget,
+    ) {
+        for _ in 0..10 {
+            if session.hits.regions().iter().any(|r| r.target == target) {
+                let at = region_center(session, target);
+                drive(session, list, &[], Some(at), true, now);
+                return;
+            }
+            let next = region_center(session, HitTarget::SheetNext);
+            drive(session, list, &[], Some(next), true, now);
+        }
+        panic!("{target:?} never shown");
+    }
+
+    /// On mobile the hero's actions are a paged big-button sheet: every action
+    /// but the keyboard reference (Options) is reachable, each finger-sized,
+    /// and a tap does exactly what its key does.
+    #[test]
+    fn mobile_hero_menu_reaches_every_action_like_its_key() {
+        let mut harness = Harness::load();
+        harness.layout.touch = true;
+        big_stack(move || {
+            let mut session = harness.start();
+            let mut list = DrawList::new();
+            let mut now = 0.0;
+            to_overworld(&mut session, &mut list, &mut now);
+            open_mobile_hero_menu(&mut session, &mut list, &mut now);
+            let mut seen = Vec::new();
+            for _ in 0..10 {
+                for r in session.hits.regions() {
+                    assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+                    if let HitTarget::OverworldAction(a) = r.target {
+                        seen.push(a);
+                    }
+                }
+                if !session
+                    .hits
+                    .regions()
+                    .iter()
+                    .any(|r| r.target == HitTarget::SheetNext)
+                {
+                    break;
+                }
+                let next = region_center(&session, HitTarget::SheetNext);
+                drive(&mut session, &mut list, &[], Some(next), true, &mut now);
+                assert!(session.hero_menu_open, "paging keeps the sheet open");
+            }
+            let want: Vec<Action> = OVERWORLD_ACTIONS
+                .iter()
+                .map(|(a, _, _, _)| *a)
+                .filter(|a| *a != Action::OptionsMenu)
+                .collect();
+            assert_eq!(seen, want);
+
+            for (action, key) in [(Action::EndWeek, Key::W), (Action::ViewArmy, Key::A)] {
+                let mut by_key = harness.start();
+                let mut key_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_key, &mut key_list, &mut now);
+                drive(&mut by_key, &mut key_list, &[key], None, false, &mut now);
+                let mut by_tap = harness.start();
+                let mut tap_list = DrawList::new();
+                let mut now = 0.0;
+                to_overworld(&mut by_tap, &mut tap_list, &mut now);
+                open_mobile_hero_menu(&mut by_tap, &mut tap_list, &mut now);
+                tap_through_pages(
+                    &mut by_tap,
+                    &mut tap_list,
+                    &mut now,
+                    HitTarget::OverworldAction(action),
+                );
+                assert_eq!(snap(&by_tap), snap(&by_key), "{action:?}");
+            }
+        });
+    }
+
+    #[test]
+    fn mobile_quit_confirm_is_a_sheet() {
+        let mut harness = Harness::load();
+        harness.layout.touch = true;
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        session.fast_quit = true;
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        let targets: Vec<_> = session.hits.regions().iter().map(|r| r.target).collect();
+        assert!(
+            targets.ends_with(&[HitTarget::FastQuitYes, HitTarget::FastQuitNo]),
+            "{targets:?}"
+        );
+        for r in session.hits.regions().iter().rev().take(2) {
+            assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+        }
+        let texts = raster::texts(&list);
+        assert!(texts.iter().any(|t| t == "Yes") && texts.iter().any(|t| t == "No"));
+        let no = region_center(&session, HitTarget::FastQuitNo);
+        drive(&mut session, &mut list, &[], Some(no), true, &mut now);
+        assert!(!session.fast_quit);
+    }
+
+    #[test]
+    fn mobile_worldmap_toggle_is_a_big_button() {
+        let mut harness = Harness::load();
+        harness.layout.touch = true;
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        let zone = harness
+            .resources
+            .zone_index_by_id(session.game.position.zone.as_str())
+            .expect("home zone");
+        session.game.world.orbs_found[zone] = true;
+        session.views.set(ViewKind::Worldmap);
+        drive(&mut session, &mut list, &[], None, false, &mut now);
+        let region = session
+            .hits
+            .regions()
+            .iter()
+            .find(|r| r.target == HitTarget::WorldmapToggle)
+            .expect("toggle published");
+        assert!(region.rect.h >= crate::sheet::MIN_BUTTON_H);
+        assert!(raster::texts(&list).iter().any(|t| t.contains("whole map")));
     }
 
     /// Clicking a sidebar panel is its key, and never starts a walk.

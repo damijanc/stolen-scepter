@@ -45,37 +45,47 @@ expect Give up?
 click 160 73
 expect Beaten in battle
 click 150 160
-# The hero's own tile opens the action menu.
+# The hero's own tile opens the action sheet (page 1: Army..Search;
+# page 2: End Week..Sail away; page 3: Save & Quit, Game Menu).
 click 136 107
-expect End Week
-# The world map, closed by a tap.
-click 60 70
+expect Actions
+# The world map (page 1), closed by a tap.
+click 89 101
 click 200 100
 expect Days
-# End the week; its astrology and budget screens close on taps.
+# End the week (page 2); its astrology and budget screens close on taps.
 click 136 107
-click 170 30
+click 230 175
+expect End Week
+click 89 53
 click 150 160
 click 150 160
 expect Days:595
-# Dismiss Army: the mobile sheet lists the stacks by name.
+# Dismiss Army (page 2): the mobile sheet lists the stacks by name.
 click 136 107
-click 170 40
+click 230 175
+click 230 53
 expect Send which troop home
 click 160 57
 expect Dismiss it?
 # No: the army stays.
 click 160 109
-# Game Menu -> Quit, answered on the status bar's N:NO button...
+# Game Menu (page 3) -> Quit, answered No on the mobile quit sheet...
 click 136 107
-click 170 100
+click 230 175
+click 253 175
+expect Save &
+click 230 53
 expect Game Menu
-click 100 108
-click 278 12
+click 160 101
+expect saving?
+click 160 89
 expect Days:595
-# ...and reopened. Y:YES quits on that frame, which ends the
-# script, so the session test fast_quit_halves_answer_like_y_and_n covers it.
+# ...and reopened. Yes quits on that frame, which ends the script, so the
+# session test fast_quit_halves_answer_like_y_and_n covers it.
 click 136 107
-click 170 100
-click 100 108
-expect Quit without saving
+click 230 175
+click 253 175
+click 230 53
+click 160 101
+expect saving?

@@ -19,6 +19,7 @@ use crate::input::{Action, Key};
 use crate::layout::{Layout, MAP_X, MAP_Y};
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
+use crate::sheet::{Columns, Sheet, SheetButton};
 use crate::sprites::{frame_index, SpriteCatalog};
 use crate::views::villain_sprite;
 
@@ -231,6 +232,47 @@ pub const OVERWORLD_ACTIONS: [(Action, Key, &str, &str); 17] = [
 /// beside the hero's cell (`hero_rect`), clamped inside the map viewport, over
 /// a full-map ESC backdrop, and lays out in two columns when 17 rows would not
 /// fit the map height (legacy 240x170 splits 9+8), else one column.
+/// The touch build's hero actions (`specs/mobile-ui-design.md`): a paged,
+/// two-column big-button sheet of [`OVERWORLD_ACTIONS`], each publishing the
+/// same `OverworldAction` the desktop row does. The Options keyboard
+/// reference is left out on mobile (the user's decision). Two labels are
+/// single nine-letter words that cannot wrap in a half-width button, so
+/// mobile names them "Hero" and "Sail away" (`mobile_overworld_menu`).
+pub fn action_sheet(resources: &Resources) -> Sheet {
+    let buttons = OVERWORLD_ACTIONS
+        .iter()
+        .filter(|(action, _, _, _)| *action != Action::OptionsMenu)
+        .map(|(action, _, key, default)| {
+            let label = match MOBILE_ACTION_LABELS.iter().find(|(k, _)| k == key) {
+                Some((_, mobile)) => banner::text(resources, "mobile_overworld_menu", key, mobile),
+                None => banner::text(resources, "overworld_menu", key, default),
+            };
+            SheetButton {
+                label: label.to_owned(),
+                target: HitTarget::OverworldAction(*action),
+            }
+        })
+        .collect();
+    Sheet {
+        key: "hero_menu",
+        title: banner::text(
+            resources,
+            "mobile_overworld_menu",
+            "title",
+            MOBILE_ACTIONS_TITLE,
+        )
+        .to_owned(),
+        body: String::new(),
+        buttons,
+        columns: Columns::Two,
+        back: Some(HitTarget::OverworldMenuClose),
+    }
+}
+
+const MOBILE_ACTIONS_TITLE: &str = "Actions";
+const MOBILE_ACTION_LABELS: [(&str, &str); 2] =
+    [("character", "Hero"), ("new_continent", "Sail away")];
+
 pub fn action_menu(
     list: &mut DrawList,
     hits: &mut HitList,
