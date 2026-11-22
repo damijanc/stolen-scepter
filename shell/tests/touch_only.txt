@@ -31,16 +31,18 @@ expect Days
 click 136 175
 wait 1s
 expect Militia
-# Tap the acting militia for its action menu.
+# Tap the acting militia for its action sheet (two-up: Wait Shoot / Fly
+# Spells / Give up Army / Hero Controls, then Back).
 click 40 39
-expect Give up
-# Controls from the menu, closed by a tap on its backdrop.
-click 100 110
-click 300 190
+expect Your move
+# Controls from the sheet, closed with its Back button.
+click 230 129
+expect Sounds
+click 90 175
 expect Militia
-# Give up from the menu; the mobile yes/no sheet's Yes button.
+# Give up from the sheet; the mobile yes/no sheet's Yes button.
 click 40 39
-click 100 70
+click 90 101
 expect Give up?
 click 160 73
 expect Beaten in battle

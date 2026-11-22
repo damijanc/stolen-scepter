@@ -390,7 +390,10 @@ impl<'r> Session<'r> {
         let mut clicked = if frame_in.left { hovered } else { None };
         // A mobile view sheet turns its own pages; the view never sees it.
         if let Some(target) = clicked {
-            if layout.touch && views.sheet_page_click(target) {
+            let combat_paged = combat
+                .as_mut()
+                .is_some_and(|session| session.combat.sheet_page_click(target));
+            if combat_paged || (layout.touch && views.sheet_page_click(target)) {
                 clicked = None;
             }
         }
@@ -1362,7 +1365,7 @@ impl<'r> Session<'r> {
 
         list.clear();
         hits.clear();
-        if let Some(session) = combat.as_ref() {
+        if let Some(session) = combat.as_mut() {
             // Combat owns the full inner area; the chrome shows its title.
             let title = session.combat.title(resources);
             Chrome {
@@ -1394,7 +1397,7 @@ impl<'r> Session<'r> {
             // (combat_loop.c:328).
             session
                 .combat
-                .draw_menus(list, hits, palette, resources, game);
+                .draw_menus(list, hits, layout, palette, resources, game);
         } else {
             Chrome {
                 layout: layout,

@@ -441,6 +441,16 @@ pub enum CombatAction {
 
 /// The menu in drawn order, with its `strings.combat_menu` key and default
 /// label. The label leads with the key it stands for.
+/// The action menu's mobile labels, in [`COMBAT_ACTIONS`] order: plain
+/// words with no key letter (spec decision 9), short enough for a two-up
+/// sheet.
+const MOBILE_ACTION_LABELS: [&str; 9] = [
+    "Wait", "Shoot", "Fly", "Spells", "Give up", "Army", "Hero", "Options", "Controls",
+];
+
+/// The mobile spell menu's question.
+const MOBILE_SPELLS_PROMPT: &str = "Cast which spell?";
+
 const COMBAT_ACTIONS: [(CombatAction, &str, &str); 9] = [
     (CombatAction::Wait, "wait", "W Wait"),
     (CombatAction::Shoot, "shoot", "S Shoot"),
@@ -502,6 +512,8 @@ pub struct CombatLoop {
     hover: Option<HitTarget>,
     /// The time of the latest step, which the title's tip line alternates on.
     now: f64,
+    /// Which page of a mobile combat sheet is showing.
+    pager: crate::sheet::Pager,
 }
 
 impl CombatLoop {
@@ -538,6 +550,7 @@ impl CombatLoop {
             pick_reason: PickReason::None,
             cast_phase: CastPhase::None,
             touch: false,
+            pager: crate::sheet::Pager::default(),
             cast_spell_idx: -1,
             pick_t1_side: 0,
             pick_t1_slot: 0,
@@ -678,13 +691,18 @@ impl CombatLoop {
     /// The combat menus, over the field and any view: the spell menu in the
     /// pick-spell phase, the action menu while it is open.
     pub fn draw_menus(
-        &self,
+        &mut self,
         list: &mut DrawList,
         hits: &mut HitList,
+        layout: &Layout,
         palette: &Palette,
         resources: &Resources,
         game: &Game,
     ) {
+        if layout.touch {
+            self.draw_menus_touch(list, hits, layout, palette, resources, game);
+            return;
+        }
         if self.picking_spell() {
             let hover = match self.hover {
                 Some(HitTarget::CombatSpell(i)) => Some(i),
@@ -700,6 +718,102 @@ impl CombatLoop {
             };
             combat_action_menu(list, hits, palette, resources, (unit.x, unit.y), hover);
         }
+    }
+
+    /// Mobile (spec Task 9): the spell and action menus as big-button
+    /// sheets publishing the desktop targets, and while a target picker is
+    /// armed a Cancel strip across the top, publishing `CombatBack`, which
+    /// the picker answers as Esc. It overlaps the top row of cells by a few
+    /// pixels and wins there; the rest of each cell stays tappable.
+    fn draw_menus_touch(
+        &mut self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        game: &Game,
+    ) {
+        use crate::sheet::{self, Columns, Sheet, SheetButton};
+        let sheet = if self.picking_spell() {
+            let buttons = COMBAT_SPELL_NAMES
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    let count = game.spells.counts.get(i).copied().unwrap_or(0);
+                    SheetButton {
+                        label: format!("{name} x{count}"),
+                        target: HitTarget::CombatSpell(i),
+                    }
+                })
+                .collect();
+            Some(Sheet {
+                key: "combat_spells",
+                title: banner::text_on(
+                    resources,
+                    true,
+                    "ui",
+                    "combat_spells_prompt",
+                    "",
+                    MOBILE_SPELLS_PROMPT,
+                )
+                .to_owned(),
+                body: String::new(),
+                buttons,
+                columns: Columns::One,
+                back: Some(HitTarget::CombatBack),
+            })
+        } else if self.action_menu && self.combat.unit_id >= 0 {
+            // The Options reference is hidden on mobile, as in the hero menu.
+            let buttons = COMBAT_ACTIONS
+                .iter()
+                .zip(MOBILE_ACTION_LABELS)
+                .filter(|((action, _, _), _)| *action != CombatAction::Options)
+                .map(|((action, key, _), mobile)| SheetButton {
+                    label: banner::text_on(resources, true, "combat_menu", key, "", mobile)
+                        .to_owned(),
+                    target: HitTarget::CombatAction(*action),
+                })
+                .collect();
+            Some(Sheet {
+                key: "combat_actions",
+                title: banner::text_on(resources, true, "combat_menu", "title", "", "Your move")
+                    .to_owned(),
+                body: String::new(),
+                buttons,
+                columns: Columns::Two,
+                back: Some(HitTarget::CombatBack),
+            })
+        } else {
+            None
+        };
+        if let Some(sheet) = sheet {
+            let page = self.pager.page_for(layout, &sheet);
+            sheet::draw(list, hits, layout, palette, &sheet, page);
+        } else if self.picker_active {
+            sheet::big_button(
+                list,
+                hits,
+                palette,
+                Rect::new(16, 0, layout.screen_w - 32, sheet::MIN_BUTTON_H),
+                &["Cancel".to_owned()],
+                HitTarget::CombatBack,
+            );
+        }
+    }
+
+    /// Turn the page of the mobile combat sheet, when `target` is a page
+    /// button and a sheet is up. True when it was one.
+    pub fn sheet_page_click(&mut self, target: HitTarget) -> bool {
+        if !(self.touch && (self.picking_spell() || self.action_menu)) {
+            return false;
+        }
+        match target {
+            HitTarget::SheetNext => self.pager.next(),
+            HitTarget::SheetPrev => self.pager.prev(),
+            _ => return false,
+        }
+        true
     }
 
     /// Replace the action banner from a `strings.combat_log` line.
@@ -1291,7 +1405,8 @@ impl CombatLoop {
         out_cancelled: &mut bool,
     ) -> bool {
         *out_cancelled = false;
-        if pointer.cancel {
+        // A right click, or the mobile Cancel strip.
+        if pointer.cancel || pointer.click == Some(HitTarget::CombatBack) {
             *out_cancelled = true;
             return false;
         }
@@ -1848,6 +1963,7 @@ mod tests {
             pick_reason: PickReason::None,
             cast_phase: CastPhase::None,
             touch: false,
+            pager: crate::sheet::Pager::default(),
             cast_spell_idx: -1,
             pick_t1_side: 0,
             pick_t1_slot: 0,
@@ -2864,6 +2980,133 @@ mod tests {
             by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::Right]);
             assert_eq!(snap(&l), snap(&keyed));
         });
+    }
+
+    /// Draw the menus as a touch build would and return what was published.
+    fn touch_hits(l: &mut CombatLoop, resources: &Resources, game: &Game) -> HitList {
+        let mut layout = Layout::from_resources(resources).expect("lays out");
+        layout.touch = true;
+        l.touch = true;
+        let mut list = DrawList::new();
+        let mut hits = HitList::default();
+        l.draw_menus(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            resources,
+            game,
+        );
+        hits
+    }
+
+    fn finger_sized(hits: &HitList) {
+        for r in hits.regions() {
+            assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+        }
+    }
+
+    #[test]
+    fn mobile_combat_action_menu_is_a_list_like_its_keys() {
+        let entries = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let found = entries.clone();
+        big_stack(move || {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatCell(0, 0)),
+            );
+            let hits = touch_hits(&mut l, &resources, &game);
+            finger_sized(&hits);
+            let targets: Vec<HitTarget> = hits.regions().iter().map(|r| r.target).collect();
+            assert!(targets.contains(&HitTarget::CombatBack));
+            assert!(!targets.contains(&HitTarget::SheetNext), "one page");
+            assert!(
+                !targets.contains(&HitTarget::CombatAction(CombatAction::Options)),
+                "no Options reference on mobile"
+            );
+            *found.lock().unwrap() = targets
+                .into_iter()
+                .filter_map(|t| match t {
+                    HitTarget::CombatAction(a) => Some(a),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+        });
+        let entries = entries.lock().unwrap().clone();
+        assert_eq!(entries.len(), 8);
+        let open = click(HitTarget::CombatCell(0, 0));
+        for (action, key) in [
+            (CombatAction::Wait, Key::W),
+            (CombatAction::Shoot, Key::S),
+            (CombatAction::Fly, Key::F),
+            (CombatAction::Cast, Key::U),
+            (CombatAction::GiveUp, Key::G),
+            (CombatAction::Army, Key::A),
+            (CombatAction::Character, Key::V),
+            (CombatAction::Controls, Key::C),
+        ] {
+            assert!(entries.contains(&action), "{action:?}");
+            assert_same(
+                mage,
+                &[key],
+                &[open, click(HitTarget::CombatAction(action))],
+            );
+        }
+    }
+
+    #[test]
+    fn mobile_spell_menu_is_a_list() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            mage(&mut l, &mut game);
+            let mut prompt = Prompt::default();
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::U]);
+            assert!(l.picking_spell());
+            let mut spells = Vec::new();
+            for _ in 0..4 {
+                let hits = touch_hits(&mut l, &resources, &game);
+                finger_sized(&hits);
+                let targets: Vec<HitTarget> = hits.regions().iter().map(|r| r.target).collect();
+                assert!(targets.contains(&HitTarget::CombatBack));
+                spells.extend(targets.iter().filter_map(|t| match t {
+                    HitTarget::CombatSpell(i) => Some(*i),
+                    _ => None,
+                }));
+                if !l.sheet_page_click(HitTarget::SheetNext)
+                    || !targets.contains(&HitTarget::SheetNext)
+                {
+                    break;
+                }
+            }
+            spells.sort_unstable();
+            spells.dedup();
+            assert_eq!(spells, (0..7).collect::<Vec<_>>());
+        });
+    }
+
+    #[test]
+    fn mobile_picker_cancel_button_cancels_like_escape() {
+        fn armed(l: &mut CombatLoop, _: &mut Game) {
+            l.arm_shoot(&loop_fixture().1);
+        }
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            armed(&mut l, &mut game);
+            let hits = touch_hits(&mut l, &resources, &game);
+            let cancel = hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::CombatBack)
+                .expect("a Cancel strip while picking");
+            assert_eq!(cancel.rect.y, 0);
+            assert!(cancel.rect.h >= crate::sheet::MIN_BUTTON_H);
+        });
+        assert_same(armed, &[Key::Escape], &[click(HitTarget::CombatBack)]);
     }
 
     /// Anti-drift for the action menu: every entry's region holds its label,
