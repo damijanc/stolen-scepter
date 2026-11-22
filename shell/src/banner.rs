@@ -246,6 +246,31 @@ mod tests {
                 }
             }
         }
+        // Castle texts (the King's audience, a castle's greeting) have no
+        // mirror group; the shell rewrites their one cue, "(space)", on
+        // mobile. Any other key cue there would show as is.
+        for castle in pack["castles"].as_array().expect("castles") {
+            for block in ["audience", "dialog"] {
+                let Some(entries) = castle["special"][block].as_object() else {
+                    continue;
+                };
+                for (key, value) in entries {
+                    // This is story prose ("as you enter the hall"), so look
+                    // for key cues rather than any key word.
+                    let text = value
+                        .as_str()
+                        .unwrap_or("")
+                        .replace("(space)", "(tap)")
+                        .to_ascii_lowercase();
+                    let cue = ["(space)", "(enter)", "(esc)", "(y/n)", "press ", "key"]
+                        .iter()
+                        .any(|c| text.contains(c));
+                    if cue {
+                        missing.push(format!("castle {block}.{key} -> {text:?}"));
+                    }
+                }
+            }
+        }
         assert!(missing.is_empty(), "no mobile version: {missing:#?}");
     }
 

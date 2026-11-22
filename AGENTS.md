@@ -30,6 +30,16 @@ will be selected only after headless engine parity is solid.
   `pack_select.rs` the pre-game pack picker (`pack_select.c`), and
   `input.rs` the key bindings, `cursor.rs` the shell-drawn mouse pointer, and
   `walk.rs` overworld click-to-move (routes over the engine's `step_preview`).
+  The mobile build is its own face of the same game
+  (`specs/mobile-ui-design.md`): `Layout::touch` (set from
+  `present::Target::native()`, or `playtest --mobile`) switches every choice
+  to `sheet.rs`'s big-button sheets and count keypad, each button carrying
+  the target the desktop row publishes, so a tap can reach nothing a key
+  cannot. The menu views' sheets live in `views/touch.rs`. Mobile wording
+  comes from the pack's `mobile_<group>` text groups through
+  `banner::text_on`, which never falls back to desktop text; a test fails on
+  any key-naming string shown on mobile without a mirror. Desktop keeps its
+  original look; only the touch flag reaches this code.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. The one stated exception is `pack_select.rs`: the picker runs before
   any pack is open, so the DrawList pipeline (built on pack art) has nothing
@@ -293,9 +303,11 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 366 engine unit tests, 585 shell unit tests, a click-only
-playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`), 25 combat digest
-goldens, and one render-free boundary test.
+Test coverage is 369 engine unit tests, 639 shell unit tests, a click-only
+mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
+the King, castle recruiting, a won fight, a den, a town spell, the hero menu)
+with a finger-size audit of every frame's tap regions (`playtest
+--audit-taps`), 25 combat digest goldens, and one render-free boundary test.
 
 Run `git log --oneline -5` for the exact tip rather than trusting a hash written
 here; the working tree should be clean before you start.

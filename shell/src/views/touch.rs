@@ -63,16 +63,17 @@ impl Views {
             Some(ViewKind::OwnCastle) => self.own_castle_sheet(resources, game),
             Some(ViewKind::RecruitSoldiers) => {
                 if self.recruit_whom != 0 && self.recruit_error.is_empty() {
-                    let name = resources
-                        .troop_by_index(self.recruit_pool[(self.recruit_whom - 1) as usize])
-                        .map(|troop| troop.name.as_str())
-                        .unwrap_or("");
+                    let troop = resources
+                        .troop_by_index(self.recruit_pool[(self.recruit_whom - 1) as usize]);
+                    let name = troop.map(|troop| troop.name.as_str()).unwrap_or("");
+                    let cost = troop.map(|troop| troop.recruit_cost).unwrap_or(0);
                     sheet::keypad(
                         list,
                         hits,
                         layout,
                         palette,
                         &format!("How many {name}?"),
+                        &crate::interact::price_note(cost, game.stats.gold),
                         &self.recruit_input,
                         Some(self.recruit_max),
                     );

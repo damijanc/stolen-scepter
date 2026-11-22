@@ -1,7 +1,7 @@
 # Mobile Touch UI Design (and the desktop restore)
 
-Status: requirements decided by the user on 2026-11-21; awaiting approval of
-this document. Read `AGENTS.md` and `specs/touch-complete-plan.md` first.
+Status: approved and built (branch `mobile-ui`, plan `specs/mobile-ui-plan.md`,
+tasks 1-10, 2026-11-22). Read `AGENTS.md` and `specs/touch-complete-plan.md` first.
 
 ## Why
 

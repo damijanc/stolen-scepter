@@ -32,6 +32,8 @@ pub const MOBILE_WORLDMAP_HINT: &str = " Tap to close ";
 /// the full line (hint + the Days / Time Stop part) fits the legacy status
 /// bar's 36 glyphs.
 pub const DEFAULT_HERO_MENU_HINT: &str = "Click hero for menu";
+/// The mobile status cue, shown always: plain words, no keys.
+const MOBILE_HERO_MENU_HINT: &str = "Tap the hero for actions";
 
 /// What the status bar says. Three modes, in priority order.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -193,13 +195,17 @@ impl Chrome<'_> {
                 // Strip the prefix WITHOUT its trailing space so the slash
                 // keeps the space before it. A pack that rewords the line
                 // without that prefix keeps its own wording.
-                if self.hero_menu_hint {
+                // Mobile always shows it: the prefix names the O and C keys a
+                // phone does not have (spec decision 9).
+                if self.hero_menu_hint || self.layout.touch {
                     if let Some(rest) = line.strip_prefix(" Options / Controls") {
-                        let hint = banner::text(
+                        let hint = banner::text_on(
                             self.resources,
+                            self.layout.touch,
                             "hints",
                             "hero_menu",
                             DEFAULT_HERO_MENU_HINT,
+                            MOBILE_HERO_MENU_HINT,
                         );
                         return format!("{hint}{rest}");
                     }
@@ -535,6 +541,20 @@ mod tests {
         // Without the flag the line is unchanged.
         let chrome = chrome_of(&layout, &palette, &resources, &game, StatusMode::Adventure);
         assert_eq!(chrome.status_text(), " Options / Controls / Days Left:400 ");
+    }
+
+    /// Mobile shows its tap cue whether or not the hero menu was ever opened:
+    /// the desktop prefix names keys a phone lacks.
+    #[test]
+    fn mobile_always_shows_the_tap_cue_instead_of_the_key_hint() {
+        let (mut layout, palette, resources, mut game) = parts("");
+        layout.touch = true;
+        game.stats.days_left = 400;
+        let chrome = chrome_of(&layout, &palette, &resources, &game, StatusMode::Adventure);
+        assert_eq!(
+            chrome.status_text(),
+            "Tap the hero for actions / Days Left:400 "
+        );
     }
 
     /// The hint also replaces the time-stop line's key hint.

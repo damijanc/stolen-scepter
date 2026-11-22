@@ -8,7 +8,12 @@
 //! ```text
 //! cargo run -p openbounty-shell --bin playtest -- --script s.txt --out shots/
 //!     [--pack <name|path>] [--seed N] [--scale S] [--save-dir DIR] [--mobile]
+//!     [--audit-taps]
 //! ```
+//!
+//! `--audit-taps` checks every frame's tap regions against the finger size
+//! (`sheet::MIN_BUTTON_H`), map tiles, combat cells and sidebar panels
+//! aside, and fails at the end listing each offender once.
 //!
 //! `--script -` reads stdin. One command per line, `#` starts a comment:
 //!
@@ -41,7 +46,7 @@ use openbounty_shell::input::{Key, KeySource};
 use openbounty_shell::layout::Layout;
 use openbounty_shell::pack;
 use openbounty_shell::palette::Palette;
-use openbounty_shell::pointer::{Button, HitList};
+use openbounty_shell::pointer::{Button, HitList, HitTarget};
 use openbounty_shell::present::Present;
 use openbounty_shell::raster::{self, Canvas, Images};
 use openbounty_shell::savepath::SavePaths;
@@ -60,6 +65,8 @@ struct Args {
     save_dir: Option<PathBuf>,
     /// Draw the mobile UI (`Layout::touch`), as the Android build does.
     mobile: bool,
+    /// Fail on the first frame publishing a tap region under a finger's size.
+    audit_taps: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -71,6 +78,7 @@ fn parse_args() -> Result<Args, String> {
         scale: 2,
         save_dir: None,
         mobile: false,
+        audit_taps: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -83,6 +91,7 @@ fn parse_args() -> Result<Args, String> {
             "--scale" => args.scale = value()?.parse().map_err(|_| "bad --scale")?,
             "--save-dir" => args.save_dir = Some(PathBuf::from(value()?)),
             "--mobile" => args.mobile = true,
+            "--audit-taps" => args.audit_taps = true,
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -141,6 +150,11 @@ struct Runner<'r> {
     frame: u64,
     held: BTreeSet<Key>,
     pointer: Option<(i32, i32)>,
+    audit_taps: bool,
+    /// What the audit found: each under-sized region once, with the script
+    /// line that first showed it.
+    undersized: BTreeSet<String>,
+    line: usize,
 }
 
 impl<'r> Runner<'r> {
@@ -202,7 +216,38 @@ impl<'r> Runner<'r> {
             }
             Phase::Over => return Err("the game has quit".into()),
         }
+        if self.audit_taps {
+            self.audit();
+        }
         Ok(())
+    }
+
+    /// The finger-size audit (`--audit-taps`): every tap region this frame
+    /// published must be at least `sheet::MIN_BUTTON_H` tall, except the map
+    /// tiles, combat cells and sidebar panels, which are the game's own
+    /// picture rather than buttons.
+    fn audit(&mut self) {
+        let hits = match &self.phase {
+            Phase::Startup(_) => &self.hits,
+            Phase::Game(session) => session.hits(),
+            Phase::Over => return,
+        };
+        let mut found = Vec::new();
+        for region in hits.regions() {
+            let exempt = matches!(
+                region.target,
+                HitTarget::MapTile(..) | HitTarget::CombatCell(..) | HitTarget::HudPanel(_)
+            );
+            if !exempt && region.rect.h < openbounty_shell::sheet::MIN_BUTTON_H {
+                found.push(format!("{:?} at {:?}", region.target, region.rect));
+            }
+        }
+        for item in found {
+            if !self.undersized.iter().any(|s| s.ends_with(&item)) {
+                self.undersized
+                    .insert(format!("line {}: {item}", self.line));
+            }
+        }
     }
 
     /// An input frame, then an idle one so the press is a single edge.
@@ -339,6 +384,9 @@ fn run() -> Result<(), String> {
         seed: args.seed,
         phase: Phase::Startup(Startup::new(&resources)),
         hits: HitList::new(),
+        audit_taps: args.audit_taps,
+        undersized: BTreeSet::new(),
+        line: 0,
         list: DrawList::new(),
         frame: 0,
         held: BTreeSet::new(),
@@ -347,6 +395,7 @@ fn run() -> Result<(), String> {
     runner.step(Input::default())?;
 
     for (number, line) in script.lines().enumerate() {
+        runner.line = number + 1;
         let line = line.split('#').next().unwrap_or("").trim();
         if line.is_empty() {
             continue;
@@ -426,6 +475,14 @@ fn run() -> Result<(), String> {
             "state" => state(&runner),
             other => return Err(fail(format!("unknown command {other}"))),
         }
+    }
+    if !runner.undersized.is_empty() {
+        let list: Vec<&str> = runner.undersized.iter().map(String::as_str).collect();
+        return Err(format!(
+            "tap regions under a finger's size ({} px):\n{}",
+            openbounty_shell::sheet::MIN_BUTTON_H,
+            list.join("\n")
+        ));
     }
     Ok(())
 }

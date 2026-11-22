@@ -299,6 +299,12 @@ impl<'r> Session<'r> {
 
     /// Advance one frame on `input` at wall-clock `now` (seconds) and draw it
     /// into `list`. The caller adds the pointer and paints the list.
+    /// The tap regions the last frame published (the next frame hit-tests
+    /// them). For tools that audit them, such as the playtest.
+    pub fn hits(&self) -> &HitList {
+        &self.hits
+    }
+
     pub fn frame(&mut self, frame_in: &FrameInput, now: f64, list: &mut DrawList) -> FrameStatus {
         let Context {
             resources,
@@ -686,7 +692,7 @@ impl<'r> Session<'r> {
                 HomeCastleAction::Audience => {
                     let (outcome, needed) = game.audience_with_king(resources);
                     let (fanfare, king) =
-                        interact::audience_messages(resources, game, outcome, needed);
+                        interact::audience_messages(resources, game, outcome, needed, layout.touch);
                     dialog.open("", &fanfare);
                     *pending_audience_message = Some(king);
                 }
@@ -1310,6 +1316,7 @@ impl<'r> Session<'r> {
                                     cap,
                                 );
                                 prompt.text_input(&troop_name, &body, 4, cap);
+                                prompt.set_note(&interact::price_note(cost, gold));
                                 *pending = PendingFlow::Dwelling {
                                     troop_id: troop_id.clone(),
                                 };
@@ -3647,6 +3654,12 @@ mod tests {
                 for region in session.hits.regions() {
                     assert!(region.rect.h >= crate::sheet::MIN_BUTTON_H, "{region:?}");
                 }
+                // The keypad covers the den's panel, so it says the price.
+                assert!(
+                    list.has_text_containing("gold each, you have"),
+                    "{:?}",
+                    raster::texts(&list)
+                );
                 if by_click {
                     for key in [PadKey::Max, PadKey::Ok] {
                         let at = region_center(&session, HitTarget::Pad(key));

@@ -346,6 +346,7 @@ pub fn keypad(
     layout: &Layout,
     palette: &Palette,
     title: &str,
+    note: &str,
     value: &str,
     max: Option<i32>,
 ) {
@@ -361,6 +362,12 @@ pub fn keypad(
         LABEL_SCALE,
     );
     y += LABEL_H + 2 * GAP;
+    // The note (a price, say) in plain text: the keypad covers whatever
+    // screen asked, so what the count costs has to be said here.
+    if !note.is_empty() {
+        list.text_centered(note, a.x + a.w / 2, y, palette.clr(Pal::White));
+        y += GLYPH_H as i32 + 2 * GAP;
+    }
     let shown = match max {
         Some(max) => format!("{value}_   (max {max})"),
         None => format!("{value}_"),
@@ -606,6 +613,7 @@ mod tests {
             &layout(),
             &Palette::fallback(),
             "Archers",
+            "250 gold each, you have 7500 gold",
             "12",
             Some(40),
         );

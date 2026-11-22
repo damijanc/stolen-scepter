@@ -1256,6 +1256,7 @@ pub fn audience_messages(
     game: &Game,
     outcome: AudienceOutcome,
     needed: i32,
+    touch: bool,
 ) -> (String, String) {
     let castle = resources.home_castle();
     let (intro, branch) = match castle {
@@ -1284,8 +1285,14 @@ pub fn audience_messages(
         ("NEEDED", &needed_str),
         ("S", s),
     ];
-    let fanfare = banner::format(intro, vars);
-    let king = banner::format(branch, vars);
+    let mut fanfare = banner::format(intro, vars);
+    let mut king = banner::format(branch, vars);
+    // The castle record has no mobile mirror; its one key cue becomes the
+    // word the mobile astrology screen uses (spec decision 9).
+    if touch {
+        fanfare = fanfare.replace("(space)", "(tap)");
+        king = king.replace("(space)", "(tap)");
+    }
     (fanfare, king)
 }
 
@@ -1351,6 +1358,11 @@ pub fn dwelling_empty(resources: &Resources) -> String {
 }
 
 /// The "Recruit how many" label from the `ui` block.
+/// The mobile keypad's price line for a count of troops.
+pub fn price_note(cost: i32, gold: i32) -> String {
+    format!("{cost} gold each, you have {gold} gold")
+}
+
 pub fn dwelling_how_many(resources: &Resources) -> String {
     banner::text(
         resources,
@@ -2293,15 +2305,33 @@ mod tests {
         game.character.name.copy_from_str("Sir Rust");
         game.character.cls.rank_title.copy_from_str("General");
 
-        let (fanfare, king) = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 3);
+        let (fanfare, king) =
+            audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 3, false);
         assert_eq!(fanfare, "Fanfare Sir Rust");
         assert_eq!(king, "Need 3 more villains");
 
-        let (_, king) = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 1);
+        let (_, king) = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 1, false);
         assert_eq!(king, "Need 1 more villain");
 
-        let (_, king) = audience_messages(&resources, &game, AudienceOutcome::Promoted, 0);
+        let (_, king) = audience_messages(&resources, &game, AudienceOutcome::Promoted, 0, false);
         assert_eq!(king, "Promoted to General");
+    }
+
+    /// Decision 9: the fanfare's "(space)" cue reads "(tap)" on mobile and
+    /// stays as written on desktop.
+    #[test]
+    fn mobile_audience_says_tap_not_space() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [], "castles": [{"id":"home","zone":"home","x":0,"y":0,
+                  "special":{"flow":"audience",
+                    "audience":{"intro":"Hear ye   (space)", "more_needed":"Go"}}}]}"#,
+        )
+        .expect("fixture parses");
+        let game = Game::default();
+        let mobile = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 1, true);
+        assert_eq!(mobile.0, "Hear ye   (tap)");
+        let desktop = audience_messages(&resources, &game, AudienceOutcome::MoreNeeded, 1, false);
+        assert_eq!(desktop.0, "Hear ye   (space)");
     }
 
     #[test]

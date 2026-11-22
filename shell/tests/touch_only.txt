@@ -2,6 +2,7 @@
 # `rclick`), as a phone plays it. Coordinates are logical 320x200 pixels.
 # Run: cargo run -p openbounty-shell --bin playtest -- \
 #        --script shell/tests/touch_only.txt --out target/touch-only --seed 7 --mobile
+# The route (and every fight's taps) is for seed 7.
 
 # Splashes and credits skip on a tap.
 click 160 100
@@ -26,9 +27,41 @@ click 160 100
 click 150 160
 expect Days
 
-# Walk by tapping toward the chest two tiles south; the archers by the
-# road catch the hero first and the fight starts.
-click 136 175
+# The Royal Hall is just north: two taps walk into its gate.
+click 136 68
+click 136 68
+expect The Royal Hall
+# Recruit soldiers: Militia, then Archers, each on the keypad (Max, OK).
+# The keypad says the price, since it covers the list.
+click 160 45
+expect Recruit Soldiers
+click 160 57
+expect How many Militia?
+expect 50 gold each
+click 264 102
+click 229 170
+click 160 93
+expect How many Archers?
+click 264 102
+click 229 170
+expect Gold: 4000
+# Back leaves the castle; walk in again and speak with the King, whose two
+# pages close on taps (the fanfare says "(tap)", not a key).
+click 90 175
+click 136 68
+expect Speak with the
+click 160 81
+expect (tap)
+click 150 160
+click 150 160
+expect The Royal Hall
+click 160 175
+expect Days
+
+# South-west toward the den: the archers' band meets the hero.
+click 136 136
+wait 1s
+click 88 170
 wait 1s
 expect Militia
 # Tap the acting militia for its action sheet (two-up: Wait Shoot / Fly
@@ -40,13 +73,109 @@ click 230 129
 expect Sounds
 click 90 175
 expect Militia
-# Give up from the sheet; the mobile yes/no sheet's Yes button.
+# Give up asks first; No fights on.
 click 40 39
 click 90 101
 expect Give up?
-click 160 73
-expect Beaten in battle
+click 160 109
+expect Militia
+# A tap on a neighbouring square moves there: two steps right.
+click 88 34
+click 136 34
+wait 1s
+expect Archers
+# The archers' sheet: Shoot arms the target pick, and the Cancel strip along
+# the top backs out of it...
+click 40 70
+click 230 45
+expect Cancel
+click 160 13
+# ...and a tap on the enemy shoots it, as a player would.
+click 280 34
+wait 3s
+# The militia close in and cut down the orcs (a tap on an enemy next to a
+# unit attacks it), the archers shoot again, and the militia finish it.
+click 184 68
+click 232 68
+wait 1s
+click 280 34
+wait 3s
+click 232 34
+click 280 34
+wait 1s
+expect Victory
 click 150 160
+
+# On to the den, two tiles a tap. A chest on the way (a flask of spell
+# power with this seed; the gold-or-leadership choice is covered by the
+# prompt tests).
+click 88 170
+wait 1s
+click 88 170
+wait 1s
+expect Spell Power
+click 150 160
+click 40 170
+wait 1s
+expect Spell Power
+click 150 160
+click 40 170
+wait 1s
+click 40 170
+wait 1s
+click 136 170
+wait 1s
+click 184 170
+wait 1s
+click 136 170
+wait 1s
+# Skeletons and sprites guard the den.
+expect Militia
+click 88 34
+click 136 34
+wait 1s
+click 280 68
+wait 3s
+click 184 68
+click 232 68
+wait 1s
+click 40 102
+wait 3s
+expect Victory
+click 150 160
+
+# The den: its keypad names the price; 2, 0, OK hires twenty Sprites.
+click 184 136
+wait 1s
+expect gold each, you have
+click 124 141
+click 89 173
+expect 20_
+click 229 173
+wait 1s
+
+# West to Larkspur. The spell is on the town's second page; buying asks
+# "... for N gold?" first, and Yes learns it.
+click 40 102
+wait 1s
+click 40 136
+wait 1s
+click 40 68
+wait 1s
+click 88 102
+wait 1s
+expect Larkspur
+click 230 175
+expect Learn Bridge
+click 160 65
+expect for
+expect 100 gold?
+click 90 61
+expect more spell
+click 160 57
+click 90 175
+expect Days
+
 # The hero's own tile opens the action sheet (page 1: Army..Search;
 # page 2: End Week..Sail away; page 3: Save & Quit, Game Menu).
 click 136 107
@@ -63,15 +192,21 @@ click 89 53
 click 150 160
 click 150 160
 expect Days:595
-# Dismiss Army (page 2): the mobile sheet lists the stacks by name.
+# Dismiss Army (page 2): the mobile sheet lists the stacks by name. Only
+# the last stack asks first, so tapping Sprites sends them home at once...
 click 136 107
 click 230 175
 click 230 53
 expect Send which troop home
-click 160 57
-expect Dismiss it?
-# No: the army stays.
-click 160 109
+expect Sprites x20
+click 160 113
+expect Days
+# ...and the list opens again for the rest (Back closes it).
+click 136 107
+click 230 175
+click 230 53
+expect Archers x10
+click 90 175
 # Game Menu (page 3) -> Quit, answered No on the mobile quit sheet...
 click 136 107
 click 230 175

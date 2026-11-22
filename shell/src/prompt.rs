@@ -76,6 +76,9 @@ pub struct Prompt {
     labels: Vec<String>,
     /// The mobile sheet's page, when its options do not fit on one.
     page: usize,
+    /// A count's mobile keypad note, such as its price (see
+    /// [`Prompt::set_note`]).
+    note: String,
 }
 
 impl Prompt {
@@ -143,6 +146,13 @@ impl Prompt {
     fn reset_sheet(&mut self) {
         self.labels.clear();
         self.page = 0;
+        self.note.clear();
+    }
+
+    /// A line the mobile keypad shows under its title, such as a price: the
+    /// keypad covers the screen that asked. Set after [`Prompt::text_input`].
+    pub fn set_note(&mut self, note: &str) {
+        self.note = note.to_owned();
     }
 
     /// The value typed into the digit-entry box, or 0 when it is empty or the
@@ -579,6 +589,7 @@ impl Prompt {
                 layout,
                 palette,
                 &self.header,
+                &self.note,
                 &self.buffer,
                 Some(self.max_value),
             );

@@ -49,6 +49,16 @@ const DEFAULT_NEW_GAME_INTRO: &str = "%NAME% the %CLASS%,\n\
 /// The class-picker bitmap's placement size. The shell cannot read a texture's
 /// intrinsic size, so this uses the shipped art (and C's missing-asset
 /// fallback), which are both 288x184.
+/// Class select's hint bar: one text line on desktop, a finger tall on
+/// mobile, where it is the way to load a game.
+fn hint_bar_h(layout: &Layout) -> i32 {
+    if layout.touch {
+        crate::sheet::MIN_BUTTON_H
+    } else {
+        GLYPH_H + 2
+    }
+}
+
 const CLASS_PICKER_W: i32 = 288;
 const CLASS_PICKER_H: i32 = 184;
 
@@ -774,10 +784,12 @@ impl Startup {
         palette: &Palette,
         resources: &Resources,
     ) {
-        hits.push(
-            Rect::new(0, 0, layout.screen_w, GLYPH_H + 2),
-            HitTarget::StartupLoad,
-        );
+        if !layout.touch {
+            hits.push(
+                Rect::new(0, 0, layout.screen_w, GLYPH_H + 2),
+                HitTarget::StartupLoad,
+            );
+        }
         let (px, py) = Self::class_picker_origin(layout);
         let count = resources.classes_count().min(4);
         for (index, rect) in CLASS_FIGURES {
@@ -787,6 +799,15 @@ impl Startup {
                     HitTarget::StartupClass(index),
                 );
             }
+        }
+        // Mobile: the hint bar is finger tall, and published after the
+        // figures so it owns its strip over their tops (the A-D letters a
+        // phone has no keys for).
+        if layout.touch {
+            hits.push(
+                Rect::new(0, 0, layout.screen_w, hint_bar_h(layout)),
+                HitTarget::StartupLoad,
+            );
         }
         if let Some(HitTarget::StartupClass(index)) = self.hover {
             let parts = CLASS_FIGURES.iter().filter(|(i, _)| *i == index);
@@ -826,12 +847,11 @@ impl Startup {
             DEFAULT_CLASS_SELECT_HINT,
             MOBILE_CLASS_SELECT_HINT,
         );
-        list.rect(
-            Rect::new(0, 0, layout.screen_w, GLYPH_H + 2),
-            palette.clr(Pal::DRed),
-        );
+        let h = hint_bar_h(layout);
+        list.rect(Rect::new(0, 0, layout.screen_w, h), palette.clr(Pal::DRed));
         let x = (layout.screen_w - hint.chars().count() as i32 * GLYPH_W) / 2;
-        list.text(hint, x.max(0), 1, palette.clr(Pal::White));
+        let y = (h - GLYPH_H) / 2;
+        list.text(hint, x.max(0), y.max(1), palette.clr(Pal::White));
     }
 
     fn draw_create_game(
