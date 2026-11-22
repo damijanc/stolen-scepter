@@ -87,7 +87,13 @@ impl Views {
             _ => return false,
         };
         let page = self.pager.page_for(layout, &sheet);
-        sheet::draw(list, hits, layout, palette, &sheet, page);
+        // The user's wording for the recruit list's page button.
+        let next = if sheet.key == "recruit" {
+            banner::text(resources, "mobile_ui", "recruit_more", "More troops")
+        } else {
+            "Next"
+        };
+        sheet::draw_with_next(list, hits, layout, palette, &sheet, page, next);
         true
     }
 

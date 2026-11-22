@@ -873,6 +873,11 @@ impl Views {
         self.town_info_active = true;
     }
 
+    /// How many troops the recruit list offers.
+    pub fn recruit_pool_len(&self) -> usize {
+        self.recruit_pool_count
+    }
+
     /// Mobile: ask `question` before running `row` (spec decision 6). Yes
     /// comes back from [`Views::town_click`] as [`TownInput::RunConfirmed`].
     pub fn town_ask(&mut self, row: TownRow, question: String) {

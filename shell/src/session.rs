@@ -3445,6 +3445,40 @@ mod tests {
         });
     }
 
+    /// The user's call (2026-11-22): the recruit list's page button says
+    /// "More troops", and it leads to the rest of the castle's troops.
+    #[test]
+    fn the_recruit_list_offers_more_troops() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            open_view(&mut session, "recruit");
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            assert!(
+                list.has_text_containing("More troops"),
+                "{:?}",
+                raster::texts(&list)
+            );
+            assert!(!list.has_text_containing("Next"));
+            all_finger_sized(&session);
+            // The label fits its button: no big glyph runs past it.
+            let more = session
+                .hits
+                .regions()
+                .iter()
+                .find(|r| r.target == HitTarget::SheetNext)
+                .expect("a page button")
+                .rect;
+            assert!(more.w >= 11 * crate::font::GLYPH_W * crate::sheet::LABEL_SCALE);
+            tap(&mut session, &mut list, &mut now, HitTarget::SheetNext);
+            let first = session.views.recruit_pool_len();
+            assert!(
+                targets_of(&session).contains(&HitTarget::RecruitRow(first - 1)),
+                "the last troop is on the next page"
+            );
+        });
+    }
+
     #[test]
     fn mobile_spellbook_and_gates_are_lists() {
         big_stack(|| {

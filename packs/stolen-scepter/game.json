@@ -5743,7 +5743,8 @@
    "worldmap_hint_whole_map": "Tap to close",
    "own_castle_mode_garrison": "Leave troops",
    "own_castle_mode_remove": "Take troops",
-   "combat_spells_prompt": "Cast which spell?"
+   "combat_spells_prompt": "Cast which spell?",
+   "recruit_more": "More troops"
   },
   "mobile_startup": {
    "controls_hint": "Tap a game, or Back",

@@ -293,6 +293,20 @@ pub fn draw(
     sheet: &Sheet,
     page: usize,
 ) {
+    draw_with_next(list, hits, layout, palette, sheet, page, "Next");
+}
+
+/// [`draw`], with the Next button saying `next` (the recruit list's
+/// "More troops").
+pub fn draw_with_next(
+    list: &mut DrawList,
+    hits: &mut HitList,
+    layout: &Layout,
+    palette: &Palette,
+    sheet: &Sheet,
+    page: usize,
+    next: &str,
+) {
     let a = backdrop(list, layout, palette);
     hits.push(a, HitTarget::SheetBlank);
     let plan = plan(layout, sheet);
@@ -334,13 +348,22 @@ pub fn draw(
             nav.push(("Prev", HitTarget::SheetPrev));
         }
         if page + 1 < plan.pages.len() {
-            nav.push(("Next", HitTarget::SheetNext));
+            nav.push((next, HitTarget::SheetNext));
         }
     }
-    let n = nav.len() as i32;
-    for (i, (label, target)) in nav.into_iter().enumerate() {
-        let left = plan.nav.x + plan.nav.w * i as i32 / n.max(1);
-        let right = plan.nav.x + plan.nav.w * (i as i32 + 1) / n.max(1);
+    // Each nav button is as wide as its label asks (two letters' margin):
+    // equal for Back / Prev / Next, wider for "More troops".
+    let weight = |label: &str| label.chars().count() as i32 + 2;
+    let total: i32 = nav
+        .iter()
+        .map(|(label, _)| weight(label))
+        .sum::<i32>()
+        .max(1);
+    let mut before = 0;
+    for (label, target) in nav.into_iter() {
+        let left = plan.nav.x + plan.nav.w * before / total;
+        before += weight(label);
+        let right = plan.nav.x + plan.nav.w * before / total;
         let rect = Rect::new(left, plan.nav.y, right - left, plan.nav.h);
         big_button(list, hits, palette, rect, &[label.to_owned()], target);
     }

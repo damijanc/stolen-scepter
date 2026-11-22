@@ -306,7 +306,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 369 engine unit tests, 646 shell unit tests, a click-only
+Test coverage is 369 engine unit tests, 647 shell unit tests, a click-only
 mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
 the King, castle recruiting, a won fight, a den, a town spell, the hero menu)
 with a finger-size audit of every frame's tap regions (`playtest
