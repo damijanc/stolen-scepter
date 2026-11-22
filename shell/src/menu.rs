@@ -31,7 +31,6 @@ const DEFAULT_ENTRIES: [(&str, &str); ENTRY_COUNT] = [
 ];
 const DEFAULT_HINT: &str = "ENTER pick  ESC close";
 /// Mobile wording (spec decision 9): no key names on a touch build.
-const MOBILE_HINT: &str = "Tap a choice, or Back";
 
 /// What one frame of menu input asks for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -151,14 +150,7 @@ impl Menu {
         }
         let pad = 6;
         let row_h = GLYPH_H + 2;
-        let hint = banner::text_on(
-            resources,
-            layout.touch,
-            "menu",
-            "hint",
-            DEFAULT_HINT,
-            MOBILE_HINT,
-        );
+        let hint = banner::text(resources, "menu", "hint", DEFAULT_HINT);
         let labels: Vec<String> = DEFAULT_ENTRIES
             .iter()
             .enumerate()
@@ -656,7 +648,12 @@ mod tests {
             &Palette::fallback(),
             &resources,
         );
-        let targets: Vec<_> = hits.regions().iter().map(|r| r.target).collect();
+        let targets: Vec<_> = hits
+            .regions()
+            .iter()
+            .map(|r| r.target)
+            .filter(|t| *t != HitTarget::SheetBlank)
+            .collect();
         assert_eq!(
             targets,
             vec![

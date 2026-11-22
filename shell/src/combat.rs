@@ -790,7 +790,11 @@ impl CombatLoop {
         if let Some(sheet) = sheet {
             let page = self.pager.page_for(layout, &sheet);
             sheet::draw(list, hits, layout, palette, &sheet, page);
-        } else if self.picker_active {
+            return;
+        }
+        // No sheet up: the next one opens on its first page.
+        self.pager = crate::sheet::Pager::default();
+        if self.picker_active {
             sheet::big_button(
                 list,
                 hits,
@@ -3057,6 +3061,33 @@ mod tests {
                 &[open, click(HitTarget::CombatAction(action))],
             );
         }
+    }
+
+    /// Review finding: a tap on the action sheet's title or the gaps between
+    /// its buttons must do nothing -- not move or attack with the unit
+    /// hidden under the sheet.
+    #[test]
+    fn a_blank_tap_on_the_mobile_action_sheet_changes_nothing() {
+        big_stack(|| {
+            let (mut l, resources, mut game) = loop_fixture();
+            let mut prompt = Prompt::default();
+            by_pointer(
+                &mut l,
+                &mut game,
+                &resources,
+                &mut prompt,
+                click(HitTarget::CombatCell(0, 0)),
+            );
+            let hits = touch_hits(&mut l, &resources, &game);
+            let before = snap(&l);
+            // The title row, above the first buttons. Only the menus are drawn
+            // here; in the game the field's cells lie underneath, and (88, 20)
+            // is cell (1, 0), next to the militia.
+            let target = hits.hit(88, 20).unwrap_or(HitTarget::CombatCell(1, 0));
+            by_pointer(&mut l, &mut game, &resources, &mut prompt, click(target));
+            assert_eq!(snap(&l), before, "{target:?} acted");
+            assert!(l.action_menu, "the sheet stays open");
+        });
     }
 
     #[test]

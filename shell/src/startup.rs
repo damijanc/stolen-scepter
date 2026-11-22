@@ -1053,6 +1053,7 @@ impl Startup {
         // The name: a title, the name typed so far, and three rows of big
         // keys (A-J, K-T, U-Z, space, delete); Back and OK along the bottom.
         let a = sheet::backdrop(list, layout, palette);
+        hits.push(a, HitTarget::SheetBlank);
         let label_h = GLYPH_H * sheet::LABEL_SCALE;
         let title = banner::text(resources, "mobile_startup", "name_title", MOBILE_NAME_TITLE);
         list.big_text_centered(
@@ -1777,7 +1778,12 @@ mod tests {
         let paths = paths("mobile-difficulty");
         let mut startup = at_difficulty(&resources, &paths);
         let (list, hits) = drawn_hits_on(&startup, &resources, true);
-        let targets: Vec<_> = hits.regions().iter().map(|r| r.target).collect();
+        let targets: Vec<_> = hits
+            .regions()
+            .iter()
+            .map(|r| r.target)
+            .filter(|t| *t != HitTarget::SheetBlank)
+            .collect();
         assert_eq!(
             targets,
             vec![

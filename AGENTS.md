@@ -38,8 +38,11 @@ will be selected only after headless engine parity is solid.
   cannot. The menu views' sheets live in `views/touch.rs`. Mobile wording
   comes from the pack's `mobile_<group>` text groups through
   `banner::text_on`, which never falls back to desktop text; a test fails on
-  any key-naming string shown on mobile without a mirror. Desktop keeps its
-  original look; only the touch flag reaches this code.
+  any key-naming PACK string (and castle text) shown on mobile without a
+  mirror -- shell constants are not covered, so read them by eye. Every sheet
+  lays `HitTarget::SheetBlank` under its buttons, so a near miss does
+  nothing. Desktop keeps its original look; only the touch flag reaches this
+  code.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. The one stated exception is `pack_select.rs`: the picker runs before
   any pack is open, so the DrawList pipeline (built on pack art) has nothing
@@ -303,7 +306,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 369 engine unit tests, 639 shell unit tests, a click-only
+Test coverage is 369 engine unit tests, 646 shell unit tests, a click-only
 mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
 the King, castle recruiting, a won fight, a den, a town spell, the hero menu)
 with a finger-size audit of every frame's tap regions (`playtest

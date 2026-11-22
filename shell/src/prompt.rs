@@ -616,7 +616,18 @@ impl Prompt {
                     .enumerate()
                     .map(|(i, label)| button(label, HitTarget::PromptPick(i)))
                     .collect();
-                (self.body.clone(), buttons, Some(HitTarget::PromptCancel))
+                // Named buttons ARE the "1. Zone" lines, so those leave the
+                // body (decision 7: names, not numbers).
+                let body = if self.labels.is_empty() {
+                    self.body.clone()
+                } else {
+                    self.body
+                        .lines()
+                        .filter(|line| banner::plain_label(line) == line.trim())
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                (body, buttons, Some(HitTarget::PromptCancel))
             }
             _ => {
                 // The A/B body lists its options as "A) ..." lines; with named
@@ -1538,8 +1549,14 @@ mod tests {
         }
     }
 
+    /// The buttons: every region but the blank one a mobile sheet lays
+    /// under them.
     fn tap_regions(hits: &HitList) -> Vec<(HitTarget, Rect)> {
-        hits.regions().iter().map(|r| (r.target, r.rect)).collect()
+        hits.regions()
+            .iter()
+            .filter(|r| r.target != HitTarget::SheetBlank)
+            .map(|r| (r.target, r.rect))
+            .collect()
     }
 
     fn all_finger_sized(hits: &HitList) {
@@ -1615,6 +1632,24 @@ mod tests {
         assert_eq!(clicked.click(HitTarget::PromptPick(1)), PromptResult::Two);
     }
 
+    /// Review finding: the continent picker's "1. Zone" lines are the
+    /// buttons, so the body does not list them a second time.
+    #[test]
+    fn mobile_named_buttons_replace_the_numbered_lines() {
+        let resources = pack("{}");
+        let mut prompt = Prompt::default();
+        prompt.numeric_labeled(
+            "Navigate",
+            "Sail where?\n1. Greenreach\n2. Isleward",
+            2,
+            vec!["Greenreach".to_owned(), "Isleward".to_owned()],
+        );
+        let (list, _) = drawn_on(&prompt, &resources, true);
+        assert!(list.has_text_containing("Sail where?"));
+        assert!(!list.has_text_containing("1. Greenreach"));
+        assert!(list.has_text_containing("Greenreach"));
+    }
+
     #[test]
     fn mobile_count_is_a_keypad() {
         let resources = pack("{}");
@@ -1622,7 +1657,12 @@ mod tests {
         prompt.text_input("Archers", "Hire how many?", 4, 40);
         let (list, hits) = drawn_on(&prompt, &resources, true);
         all_finger_sized(&hits);
-        assert_eq!(hits.regions().len(), crate::numpad::PAD_KEYS.len());
+        let pads = hits
+            .regions()
+            .iter()
+            .filter(|r| matches!(r.target, HitTarget::Pad(_)))
+            .count();
+        assert_eq!(pads, crate::numpad::PAD_KEYS.len());
         assert!(list.has_text_containing("Archers"));
     }
 

@@ -44,6 +44,11 @@ pub enum HitTarget {
     /// owns the sheet's `Pager`.
     SheetPrev,
     SheetNext,
+    /// A mobile sheet's empty area (its title, body and the gaps between
+    /// buttons): published over the sheet before its buttons so a near miss
+    /// does nothing, rather than reaching the map, a combat cell or the
+    /// screen's Esc underneath. Every handler ignores it.
+    SheetBlank,
     /// The ESC cell that ends a numbered or A/B strip: cancels the prompt,
     /// exactly as the Esc key does.
     PromptCancel,

@@ -25,6 +25,9 @@ const LABEL_H: i32 = GLYPH_H as i32 * LABEL_SCALE;
 const LABEL_W: i32 = GLYPH_W as i32 * LABEL_SCALE;
 /// A label's lines at most; the rest of a longer label is cut with "..".
 const MAX_LABEL_LINES: usize = 2;
+/// A title's lines at most: one more than a label, so a question with a
+/// price in it ("Learn Raise Control for 500 gold?") is never cut.
+const MAX_TITLE_LINES: usize = 3;
 
 /// The whole inner screen, inside the frame: where every sheet draws.
 pub fn area(layout: &Layout) -> Rect {
@@ -94,10 +97,16 @@ impl Pager {
 /// A label wrapped to `chars` per line, at most two lines, the second cut
 /// with ".." when the label is longer still.
 fn label_lines(label: &str, chars: usize) -> Vec<String> {
-    let mut lines = wrap(label, chars.max(1));
-    if lines.len() > MAX_LABEL_LINES {
-        lines.truncate(MAX_LABEL_LINES);
-        let last = &mut lines[MAX_LABEL_LINES - 1];
+    lines_cut(label, chars, MAX_LABEL_LINES)
+}
+
+/// `text` wrapped to `chars` per line, at most `max` lines, the last cut
+/// with ".." when it is longer still.
+fn lines_cut(text: &str, chars: usize, max: usize) -> Vec<String> {
+    let mut lines = wrap(text, chars.max(1));
+    if lines.len() > max {
+        lines.truncate(max);
+        let last = &mut lines[max - 1];
         let keep = chars.saturating_sub(2).min(last.chars().count());
         *last = last.chars().take(keep).collect::<String>() + "..";
     }
@@ -170,7 +179,7 @@ fn plan(layout: &Layout, sheet: &Sheet) -> Plan {
     let title = if sheet.title.is_empty() {
         Vec::new()
     } else {
-        label_lines(&sheet.title, (w / LABEL_W).max(1) as usize)
+        lines_cut(&sheet.title, (w / LABEL_W).max(1) as usize, MAX_TITLE_LINES)
     };
     if !title.is_empty() {
         y += title.len() as i32 * LABEL_H + 2 * GAP;
@@ -285,6 +294,7 @@ pub fn draw(
     page: usize,
 ) {
     let a = backdrop(list, layout, palette);
+    hits.push(a, HitTarget::SheetBlank);
     let plan = plan(layout, sheet);
     let page = page.min(plan.pages.len() - 1);
     for (i, line) in plan.title.iter().enumerate() {
@@ -351,17 +361,23 @@ pub fn keypad(
     max: Option<i32>,
 ) {
     let a = backdrop(list, layout, palette);
+    hits.push(a, HitTarget::SheetBlank);
     let x = a.x + PAD;
     let w = a.w - 2 * PAD;
     let mut y = a.y + PAD;
-    list.big_text_centered(
-        title,
-        a.x + a.w / 2,
-        y,
-        palette.clr(Pal::Yellow),
-        LABEL_SCALE,
-    );
-    y += LABEL_H + 2 * GAP;
+    // A long troop name ("How many Barbarians?") wraps rather than running
+    // off the sheet.
+    for line in lines_cut(title, (w / LABEL_W).max(1) as usize, MAX_LABEL_LINES) {
+        list.big_text_centered(
+            &line,
+            a.x + a.w / 2,
+            y,
+            palette.clr(Pal::Yellow),
+            LABEL_SCALE,
+        );
+        y += LABEL_H;
+    }
+    y += 2 * GAP;
     // The note (a price, say) in plain text: the keypad covers whatever
     // screen asked, so what the count costs has to be said here.
     if !note.is_empty() {
@@ -470,7 +486,51 @@ mod tests {
             sheet,
             page,
         );
-        (list, hits)
+        (list, buttons_only(&hits))
+    }
+
+    /// `hits` without the blank region every sheet lays under its buttons.
+    fn buttons_only(hits: &HitList) -> HitList {
+        let mut out = HitList::new();
+        for r in hits.regions() {
+            if r.target != HitTarget::SheetBlank {
+                out.push(r.rect, r.target);
+            }
+        }
+        out
+    }
+
+    /// A near miss on a sheet does nothing: the blank region covers the
+    /// whole area and is published first, so every button wins over it.
+    #[test]
+    fn a_sheet_lays_a_blank_region_under_its_buttons() {
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        draw(
+            &mut list,
+            &mut hits,
+            &layout(),
+            &Palette::fallback(),
+            &sheet_of(&["Easy", "Normal"], true),
+            0,
+        );
+        let first = hits.regions()[0];
+        assert_eq!(
+            (first.target, first.rect),
+            (HitTarget::SheetBlank, area(&layout()))
+        );
+        let mut pad = HitList::new();
+        keypad(
+            &mut list,
+            &mut pad,
+            &layout(),
+            &Palette::fallback(),
+            "A",
+            "",
+            "",
+            None,
+        );
+        assert_eq!(pad.regions()[0].target, HitTarget::SheetBlank);
     }
 
     fn inside(r: Rect, a: Rect) -> bool {
@@ -603,6 +663,37 @@ mod tests {
         assert_eq!(pager.page_for(&layout, &other), 0);
     }
 
+    /// Review finding: a long keypad title wraps instead of running past the
+    /// sheet.
+    #[test]
+    fn a_long_keypad_title_stays_inside_the_area() {
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        keypad(
+            &mut list,
+            &mut hits,
+            &layout(),
+            &Palette::fallback(),
+            "How many Barbarians?",
+            "",
+            "",
+            None,
+        );
+        let area = area(&layout());
+        let mut lines = 0;
+        for cmd in list.as_slice() {
+            if let DrawCmd::BigText { text, x, .. } = cmd {
+                let w = text.chars().count() as i32 * LABEL_W;
+                assert!(*x >= area.x && x + w <= area.x + area.w, "{text:?} at {x}");
+                lines += 1;
+            }
+        }
+        assert!(lines >= 3, "two title lines and the value line");
+        for r in buttons_only(&hits).regions() {
+            assert!(inside(r.rect, area) && r.rect.h >= MIN_BUTTON_H, "{r:?}");
+        }
+    }
+
     #[test]
     fn the_keypad_publishes_every_pad_key_at_min_height() {
         let mut list = DrawList::new();
@@ -618,7 +709,7 @@ mod tests {
             Some(40),
         );
         let area = area(&layout());
-        let mut keys: Vec<PadKey> = hits
+        let mut keys: Vec<PadKey> = buttons_only(&hits)
             .regions()
             .iter()
             .map(|r| {

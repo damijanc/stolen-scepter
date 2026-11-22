@@ -1382,6 +1382,8 @@ impl Views {
         if layout.touch && self.draw_touch(list, hits, layout, palette, resources, game, present) {
             return;
         }
+        // No sheet up: the next one opens on its first page.
+        self.pager = crate::sheet::Pager::default();
 
         // Menu views publish a full-screen ESC backdrop BEFORE their rows (D2),
         // so a row wins and a click anywhere else walks the view back. The

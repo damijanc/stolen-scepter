@@ -297,14 +297,14 @@ impl<'r> Session<'r> {
         })
     }
 
-    /// Advance one frame on `input` at wall-clock `now` (seconds) and draw it
-    /// into `list`. The caller adds the pointer and paints the list.
     /// The tap regions the last frame published (the next frame hit-tests
     /// them). For tools that audit them, such as the playtest.
     pub fn hits(&self) -> &HitList {
         &self.hits
     }
 
+    /// Advance one frame on `input` at wall-clock `now` (seconds) and draw it
+    /// into `list`. The caller adds the pointer and paints the list.
     pub fn frame(&mut self, frame_in: &FrameInput, now: f64, list: &mut DrawList) -> FrameStatus {
         let Context {
             resources,
@@ -936,6 +936,8 @@ impl<'r> Session<'r> {
                         pager.prev();
                         click = None;
                     }
+                    // A near miss on the sheet keeps it open.
+                    Some(HitTarget::SheetBlank) => click = None,
                     Some(HitTarget::OverworldAction(action)) => {
                         *hero_menu_open = false;
                         input.action = action;
@@ -3260,6 +3262,44 @@ mod tests {
 
     /// Decision 6: on mobile a purchase asks "...for N gold?" first, spends
     /// nothing until Yes, and Yes buys exactly what the desktop click buys.
+    /// Review finding: a tap on a sheet's blank area (its title) is nothing:
+    /// the town stays open and the hero menu stays up.
+    #[test]
+    fn a_blank_tap_on_a_mobile_sheet_changes_nothing() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            in_millbrook(&mut session, &mut list, &mut now);
+            let game = session.game;
+            drive(
+                &mut session,
+                &mut list,
+                &[],
+                Some((160, 14)),
+                true,
+                &mut now,
+            );
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            assert_eq!(session.views.active(), Some(ViewKind::Town));
+            assert_eq!(session.game, game);
+
+            session.views.dismiss();
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            session.hero_menu_open = true;
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            drive(
+                &mut session,
+                &mut list,
+                &[],
+                Some((160, 14)),
+                true,
+                &mut now,
+            );
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            assert!(session.hero_menu_open, "the hero sheet stays open");
+        });
+    }
+
     #[test]
     fn a_town_purchase_asks_first_on_mobile() {
         big_stack(|| {
@@ -3310,6 +3350,57 @@ mod tests {
         });
     }
 
+    /// Review finding: the purchase question names the whole price, even for
+    /// the shipped spells with the longest names (decision 6: the player sees
+    /// what it costs before saying Yes).
+    #[test]
+    fn the_purchase_question_shows_the_whole_price_for_long_spell_names() {
+        big_stack(|| {
+            let harness = touch_harness();
+            for (spell, cost) in [("raise_control", 500), ("find_villain", 1000)] {
+                let (mut session, mut list, mut now) = touch_session(&harness);
+                let town = session
+                    .game
+                    .towns
+                    .iter_mut()
+                    .find(|t| t.id.as_str() == "millbrook")
+                    .expect("millbrook");
+                town.spell_for_sale.copy_from_str(spell);
+                in_millbrook(&mut session, &mut list, &mut now);
+                tap(
+                    &mut session,
+                    &mut list,
+                    &mut now,
+                    HitTarget::TownRow(TownRow::Spell),
+                );
+                assert!(session.views.town_asking(), "{spell}: asks first");
+                let shown = raster::texts(&list).join(" ");
+                assert!(
+                    shown.contains(&format!("for {cost} gold?")) && !shown.contains(".."),
+                    "{spell}: {shown}"
+                );
+            }
+        });
+    }
+
+    /// Review finding: a sheet left on page 2 does not open there next time.
+    #[test]
+    fn a_reopened_town_starts_on_its_first_page() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            in_millbrook(&mut session, &mut list, &mut now);
+            tap(&mut session, &mut list, &mut now, HitTarget::SheetNext);
+            assert!(!targets_of(&session).contains(&HitTarget::TownRow(TownRow::Contract)));
+            // Off the sheet (the frame) is the view's Esc.
+            drive(&mut session, &mut list, &[], Some((4, 100)), true, &mut now);
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            assert_eq!(session.views.active(), None);
+            in_millbrook(&mut session, &mut list, &mut now);
+            assert!(targets_of(&session).contains(&HitTarget::TownRow(TownRow::Contract)));
+        });
+    }
+
     #[test]
     fn a_refused_purchase_skips_the_confirm() {
         big_stack(|| {
@@ -3327,6 +3418,8 @@ mod tests {
                 !targets_of(&session).contains(&HitTarget::PromptYes),
                 "no confirm"
             );
+            // The refusal shows at once, as on desktop: the info sheet's OK.
+            assert!(targets_of(&session).contains(&HitTarget::DialogDismiss));
             assert_eq!(session.game.stats.gold, 0);
             all_finger_sized(&session);
         });

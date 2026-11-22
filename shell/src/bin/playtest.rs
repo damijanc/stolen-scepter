@@ -65,7 +65,8 @@ struct Args {
     save_dir: Option<PathBuf>,
     /// Draw the mobile UI (`Layout::touch`), as the Android build does.
     mobile: bool,
-    /// Fail on the first frame publishing a tap region under a finger's size.
+    /// Check every frame's tap regions against a finger's size, and fail at
+    /// the end listing each offender once.
     audit_taps: bool,
 }
 
