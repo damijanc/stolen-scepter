@@ -173,10 +173,25 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(path).expect("pack reads"))
                 .expect("json");
         let strings = pack["strings"].as_object().expect("strings");
+        // A letter hotkey range like "A-D" or "(A-Z)": capital, dash,
+        // capital, standing alone.
+        let letter_range = |s: &str| {
+            let c: Vec<char> = s.chars().collect();
+            c.windows(3).enumerate().any(|(i, w)| {
+                let alone = |j: Option<&char>| j.map_or(true, |ch| !ch.is_ascii_alphanumeric());
+                w[0].is_ascii_uppercase()
+                    && w[1] == '-'
+                    && w[2].is_ascii_uppercase()
+                    && alone(if i == 0 { None } else { c.get(i - 1) })
+                    && alone(c.get(i + 3))
+            })
+        };
         let names_a_key = |s: &str| {
             let lower = s.to_ascii_lowercase();
             lower.contains("(y/n)")
                 || lower.contains("arrow key")
+                || letter_range(s)
+                || s.contains(" L to ")
                 || lower
                     .split(|c: char| !c.is_ascii_alphanumeric())
                     .any(|w| matches!(w, "esc" | "enter" | "space" | "ctrl" | "key" | "keys"))

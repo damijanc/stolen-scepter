@@ -21,6 +21,7 @@ use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
 use crate::savepath::{scan_slots, SavePaths, SlotSet, SAVE_SLOT_COUNT};
+use crate::sheet::{self, Columns, Sheet, SheetButton};
 use crate::slot_picker::{SlotChoice, SlotPicker};
 
 /// Text C compiles in for the startup screens; the pack overrides it under
@@ -34,6 +35,9 @@ const DEFAULT_NEW_GAME_SELECT_HINT: &str = "Up/Down to choose, Enter to accept";
 /// Mobile wording (spec decision 9): no key names on a touch build.
 const MOBILE_CONTROLS_HINT: &str = "Tap a game, or Back";
 const MOBILE_NEW_GAME_SELECT_HINT: &str = "Tap a difficulty";
+const MOBILE_DIFFICULTY_TITLE: &str = "Difficulty";
+const MOBILE_CLASS_SELECT_HINT: &str = "Tap a hero - or here to load a game";
+const MOBILE_NAME_TITLE: &str = "Your name";
 const DEFAULT_DIFFICULTY_LABELS: [&str; 4] = ["Easy", "Normal", "Hard", "Impossible?"];
 const DEFAULT_DIFFICULTY_SCORES: [&str; 4] = ["x.5", " x1", " x2", " x4"];
 const DEFAULT_NEW_GAME_INTRO: &str = "%NAME% the %CLASS%,\n\
@@ -293,6 +297,11 @@ impl Startup {
                 None
             }
             // A difficulty row is "select it, then Enter".
+            // The mobile screens' Back: Esc, back to class select.
+            (Screen::CreateGame, HitTarget::StartupBack) => {
+                self.screen = Screen::ClassSelect;
+                None
+            }
             (Screen::CreateGame, HitTarget::Difficulty(row))
                 if self.has_name && row < DIFFICULTY_KEYS.len() =>
             {
@@ -809,11 +818,13 @@ impl Startup {
         palette: &Palette,
         resources: &Resources,
     ) {
-        let hint = banner::text(
+        let hint = banner::text_on(
             resources,
+            layout.touch,
             "startup",
             "class_select_hint",
             DEFAULT_CLASS_SELECT_HINT,
+            MOBILE_CLASS_SELECT_HINT,
         );
         list.rect(
             Rect::new(0, 0, layout.screen_w, GLYPH_H + 2),
@@ -832,6 +843,10 @@ impl Startup {
         resources: &Resources,
         time: f64,
     ) {
+        if layout.touch {
+            self.draw_create_game_touch(list, hits, layout, palette, resources, time);
+            return;
+        }
         let w = 30 * GLYPH_W;
         let h = 12 * GLYPH_H;
         let x = (layout.screen_w - w) / 2;
@@ -892,11 +907,6 @@ impl Startup {
             if self.has_name {
                 hits.push(Rect::new(x, row_y, w, GLYPH_H), HitTarget::Difficulty(i));
             }
-        }
-
-        // The letter grid is the touch build's: desktop types the name.
-        if !self.has_name && layout.touch {
-            name_grid(list, hits, layout, palette, y + h + 2);
         }
 
         if self.has_name {
@@ -970,52 +980,120 @@ fn expand_version(src: &str, version: i32) -> String {
     src.replace("%VERSION%", &version.to_string())
 }
 
-/// The hero-name letter grid, drawn in its own box under the create-game
-/// panel while the name is being typed: three rows of ten cells, A-J, K-T,
-/// then U-Z, space, delete and a double-width OK.
-///
-/// DIVERGENCE: C types the name from the keyboard only. A phone has none.
-fn name_grid(
-    list: &mut DrawList,
-    hits: &mut HitList,
-    layout: &Layout,
-    palette: &Palette,
-    top: i32,
-) {
-    const COLS: i32 = 10;
-    let cell_w = 2 * GLYPH_W;
-    let cell_h = GLYPH_H + 3;
-    let w = COLS * cell_w;
-    let x = (layout.screen_w - w) / 2;
-    let box_rect = Rect::new(x - 2, top, w + 4, 3 * cell_h + 4);
-    list.rect(box_rect, palette.clr(Pal::DBlue));
-    list.rect_lines(box_rect, palette.clr(Pal::Yellow));
+impl Startup {
+    /// The touch build's create-game screen (`specs/mobile-ui-design.md`):
+    /// big letter keys while the name is typed, then the difficulties as a
+    /// big-button list. Every key carries the desktop target, so `click`
+    /// answers it through the same name and difficulty paths.
+    fn draw_create_game_touch(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        time: f64,
+    ) {
+        if self.has_name {
+            let buttons = DIFFICULTY_KEYS
+                .iter()
+                .enumerate()
+                .map(|(i, key)| {
+                    let label = banner::text(
+                        resources,
+                        "difficulty",
+                        &format!("{key}.label"),
+                        DEFAULT_DIFFICULTY_LABELS[i],
+                    );
+                    let days = resources.time.days_per_difficulty[i];
+                    SheetButton {
+                        label: format!("{label} - {days} days"),
+                        target: HitTarget::Difficulty(i),
+                    }
+                })
+                .collect();
+            let sheet = Sheet {
+                key: "difficulty",
+                title: banner::text(
+                    resources,
+                    "mobile_startup",
+                    "difficulty_title",
+                    MOBILE_DIFFICULTY_TITLE,
+                )
+                .to_owned(),
+                body: String::new(),
+                buttons,
+                columns: Columns::One,
+                back: Some(HitTarget::StartupBack),
+            };
+            sheet::draw(list, hits, layout, palette, &sheet, 0);
+            return;
+        }
 
-    let mut keys: Vec<(HitTarget, String, i32)> = ('A'..='Z')
-        .map(|c| (HitTarget::NameKey(c), c.to_string(), 1))
-        .collect();
-    keys.push((HitTarget::NameKey(' '), "_".to_owned(), 1));
-    keys.push((HitTarget::NameDel, "<".to_owned(), 1));
-    keys.push((HitTarget::NameDone, "OK".to_owned(), 2));
-
-    let mut slot = 0;
-    for (target, label, span) in keys {
-        let col = slot % COLS;
-        let row = slot / COLS;
-        let rect = Rect::new(
-            x + col * cell_w,
-            top + 2 + row * cell_h,
-            span * cell_w,
-            cell_h,
+        // The name: a title, the name typed so far, and three rows of big
+        // keys (A-J, K-T, U-Z, space, delete); Back and OK along the bottom.
+        let a = sheet::backdrop(list, layout, palette);
+        let label_h = GLYPH_H * sheet::LABEL_SCALE;
+        let title = banner::text(resources, "mobile_startup", "name_title", MOBILE_NAME_TITLE);
+        list.big_text_centered(
+            title,
+            a.x + a.w / 2,
+            a.y + 4,
+            palette.clr(Pal::Yellow),
+            sheet::LABEL_SCALE,
         );
-        list.text_centered(
-            &label,
-            rect.x + rect.w / 2,
-            rect.y + 2,
+        let caret = if ((time * 2.0) as i64) & 1 == 0 && self.name.chars().count() < NAME_MAX {
+            "_"
+        } else {
+            " "
+        };
+        list.big_text_centered(
+            &format!("{}{caret}", self.name),
+            a.x + a.w / 2,
+            a.y + 4 + label_h + 4,
             palette.clr(Pal::White),
+            sheet::LABEL_SCALE,
         );
-        hits.push(rect, target);
-        slot += span;
+
+        const COLS: i32 = 10;
+        let gap = 2;
+        let key_w = (a.w - 8 - (COLS - 1) * gap) / COLS;
+        let key_h = sheet::MIN_BUTTON_H;
+        let grid_y = a.y + 4 + 2 * (label_h + 4) + 4;
+        let mut keys: Vec<(HitTarget, String, i32)> = ('A'..='Z')
+            .map(|c| (HitTarget::NameKey(c), c.to_string(), 1))
+            .collect();
+        keys.push((HitTarget::NameKey(' '), "_".to_owned(), 1));
+        keys.push((HitTarget::NameDel, "Del".to_owned(), 3));
+        let mut slot = 0;
+        for (target, label, span) in keys {
+            let rect = Rect::new(
+                a.x + 4 + (slot % COLS) * (key_w + gap),
+                grid_y + (slot / COLS) * (key_h + gap),
+                span * key_w + (span - 1) * gap,
+                key_h,
+            );
+            sheet::big_button(list, hits, palette, rect, &[label], target);
+            slot += span;
+        }
+        let nav_y = a.y + a.h - 4 - key_h;
+        let half = (a.w - 8 - gap) / 2;
+        sheet::big_button(
+            list,
+            hits,
+            palette,
+            Rect::new(a.x + 4, nav_y, half, key_h),
+            &["Back".to_owned()],
+            HitTarget::StartupBack,
+        );
+        sheet::big_button(
+            list,
+            hits,
+            palette,
+            Rect::new(a.x + 4 + half + gap, nav_y, a.w - 8 - half - gap, key_h),
+            &["OK".to_owned()],
+            HitTarget::NameDone,
+        );
     }
 }
 
@@ -1669,6 +1747,84 @@ mod tests {
         by_click.click(HitTarget::NameDone, &resources, &paths, 0.0);
         assert!(!by_click.name.is_empty());
         assert_eq!(by_click, by_key);
+    }
+
+    /// On mobile the difficulty table is a list of big buttons; a tap does
+    /// what the desktop row click does, and Back returns to class select.
+    #[test]
+    fn mobile_difficulty_is_a_list_and_tapping_matches_the_row_click() {
+        let resources = resources();
+        let paths = paths("mobile-difficulty");
+        let mut startup = at_difficulty(&resources, &paths);
+        let (list, hits) = drawn_hits_on(&startup, &resources, true);
+        let targets: Vec<_> = hits.regions().iter().map(|r| r.target).collect();
+        assert_eq!(
+            targets,
+            vec![
+                HitTarget::Difficulty(0),
+                HitTarget::Difficulty(1),
+                HitTarget::Difficulty(2),
+                HitTarget::Difficulty(3),
+                HitTarget::StartupBack,
+            ]
+        );
+        for r in hits.regions() {
+            assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+        }
+        assert!(list.has_text_containing("Normal - 600 days"));
+        let mut back = startup.clone();
+        back.click(HitTarget::StartupBack, &resources, &paths, 1.0);
+        assert_eq!(back.screen, Screen::ClassSelect);
+        startup.click(HitTarget::Difficulty(2), &resources, &paths, 1.0);
+        assert_eq!((startup.screen, startup.difficulty), (Screen::Intro, 2));
+    }
+
+    /// The class-select line names no keyboard letters on mobile.
+    #[test]
+    fn mobile_class_select_hint_names_no_letters() {
+        let resources = resources();
+        let startup = Startup {
+            screen: Screen::ClassSelect,
+            ..Startup::default()
+        };
+        let (list, _) = drawn_hits_on(&startup, &resources, true);
+        let line = list
+            .texts()
+            .into_iter()
+            .map(|(_, _, t)| t.to_owned())
+            .find(|t| t.contains("hero"))
+            .expect("the hint drawn");
+        assert!(!line.contains("A-D") && !line.contains(" L "), "{line}");
+    }
+
+    /// On mobile every name key is finger-sized.
+    #[test]
+    fn mobile_name_keys_are_finger_sized() {
+        let resources = resources();
+        let paths = paths("mobile-name-keys");
+        let startup = at_name(&resources, &paths);
+        let (_, hits) = drawn_hits_on(&startup, &resources, true);
+        let keys: Vec<_> = hits
+            .regions()
+            .iter()
+            .filter(|r| {
+                matches!(
+                    r.target,
+                    HitTarget::NameKey(_) | HitTarget::NameDel | HitTarget::NameDone
+                )
+            })
+            .collect();
+        assert_eq!(keys.len(), 29);
+        for r in keys {
+            assert!(
+                r.rect.h >= crate::sheet::MIN_BUTTON_H && r.rect.w >= 24,
+                "{r:?}"
+            );
+        }
+        assert!(hits
+            .regions()
+            .iter()
+            .any(|r| r.target == HitTarget::StartupBack));
     }
 
     /// Desktop keeps C's name screen: typed, with no letter grid.

@@ -5725,7 +5725,9 @@
    "astrology_body": "The stargazers say:\nThe week of %TROOP%\n\nEvery %TROOP% dwelling\nfills up again.      (tap)",
    "combat_give_up_header": "Give up?",
    "body_save_confirm": "Your game is saved.\nTap to return to the game.",
-   "combat_give_up_body": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?"
+   "combat_give_up_body": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?",
+   "spell_castle_gate_choose": "To which castle?",
+   "spell_town_gate_choose": "To which town?"
   },
   "mobile_combat_log": {
    "give_up_prompt": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?",
@@ -5737,11 +5739,13 @@
    "worldmap_hint_your_map": "Tap to close",
    "worldmap_hint_whole_map": "Tap to close",
    "own_castle_mode_garrison": "Leave troops",
-   "own_castle_mode_remove": "Take troops"
+   "own_castle_mode_remove": "Take troops",
+   "combat_spells_prompt": "Cast which spell?"
   },
   "mobile_startup": {
    "controls_hint": "Tap a game, or Back",
-   "new_game_select_hint": "Tap a difficulty"
+   "new_game_select_hint": "Tap a difficulty",
+   "class_select_hint": "Tap a hero - or here to load a game"
   },
   "mobile_prompts": {
    "text_hint": "",

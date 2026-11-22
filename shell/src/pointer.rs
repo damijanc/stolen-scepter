@@ -83,6 +83,9 @@ pub enum HitTarget {
     StartupClass(usize),
     /// The class-select hint bar, which names `L`: a click there is `L`.
     StartupLoad,
+    /// The mobile name and difficulty screens' Back button: Esc there, back
+    /// to class select.
+    StartupBack,
     /// A difficulty row on the create-game screen, in `Difficulty` order.
     Difficulty(usize),
     /// A combat field cell, by grid position.

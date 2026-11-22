@@ -7,19 +7,21 @@
 click 160 100
 click 160 100
 click 160 100
-expect Pick a hero
+expect Tap a hero
 
-# Class A, then the name on the letter grid: A, D, A, OK.
+# Class A, then the name on the big letter keys: A, D, A, OK.
 click 52 100
-expect Name
-click 88 157
-click 136 157
-click 88 157
-click 224 179
+expect Your name
+click 33 69
+click 117 69
+click 33 69
 expect Ada
+click 230 175
 
-# Normal difficulty, then a tap skips the intro and one closes the welcome.
-click 160 104
+# Normal difficulty from the big-button list, then a tap skips the intro
+# and one closes the welcome.
+expect Normal - 600 days
+click 160 73
 click 160 100
 click 150 160
 expect Days

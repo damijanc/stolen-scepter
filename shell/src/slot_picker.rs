@@ -23,6 +23,7 @@ use crate::layout::Layout;
 use crate::palette::{Pal, Palette};
 use crate::pointer::{HitList, HitTarget};
 use crate::savepath::{SavePaths, SlotSet, SAVE_SLOT_COUNT};
+use crate::sheet::{self, Columns, Sheet, SheetButton};
 
 /// Text C compiles in for the picker; the pack overrides it under
 /// `strings.startup`.
@@ -50,6 +51,8 @@ pub struct SlotPicker {
     /// What the pointer was over last frame, so `set_hover` can tell a new
     /// row from a resting pointer.
     hover: Option<HitTarget>,
+    /// The mobile sheet's page.
+    page: usize,
 }
 
 impl SlotPicker {
@@ -59,6 +62,7 @@ impl SlotPicker {
             slots,
             extra_row,
             hover: None,
+            page: 0,
         }
     }
 
@@ -119,6 +123,14 @@ impl SlotPicker {
                 }
             }
             HitTarget::SlotCancel => Some(SlotChoice::Cancel),
+            HitTarget::SheetNext => {
+                self.page += 1;
+                None
+            }
+            HitTarget::SheetPrev => {
+                self.page = self.page.saturating_sub(1);
+                None
+            }
             _ => None,
         }
     }
@@ -149,6 +161,10 @@ impl SlotPicker {
         extra_label: &str,
         hint: &str,
     ) {
+        if layout.touch {
+            self.draw_sheet(list, hits, layout, palette, resources, title, extra_label);
+            return;
+        }
         let row_count = self.row_count();
         let pad = 6;
         let row_h = GLYPH_H + 2;
@@ -204,6 +220,64 @@ impl SlotPicker {
         }
 
         list.text(hint, x + pad, y + h - pad - instr_h, palette.clr(Pal::Grey));
+    }
+}
+
+impl SlotPicker {
+    /// The touch build's picker: one big button per slot (and the extra row),
+    /// paged, with Back -- each carrying the desktop row's target.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_sheet(
+        &self,
+        list: &mut DrawList,
+        hits: &mut HitList,
+        layout: &Layout,
+        palette: &Palette,
+        resources: &Resources,
+        title: &str,
+        extra_label: &str,
+    ) {
+        let empty = banner::text(
+            resources,
+            "startup",
+            "save_picker_empty",
+            DEFAULT_SAVE_PICKER_EMPTY,
+        );
+        let mut buttons: Vec<SheetButton> = (0..SAVE_SLOT_COUNT)
+            .map(|slot| {
+                let label = match &self.slots.headers[slot] {
+                    Some(header) => format!(
+                        "{}. {} - {} days",
+                        slot + 1,
+                        header.name.as_str(),
+                        header.days_left
+                    ),
+                    None => format!("{}. {empty}", slot + 1),
+                };
+                SheetButton {
+                    label,
+                    target: HitTarget::SlotRow(slot),
+                }
+            })
+            .collect();
+        if self.extra_row {
+            buttons.push(SheetButton {
+                label: extra_label.to_owned(),
+                target: HitTarget::SlotRow(SAVE_SLOT_COUNT),
+            });
+        }
+        let sheet = Sheet {
+            key: "slots",
+            title: title.trim().to_owned(),
+            body: String::new(),
+            buttons,
+            columns: Columns::One,
+            back: Some(HitTarget::SlotCancel),
+        };
+        let page = self
+            .page
+            .min(sheet::page_count(layout, &sheet).saturating_sub(1));
+        sheet::draw(list, hits, layout, palette, &sheet, page);
     }
 }
 
@@ -547,5 +621,57 @@ mod tests {
         let mut plain = SlotPicker::new(slots_with(&[]), false);
         plain.set_hover(Some(HitTarget::SlotRow(SAVE_SLOT_COUNT)));
         assert_eq!(plain.cursor, 0);
+    }
+
+    fn drawn_touch(picker: &SlotPicker) -> HitList {
+        let resources = Resources::from_json_str(r#"{"render": {"mode": "legacy"}, "troops": []}"#)
+            .expect("fixture parses");
+        let mut layout = Layout::from_resources(&resources).expect("lays out");
+        layout.touch = true;
+        let mut list = DrawList::new();
+        let mut hits = HitList::new();
+        picker.draw(
+            &mut list,
+            &mut hits,
+            &layout,
+            &Palette::fallback(),
+            &resources,
+            "Choose a game",
+            "New game",
+            "hint",
+        );
+        hits
+    }
+
+    /// On mobile the picker is a paged big-button list: every slot and the
+    /// extra row are reachable, each finger-sized, with Back on every page.
+    #[test]
+    fn mobile_slot_picker_pages_through_all_slots() {
+        let mut picker = SlotPicker::new(slots_with(&[0, 3]), true);
+        let mut seen = Vec::new();
+        for _ in 0..10 {
+            let hits = drawn_touch(&picker);
+            let targets: Vec<_> = hits.regions().iter().map(|r| r.target).collect();
+            for r in hits.regions() {
+                assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+            }
+            assert!(
+                targets.contains(&HitTarget::SlotCancel),
+                "Back on every page"
+            );
+            seen.extend(targets.iter().filter_map(|t| match t {
+                HitTarget::SlotRow(i) => Some(*i),
+                _ => None,
+            }));
+            if !targets.contains(&HitTarget::SheetNext) {
+                break;
+            }
+            assert_eq!(picker.click(HitTarget::SheetNext), None);
+        }
+        assert_eq!(seen, (0..=SAVE_SLOT_COUNT).collect::<Vec<_>>());
+        assert_eq!(
+            picker.click(HitTarget::SlotRow(3)),
+            Some(SlotChoice::Slot(3))
+        );
     }
 }

@@ -230,8 +230,8 @@ pub fn page_count(layout: &Layout, sheet: &Sheet) -> usize {
 }
 
 /// One big button: a filled block a pixel in from each side, its label's
-/// lines centred in big text.
-fn big_button(
+/// lines centred in big text, published as `target`.
+pub fn big_button(
     list: &mut DrawList,
     hits: &mut HitList,
     palette: &Palette,
@@ -258,7 +258,8 @@ fn big_button(
     hits.push(rect, target);
 }
 
-fn backdrop(list: &mut DrawList, layout: &Layout, palette: &Palette) -> Rect {
+/// The sheet's blue, yellow-framed backdrop over [`area`]; returns the area.
+pub fn backdrop(list: &mut DrawList, layout: &Layout, palette: &Palette) -> Rect {
     let a = area(layout);
     list.rect(a, palette.clr(Pal::DBlue));
     list.rect_lines(a, palette.clr(Pal::Yellow));
