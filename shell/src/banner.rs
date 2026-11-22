@@ -125,9 +125,36 @@ pub fn choice_index(line: &str) -> Option<usize> {
     matches!(chars.next(), Some(')' | '.')).then_some(choice)
 }
 
+/// A menu line without its key letter: "B) Hire a boat" becomes "Hire a
+/// boat". A big button names its choice by being tapped, so the letter only
+/// points at a key a phone does not have. A line with no letter is returned
+/// trimmed.
+pub fn plain_label(line: &str) -> &str {
+    let trimmed = line.trim();
+    let mut chars = trimmed.char_indices();
+    if let (Some((_, key)), Some((at, mark))) = (chars.next(), chars.next()) {
+        if key.is_ascii_alphanumeric() && matches!(mark, ')' | '.') {
+            return trimmed[at + 1..].trim_start();
+        }
+    }
+    trimmed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_label_drops_only_a_leading_key_letter() {
+        assert_eq!(
+            plain_label("B) Hire a boat (100/week)"),
+            "Hire a boat (100/week)"
+        );
+        assert_eq!(plain_label("  2. Audience "), "Audience");
+        assert_eq!(plain_label("The Royal Hall"), "The Royal Hall");
+        assert_eq!(plain_label("Mr. Smith"), "Mr. Smith");
+        assert_eq!(plain_label(""), "");
+    }
 
     #[test]
     fn text_on_prefers_the_mobile_mirror_only_on_touch() {

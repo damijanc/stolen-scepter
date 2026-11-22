@@ -387,7 +387,13 @@ impl<'r> Session<'r> {
         // It hit-tests the PREVIOUS frame's HitList (one frame of latency).
         let pointer_at = frame_in.pointer_at;
         let hovered = pointer_at.and_then(|(lx, ly)| hits.hit(lx, ly));
-        let clicked = if frame_in.left { hovered } else { None };
+        let mut clicked = if frame_in.left { hovered } else { None };
+        // A mobile view sheet turns its own pages; the view never sees it.
+        if let Some(target) = clicked {
+            if layout.touch && views.sheet_page_click(target) {
+                clicked = None;
+            }
+        }
         views.set_hover(hovered);
         menu.set_hover(hovered);
         if let Some(session) = combat.as_mut() {
@@ -657,7 +663,10 @@ impl<'r> Session<'r> {
                 None => views.town_update(keys),
             };
             match town {
-                TownInput::RunRow(row) => run_town_row(game, resources, views, row),
+                TownInput::RunRow(row) if layout.touch => ask_town_row(game, resources, views, row),
+                TownInput::RunRow(row) | TownInput::RunConfirmed(row) => {
+                    run_town_row(game, resources, views, row)
+                }
                 TownInput::Dismissed | TownInput::Handled | TownInput::None => {}
             }
         } else if views.active() == Some(ViewKind::HomeCastle) {
@@ -2226,6 +2235,50 @@ fn dispatch_spell(
     }
 }
 
+/// Mobile: ask before a town purchase (spec decision 6). The row runs on a
+/// copy first; one the engine would refuse, or that costs nothing, runs for
+/// real at once, so its refusal shows exactly as on desktop. One that would
+/// spend gold asks "... for N gold?", N being what the copy spent, and Yes
+/// runs the very same row through [`run_town_row`].
+fn ask_town_row(game: &mut Game, resources: &Resources, views: &mut Views, row: TownRow) {
+    let key = match row {
+        TownRow::Boat if !game.boat.has_boat => "town_confirm_boat",
+        TownRow::Spell => "town_confirm_spell",
+        TownRow::Siege => "town_confirm_siege",
+        _ => return run_town_row(game, resources, views, row),
+    };
+    let mut probe = *game;
+    let mut probe_views = views.clone();
+    run_town_row(&mut probe, resources, &mut probe_views, row);
+    let cost = game.stats.gold - probe.stats.gold;
+    if cost <= 0 {
+        return run_town_row(game, resources, views, row);
+    }
+    let spell = game
+        .towns
+        .iter()
+        .find(|town| town.id.as_str() == views.town_record_key())
+        .and_then(|town| resources.spell_by_id(town.spell_for_sale.as_str()))
+        .map(|spell| spell.name.as_str().to_owned())
+        .unwrap_or_default();
+    let default = match row {
+        TownRow::Boat => "Hire a boat for %COST% gold?",
+        TownRow::Spell => "Learn %SPELL% for %COST% gold?",
+        _ => "Buy siege weapons for %COST% gold?",
+    };
+    let cost = cost.to_string();
+    let question = banner::formatted_on(
+        resources,
+        true,
+        "banners",
+        key,
+        default,
+        default,
+        &[("COST", &cost), ("SPELL", &spell)],
+    );
+    views.town_ask(row, question);
+}
+
 /// Run one town action row: the engine applies the transaction and the result
 /// is shown through the town info overlay. Ports `town_do_row`.
 fn run_town_row(game: &mut Game, resources: &Resources, views: &mut Views, row: TownRow) {
@@ -2280,7 +2333,7 @@ mod tests {
     use crate::savepath::SavePaths;
     use crate::sprites::SpriteCatalog;
     use crate::startup::{StartupAction, StartupChoice};
-    use crate::views::ViewKind;
+    use crate::views::{TownRow, ViewKind};
     use openbounty_engine::fog::Fog;
     use openbounty_engine::game::{
         ArmyStack, CastleOwnerKind, FoeState, Game, GateDestination, GAME_ARMY_SLOTS,
@@ -3101,6 +3154,234 @@ mod tests {
             }
         }
         panic!("a menu view publishes a ViewBack backdrop");
+    }
+
+    /// A touch session on the overworld.
+    fn touch_session(harness: &Harness) -> (Session<'_>, DrawList, f64) {
+        let mut session = harness.start();
+        let mut list = DrawList::new();
+        let mut now = 0.0;
+        to_overworld(&mut session, &mut list, &mut now);
+        (session, list, now)
+    }
+
+    fn touch_harness() -> Harness {
+        let mut harness = Harness::load();
+        harness.layout.touch = true;
+        harness
+    }
+
+    fn targets_of(session: &Session) -> Vec<HitTarget> {
+        session.hits.regions().iter().map(|r| r.target).collect()
+    }
+
+    fn all_finger_sized(session: &Session) {
+        for r in session.hits.regions() {
+            assert!(r.rect.h >= crate::sheet::MIN_BUTTON_H, "{r:?}");
+        }
+    }
+
+    fn tap(session: &mut Session, list: &mut DrawList, now: &mut f64, target: HitTarget) {
+        // A long sheet pages: turn to the page that holds `target` first.
+        for _ in 0..8 {
+            if targets_of(session).contains(&target)
+                || !targets_of(session).contains(&HitTarget::SheetNext)
+            {
+                break;
+            }
+            let next = region_center(session, HitTarget::SheetNext);
+            drive(session, list, &[], Some(next), true, now);
+            drive(session, list, &[], None, false, now);
+        }
+        let at = region_center(session, target);
+        drive(session, list, &[], Some(at), true, now);
+        drive(session, list, &[], None, false, now);
+    }
+
+    /// Stand in Millbrook's town, as arriving does (`in_town` is set only for
+    /// the step that arrived).
+    fn in_millbrook(session: &mut Session, list: &mut DrawList, now: &mut f64) {
+        session.game.position.in_town.copy_from_str("millbrook");
+        session.views.town_open("Millbrook", "millbrook", 13, 46);
+        drive(session, list, &[], None, false, now);
+    }
+
+    #[test]
+    fn mobile_town_rows_are_sheet_buttons_with_prices() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            in_millbrook(&mut session, &mut list, &mut now);
+            all_finger_sized(&session);
+            let mut targets = targets_of(&session);
+            let mut texts = raster::texts(&list);
+            while targets.contains(&HitTarget::SheetNext) {
+                let next = region_center(&session, HitTarget::SheetNext);
+                drive(&mut session, &mut list, &[], Some(next), true, &mut now);
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                all_finger_sized(&session);
+                targets = targets_of(&session)
+                    .into_iter()
+                    .chain(targets.into_iter().filter(|t| *t != HitTarget::SheetNext))
+                    .collect();
+                texts.extend(raster::texts(&list));
+            }
+            for row in [
+                TownRow::Contract,
+                TownRow::Boat,
+                TownRow::Info,
+                TownRow::Spell,
+                TownRow::Siege,
+            ] {
+                assert!(
+                    targets.contains(&HitTarget::TownRow(row)),
+                    "{row:?} in {targets:?}"
+                );
+            }
+            assert!(targets.contains(&HitTarget::ViewBack));
+            assert!(
+                !texts
+                    .iter()
+                    .any(|t| t.starts_with("A)") || t.starts_with("B)")),
+                "{texts:?}"
+            );
+        });
+    }
+
+    /// Decision 6: on mobile a purchase asks "...for N gold?" first, spends
+    /// nothing until Yes, and Yes buys exactly what the desktop click buys.
+    #[test]
+    fn a_town_purchase_asks_first_on_mobile() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            in_millbrook(&mut session, &mut list, &mut now);
+            let gold = session.game.stats.gold;
+            tap(
+                &mut session,
+                &mut list,
+                &mut now,
+                HitTarget::TownRow(TownRow::Siege),
+            );
+            assert_eq!(session.game.stats.gold, gold, "nothing spent before Yes");
+            let targets = targets_of(&session);
+            assert!(
+                targets.contains(&HitTarget::PromptYes) && targets.contains(&HitTarget::PromptNo)
+            );
+            all_finger_sized(&session);
+            assert!(raster::texts(&list).iter().any(|t| t.contains("gold?")));
+            tap(&mut session, &mut list, &mut now, HitTarget::PromptYes);
+
+            let desktop = Harness::load();
+            let (mut keyed, mut klist, mut know) = touch_session(&desktop);
+            in_millbrook(&mut keyed, &mut klist, &mut know);
+            tap(
+                &mut keyed,
+                &mut klist,
+                &mut know,
+                HitTarget::TownRow(TownRow::Siege),
+            );
+            assert!(session.game.stats.gold < gold);
+            assert_eq!(session.game, keyed.game);
+
+            // No backs out without buying.
+            let (mut again, mut alist, mut anow) = touch_session(&harness);
+            in_millbrook(&mut again, &mut alist, &mut anow);
+            tap(
+                &mut again,
+                &mut alist,
+                &mut anow,
+                HitTarget::TownRow(TownRow::Siege),
+            );
+            tap(&mut again, &mut alist, &mut anow, HitTarget::PromptNo);
+            assert_eq!(again.game.stats.gold, gold);
+            assert!(!again.views.town_asking(), "back on the town");
+            assert_eq!(again.views.active(), Some(ViewKind::Town));
+        });
+    }
+
+    #[test]
+    fn a_refused_purchase_skips_the_confirm() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            session.game.stats.gold = 0;
+            in_millbrook(&mut session, &mut list, &mut now);
+            tap(
+                &mut session,
+                &mut list,
+                &mut now,
+                HitTarget::TownRow(TownRow::Siege),
+            );
+            assert!(
+                !targets_of(&session).contains(&HitTarget::PromptYes),
+                "no confirm"
+            );
+            assert_eq!(session.game.stats.gold, 0);
+            all_finger_sized(&session);
+        });
+    }
+
+    #[test]
+    fn mobile_recruit_goes_list_then_keypad() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            open_view(&mut session, "recruit");
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            all_finger_sized(&session);
+            assert!(targets_of(&session).contains(&HitTarget::RecruitRow(0)));
+            assert!(targets_of(&session).contains(&HitTarget::ViewBack));
+            tap(&mut session, &mut list, &mut now, HitTarget::RecruitRow(0));
+            all_finger_sized(&session);
+            let pads = targets_of(&session)
+                .into_iter()
+                .filter(|t| matches!(t, HitTarget::Pad(_)))
+                .count();
+            assert_eq!(pads, crate::numpad::PAD_KEYS.len());
+        });
+    }
+
+    #[test]
+    fn mobile_spellbook_and_gates_are_lists() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            session.game.spells.counts[7] = 2;
+            open_view(&mut session, "spells");
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            all_finger_sized(&session);
+            assert!(targets_of(&session).contains(&HitTarget::Spell(7)));
+            assert!(targets_of(&session).contains(&HitTarget::ViewBack));
+
+            open_view(&mut session, "gate");
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            all_finger_sized(&session);
+            assert!(targets_of(&session).contains(&HitTarget::GateRow(0)));
+            assert!(targets_of(&session).contains(&HitTarget::ViewBack));
+        });
+    }
+
+    #[test]
+    fn mobile_castles_and_controls_are_finger_sized() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            for (name, want) in [
+                ("home", HitTarget::HomeCastleRow(1)),
+                ("own", HitTarget::OwnCastleToggle),
+                ("controls", HitTarget::ControlsRow(0)),
+            ] {
+                open_view(&mut session, name);
+                drive(&mut session, &mut list, &[], None, false, &mut now);
+                all_finger_sized(&session);
+                assert!(
+                    targets_of(&session).contains(&want),
+                    "{name}: {:?}",
+                    targets_of(&session)
+                );
+            }
+        });
     }
 
     /// Open one menu view directly on the session, as the views tests do.

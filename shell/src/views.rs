@@ -31,6 +31,8 @@ use crate::pointer::{HitList, HitTarget};
 use crate::present::Present;
 use crate::sprites::SpriteCatalog;
 
+mod touch;
+
 /// The character portrait's legacy size. C defaults to 96x102 and the shipped
 /// pack's class portraits are exactly that, so the belt below it is placed a
 /// deterministic 102px from the view top.
@@ -199,6 +201,9 @@ pub enum TownInput {
     Dismissed,
     /// The player executed a row; the caller runs the transaction.
     RunRow(TownRow),
+    /// Mobile: the player said Yes to a purchase the caller asked about; run
+    /// it for real.
+    RunConfirmed(TownRow),
 }
 
 /// The home-castle menu's choices, as the keyboard and the pointer both
@@ -284,6 +289,11 @@ pub struct Views {
     hover: Option<HitTarget>,
     town_info_body: String,
     town_info_active: bool,
+    /// Mobile only (spec decision 6): the purchase waiting on Yes / No, with
+    /// its question. Desktop buys on the row, as C does, and never sets it.
+    town_confirm: Option<(TownRow, String)>,
+    /// Which page of a long mobile sheet is showing.
+    pager: crate::sheet::Pager,
     /// The own-castle screen's context, porting `s_castle_id` and
     /// `s_garrison_mode`.
     own_castle_id: String,
@@ -824,6 +834,7 @@ impl Views {
         self.town_cursor = 0;
         self.town_info_body.clear();
         self.town_info_active = false;
+        self.town_confirm = None;
         self.set(ViewKind::Town);
     }
 
@@ -862,10 +873,43 @@ impl Views {
         self.town_info_active = true;
     }
 
+    /// Mobile: ask `question` before running `row` (spec decision 6). Yes
+    /// comes back from [`Views::town_click`] as [`TownInput::RunConfirmed`].
+    pub fn town_ask(&mut self, row: TownRow, question: String) {
+        self.town_confirm = Some((row, question));
+    }
+
+    /// Whether a purchase question is up.
+    pub fn town_asking(&self) -> bool {
+        self.town_confirm.is_some()
+    }
+
+    /// Turn the page of the mobile sheet the active view shows, when
+    /// `target` is a page button. True when it was one.
+    pub fn sheet_page_click(&mut self, target: HitTarget) -> bool {
+        if !self.active().is_some_and(touch::has_sheet) {
+            return false;
+        }
+        match target {
+            HitTarget::SheetNext => self.pager.next(),
+            HitTarget::SheetPrev => self.pager.prev(),
+            _ => return false,
+        }
+        true
+    }
+
     /// Read one frame of town-menu input, porting `views_town_update`. When a
     /// row is executed the caller runs the transaction and shows the result
     /// with [`Views::town_show_info`].
     pub fn town_update(&mut self, keys: &dyn KeySource) -> TownInput {
+        if self.town_confirm.is_some() {
+            // Only the phone asks; its Back key is ESC, which is No.
+            if keys.pressed(Key::Escape) {
+                self.town_confirm = None;
+                return TownInput::Handled;
+            }
+            return TownInput::None;
+        }
         if self.town_info_active {
             // The info overlay owns the keys until ESC/Enter/Space or A-E.
             if keys.pressed(Key::Escape)
@@ -915,6 +959,20 @@ impl Views {
     /// backdrop is ESC: it clears the info overlay when one is up, and
     /// otherwise dismisses the view.
     pub fn town_click(&mut self, target: HitTarget) -> TownInput {
+        if let Some((row, _)) = &self.town_confirm {
+            let row = *row;
+            return match target {
+                HitTarget::PromptYes => {
+                    self.town_confirm = None;
+                    TownInput::RunConfirmed(row)
+                }
+                HitTarget::PromptNo | HitTarget::ViewBack => {
+                    self.town_confirm = None;
+                    TownInput::Handled
+                }
+                _ => TownInput::None,
+            };
+        }
         match target {
             HitTarget::ViewBack => {
                 if self.town_info_active {
@@ -1319,6 +1377,11 @@ impl Views {
             self.cartoon_started = time;
         }
         self.cartoon_was_active = cartoon_active;
+
+        // Mobile draws the menu views as big-button sheets (spec Task 8).
+        if layout.touch && self.draw_touch(list, hits, layout, palette, resources, game, present) {
+            return;
+        }
 
         // Menu views publish a full-screen ESC backdrop BEFORE their rows (D2),
         // so a row wins and a click anywhere else walks the view back. The

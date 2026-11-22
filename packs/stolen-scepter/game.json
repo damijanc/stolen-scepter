@@ -5727,7 +5727,10 @@
    "body_save_confirm": "Your game is saved.\nTap to return to the game.",
    "combat_give_up_body": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?",
    "spell_castle_gate_choose": "To which castle?",
-   "spell_town_gate_choose": "To which town?"
+   "spell_town_gate_choose": "To which town?",
+   "town_confirm_boat": "Hire a boat for %COST% gold?",
+   "town_confirm_spell": "Learn %SPELL% for %COST% gold?",
+   "town_confirm_siege": "Buy siege weapons for %COST% gold?"
   },
   "mobile_combat_log": {
    "give_up_prompt": "Surrender costs you every\narmy and sends you home\nto the King. Surrender?",
