@@ -1319,6 +1319,14 @@ impl<'r> Session<'r> {
                                 );
                                 prompt.text_input(&troop_name, &body, 4, cap);
                                 prompt.set_note(&interact::price_note(cost, gold));
+                                // Mobile shows the den's troop first, with
+                                // Hire and Leave (the user's call, 2026-11-22).
+                                if layout.touch {
+                                    prompt.set_showcase(&[
+                                        format!("{troop_name}: {count} here, {cost} gold each"),
+                                        format!("You have {gold} gold"),
+                                    ]);
+                                }
                                 *pending = PendingFlow::Dwelling {
                                     troop_id: troop_id.clone(),
                                 };
@@ -1482,6 +1490,7 @@ impl<'r> Session<'r> {
             // A view covers the map area while the overworld keeps running
             // below. Each view derives its own animation clock from the wall
             // time, as C does with GetTime().
+            views.set_throne_room(layout.touch && dialog.is_active());
             views.draw(
                 list, hits, layout, palette, resources, catalog, map, fog, game, present, now,
             );
@@ -3437,11 +3446,95 @@ mod tests {
             assert!(targets_of(&session).contains(&HitTarget::ViewBack));
             tap(&mut session, &mut list, &mut now, HitTarget::RecruitRow(0));
             all_finger_sized(&session);
+            // The user's call (2026-11-22): the troop's picture comes first,
+            // with its price, Hire and Back; no keypad yet.
+            assert!(has_troop_art(&list), "the troop is shown");
+            assert!(list.has_text_containing("gold each"));
+            let targets = targets_of(&session);
+            assert!(targets.contains(&HitTarget::ShowcaseHire));
+            assert!(!targets.iter().any(|t| matches!(t, HitTarget::Pad(_))));
+            tap(&mut session, &mut list, &mut now, HitTarget::ShowcaseHire);
+            all_finger_sized(&session);
             let pads = targets_of(&session)
                 .into_iter()
                 .filter(|t| matches!(t, HitTarget::Pad(_)))
                 .count();
             assert_eq!(pads, crate::numpad::PAD_KEYS.len());
+        });
+    }
+
+    /// Whether `list` blits a troop sprite (the picture-first screens).
+    fn has_troop_art(list: &DrawList) -> bool {
+        list.as_slice().iter().any(|cmd| {
+            matches!(
+                cmd,
+                crate::draw::DrawCmd::Blit {
+                    sprite: crate::draw::Sprite::TroopStill(_)
+                        | crate::draw::Sprite::TroopAnim { .. },
+                    ..
+                }
+            )
+        })
+    }
+
+    /// The picture-first den (2026-11-22): the troop and its price with
+    /// Hire and Leave; Hire opens the keypad, Leave goes without buying.
+    #[test]
+    fn mobile_den_shows_the_troop_before_the_keypad() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            let army = session.game.army;
+            step_onto_dwelling(&mut session, &mut list, &mut now);
+            all_finger_sized(&session);
+            assert!(has_troop_art(&list), "the troop is shown");
+            assert!(list.has_text_containing("gold each"));
+            let targets = targets_of(&session);
+            assert!(targets.contains(&HitTarget::ShowcaseHire));
+            assert!(!targets
+                .iter()
+                .any(|t| matches!(t, HitTarget::Pad(PadKey::Digit(_)))));
+            // Leave: nothing bought, the den closes.
+            tap(
+                &mut session,
+                &mut list,
+                &mut now,
+                HitTarget::Pad(PadKey::Esc),
+            );
+            assert_eq!(session.game.army, army);
+            assert!(!session.prompt.is_active());
+        });
+    }
+
+    /// While the King speaks, the throne room is behind him on mobile, not
+    /// the Royal Hall's buttons (2026-11-22; a picture of the King is a
+    /// follow-up).
+    #[test]
+    fn mobile_king_speaks_over_the_throne_room() {
+        big_stack(|| {
+            let harness = touch_harness();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            open_view(&mut session, "home");
+            drive(&mut session, &mut list, &[], None, false, &mut now);
+            tap(
+                &mut session,
+                &mut list,
+                &mut now,
+                HitTarget::HomeCastleRow(1),
+            );
+            assert!(session.dialog.is_active(), "the King speaks");
+            assert!(
+                !list.has_text_containing("Recruit soldiers"),
+                "{:?}",
+                raster::texts(&list)
+            );
+            assert!(list.as_slice().iter().any(|cmd| matches!(
+                cmd,
+                crate::draw::DrawCmd::Blit {
+                    sprite: crate::draw::Sprite::Backdrop(_),
+                    ..
+                }
+            )));
         });
     }
 
@@ -3778,6 +3871,10 @@ mod tests {
                 let mut now = 0.0;
                 to_overworld(&mut session, &mut list, &mut now);
                 step_onto_dwelling(&mut session, &mut list, &mut now);
+                // The den's picture comes first; Hire opens the keypad.
+                let hire = region_center(&session, HitTarget::ShowcaseHire);
+                drive(&mut session, &mut list, &[], Some(hire), true, &mut now);
+                drive(&mut session, &mut list, &[], None, false, &mut now);
                 for region in session.hits.regions() {
                     assert!(region.rect.h >= crate::sheet::MIN_BUTTON_H, "{region:?}");
                 }

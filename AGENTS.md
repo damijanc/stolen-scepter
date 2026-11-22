@@ -41,7 +41,10 @@ will be selected only after headless engine parity is solid.
   any key-naming PACK string (and castle text) shown on mobile without a
   mirror -- shell constants are not covered, so read them by eye. Every sheet
   lays `HitTarget::SheetBlank` under its buttons, so a near miss does
-  nothing. Desktop keeps its original look; only the touch flag reaches this
+  nothing. Recruiting is picture-first on mobile: a den and the castle list
+  show the troop large over its backdrop (`views::draw_showcase_backdrop`)
+  with the price and Hire (`HitTarget::ShowcaseHire`) before the keypad, and
+  the King speaks over his throne room. Desktop keeps its original look; only the touch flag reaches this
   code.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that
   way. The one stated exception is `pack_select.rs`: the picker runs before
@@ -306,7 +309,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 369 engine unit tests, 647 shell unit tests, a click-only
+Test coverage is 369 engine unit tests, 649 shell unit tests, a click-only
 mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
 the King, castle recruiting, a won fight, a den, a town spell, the hero menu)
 with a finger-size audit of every frame's tap regions (`playtest

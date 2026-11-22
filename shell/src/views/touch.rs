@@ -45,8 +45,10 @@ impl Views {
         layout: &Layout,
         palette: &Palette,
         resources: &Resources,
+        catalog: &SpriteCatalog,
         game: &Game,
         present: &Present,
+        time: f64,
     ) -> bool {
         if !self.active().is_some_and(has_sheet) {
             return false;
@@ -59,9 +61,55 @@ impl Views {
         );
         let sheet = match self.active() {
             Some(ViewKind::Town) => self.town_sheet(resources, game),
+            // While the King speaks, his throne room is behind him.
+            Some(ViewKind::HomeCastle) if self.throne_room => {
+                hits.push(sheet::area(layout), HitTarget::SheetBlank);
+                draw_showcase_backdrop(
+                    list,
+                    palette,
+                    catalog,
+                    crate::draw::Backdrop::Castle,
+                    home_castle_troop(game, resources),
+                    time,
+                );
+                return true;
+            }
             Some(ViewKind::HomeCastle) => home_castle_sheet(resources),
             Some(ViewKind::OwnCastle) => self.own_castle_sheet(resources, game),
             Some(ViewKind::RecruitSoldiers) => {
+                // The picked troop's picture first, with its price, Hire and
+                // Back (the user's call, 2026-11-22).
+                if self.recruit_whom != 0 && self.recruit_error.is_empty() && self.recruit_showcase
+                {
+                    let index = self.recruit_pool[(self.recruit_whom - 1) as usize];
+                    let troop = resources.troop_by_index(index);
+                    let name = troop.map(|t| t.name.as_str()).unwrap_or("");
+                    let cost = troop.map(|t| t.recruit_cost).unwrap_or(0);
+                    draw_showcase_backdrop(
+                        list,
+                        palette,
+                        catalog,
+                        crate::draw::Backdrop::Castle,
+                        index,
+                        time,
+                    );
+                    sheet::showcase(
+                        list,
+                        hits,
+                        layout,
+                        palette,
+                        SHOWCASE_TOP,
+                        &[
+                            format!("{name} - {cost} gold each"),
+                            format!("You have {} gold", game.stats.gold),
+                        ],
+                        &[
+                            ("Hire", HitTarget::ShowcaseHire),
+                            ("Back", HitTarget::ViewBack),
+                        ],
+                    );
+                    return true;
+                }
                 if self.recruit_whom != 0 && self.recruit_error.is_empty() {
                     let troop = resources
                         .troop_by_index(self.recruit_pool[(self.recruit_whom - 1) as usize]);

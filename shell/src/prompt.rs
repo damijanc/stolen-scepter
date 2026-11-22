@@ -79,6 +79,9 @@ pub struct Prompt {
     /// A count's mobile keypad note, such as its price (see
     /// [`Prompt::set_note`]).
     note: String,
+    /// Mobile's picture step before a count (a den): these lines and Hire /
+    /// Leave in a band under the picture the view draws. Empty: no step.
+    showcase: Vec<String>,
 }
 
 impl Prompt {
@@ -147,6 +150,14 @@ impl Prompt {
         self.labels.clear();
         self.page = 0;
         self.note.clear();
+        self.showcase.clear();
+    }
+
+    /// Mobile: show `lines` and Hire / Leave under the view's picture before
+    /// the count keypad. Set after [`Prompt::text_input`]. Hire moves on to
+    /// the keypad; Leave cancels exactly as the keypad's Back does.
+    pub fn set_showcase(&mut self, lines: &[String]) {
+        self.showcase = lines.to_vec();
     }
 
     /// A line the mobile keypad shows under its title, such as a price: the
@@ -228,6 +239,10 @@ impl Prompt {
             (Kind::Numeric | Kind::AbChoice, HitTarget::PromptCancel) => {
                 self.dismiss();
                 PromptResult::Cancel
+            }
+            (Kind::TextInput, HitTarget::ShowcaseHire) => {
+                self.showcase.clear();
+                PromptResult::None
             }
             (Kind::TextInput, HitTarget::Pad(key)) => match key {
                 PadKey::Digit(d) => {
@@ -582,6 +597,21 @@ impl Prompt {
         layout: &Layout,
         palette: &Palette,
     ) {
+        if self.kind == Kind::TextInput && !self.showcase.is_empty() {
+            sheet::showcase(
+                list,
+                hits,
+                layout,
+                palette,
+                crate::views::SHOWCASE_TOP,
+                &self.showcase,
+                &[
+                    ("Hire", HitTarget::ShowcaseHire),
+                    ("Leave", HitTarget::Pad(PadKey::Esc)),
+                ],
+            );
+            return;
+        }
         if self.kind == Kind::TextInput {
             sheet::keypad(
                 list,

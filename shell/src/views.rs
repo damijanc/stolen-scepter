@@ -294,6 +294,12 @@ pub struct Views {
     town_confirm: Option<(TownRow, String)>,
     /// Which page of a long mobile sheet is showing.
     pager: crate::sheet::Pager,
+    /// Mobile: the castle recruit shows the picked troop's picture, with
+    /// Hire and Back, before its keypad (the user's call, 2026-11-22).
+    recruit_showcase: bool,
+    /// Mobile: a dialog (the King's audience) is up over the home castle,
+    /// so the throne room shows behind it instead of the hall's buttons.
+    throne_room: bool,
     /// The own-castle screen's context, porting `s_castle_id` and
     /// `s_garrison_mode`.
     own_castle_id: String,
@@ -873,6 +879,12 @@ impl Views {
         self.town_info_active = true;
     }
 
+    /// Mobile: whether a dialog is up over the view, so the home castle
+    /// shows its throne room behind the King's words. Set every frame.
+    pub fn set_throne_room(&mut self, on: bool) {
+        self.throne_room = on;
+    }
+
     /// How many troops the recruit list offers.
     pub fn recruit_pool_len(&self) -> usize {
         self.recruit_pool_count
@@ -1302,6 +1314,11 @@ impl Views {
             return false;
         }
         if self.recruit_whom != 0 {
+            // Mobile's picture step: Hire moves on to the count.
+            if target == HitTarget::ShowcaseHire {
+                self.recruit_showcase = false;
+                return false;
+            }
             // Counting: only the strip acts, through the key path's helpers.
             match target {
                 HitTarget::Pad(PadKey::Digit(d)) => self.recruit_type_digit(d),
@@ -1326,6 +1343,8 @@ impl Views {
                     self.recruit_whom = (i + 1) as i32;
                     self.recruit_max = self.recruit_recompute_max(resources, game, i);
                     self.recruit_input.clear();
+                    // Only mobile draws it; desktop goes straight to its count.
+                    self.recruit_showcase = true;
                 }
             }
         }
@@ -1384,7 +1403,11 @@ impl Views {
         self.cartoon_was_active = cartoon_active;
 
         // Mobile draws the menu views as big-button sheets (spec Task 8).
-        if layout.touch && self.draw_touch(list, hits, layout, palette, resources, game, present) {
+        if layout.touch
+            && self.draw_touch(
+                list, hits, layout, palette, resources, catalog, game, present, time,
+            )
+        {
             return;
         }
         // No sheet up: the next one opens on its first page.
@@ -1446,6 +1469,16 @@ impl Views {
             }
             Some(ViewKind::RecruitSoldiers) => self
                 .draw_recruit_soldiers(list, hits, layout, palette, resources, catalog, game, time),
+            // Mobile: the den's picture with its troop large and alive; the
+            // prompt draws the price and Hire below it.
+            Some(ViewKind::Dwelling) if layout.touch => draw_showcase_backdrop(
+                list,
+                palette,
+                catalog,
+                dwelling_backdrop(self.dwelling_kind),
+                self.dwelling_troop_index,
+                time,
+            ),
             Some(ViewKind::Dwelling) => {
                 self.draw_dwelling(list, layout, palette, resources, catalog)
             }
@@ -2977,6 +3010,32 @@ fn draw_location_backdrop(
         );
     }
 }
+
+/// Mobile's picture-first backdrop: the location art with its troop drawn
+/// twice the size and animated, so a player sees what they are hiring. The
+/// black band below the art is left for the price and the Hire button
+/// (`sheet::showcase`, from `SHOWCASE_TOP`).
+pub(crate) fn draw_showcase_backdrop(
+    list: &mut DrawList,
+    palette: &Palette,
+    catalog: &SpriteCatalog,
+    backdrop: crate::draw::Backdrop,
+    troop_index: i32,
+    time: f64,
+) {
+    list.rect(Rect::new(MAP_X, MAP_Y, 240, 102), palette.clr(Pal::Black));
+    list.blit(
+        Sprite::Backdrop(backdrop),
+        Dst::rect(MAP_X, MAP_Y, 240, 102),
+    );
+    let tick = (time * 6.66) as i32;
+    if let Some(sprite) = troop_sprite(catalog, troop_index, tick) {
+        list.blit(sprite, Dst::rect(MAP_X + 72, MAP_Y + 102 - 68 - 2, 96, 68));
+    }
+}
+
+/// Where the mobile picture-first band starts: just under the 102px art.
+pub(crate) const SHOWCASE_TOP: i32 = MAP_Y + 102;
 
 /// The castle-class troop that idles on the home-castle backdrop, porting
 /// `pick_castle_troop` in `home_castle.c`.

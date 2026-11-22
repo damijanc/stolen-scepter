@@ -31,16 +31,20 @@ expect Days
 click 136 68
 click 136 68
 expect The Royal Hall
-# Recruit soldiers: Militia, then Archers, each on the keypad (Max, OK).
-# The keypad says the price, since it covers the list.
+# Recruit soldiers: Militia, then Archers. A troop shows its picture and
+# price first; Hire opens the keypad (Max, OK), which says the price too.
 click 160 45
 expect Recruit Soldiers
 click 160 57
+expect Militia - 50 gold each
+click 85 175
 expect How many Militia?
 expect 50 gold each
 click 264 102
 click 229 170
 click 160 93
+expect Archers - 250 gold each
+click 85 175
 expect How many Archers?
 click 264 102
 click 229 170
@@ -50,6 +54,7 @@ expect Gold: 4000
 click 90 175
 click 136 68
 expect Speak with the
+# The King speaks over his throne room.
 click 160 81
 expect (tap)
 click 150 160
@@ -144,9 +149,12 @@ wait 3s
 expect Victory
 click 150 160
 
-# The den: its keypad names the price; 2, 0, OK hires twenty Sprites.
+# The den shows its troop first: Sprites, how many are here and the price,
+# with Hire and Leave. Hire opens the keypad; 2, 0, OK hires twenty.
 click 184 136
 wait 1s
+expect Sprites: 200 here, 15 gold each
+click 85 175
 expect gold each, you have
 click 124 141
 click 89 173

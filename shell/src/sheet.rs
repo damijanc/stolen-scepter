@@ -369,6 +369,56 @@ pub fn draw_with_next(
     }
 }
 
+/// The band of a mobile picture-first screen (a den's or the castle's
+/// troop): the picture stays visible above, and the band below it holds
+/// `lines` of plain text and a row of big `buttons`, each as wide as its
+/// label asks. A tap anywhere else on the inner screen does nothing.
+pub fn showcase(
+    list: &mut DrawList,
+    hits: &mut HitList,
+    layout: &Layout,
+    palette: &Palette,
+    top: i32,
+    lines: &[String],
+    buttons: &[(&str, HitTarget)],
+) {
+    let a = area(layout);
+    hits.push(a, HitTarget::SheetBlank);
+    let band = Rect::new(a.x, top, a.w, a.y + a.h - top);
+    list.rect(band, palette.clr(Pal::DBlue));
+    list.rect_lines(band, palette.clr(Pal::Yellow));
+    for (i, line) in lines.iter().enumerate() {
+        list.text(
+            line,
+            band.x + PAD,
+            band.y + PAD + i as i32 * (GLYPH_H as i32 + 1),
+            palette.clr(Pal::White),
+        );
+    }
+    let row = Rect::new(
+        band.x + PAD,
+        band.y + band.h - PAD - MIN_BUTTON_H,
+        band.w - 2 * PAD,
+        MIN_BUTTON_H,
+    );
+    let weight = |label: &str| label.chars().count() as i32 + 2;
+    let total: i32 = buttons.iter().map(|(l, _)| weight(l)).sum::<i32>().max(1);
+    let mut before = 0;
+    for (label, target) in buttons {
+        let left = row.x + row.w * before / total;
+        before += weight(label);
+        let right = row.x + row.w * before / total;
+        big_button(
+            list,
+            hits,
+            palette,
+            Rect::new(left, row.y, right - left, row.h),
+            &[(*label).to_owned()],
+            *target,
+        );
+    }
+}
+
 /// A count keypad over the inner screen: `title` and the typed `value` (with
 /// the most allowed, when known) on top, then a 4x4 grid -- 7 8 9 Del /
 /// 4 5 6 Max / 1 2 3 Back / 0 (two wide) OK (two wide) -- publishing

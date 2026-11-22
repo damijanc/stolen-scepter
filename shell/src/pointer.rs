@@ -49,6 +49,9 @@ pub enum HitTarget {
     /// does nothing, rather than reaching the map, a combat cell or the
     /// screen's Esc underneath. Every handler ignores it.
     SheetBlank,
+    /// Mobile's picture-first recruit screens (a den, the castle list): Hire
+    /// moves on from the troop's picture to the count keypad.
+    ShowcaseHire,
     /// The ESC cell that ends a numbered or A/B strip: cancels the prompt,
     /// exactly as the Esc key does.
     PromptCancel,
