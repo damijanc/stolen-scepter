@@ -2415,7 +2415,8 @@ mod tests {
         );
         frame(&mut session, Keys::pressed(&[Key::Enter]), 1.0);
         let start = (session.game.position.x, session.game.position.y);
-        frame(&mut session, Keys::pressed(&[Key::Down]), 2.0);
+        // West of the home spawn is open grass; the King's gate is north.
+        frame(&mut session, Keys::pressed(&[Key::Left]), 2.0);
         frame(&mut session, Keys::default(), 3.0);
         assert_ne!((session.game.position.x, session.game.position.y), start);
         assert!(raster::texts(&list).iter().any(|t| t.contains("Days")));

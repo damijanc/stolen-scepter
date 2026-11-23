@@ -27,8 +27,7 @@ click 160 100
 click 150 160
 expect Days
 
-# The Royal Hall is just north: two taps walk into its gate.
-click 136 68
+# The Royal Hall is just north: one tap walks into its gate.
 click 136 68
 expect The Royal Hall
 # Recruit soldiers: Militia, then Archers. A troop shows its picture and
@@ -63,10 +62,19 @@ expect The Royal Hall
 click 160 175
 expect Days
 
-# South-west toward the den: the archers' band meets the hero.
-click 136 136
+# East along the clearing, two tiles a tap: a hostile band of skeletons and
+# sprites meets the hero and the fight opens.
+click 232 102
 wait 1s
-click 88 170
+click 232 102
+wait 1s
+click 232 170
+wait 1s
+click 232 136
+wait 1s
+click 232 136
+wait 1s
+click 232 136
 wait 1s
 expect Militia
 # Tap the acting militia for its action sheet (two-up: Wait Shoot / Fly
@@ -98,62 +106,25 @@ click 160 13
 # ...and a tap on the enemy shoots it, as a player would.
 click 280 34
 wait 3s
-# The militia close in and cut down the orcs (a tap on an enemy next to a
-# unit attacks it), the archers shoot again, and the militia finish it.
+# The militia close in and cut down the skeletons (a tap on an enemy next to
+# a unit attacks it), and the archers finish the sprites beside them.
 click 184 68
 click 232 68
 wait 1s
-click 280 34
-wait 3s
-click 232 34
-click 280 34
-wait 1s
-expect Victory
-click 150 160
-
-# On to the den, two tiles a tap. A chest on the way (a flask of spell
-# power with this seed; the gold-or-leadership choice is covered by the
-# prompt tests).
-click 88 170
-wait 1s
-click 88 170
-wait 1s
-expect Spell Power
-click 150 160
-click 40 170
-wait 1s
-expect Spell Power
-click 150 160
-click 40 170
-wait 1s
-click 40 170
-wait 1s
-click 136 170
-wait 1s
-click 184 170
-wait 1s
-click 136 170
-wait 1s
-# Skeletons and sprites guard the den.
-expect Militia
-click 88 34
-click 136 34
-wait 1s
-click 280 68
-wait 3s
-click 184 68
-click 232 68
 wait 1s
 click 40 102
 wait 3s
 expect Victory
 click 150 160
 
-# The den shows its troop first: Sprites, how many are here and the price,
-# with Hire and Leave. Hire opens the keypad; 2, 0, OK hires twenty.
-click 184 136
+# North to the den, two tiles a tap. It shows its troop first: Wolves, how
+# many are here and the price, with Hire and Leave. Hire opens the keypad;
+# 2, 0, OK hires twenty.
+click 136 34
 wait 1s
-expect Sprites: 200 here, 15 gold each
+click 184 34
+wait 1s
+expect Wolves: 150 here, 40 gold each
 click 85 175
 expect gold each, you have
 click 124 141
@@ -162,22 +133,40 @@ expect 20_
 click 229 173
 wait 1s
 
-# West to Larkspur. The spell is on the town's second page; buying asks
-# "... for N gold?" first, and Yes learns it.
-click 40 102
+# Back west past the King to Millbrook, the sea town beside his castle.
+click 136 170
 wait 1s
-click 40 136
+click 40 102
 wait 1s
 click 40 68
 wait 1s
-click 88 102
+click 40 68
 wait 1s
-expect Larkspur
+click 40 34
+wait 1s
+click 40 102
+wait 1s
+click 40 102
+wait 1s
+click 40 68
+wait 1s
+click 40 34
+wait 1s
+expect Millbrook
+# Hire a boat: it asks "... for 500 gold?" first, and Yes swaps the row for
+# returning it.
+click 160 92
+expect Hire a boat for
+expect 500 gold?
+click 90 61
+expect Return the boat
+# The spell is on the town's second page; buying asks "... for N gold?"
+# first, and Yes learns it.
 click 230 175
-expect Learn Bridge
+expect Learn Fireball
 click 160 65
 expect for
-expect 100 gold?
+expect 1500 gold?
 click 90 61
 expect more spell
 click 160 57
@@ -201,12 +190,12 @@ click 150 160
 click 150 160
 expect Days:595
 # Dismiss Army (page 2): the mobile sheet lists the stacks by name. Only
-# the last stack asks first, so tapping Sprites sends them home at once...
+# the last stack asks first, so tapping Wolves sends them home at once...
 click 136 107
 click 230 175
 click 230 53
 expect Send which troop home
-expect Sprites x20
+expect Wolves x20
 click 160 113
 expect Days
 # ...and the list opens again for the rest (Back closes it).

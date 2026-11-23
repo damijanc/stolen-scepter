@@ -495,15 +495,19 @@ def sea(grid):
                                              for x, y in c)), []))
 
 
-def spread(rng, candidates, count, min_dist, taken, keep_off=1):
+def spread(rng, candidates, count, min_dist, taken, keep_off=1, start=()):
     """Pick up to `count` candidates by farthest-point sampling, never within
-    `keep_off` of anything in `taken` (a set of tiles)."""
+    `keep_off` of anything in `taken` (a set of tiles). `start` holds picks
+    already made: they count toward `count` and the spacing, and are returned
+    first."""
     pool = [c for c in candidates
             if all((c[0] + dx, c[1] + dy) not in taken
                    for dx in range(-keep_off, keep_off + 1)
                    for dy in range(-keep_off, keep_off + 1))]
     rng.shuffle(pool)
-    chosen = []
+    chosen = list(start)
+    pool = [c for c in pool
+            if all(abs(c[0] - p[0]) + abs(c[1] - p[1]) >= min_dist for p in chosen)]
     while pool and len(chosen) < count:
         if not chosen:
             pick = pool[0]
@@ -561,13 +565,17 @@ def severs_walkable(grid, castles):
     return False
 
 
-def spread_castles(rng, candidates, count, min_dist, grid):
+def spread_castles(rng, candidates, count, min_dist, grid, start=(), avoid=frozenset()):
     """`spread`, but a candidate is skipped when its walls would sever the
     walkable land. Skipping is what lets a castle stand against a wall: the
-    originals do, and only the corridor-pinching sites are refused."""
-    pool = list(candidates)
+    originals do, and only the corridor-pinching sites are refused. `start`
+    holds castles already placed; a candidate whose walls touch `avoid` is
+    refused too."""
+    pool = [c for c in candidates if not (castle_walls([c]) & avoid)]
     rng.shuffle(pool)
-    chosen = []
+    chosen = list(start)
+    pool = [c for c in pool
+            if all(abs(c[0] - p[0]) + abs(c[1] - p[1]) >= min_dist for p in chosen)]
     while pool and len(chosen) < count:
         if not chosen:
             order = pool
@@ -591,6 +599,90 @@ def spread_castles(rng, candidates, count, min_dist, grid):
         chosen.append(pick)
         pool = [c for c in pool if abs(c[0] - pick[0]) + abs(c[1] - pick[1]) >= min_dist]
     return chosen
+
+
+# The original's King always had a town on the sea a short walk from his
+# gate, so the hero can hire a boat before meeting any army. KING_TOWN_STEPS
+# is that walk, home spawn to town tile, on foot with every castle standing.
+KING_TOWN_STEPS = 8
+# No wandering army starts within this many steps of the home spawn.
+KING_SAFE_STEPS = 12
+
+
+def home_spawn_of(king, main):
+    kx, ky = king
+    return (kx, ky + 2) if (kx, ky + 2) in main else (kx, ky + 1)
+
+
+def walk_steps(grid, start, blocked, limit):
+    """Walking steps from `start` to each walkable tile within `limit`, 8-way,
+    never through `blocked`."""
+    dist = {start: 0}
+    q = deque([start])
+    while q:
+        p = q.popleft()
+        if dist[p] == limit:
+            continue
+        for dx, dy in OFFSETS.values():
+            n = (p[0] + dx, p[1] + dy)
+            if n not in dist and n not in blocked and at(grid, *n) in WALKABLE:
+                dist[n] = dist[p] + 1
+                q.append(n)
+    return dist
+
+
+def walk_route(grid, start, goal, blocked):
+    """One shortest walking route from `start` to `goal`, both ends included,
+    never through `blocked`; None when there is none."""
+    prev = {start: None}
+    q = deque([start])
+    while q:
+        p = q.popleft()
+        if p == goal:
+            out = []
+            while p is not None:
+                out.append(p)
+                p = prev[p]
+            return out[::-1]
+        for dx, dy in OFFSETS.values():
+            n = (p[0] + dx, p[1] + dy)
+            if n not in prev and n not in blocked and at(grid, *n) in WALKABLE:
+                prev[n] = p
+                q.append(n)
+    return None
+
+
+def pick_king(grid, sites, town_sites, main, centre):
+    """The King's castle: of the castle sites with a sea town within
+    KING_TOWN_STEPS of the home spawn, the one nearest the middle of the land.
+    Returns (castle, town, route) or raises when no site qualifies."""
+    cx, cy = centre
+    for king in sorted(sites, key=lambda c: ((c[0] - cx) ** 2 + (c[1] - cy) ** 2, c)):
+        if severs_walkable(grid, [king]):
+            continue
+        walls = castle_walls([king])
+        home = home_spawn_of(king, main)
+        if home in walls:
+            continue
+        reach = walk_steps(grid, home, walls, KING_TOWN_STEPS)
+        best = None
+        for town in town_sites:
+            # A town is stepped onto from a neighbour, so it sits one step
+            # past the nearest walkable tile beside it.
+            if town in walls or abs(town[0] - king[0]) <= 3 and abs(town[1] - king[1]) <= 3:
+                continue
+            near = [reach[n] for n in ((town[0] + dx, town[1] + dy)
+                                       for dx, dy in OFFSETS.values()) if n in reach]
+            if near and min(near) + 1 <= KING_TOWN_STEPS:
+                steps = min(near) + 1
+                if best is None or (steps, town) < best[0]:
+                    best = ((steps, town), town)
+        if best is None:
+            continue
+        town = best[1]
+        route = walk_route(grid, home, town, walls)
+        return king, town, route
+    raise RuntimeError(f"no castle site has a sea town within {KING_TOWN_STEPS} steps")
 
 
 def place(cfg, grid, rng):
@@ -630,17 +722,6 @@ def place(cfg, grid, rng):
         if all(at(grid, *c) == GRASS for c in block) and below in home_land \
                 and at(grid, *below) == GRASS:
             sites.append((x, y))
-    castles = spread_castles(rng, sites, cfg["castles"], 7, grid)
-    if len(castles) < cfg["castles"]:
-        raise RuntimeError(f"room for {len(castles)} of {cfg['castles']} castles")
-    if cfg["home"]:
-        # The King's castle first: the one nearest the middle of the land.
-        cx = sum(x for x, _ in main) / len(main)
-        cy = sum(y for _, y in main) / len(main)
-        castles.sort(key=lambda c: (c[0] - cx) ** 2 + (c[1] - cy) ** 2)
-    for x, y in castles:
-        take(*[(x + dx, y + dy) for dx in (-2, -1, 0, 1, 2) for dy in (-2, -1, 0, 1, 2)])
-
     # Towns: coast grass with a dock on the open sea and a walkable gate.
     town_sites = []
     for x, y in coast:
@@ -650,7 +731,27 @@ def place(cfg, grid, rng):
                      if (x + dx, y + dy) in home_land and (x + dx, y + dy) != dock), None)
         if dock and gate:
             town_sites.append((x, y))
-    towns_xy = spread(rng, town_sites, cfg["towns"], 6, taken, keep_off=1)
+
+    # The King's castle comes first, and with it the sea town beside it and
+    # the walk between them, which no other castle may block.
+    king_start, town_start, king_route = [], [], []
+    if cfg["home"]:
+        cx = sum(x for x, _ in main) / len(main)
+        cy = sum(y for _, y in main) / len(main)
+        king, king_town, king_route = pick_king(
+            grid, sites, [t for t in town_sites if t in main], main, (cx, cy))
+        king_start, town_start = [king], [king_town]
+    keep_clear = set(king_route) | {(t[0] + dx, t[1] + dy) for t in town_start
+                                    for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
+    castles = spread_castles(rng, sites, cfg["castles"], 7, grid,
+                             start=king_start, avoid=keep_clear)
+    if len(castles) < cfg["castles"]:
+        raise RuntimeError(f"room for {len(castles)} of {cfg['castles']} castles")
+    for x, y in castles:
+        take(*[(x + dx, y + dy) for dx in (-2, -1, 0, 1, 2) for dy in (-2, -1, 0, 1, 2)])
+
+    towns_xy = spread(rng, town_sites, cfg["towns"], 6, taken, keep_off=1,
+                      start=town_start)
     if len(towns_xy) < cfg["towns"]:
         raise RuntimeError(f"room for {len(towns_xy)} of {cfg['towns']} towns")
     towns = []
@@ -662,6 +763,8 @@ def place(cfg, grid, rng):
         towns.append(dict(x=x, y=y, boat=dict(x=dock[0], y=dock[1]),
                           gate=dict(x=gate[0], y=gate[1])))
         take((x, y), gate)
+    # Nothing else -- chest, army or sign -- stands on the King's walk.
+    take(*king_route)
 
     out = dict(id=cfg["id"], width=SIZE, height=SIZE,
                castles=[dict(x=x, y=y) for x, y in castles], towns=towns)
@@ -672,8 +775,7 @@ def place(cfg, grid, rng):
     out["hero_spawn"] = dict(x=hero[0], y=hero[1])
     take(hero)
     if cfg["home"]:
-        kx, ky = castles[0]
-        home = (kx, ky + 2) if (kx, ky + 2) in main else (kx, ky + 1)
+        home = home_spawn_of(castles[0], main)
         out["home_spawn"] = dict(x=home[0], y=home[1])
         take(home)
         alcove = spread(rng, [c for c in main if grid[c[1]][c[0]] == GRASS], 1, 1,
@@ -690,8 +792,13 @@ def place(cfg, grid, rng):
     if len(chests) < 21:
         raise RuntimeError("fewer than 21 chests: the salt pool would be too small")
 
-    # Wandering armies: main-landmass grass, clear of castle gates.
-    armies = spread(rng, [c for c in home_land if grid[c[1]][c[0]] == GRASS],
+    # Wandering armies: main-landmass grass, clear of castle gates, and at
+    # home clear of the King's surroundings too.
+    safe = set()
+    if cfg["home"]:
+        safe = set(walk_steps(grid, home, castle_walls(castles), KING_SAFE_STEPS))
+    armies = spread(rng, [c for c in home_land if grid[c[1]][c[0]] == GRASS
+                          and c not in safe],
                     cfg["armies"], 4, taken, keep_off=1)
     out["wandering_armies"] = [dict(x=x, y=y) for x, y in armies]
     take(*armies)

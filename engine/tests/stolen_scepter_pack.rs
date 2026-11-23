@@ -4,14 +4,17 @@
 //! Built by `tools/gen_maps.py` + `tools/build_pack.py`; see
 //! `specs/publish-plan.md`, Phase 2.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use openbounty_engine::combat::CombatResult;
-use openbounty_engine::game::{Game, VillainSiegeOutcome};
+use openbounty_engine::fog::Fog;
+use openbounty_engine::game::{BoatActionOutcome, Game, VillainSiegeOutcome};
 use openbounty_engine::map::Map;
 use openbounty_engine::resources::Resources;
-use openbounty_engine::step::{search_here, SearchOutcome};
-use openbounty_engine::tile::Terrain;
+use openbounty_engine::step::{
+    game_step_basic, search_here, SearchOutcome, StepInteraction, StepResult,
+};
+use openbounty_engine::tile::{Interact, Terrain};
 
 const PACK: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -182,6 +185,148 @@ fn a_new_game_starts_for_every_class_and_buries_the_scepter() {
                 .tile_i32(game.scepter.x, game.scepter.y)
                 .expect("scepter tile");
             assert!(!tile.blocks_foot, "the scepter lies under a blocked tile");
+        }
+    }
+}
+
+/// The walk `tools/gen_maps.py` promises from the King's gate to a sea town
+/// (`KING_TOWN_STEPS`): the original always had one there, and without it a
+/// new hero can be stuck on the home continent with no boat in reach.
+const KING_TOWN_STEPS: usize = 8;
+
+/// Whether this water tile is joined to the map's border: where a boat sails.
+fn on_open_sea(map: &Map, start: (i32, i32)) -> bool {
+    let is_water = |x: i32, y: i32| {
+        map.tile_i32(x, y)
+            .is_some_and(|t| t.terrain == Terrain::Water)
+    };
+    if !is_water(start.0, start.1) {
+        return false;
+    }
+    let (w, h) = (map.width as i32, map.height as i32);
+    let mut seen = HashSet::from([start]);
+    let mut queue = VecDeque::from([start]);
+    while let Some((x, y)) = queue.pop_front() {
+        if x == 0 || y == 0 || x == w - 1 || y == h - 1 {
+            return true;
+        }
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let next = (x + dx, y + dy);
+            if is_water(next.0, next.1) && seen.insert(next) {
+                queue.push_back(next);
+            }
+        }
+    }
+    false
+}
+
+/// The shortest walk from the hero onto the nearest town, as step offsets.
+/// Everything that bounces the hero (towns on the way, castle gates,
+/// dwellings, the alcove), teleport caves and hostile armies count as walls.
+fn walk_to_nearest_town(game: &Game, map: &Map) -> Option<Vec<(i32, i32)>> {
+    let hostile: HashSet<(i32, i32)> = game.foes[..game.foe_count]
+        .iter()
+        .filter(|f| f.alive && !f.friendly && f.zone == game.position.zone)
+        .map(|f| (f.x, f.y))
+        .collect();
+    let start = (game.position.x, game.position.y);
+    let mut prev = HashMap::from([(start, start)]);
+    let mut queue = VecDeque::from([start]);
+    while let Some(here) = queue.pop_front() {
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                let next = (here.0 + dx, here.1 + dy);
+                if (dx, dy) == (0, 0) || prev.contains_key(&next) || hostile.contains(&next) {
+                    continue;
+                }
+                let Some(tile) = map.tile_i32(next.0, next.1) else {
+                    continue;
+                };
+                let passable = match tile.interactive {
+                    Interact::None => !tile.blocks_foot && tile.terrain.walkable(),
+                    Interact::TreasureChest
+                    | Interact::Sign
+                    | Interact::Artifact
+                    | Interact::Orb
+                    | Interact::Navmap => true,
+                    _ => false,
+                };
+                if tile.interactive == Interact::Town {
+                    prev.insert(next, here);
+                    let mut steps = Vec::new();
+                    let mut at = next;
+                    while at != start {
+                        let from = prev[&at];
+                        steps.push((at.0 - from.0, at.1 - from.1));
+                        at = from;
+                    }
+                    steps.reverse();
+                    return Some(steps);
+                }
+                if passable {
+                    prev.insert(next, here);
+                    queue.push_back(next);
+                }
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn a_new_hero_walks_from_the_king_to_a_sea_town_and_hires_a_boat() {
+    let resources = resources();
+    for class in 0..4 {
+        for seed in [0, 1, 2, 3, 7, 42, 99, 200, 1234, 65_535] {
+            let mut game = Game::default();
+            game.init_seeded_with_resources(&resources, Some("Tester"), class, 1, seed);
+            let zone = game.position.zone.as_str().to_owned();
+            let mut map =
+                Map::load_zone_with_placements(&resources, &zone, &game).expect("home map");
+            let mut fog = Fog::default();
+            let what = format!("class {class} seed {seed}");
+
+            let steps = walk_to_nearest_town(&game, &map)
+                .unwrap_or_else(|| panic!("{what}: no town can be walked to"));
+            assert!(
+                steps.len() <= KING_TOWN_STEPS,
+                "{what}: the nearest town is {} steps from the King, not {KING_TOWN_STEPS}",
+                steps.len()
+            );
+
+            // Walk it for real: no army catches the hero on the way, and the
+            // last step bounces off the town and opens it.
+            let (last, walk) = steps.split_last().expect("at least one step");
+            for &(dx, dy) in walk {
+                match game_step_basic(&mut game, &mut map, &mut fog, &resources, dx, dy) {
+                    StepResult::Moved {
+                        collision: None,
+                        bounced: false,
+                        ..
+                    } => {}
+                    other => panic!("{what}: the walk to town was stopped: {other:?}"),
+                }
+            }
+            let (boat_x, boat_y) =
+                match game_step_basic(&mut game, &mut map, &mut fog, &resources, last.0, last.1) {
+                    StepResult::Moved {
+                        interaction: StepInteraction::Town { boat_x, boat_y, .. },
+                        bounced: true,
+                        ..
+                    } => (boat_x, boat_y),
+                    other => panic!("{what}: the last step did not open a town: {other:?}"),
+                };
+            assert!(!game.position.in_town.is_empty(), "{what}: not in town");
+
+            assert!(
+                on_open_sea(&map, (boat_x, boat_y)),
+                "{what}: the town's dock ({boat_x},{boat_y}) is not on the open sea"
+            );
+            assert_eq!(
+                game.rent_boat(&resources, boat_x, boat_y, &zone),
+                BoatActionOutcome::RentOk,
+                "{what}: the starting purse cannot hire a boat"
+            );
         }
     }
 }

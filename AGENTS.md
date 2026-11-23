@@ -311,7 +311,7 @@ Implemented and tested:
 
 Test coverage is 369 engine unit tests, 649 shell unit tests, a click-only
 mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
-the King, castle recruiting, a won fight, a den, a town spell, the hero menu)
+the King, castle recruiting, a won fight, a den, a boat and a spell at the sea town beside the King, the hero menu)
 with a finger-size audit of every frame's tap regions (`playtest
 --audit-taps`), 25 combat digest goldens, and one render-free boundary test.
 
