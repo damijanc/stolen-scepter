@@ -59,6 +59,8 @@ const DEFAULT_CL_CANT_FLY: &str = "Can't Fly";
 const DEFAULT_CL_ONLY_ONE_SPELL: &str = "Only 1 spell per round!";
 const DEFAULT_CL_NO_SPELL_TYPE: &str = "No spells of that type";
 const DEFAULT_CL_CANNOT_CAST: &str = "You cannot cast magic";
+/// Fits the combat title bar (36 glyphs) with the shipped continent names.
+const DEFAULT_CL_CANNOT_CAST_WHERE: &str = "No magic: wizard in %ZONE% %X%,%Y%";
 const DEFAULT_CL_FLY: &str = "%TROOP% fly";
 const DEFAULT_CL_MELEE_HIT: &str = "%ATK% vs %TGT%, %COUNT% die";
 const DEFAULT_CL_RANGED_HIT: &str = "%ATK% shoot %TGT% killing %COUNT%";
@@ -1211,7 +1213,16 @@ impl CombatLoop {
             return;
         }
         if !game.stats.knows_magic {
-            self.log(resources, "cannot_cast", DEFAULT_CL_CANNOT_CAST);
+            // The user's call (2026-11-27): say where magic is taught.
+            match crate::interact::magic_alcove(resources) {
+                Some((zone, x, y)) => self.log_formatted(
+                    resources,
+                    "cannot_cast_where",
+                    DEFAULT_CL_CANNOT_CAST_WHERE,
+                    &[("ZONE", zone), ("X", &x.to_string()), ("Y", &y.to_string())],
+                ),
+                None => self.log(resources, "cannot_cast", DEFAULT_CL_CANNOT_CAST),
+            }
             return;
         }
         self.cast_phase = CastPhase::PickSpell;
@@ -2133,6 +2144,25 @@ mod tests {
 
     /// `U` opens the spell menu; the letter closes it into the target picker,
     /// whose ring then shows.
+    /// The user's call (2026-11-27): casting without knowing magic says
+    /// where the wizard who teaches it lives, as the overworld banner does.
+    #[test]
+    fn casting_without_magic_says_where_to_learn_it() {
+        big_stack(|| {
+            let (mut l, _, mut game) = loop_fixture();
+            let resources = Resources::from_json_str(
+                r#"{"troops": [], "zones": [{"id":"home","name":"Highmoor",
+                     "magic_alcove":{"x":29,"y":49}}]}"#,
+            )
+            .expect("fixture parses");
+            game.stats.knows_magic = false;
+            let mut prompt = Prompt::default();
+            by_keys(&mut l, &mut game, &resources, &mut prompt, &[Key::U]);
+            assert!(!l.picking_spell());
+            assert!(l.banner.contains("Highmoor 29,49"), "{:?}", l.banner);
+        });
+    }
+
     #[test]
     fn the_spell_menu_shows_from_u_until_a_letter_is_picked() {
         let (mut loop_, resources, mut game) = loop_fixture();

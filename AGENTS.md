@@ -182,6 +182,12 @@ Implemented and tested:
   `demo_scepter.c` re-implements it as `puzzle_cam`; it clamps the 5x5
   WINDOW to `[0, width-5]`, which is not the per-cell clamp the `tables.c`
   header comment describes. It belongs to whichever shell draws the puzzle.
+- Finding the villain's castle, a DIVERGENCE by the user's call
+  (2026-11-27): the original's players read castle locations off the printed
+  manual's map, which this game does not ship. `Game::hear_town_news` makes
+  the contracted villain's castle `known` when a town's news names it (C sets
+  `known` only on a gate visit or Find Villain), and the world map then marks
+  that castle through the fog in a white box, on both desktop and mobile.
 - The weekly economy queries. `Game::weekly_net_gold` judges the boat fare
   on the POST-CREDIT wallet, mirroring `apply_week_end`, which banks the
   commission and pays upkeep before it looks at the fare; a poor hero whose
@@ -311,7 +317,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 369 engine unit tests, 651 shell unit tests, a click-only
+Test coverage is 370 engine unit tests, 654 shell unit tests, a click-only
 mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
 the King, castle recruiting, a won fight, a den, a boat and a spell at the sea town beside the King, the hero menu)
 with a finger-size audit of every frame's tap regions (`playtest

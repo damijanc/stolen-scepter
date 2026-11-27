@@ -2384,6 +2384,41 @@ impl Game {
             .any(|slot| slot.as_str() == villain_id)
     }
 
+    /// A town's news, heard: when it names the castle that holds the villain
+    /// under contract, that castle becomes `known`, as visiting its gate or
+    /// casting Find Villain makes it. True when it did.
+    ///
+    /// DIVERGENCE, deliberate (the user's call, 2026-11-27): C's town news
+    /// is text only, and its players found the castle on the printed
+    /// manual's map, which this game does not ship. News the town would not
+    /// give (a castle excluded from intel) teaches nothing.
+    pub fn hear_town_news(&mut self, resources: &Resources, town_id: &str) -> bool {
+        if self.contract.active_id.is_empty() {
+            return false;
+        }
+        let Some(town) = resources.town_by_id(town_id) else {
+            return false;
+        };
+        let castle_id = town.intel_castle.as_str();
+        if castle_id.is_empty()
+            || resources
+                .castle_by_id(castle_id)
+                .is_some_and(|castle| castle.special.excluded_from_intel)
+        {
+            return false;
+        }
+        for castle in self.castles.iter_mut() {
+            if castle.id.as_str() == castle_id
+                && castle.owner_kind == CastleOwnerKind::Villain
+                && castle.villain_id.as_str() == self.contract.active_id.as_str()
+            {
+                castle.known = true;
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn take_next_contract<'a>(&'a mut self, resources: &Resources) -> Option<&'a str> {
         if self.position.in_town.is_empty() {
             return None;
@@ -6356,6 +6391,46 @@ mod tests {
         assert_eq!(game.take_next_contract(&resources), Some("villain1"));
         assert_eq!(game.contract.last_contract, 1);
         assert_eq!(game.contract.active_id.as_str(), "villain1");
+    }
+
+    /// A port extension, not C (the user's call, 2026-11-27): the original's
+    /// players found a castle on the manual's map, which this game does not
+    /// ship. So a town's news naming the castle that holds the villain under
+    /// contract makes that castle known, as visiting its gate or Find Villain
+    /// does. News about any other castle, or with no contract, changes nothing.
+    #[test]
+    fn town_news_about_the_contracted_villains_castle_makes_it_known() {
+        let resources = Resources::from_json_str(
+            r#"{"troops": [], "zones": [{"id":"home"}],
+                "towns": [{"id":"town0","zone":"home","x":1,"y":1,"intel_castle":"keep"},
+                          {"id":"town1","zone":"home","x":2,"y":2,"intel_castle":"tower"}],
+                "castles": [{"id":"keep","zone":"home","x":5,"y":5},
+                            {"id":"tower","zone":"home","x":9,"y":9}]}"#,
+        )
+        .expect("fixture parses");
+        let mut game = Game::default();
+        for (slot, (id, villain)) in [("keep", "villain0"), ("tower", "villain1")]
+            .iter()
+            .enumerate()
+        {
+            game.castles[slot].id.copy_from_str(id);
+            game.castles[slot].owner_kind = CastleOwnerKind::Villain;
+            game.castles[slot].villain_id.copy_from_str(villain);
+        }
+
+        // No contract: the news is only news.
+        assert!(!game.hear_town_news(&resources, "town0"));
+        assert!(!game.castles[0].known);
+
+        game.contract.active_id.copy_from_str("villain0");
+        // News about another villain's castle changes nothing.
+        assert!(!game.hear_town_news(&resources, "town1"));
+        assert!(!game.castles[1].known);
+        // News about the contracted villain's castle makes it known.
+        assert!(game.hear_town_news(&resources, "town0"));
+        assert!(game.castles[0].known);
+        // An unknown town is ignored.
+        assert!(!game.hear_town_news(&resources, "nowhere"));
     }
 
     #[test]

@@ -1756,13 +1756,34 @@ impl Views {
             if castle.x < 0 || castle.y < 0 {
                 continue;
             }
-            if !reveal_all && !fog.seen(castle.x, castle.y) {
+            // DIVERGENCE, the user's call (2026-11-27): the contracted
+            // villain's castle, once known, shows through the fog in a white
+            // box, standing in for the original manual's castle map.
+            let wanted = !game.contract.active_id.is_empty()
+                && game.castles.iter().any(|record| {
+                    record.id.as_str() == castle.id.as_str()
+                        && record.known
+                        && record.owner_kind == CastleOwnerKind::Villain
+                        && record.villain_id.as_str() == game.contract.active_id.as_str()
+                });
+            if !reveal_all && !fog.seen(castle.x, castle.y) && !wanted {
                 continue;
             }
             list.rect(
                 Rect::new(gx + castle.x * pix, gy + castle.y * pix, pix, pix),
                 palette.clr(Pal::Red),
             );
+            if wanted {
+                list.rect_lines(
+                    Rect::new(
+                        gx + (castle.x - 1) * pix - 1,
+                        gy + (castle.y - 1) * pix - 1,
+                        3 * pix + 2,
+                        3 * pix + 2,
+                    ),
+                    palette.clr(Pal::White),
+                );
+            }
         }
 
         // The hero blinks yellow/red at ~3 Hz.
@@ -4155,6 +4176,47 @@ mod tests {
         assert_eq!(rects_of_color(&list, palette.clr(Pal::Green)), 1);
         assert_eq!(rects_of_color(&list, palette.clr(Pal::Red)), 1);
         assert_eq!(rects_of_color(&list, palette.clr(Pal::Yellow)), 1);
+    }
+
+    /// The user's call (2026-11-27): once the contracted villain's castle is
+    /// known, the world map marks it even where the fog still hides it -- a
+    /// red square in a white box -- in place of the original manual's map.
+    #[test]
+    fn the_worldmap_marks_the_known_castle_of_the_contracted_villain() {
+        let (resources, layout, catalog, palette, map, fog, mut game) = worldmap_parts();
+        game.castles[0].id.copy_from_str("c0");
+        game.castles[0].owner_kind = CastleOwnerKind::Villain;
+        game.castles[0].villain_id.copy_from_str("v0");
+        game.contract.active_id.copy_from_str("v0");
+        let mut views = Views::new();
+        views.set(ViewKind::Worldmap);
+        let marked = |game: &Game| {
+            let list = draw_worldmap_view(
+                &mut views.clone(),
+                &resources,
+                &layout,
+                &catalog,
+                &palette,
+                &map,
+                &fog,
+                game,
+                1.0,
+            );
+            (
+                rects_of_color(&list, palette.clr(Pal::Red)),
+                list.as_slice().iter().any(|cmd| {
+                    matches!(cmd, DrawCmd::RectLines { color, .. } if *color == palette.clr(Pal::White))
+                }),
+            )
+        };
+        // Fogged and not yet known: no marker at all.
+        assert_eq!(marked(&game), (0, false));
+        // Known: marked through the fog.
+        game.castles[0].known = true;
+        assert_eq!(marked(&game), (1, true));
+        // Known, but not the villain under contract: only the normal rule.
+        game.contract.active_id.copy_from_str("v1");
+        assert_eq!(marked(&game), (0, false));
     }
 
     fn controls_fixtures() -> (Resources, Layout, SpriteCatalog) {

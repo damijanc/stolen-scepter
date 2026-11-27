@@ -169,7 +169,9 @@ expect for
 expect 1500 gold?
 click 90 61
 expect more spell
-click 160 57
+# A Knight cannot cast yet, and the town says so when he buys.
+expect learn magic
+click 160 81
 click 90 175
 expect Days
 

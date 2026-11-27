@@ -477,23 +477,7 @@ pub fn spell_header(resources: &Resources, id: &str, fallback: &str) -> String {
 /// the shell's no-spell branch of `INPUT_ACTION_CAST_SPELL`. The alcove
 /// coordinates are substituted from the first zone that declares one.
 pub fn no_spell_banner(resources: &Resources) -> (String, String) {
-    let mut zone_label = "";
-    let mut alcove_x = 0;
-    let mut alcove_y = 0;
-    for index in 0..resources.zone_count() {
-        if let Some(zone) = resources.zone_by_index(index) {
-            if zone.magic_alcove_x >= 0 && zone.magic_alcove_y >= 0 {
-                zone_label = if zone.name.is_empty() {
-                    zone.id.as_str()
-                } else {
-                    zone.name.as_str()
-                };
-                alcove_x = zone.magic_alcove_x;
-                alcove_y = zone.magic_alcove_y;
-                break;
-            }
-        }
-    }
+    let (zone_label, alcove_x, alcove_y) = magic_alcove(resources).unwrap_or(("", 0, 0));
     let x = alcove_x.to_string();
     let y = alcove_y.to_string();
     let body = banner::formatted(
@@ -504,6 +488,22 @@ pub fn no_spell_banner(resources: &Resources) -> (String, String) {
         &[("ZONE", zone_label), ("X", &x), ("Y", &y)],
     );
     (String::new(), body)
+}
+
+/// Where magic is taught: the first continent declaring a magic alcove, as
+/// `(continent name, x, y)`.
+pub fn magic_alcove(resources: &Resources) -> Option<(&str, i32, i32)> {
+    (0..resources.zone_count())
+        .filter_map(|index| resources.zone_by_index(index))
+        .find(|zone| zone.magic_alcove_x >= 0 && zone.magic_alcove_y >= 0)
+        .map(|zone| {
+            let label = if zone.name.is_empty() {
+                zone.id.as_str()
+            } else {
+                zone.name.as_str()
+            };
+            (label, zone.magic_alcove_x, zone.magic_alcove_y)
+        })
 }
 
 /// Turn an adventure-cast outcome into the `(header, body)` dialog it presents,
@@ -915,6 +915,9 @@ pub fn town_boat_toast(resources: &Resources, outcome: BoatActionOutcome) -> Opt
 
 /// The spell-buy toast, porting `town_do_spell`. The engine applies the buy;
 /// this writes the result message.
+const DEFAULT_TOWN_SPELL_NEEDS_MAGIC: &str =
+    "\n\nYou will need to learn magic\nbefore you can cast it.";
+
 pub fn town_spell_toast(resources: &Resources, game: &Game, outcome: SpellBuyOutcome) -> String {
     match outcome {
         SpellBuyOutcome::NoSpell => banner::text(
@@ -942,13 +945,24 @@ pub fn town_spell_toast(resources: &Resources, game: &Game, outcome: SpellBuyOut
             } else {
                 "s"
             };
-            banner::formatted(
+            let mut toast = banner::formatted(
                 resources,
                 "banners",
                 "town_spell_can_learn",
                 DEFAULT_TOWN_SPELL_CAN_LEARN,
                 &[("LEFT", &left), ("S", s)],
-            )
+            );
+            // The user's call (2026-11-27): a hero who cannot cast yet hears
+            // it here, not first in a fight.
+            if !game.stats.knows_magic {
+                toast.push_str(banner::text(
+                    resources,
+                    "banners",
+                    "town_spell_needs_magic",
+                    DEFAULT_TOWN_SPELL_NEEDS_MAGIC,
+                ));
+            }
+            toast
         }
     }
 }
@@ -2215,6 +2229,13 @@ mod tests {
         assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::NoGold).contains("gold"));
         assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::Ok)
             .contains("Room for 3 more spells"));
+
+        // The user's call (2026-11-27): a hero who cannot cast yet is told so
+        // when buying; one who can is not.
+        game.stats.knows_magic = false;
+        assert!(town_spell_toast(&resources, &game, SpellBuyOutcome::Ok).contains("learn magic"));
+        game.stats.knows_magic = true;
+        assert!(!town_spell_toast(&resources, &game, SpellBuyOutcome::Ok).contains("learn magic"));
 
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::Already).contains("siege weapons"));
         assert!(town_siege_toast(&resources, SiegeBuyOutcome::NoGold).contains("gold"));

@@ -2322,7 +2322,12 @@ fn run_town_row(game: &mut Game, resources: &Resources, views: &mut Views, row: 
                 None => return,
             }
         }
-        TownRow::Info => interact::town_intel_toast(resources, game, &record_key),
+        TownRow::Info => {
+            // News naming the contracted villain's castle makes it known, so
+            // the world map marks it (the user's call, 2026-11-27).
+            game.hear_town_news(resources, &record_key);
+            interact::town_intel_toast(resources, game, &record_key)
+        }
         TownRow::Spell => {
             let outcome = game.buy_spell(resources, &record_key);
             interact::town_spell_toast(resources, game, outcome)
@@ -3408,6 +3413,47 @@ mod tests {
             assert_eq!(session.views.active(), None);
             in_millbrook(&mut session, &mut list, &mut now);
             assert!(targets_of(&session).contains(&HitTarget::TownRow(TownRow::Contract)));
+        });
+    }
+
+    /// Asking a town for news about the contracted villain's castle makes
+    /// that castle known (the user's call, 2026-11-27).
+    #[test]
+    fn town_news_marks_the_contracted_villains_castle_known() {
+        big_stack(|| {
+            let harness = Harness::load();
+            let (mut session, mut list, mut now) = touch_session(&harness);
+            let intel = harness
+                .resources
+                .town_by_id("millbrook")
+                .expect("millbrook")
+                .intel_castle;
+            let slot = session
+                .game
+                .castles
+                .iter()
+                .position(|c| c.id.as_str() == intel.as_str())
+                .expect("the castle the news names");
+            // Put a villain there and take his contract.
+            let villain = harness.resources.villain_by_index(0).expect("a villain").id;
+            session.game.castles[slot].owner_kind = CastleOwnerKind::Villain;
+            session.game.castles[slot]
+                .villain_id
+                .copy_from_str(villain.as_str());
+            session
+                .game
+                .contract
+                .active_id
+                .copy_from_str(villain.as_str());
+            session.game.castles[slot].known = false;
+            in_millbrook(&mut session, &mut list, &mut now);
+            tap(
+                &mut session,
+                &mut list,
+                &mut now,
+                HitTarget::TownRow(TownRow::Info),
+            );
+            assert!(session.game.castles[slot].known);
         });
     }
 
