@@ -3507,9 +3507,9 @@ mod tests {
         });
     }
 
-    /// While the King speaks, the throne room is behind him on mobile, not
-    /// the Royal Hall's buttons (2026-11-22; a picture of the King is a
-    /// follow-up).
+    /// While the King speaks on mobile, his portrait fills the picture area
+    /// instead of the Royal Hall's buttons (the user's calls, 2026-11-22 and
+    /// 2026-11-27).
     #[test]
     fn mobile_king_speaks_over_the_throne_room() {
         big_stack(|| {
@@ -3532,7 +3532,7 @@ mod tests {
             assert!(list.as_slice().iter().any(|cmd| matches!(
                 cmd,
                 crate::draw::DrawCmd::Blit {
-                    sprite: crate::draw::Sprite::Backdrop(_),
+                    sprite: crate::draw::Sprite::King,
                     ..
                 }
             )));

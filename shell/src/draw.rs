@@ -184,10 +184,8 @@ pub enum Sprite {
 
     PuzzleCover,
     Backdrop(Backdrop),
-    /// The King's portrait, one breathing frame (mobile's audience screen).
-    KingAnim {
-        frame: i32,
-    },
+    /// The King's portrait (mobile's audience screen): one still picture.
+    King,
     EndingWin,
     EndingLose,
 

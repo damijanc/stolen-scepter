@@ -95,9 +95,8 @@ pub struct ResSprites {
     pub forest_backdrop: FixedStr<RES_PATH_LEN>,
     pub hillcave_backdrop: FixedStr<RES_PATH_LEN>,
     pub dungeon_backdrop: FixedStr<RES_PATH_LEN>,
-    /// The King's portrait, frame 0 (`<stem>_00.png`; the shell derives the
-    /// other breathing frames as it does for villains). A port extension C
-    /// does not have: the mobile shell shows it while he speaks. Optional.
+    /// The King's portrait, one still picture. A port extension C does not
+    /// have: the mobile shell shows it while he speaks. Optional.
     pub king_portrait: FixedStr<RES_PATH_LEN>,
     pub ending_win: FixedStr<RES_PATH_LEN>,
     pub ending_lose: FixedStr<RES_PATH_LEN>,

@@ -44,7 +44,8 @@ will be selected only after headless engine parity is solid.
   nothing. Recruiting is picture-first on mobile: a den and the castle list
   show the troop large over its backdrop (`views::draw_showcase_backdrop`)
   with the price and Hire (`HitTarget::ShowcaseHire`) before the keypad, and
-  the King speaks over his throne room with his portrait in a gold frame
+  the King speaks under his portrait, one still picture filling the area above
+  the speech
   (`sprites.ui.king_portrait`, a port extension made by `tools/gen_king_ai.py`). Desktop keeps its original look; only the touch flag reaches this
   code.
   `backend.rs` is the ONLY module that knows macroquad exists; keep it that

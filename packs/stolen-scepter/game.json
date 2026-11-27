@@ -5603,7 +5603,7 @@
    "forest_backdrop": "art/ui/backdrop_forest.png",
    "hillcave_backdrop": "art/ui/backdrop_hillcave.png",
    "dungeon_backdrop": "art/ui/backdrop_dungeon.png",
-   "king_portrait": "art/ui/king_00.png",
+   "king_portrait": "art/ui/king.png",
    "ending_win": "art/ui/end_win_screen.png",
    "ending_lose": "art/ui/end_lose_screen.png",
    "view_icons_extra": [

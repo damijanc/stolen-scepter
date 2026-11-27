@@ -7,11 +7,13 @@
 see tools/README.md) into local, ignored `game-assets/ai-out/<run>/king/`,
 with a contact sheet, in the villain portraits' painterly style.
 
-`compose` needs no tunnel: it writes the picked render as the four breathing
-frames `art/ui/king_00..03.png` at the villain portraits' size (the 48x34
-slot times the pack's scale), records provenance, and `build_pack.py` then
-names `sprites.ui.king_portrait`. The look is the user's call (2026-11-23):
-a kindly old king.
+`compose` needs no tunnel: it writes the picked render as one still picture,
+`art/ui/king.png`, wide enough to fill the whole 240x102 picture area above
+the speech (times the pack's scale), records provenance, and `build_pack.py`
+then names `sprites.ui.king_portrait`. The crop keeps the crown: it is
+anchored near the top of the render, not on the face. The look is the user's
+call (2026-11-23: a kindly old king; 2026-11-27: seed 101, filling the
+picture area, still rather than breathing).
 """
 import argparse
 import os
@@ -20,8 +22,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_ai  # noqa: E402
 import json  # noqa: E402
+from compose_startup import crop  # noqa: E402
 from gen_startup import Args, contact_sheet, render  # noqa: E402
-from gen_villains_ai import BREATH, FRAMES, NEG, SIZE, STYLE, frame  # noqa: E402
+from gen_villains_ai import NEG, SIZE, STYLE  # noqa: E402
 from packart import PACK, ROOT, register  # noqa: E402
 from pngio import read_png, write_png  # noqa: E402
 
@@ -30,6 +33,25 @@ LOOK = ("a kindly old king with a long silver beard and warm tired eyes, a gold 
         "expression, a throne hall with candles and banners behind him")
 AUTHOR = "AI-generated (tools/gen_king_ai.py: SDXL DreamShaper XL), composed by " \
          "tools/gen_king_ai.py"
+
+
+# The picture area above the King's words, in legacy pixels.
+AREA_W, AREA_H = 240, 102
+# Where the crop sits between the top (0) and bottom (1) of the render: near
+# the top, so the crown stays in.
+ANCHOR_Y = 0.05
+
+
+def wide_frame(w, h, px, tw, th):
+    """Crop to the area's aspect, as wide as the render allows, centred
+    horizontally and anchored near the top, then scale to tw x th."""
+    if w * th > h * tw:
+        cw, ch = h * tw // th, h
+    else:
+        cw, ch = w, w * th // tw
+    x0 = (w - cw) // 2
+    y0 = int((h - ch) * ANCHOR_Y)
+    return gen_ai.box_downscale(cw, ch, crop(w, h, px, x0, y0, cw, ch), tw, th)[2]
 
 
 def out_dir(run):
@@ -55,15 +77,13 @@ def cmd_render(cli):
 def cmd_compose(cli):
     with open(os.path.join(PACK, "game.json")) as fh:
         scale = json.load(fh)["render"].get("scale", 1)
-    tw, th = 48 * scale, 34 * scale
+    tw, th = AREA_W * scale, AREA_H * scale
     w, h, px = read_png(os.path.join(out_dir(cli.run), f"king_{cli.seed}.png"))
-    written = []
-    for i in range(FRAMES):
-        rel = f"art/ui/king_{i:02d}.png"
-        write_png(os.path.join(PACK, rel), tw, th, frame(w, h, px, tw, th, BREATH[i]))
-        written.append(rel)
+    rel = "art/ui/king.png"
+    write_png(os.path.join(PACK, rel), tw, th, wide_frame(w, h, px, tw, th))
+    written = [rel]
     register(written, AUTHOR, method="ai-generated")
-    print(f"wrote {len(written)} King frames at {tw}x{th}; now run tools/build_pack.py")
+    print(f"wrote {rel} at {tw}x{th}; now run tools/build_pack.py")
     return 0
 
 

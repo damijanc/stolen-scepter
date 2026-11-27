@@ -438,9 +438,14 @@ fn home_castle_sheet(resources: &Resources) -> Sheet {
     }
 }
 
-/// The throne room behind the King's words on mobile: the castle backdrop
-/// with the King's portrait in a gold frame, breathing slowly. A pack with
-/// no portrait shows the castle's idling troop instead, as before.
+/// The King above his words on mobile: his portrait fills the whole picture
+/// area, still (the user's calls, 2026-11-27: no framed inset over
+/// the courtyard, and no breathing zoom). A pack with no portrait shows the castle backdrop and its
+/// idling troop instead.
+/// The King's picture area: the whole 240x102 above the speech box.
+const KING_W: i32 = 240;
+const KING_H: i32 = 102;
+
 fn draw_throne_room(
     list: &mut DrawList,
     palette: &Palette,
@@ -448,8 +453,7 @@ fn draw_throne_room(
     castle_troop: i32,
     time: f64,
 ) {
-    let frame = ((time * 2.0) as i32).rem_euclid(4);
-    let king = crate::draw::Sprite::KingAnim { frame };
+    let king = crate::draw::Sprite::King;
     if catalog.path(king).is_none_or(str::is_empty) {
         draw_showcase_backdrop(
             list,
@@ -461,21 +465,7 @@ fn draw_throne_room(
         );
         return;
     }
-    // The backdrop without its troop, then the portrait (48x34 aspect).
-    draw_showcase_backdrop(
-        list,
-        palette,
-        catalog,
-        crate::draw::Backdrop::Castle,
-        -1,
-        time,
-    );
-    let picture = Rect::new(MAP_X + 48, MAP_Y, 144, 102);
-    list.blit(king, Dst::rect(picture.x, picture.y, picture.w, picture.h));
-    list.rect_lines(
-        Rect::new(picture.x - 1, picture.y, picture.w + 2, picture.h),
-        palette.clr(Pal::Yellow),
-    );
+    list.blit(king, Dst::rect(MAP_X, MAP_Y, KING_W, KING_H));
 }
 
 #[cfg(test)]
@@ -498,7 +488,7 @@ mod tests {
     #[test]
     fn the_throne_room_shows_the_king_when_the_pack_has_him() {
         let with = Resources::from_json_str(
-            r#"{"troops":[],"sprites":{"ui":{"castle_backdrop":"c.png","king_portrait":"k_00.png"}}}"#,
+            r#"{"troops":[],"sprites":{"ui":{"castle_backdrop":"c.png","king_portrait":"k.png"}}}"#,
         )
         .expect("parses");
         let mut list = DrawList::new();
@@ -510,11 +500,24 @@ mod tests {
             0.0,
         );
         let sprites = blits(&list);
-        assert!(
-            sprites.contains(&Sprite::KingAnim { frame: 0 }),
-            "{sprites:?}"
+        assert!(sprites.contains(&Sprite::King), "{sprites:?}");
+        // He fills the picture area on his own: no courtyard around him.
+        assert!(!sprites.contains(&Sprite::Backdrop(crate::draw::Backdrop::Castle)));
+        let filled = list.as_slice().iter().any(|cmd| {
+            matches!(cmd, DrawCmd::Blit { sprite: Sprite::King, dst, .. }
+                if *dst == Dst::rect(MAP_X, MAP_Y, KING_W, KING_H))
+        });
+        assert!(filled, "the portrait fills the picture area");
+        // Still: a second later the very same picture, at the same place.
+        let mut later = DrawList::new();
+        draw_throne_room(
+            &mut later,
+            &Palette::fallback(),
+            &SpriteCatalog::from_resources(&with),
+            0,
+            1.37,
         );
-        assert!(sprites.contains(&Sprite::Backdrop(crate::draw::Backdrop::Castle)));
+        assert_eq!(later.as_slice(), list.as_slice());
 
         let without = Resources::from_json_str(r#"{"troops":[]}"#).expect("parses");
         let mut list = DrawList::new();
@@ -525,8 +528,6 @@ mod tests {
             0,
             0.0,
         );
-        assert!(!blits(&list)
-            .iter()
-            .any(|s| matches!(s, Sprite::KingAnim { .. })));
+        assert!(!blits(&list).iter().any(|s| matches!(s, Sprite::King)));
     }
 }

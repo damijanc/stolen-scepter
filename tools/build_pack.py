@@ -297,8 +297,8 @@ def build():
                     dungeon_backdrop=art("ui", "backdrop_dungeon.png"),
                     # The King's portrait (tools/gen_king_ai.py), named only
                     # once its art exists, so the pack never names a hole.
-                    **({"king_portrait": art("ui", "king_00.png")}
-                       if os.path.exists(os.path.join(PACK, "art", "ui", "king_00.png"))
+                    **({"king_portrait": art("ui", "king.png")}
+                       if os.path.exists(os.path.join(PACK, "art", "ui", "king.png"))
                        else {}),
                     ending_win=art("ui", "end_win_screen.png"),
                     ending_lose=art("ui", "end_lose_screen.png"),
