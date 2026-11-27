@@ -1320,6 +1320,26 @@
       "method": "ai-generated",
       "license": "CC0-1.0"
     },
+    "art/ui/king_00.png": {
+      "author": "AI-generated (tools/gen_king_ai.py: SDXL DreamShaper XL), composed by tools/gen_king_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/ui/king_01.png": {
+      "author": "AI-generated (tools/gen_king_ai.py: SDXL DreamShaper XL), composed by tools/gen_king_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/ui/king_02.png": {
+      "author": "AI-generated (tools/gen_king_ai.py: SDXL DreamShaper XL), composed by tools/gen_king_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
+    "art/ui/king_03.png": {
+      "author": "AI-generated (tools/gen_king_ai.py: SDXL DreamShaper XL), composed by tools/gen_king_ai.py",
+      "method": "ai-generated",
+      "license": "CC0-1.0"
+    },
     "art/ui/puzzle_cover.png": {
       "author": "AI-generated (tools/gen_hud_ai.py: SDXL DreamShaper XL), composed by tools/gen_hud_ai.py",
       "method": "ai-generated",

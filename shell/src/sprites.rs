@@ -106,6 +106,8 @@ pub struct SpriteCatalog {
     class_portrait: Vec<String>,
     villain_portrait: Vec<String>,
     villain_anim: Vec<Vec<String>>,
+    /// The King's breathing frames, derived like a wanted poster's.
+    king_anim: Vec<String>,
     view_icon: Vec<String>,
     troop_still: Vec<String>,
     troop_anim: Vec<Vec<String>>,
@@ -200,7 +202,10 @@ impl SpriteCatalog {
             })
             .collect();
 
+        let king_anim = derived_villain_frames(sprites.king_portrait.as_str());
+
         Self {
+            king_anim,
             hero_walk: AnimPaths::from_res(&sprites.hero_walk),
             hero_idle: AnimPaths::from_res(&sprites.hero_idle),
             hero_boat: AnimPaths::from_res(&sprites.hero_boat),
@@ -278,6 +283,7 @@ impl SpriteCatalog {
                 .get(villain)?
                 .get(frame as usize)?
                 .as_str(),
+            Sprite::KingAnim { frame } => self.king_anim.get(frame as usize)?.as_str(),
             Sprite::ViewIcon(index) => self.view_icon.get(index)?.as_str(),
             Sprite::TroopStill(index) => self.troop_still.get(index)?.as_str(),
             Sprite::TroopAnim { troop, frame } => {
@@ -354,6 +360,7 @@ impl SpriteCatalog {
         for group in [
             &self.class_portrait,
             &self.villain_portrait,
+            &self.king_anim,
             &self.view_icon,
             &self.troop_still,
             &self.combat_tile,
@@ -508,6 +515,26 @@ mod tests {
                    "move_rate":1,"melee":[1,1],"ranged":[0,0,0],"recruit_cost":1,
                    "spoils_factor":1,"abilities":"","morale_group":"A"{extra}}}]}}"#
         ))
+    }
+
+    /// The King's portrait (mobile's audience screen) breathes over four
+    /// frames derived from its frame-0 path, as a wanted poster does; a pack
+    /// that names none has no King to draw.
+    #[test]
+    fn the_kings_portrait_frames_come_from_its_frame_zero_path() {
+        let with =
+            catalog(r#"{"troops":[],"sprites":{"ui":{"king_portrait":"art/ui/king_00.png"}}}"#);
+        assert_eq!(
+            with.path(Sprite::KingAnim { frame: 0 }),
+            Some("art/ui/king_00.png")
+        );
+        assert_eq!(
+            with.path(Sprite::KingAnim { frame: 3 }),
+            Some("art/ui/king_03.png")
+        );
+        assert!(with.all_paths().contains(&"art/ui/king_02.png"));
+        let without = catalog(r#"{"troops":[]}"#);
+        assert_eq!(without.path(Sprite::KingAnim { frame: 0 }), None);
     }
 
     #[test]

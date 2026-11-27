@@ -95,6 +95,10 @@ pub struct ResSprites {
     pub forest_backdrop: FixedStr<RES_PATH_LEN>,
     pub hillcave_backdrop: FixedStr<RES_PATH_LEN>,
     pub dungeon_backdrop: FixedStr<RES_PATH_LEN>,
+    /// The King's portrait, frame 0 (`<stem>_00.png`; the shell derives the
+    /// other breathing frames as it does for villains). A port extension C
+    /// does not have: the mobile shell shows it while he speaks. Optional.
+    pub king_portrait: FixedStr<RES_PATH_LEN>,
     pub ending_win: FixedStr<RES_PATH_LEN>,
     pub ending_lose: FixedStr<RES_PATH_LEN>,
     pub orb: FixedStr<RES_PATH_LEN>,
@@ -154,6 +158,7 @@ impl Default for ResSprites {
             forest_backdrop: FixedStr::empty(),
             hillcave_backdrop: FixedStr::empty(),
             dungeon_backdrop: FixedStr::empty(),
+            king_portrait: FixedStr::empty(),
             ending_win: FixedStr::empty(),
             ending_lose: FixedStr::empty(),
             orb: FixedStr::empty(),
@@ -1899,6 +1904,7 @@ impl Resources {
                 ("forest_backdrop", &mut sprites.forest_backdrop),
                 ("hillcave_backdrop", &mut sprites.hillcave_backdrop),
                 ("dungeon_backdrop", &mut sprites.dungeon_backdrop),
+                ("king_portrait", &mut sprites.king_portrait),
                 ("ending_win", &mut sprites.ending_win),
                 ("ending_lose", &mut sprites.ending_lose),
                 ("orb", &mut sprites.orb),
@@ -3721,6 +3727,7 @@ mod tests {
     fn the_ui_and_hud_groups_land_in_their_own_slots() {
         let resources = sprite_pack(
             r#"{"ui":{"chrome_overworld":"ui/chrome.png","town_backdrop":"ui/town.png",
+                      "king_portrait":"ui/king_00.png",
                       "orb":"ui/orb.png","view_icons_extra":["i0.png","i1.png"]},
                 "hud":{"bar_strip":"hud/bar.png","gold_purse":"hud/purse.png",
                        "siege_animation":["s0.png","s1.png","s2.png"]}}"#,
@@ -3729,6 +3736,7 @@ mod tests {
 
         assert_eq!(sprites.chrome_overworld.as_str(), "ui/chrome.png");
         assert_eq!(sprites.town_backdrop.as_str(), "ui/town.png");
+        assert_eq!(sprites.king_portrait.as_str(), "ui/king_00.png");
         assert_eq!(sprites.orb.as_str(), "ui/orb.png");
         assert_eq!(sprites.view_icons_extra_count, 2);
         assert_eq!(sprites.view_icons_extra[1].as_str(), "i1.png");

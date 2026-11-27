@@ -295,6 +295,11 @@ def build():
                     forest_backdrop=art("ui", "backdrop_forest.png"),
                     hillcave_backdrop=art("ui", "backdrop_hillcave.png"),
                     dungeon_backdrop=art("ui", "backdrop_dungeon.png"),
+                    # The King's portrait (tools/gen_king_ai.py), named only
+                    # once its art exists, so the pack never names a hole.
+                    **({"king_portrait": art("ui", "king_00.png")}
+                       if os.path.exists(os.path.join(PACK, "art", "ui", "king_00.png"))
+                       else {}),
                     ending_win=art("ui", "end_win_screen.png"),
                     ending_lose=art("ui", "end_lose_screen.png"),
                     view_icons_extra=[art("ui", f"inventory_zone_{z}.png") for z in zone_ids],

@@ -64,11 +64,10 @@ impl Views {
             // While the King speaks, his throne room is behind him.
             Some(ViewKind::HomeCastle) if self.throne_room => {
                 hits.push(sheet::area(layout), HitTarget::SheetBlank);
-                draw_showcase_backdrop(
+                draw_throne_room(
                     list,
                     palette,
                     catalog,
-                    crate::draw::Backdrop::Castle,
                     home_castle_troop(game, resources),
                     time,
                 );
@@ -436,5 +435,98 @@ fn home_castle_sheet(resources: &Resources) -> Sheet {
         buttons,
         columns: Columns::One,
         back: Some(HitTarget::ViewBack),
+    }
+}
+
+/// The throne room behind the King's words on mobile: the castle backdrop
+/// with the King's portrait in a gold frame, breathing slowly. A pack with
+/// no portrait shows the castle's idling troop instead, as before.
+fn draw_throne_room(
+    list: &mut DrawList,
+    palette: &Palette,
+    catalog: &SpriteCatalog,
+    castle_troop: i32,
+    time: f64,
+) {
+    let frame = ((time * 2.0) as i32).rem_euclid(4);
+    let king = crate::draw::Sprite::KingAnim { frame };
+    if catalog.path(king).is_none_or(str::is_empty) {
+        draw_showcase_backdrop(
+            list,
+            palette,
+            catalog,
+            crate::draw::Backdrop::Castle,
+            castle_troop,
+            time,
+        );
+        return;
+    }
+    // The backdrop without its troop, then the portrait (48x34 aspect).
+    draw_showcase_backdrop(
+        list,
+        palette,
+        catalog,
+        crate::draw::Backdrop::Castle,
+        -1,
+        time,
+    );
+    let picture = Rect::new(MAP_X + 48, MAP_Y, 144, 102);
+    list.blit(king, Dst::rect(picture.x, picture.y, picture.w, picture.h));
+    list.rect_lines(
+        Rect::new(picture.x - 1, picture.y, picture.w + 2, picture.h),
+        palette.clr(Pal::Yellow),
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::draw::{DrawCmd, Sprite};
+
+    fn blits(list: &DrawList) -> Vec<Sprite> {
+        list.as_slice()
+            .iter()
+            .filter_map(|cmd| match cmd {
+                DrawCmd::Blit { sprite, .. } => Some(*sprite),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The King's portrait shows when the pack has one; otherwise the
+    /// castle's troop, as before the art existed.
+    #[test]
+    fn the_throne_room_shows_the_king_when_the_pack_has_him() {
+        let with = Resources::from_json_str(
+            r#"{"troops":[],"sprites":{"ui":{"castle_backdrop":"c.png","king_portrait":"k_00.png"}}}"#,
+        )
+        .expect("parses");
+        let mut list = DrawList::new();
+        draw_throne_room(
+            &mut list,
+            &Palette::fallback(),
+            &SpriteCatalog::from_resources(&with),
+            0,
+            0.0,
+        );
+        let sprites = blits(&list);
+        assert!(
+            sprites.contains(&Sprite::KingAnim { frame: 0 }),
+            "{sprites:?}"
+        );
+        assert!(sprites.contains(&Sprite::Backdrop(crate::draw::Backdrop::Castle)));
+
+        let without = Resources::from_json_str(r#"{"troops":[]}"#).expect("parses");
+        let mut list = DrawList::new();
+        draw_throne_room(
+            &mut list,
+            &Palette::fallback(),
+            &SpriteCatalog::from_resources(&without),
+            0,
+            0.0,
+        );
+        assert!(!blits(&list)
+            .iter()
+            .any(|s| matches!(s, Sprite::KingAnim { .. })));
     }
 }
