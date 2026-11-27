@@ -281,7 +281,13 @@ impl Map {
 }
 
 pub fn is_scepter_tile(tile: &Tile) -> bool {
-    tile.terrain == Terrain::Grass && tile.interactive == Interact::None && !tile.blocks_foot
+    tile.terrain == Terrain::Grass
+        && tile.interactive == Interact::None
+        && !tile.blocks_foot
+        // A castle's open side pieces are walkable since 2026-11-27 (see
+        // `stamp_castle`), but they were never burial ground: keeping them
+        // out leaves every seed's Scepter where C buries it.
+        && !tile.art.as_str().starts_with("castle_")
 }
 
 #[derive(Debug)]
@@ -515,28 +521,48 @@ fn game_friendly_foe_origin_at(game: &Game, zone: &str, x: i32, y: i32) -> bool 
     })
 }
 
+/// What one piece of a castle is: the gate, a wall the art draws, or a side
+/// piece the art leaves as open grass.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CastlePiece {
+    Gate,
+    Wall,
+    Open,
+}
+
 fn stamp_castle(map: &mut Map, x: i32, y: i32, id: &str) {
     // A castle is 3 wide by 2 tall, centred on its gate at the bottom middle.
     // The `br` piece sits at the TOP middle: the name is wrong but it is the
     // asset's, so it is preserved.
-    for (dx, dy, art, is_gate) in [
-        (-1, -1, "castle_tl", false),
-        (0, -1, "castle_br", false),
-        (1, -1, "castle_tr", false),
-        (-1, 0, "castle_ml", false),
-        (0, 0, "castle_gate", true),
-        (1, 0, "castle_mr", false),
+    //
+    // DIVERGENCE, the user's call (2026-11-27): C blocks all five non-gate
+    // pieces, but this pack's castle art fills only the middle column, so
+    // the four side pieces looked like grass and were invisible walls that
+    // could close a corridor. Only what is drawn blocks; the side pieces are
+    // walkable grass.
+    for (dx, dy, art, piece) in [
+        (-1, -1, "castle_tl", CastlePiece::Open),
+        (0, -1, "castle_br", CastlePiece::Wall),
+        (1, -1, "castle_tr", CastlePiece::Open),
+        (-1, 0, "castle_ml", CastlePiece::Open),
+        (0, 0, "castle_gate", CastlePiece::Gate),
+        (1, 0, "castle_mr", CastlePiece::Open),
     ] {
         let Some(tile) = map.tile_mut_i32(x + dx, y + dy) else {
             continue;
         };
         tile.art.copy_from_str(art);
-        if is_gate {
-            tile.interactive = Interact::CastleGate;
-            tile.id.copy_from_str(id);
-            tile.blocks_foot = false;
-        } else {
-            tile.blocks_foot = true;
+        match piece {
+            CastlePiece::Gate => {
+                tile.interactive = Interact::CastleGate;
+                tile.id.copy_from_str(id);
+                tile.blocks_foot = false;
+            }
+            CastlePiece::Wall => tile.blocks_foot = true,
+            CastlePiece::Open => {
+                tile.terrain = Terrain::Grass;
+                tile.blocks_foot = false;
+            }
         }
     }
 }
@@ -985,6 +1011,17 @@ mod tests {
         assert_eq!(art_at(&map, 6, 2), "castle_gate");
         assert_eq!(art_at(&map, 7, 2), "castle_mr");
         assert_eq!(art_at(&map, 4, 2), "tower");
+
+        // DIVERGENCE, the user's call (2026-11-27): only what the castle art
+        // draws blocks -- the top piece; the gate is the way in -- and the
+        // four side pieces, drawn as open grass, are walkable. C blocks the
+        // whole 3x2.
+        let blocks = |x: usize, y: usize| map.tile(x, y).expect("in bounds").blocks_foot;
+        assert!(blocks(6, 1), "the top piece blocks");
+        assert!(!blocks(6, 2), "the gate is the way in");
+        for (x, y) in [(5, 1), (7, 1), (5, 2), (7, 2)] {
+            assert!(!blocks(x, y), "side piece ({x},{y}) is walkable");
+        }
     }
 
     #[test]

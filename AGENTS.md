@@ -188,6 +188,14 @@ Implemented and tested:
   the contracted villain's castle `known` when a town's news names it (C sets
   `known` only on a gate visit or Find Villain), and the world map then marks
   that castle through the fog in a white box, on both desktop and mobile.
+- Castle footprint, a DIVERGENCE by the user's call (2026-11-27): C blocks
+  the whole 3x2 castle block, but this pack's castle art fills only the
+  middle column, so the four side pieces looked like grass and were invisible
+  walls that could close a corridor. `stamp_castle` blocks only the drawn top
+  piece (the gate stays the way in) and makes the side pieces walkable grass.
+  `is_scepter_tile` keeps castle pieces out of the burial pool, so every
+  seed's Scepter stays where C buries it. Foes still keep off the ring around
+  a gate.
 - The weekly economy queries. `Game::weekly_net_gold` judges the boat fare
   on the POST-CREDIT wallet, mirroring `apply_week_end`, which banks the
   commission and pays upkeep before it looks at the fare; a poor hero whose
