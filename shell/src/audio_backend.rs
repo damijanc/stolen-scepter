@@ -71,6 +71,12 @@ fn tune_path(audio: &ResAudio, tune: Tune) -> &str {
         Tune::Slain => audio.tune_slain.as_str(),
         Tune::Spell => audio.tune_spell.as_str(),
         Tune::Victory => audio.tune_victory.as_str(),
+        Tune::WalkDesert => audio.tune_walk_desert.as_str(),
+        Tune::WalkBridge => audio.tune_walk_bridge.as_str(),
+        Tune::Sail => audio.tune_sail.as_str(),
+        Tune::Fly => audio.tune_fly.as_str(),
+        Tune::Buy => audio.tune_buy.as_str(),
+        Tune::Discover => audio.tune_discover.as_str(),
     }
 }
 
@@ -177,6 +183,11 @@ impl KiraAudio {
         if !self.sounds_enabled {
             return;
         }
+        // A tune the pack lacks plays its fallback, if it has one.
+        let tune = match (&self.tunes[tune.index()], tune.fallback()) {
+            (None, Some(fallback)) => fallback,
+            _ => tune,
+        };
         let slot = tune.index();
         let Some(data) = self.tunes[slot].as_ref() else {
             return;

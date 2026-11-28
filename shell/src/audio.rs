@@ -10,11 +10,15 @@
 //! drawn and toggleable, and C reads neither. See `specs/audio-design.md`.
 
 use openbounty_engine::combat::{Combat, COMBAT_SIDES, COMBAT_SLOTS};
+use openbounty_engine::game::{Game, Mount, TravelMode};
+use openbounty_engine::map::Map;
 use openbounty_engine::step::{StepInteraction, StepResult};
+use openbounty_engine::tile::Terrain;
 
-/// The one-shot events. The first four are C's `AudioTuneId`; the combat
-/// five after them are a port extension (C's fights are silent but for the
-/// defeat tune), derived from what the engine's combat state records.
+/// The one-shot events. The first four are C's `AudioTuneId`; the rest are
+/// a port extension, derived from what the engine returns: the combat five
+/// (C's fights are silent but for the defeat tune), the walk tune's variants
+/// for the ground and the mount, and the overworld's purchases and finds.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Tune {
     Walk,
@@ -31,10 +35,22 @@ pub enum Tune {
     Spell,
     /// The player won the fight.
     Victory,
+    /// The walk tune ridden over sand.
+    WalkDesert,
+    /// The walk tune ridden over a bridge's planks.
+    WalkBridge,
+    /// The walk tune afloat.
+    Sail,
+    /// The walk tune in the air.
+    Fly,
+    /// Gold spent: a boat, siege weapons, a spell, recruits.
+    Buy,
+    /// An artifact, orb or navigation map picked up.
+    Discover,
 }
 
 impl Tune {
-    pub const ALL: [Tune; 9] = [
+    pub const ALL: [Tune; 15] = [
         Tune::Walk,
         Tune::Bump,
         Tune::Chest,
@@ -44,6 +60,12 @@ impl Tune {
         Tune::Slain,
         Tune::Spell,
         Tune::Victory,
+        Tune::WalkDesert,
+        Tune::WalkBridge,
+        Tune::Sail,
+        Tune::Fly,
+        Tune::Buy,
+        Tune::Discover,
     ];
 
     /// The tune's slot in [`Tune::ALL`].
@@ -57,6 +79,47 @@ impl Tune {
     pub fn ducks(self) -> bool {
         !matches!(self, Tune::Hit | Tune::Shoot | Tune::Slain | Tune::Spell)
     }
+
+    /// What plays instead when the pack lacks this tune: the walk variants
+    /// fall back to the plain walk tune, so an older pack still ticks.
+    pub fn fallback(self) -> Option<Tune> {
+        match self {
+            Tune::WalkDesert | Tune::WalkBridge | Tune::Sail | Tune::Fly => Some(Tune::Walk),
+            _ => None,
+        }
+    }
+}
+
+/// The walk tune for how the hero travels and what they stand on. Flying
+/// beats sailing (a flyer never boards), and both beat the ground; a bridge
+/// beats the terrain under it.
+pub fn travel_tune(flying: bool, sailing: bool, terrain: Terrain, bridge: bool) -> Tune {
+    if flying {
+        Tune::Fly
+    } else if sailing {
+        Tune::Sail
+    } else if bridge {
+        Tune::WalkBridge
+    } else if terrain == Terrain::Desert {
+        Tune::WalkDesert
+    } else {
+        Tune::Walk
+    }
+}
+
+/// The walk tune `tune` becomes for the hero's current tile and mount;
+/// every other tune passes through.
+pub fn on_ground(tune: Tune, game: &Game, map: &Map) -> Tune {
+    if tune != Tune::Walk {
+        return tune;
+    }
+    let tile = map.tile_i32(game.position.x, game.position.y);
+    travel_tune(
+        game.character.mount == Mount::Fly,
+        game.travel_mode == TravelMode::Boat || game.character.mount == Mount::Sail,
+        tile.map_or(Terrain::Grass, |t| t.terrain),
+        tile.is_some_and(|t| t.is_bridge),
+    )
 }
 
 /// The few combat fields that tell which sound an action made, captured
@@ -204,10 +267,17 @@ pub fn tunes_for_step(result: &StepResult, absorbed: bool) -> [Option<Tune>; 2] 
             bounced,
             ..
         } => {
-            let chest = matches!(interaction, StepInteraction::TreasureChest { .. });
+            // The chest is C's; a find is the port's own.
+            let first = match interaction {
+                StepInteraction::TreasureChest { .. } => Some(Tune::Chest),
+                StepInteraction::Artifact { .. }
+                | StepInteraction::Orb { .. }
+                | StepInteraction::Navmap { .. } => Some(Tune::Discover),
+                _ => None,
+            };
             // A bounced step skips `GameOnStep`, and with it the walk tune.
             [
-                chest.then_some(Tune::Chest),
+                first,
                 if *bounced {
                     None
                 } else {
@@ -349,6 +419,7 @@ impl Music {
 mod tests {
     use super::*;
     use openbounty_engine::game::ChestRoll;
+    use openbounty_engine::map::Tile;
     use openbounty_engine::step::StepAdvance;
     use openbounty_engine::tile::{Interact, Terrain};
 
@@ -654,20 +725,12 @@ mod tests {
         }
     }
 
-    /// C ducks the music for its four tunes; the combat blows would pump it.
+    /// C ducks the music for its four tunes, and the walk's variants are the
+    /// walk; the combat blows would pump it.
     #[test]
     fn only_the_combat_blows_skip_the_duck() {
-        let ducking: Vec<Tune> = Tune::ALL.into_iter().filter(|t| t.ducks()).collect();
-        assert_eq!(
-            ducking,
-            [
-                Tune::Walk,
-                Tune::Bump,
-                Tune::Chest,
-                Tune::Defeat,
-                Tune::Victory
-            ]
-        );
+        let quiet: Vec<Tune> = Tune::ALL.into_iter().filter(|t| !t.ducks()).collect();
+        assert_eq!(quiet, [Tune::Hit, Tune::Shoot, Tune::Slain, Tune::Spell]);
     }
 
     fn snaps(edit: impl FnOnce(&mut Combat)) -> (CombatSnap, CombatSnap) {
@@ -709,5 +772,74 @@ mod tests {
             c.units[1][0].dead = true;
         });
         assert_eq!(combat_tunes(&a, &b), [Some(Tune::Spell), Some(Tune::Slain)]);
+    }
+
+    /// Artifacts, orbs and navigation maps play the find sound where a chest
+    /// plays its own, and the ride on still ticks.
+    #[test]
+    fn picking_up_a_find_plays_the_discover_tune() {
+        for interaction in [
+            StepInteraction::Artifact { id: "a".to_owned() },
+            StepInteraction::Orb {
+                id: "o".to_owned(),
+                zone_index: None,
+            },
+            StepInteraction::Navmap {
+                id: "n".to_owned(),
+                discovered_zone: None,
+            },
+        ] {
+            assert_eq!(
+                tunes_for_step(&moved(interaction), false),
+                [Some(Tune::Discover), Some(Tune::Walk)]
+            );
+        }
+    }
+
+    #[test]
+    fn the_walk_tune_follows_the_mount_then_the_ground() {
+        use Terrain::{Desert, Grass, Water};
+        // flying, sailing, terrain, bridge
+        assert_eq!(travel_tune(false, false, Grass, false), Tune::Walk);
+        assert_eq!(travel_tune(false, false, Desert, false), Tune::WalkDesert);
+        assert_eq!(travel_tune(false, false, Water, true), Tune::WalkBridge);
+        assert_eq!(travel_tune(false, true, Water, false), Tune::Sail);
+        assert_eq!(travel_tune(true, false, Desert, true), Tune::Fly);
+    }
+
+    #[test]
+    fn on_ground_reads_the_hero_tile_and_leaves_other_tunes_alone() {
+        let mut tiles = vec![Tile::default(); 3];
+        tiles[1].terrain = Terrain::Desert;
+        tiles[2].terrain = Terrain::Water;
+        tiles[2].is_bridge = true;
+        let map = Map::from_tiles(3, 1, tiles).expect("rectangular");
+        let mut game = Box::<Game>::default();
+        for (x, tune) in [
+            (0, Tune::Walk),
+            (1, Tune::WalkDesert),
+            (2, Tune::WalkBridge),
+        ] {
+            game.position.x = x;
+            assert_eq!(on_ground(Tune::Walk, &game, &map), tune);
+        }
+        game.travel_mode = TravelMode::Boat;
+        assert_eq!(on_ground(Tune::Walk, &game, &map), Tune::Sail);
+        game.character.mount = Mount::Fly;
+        assert_eq!(on_ground(Tune::Walk, &game, &map), Tune::Fly);
+        assert_eq!(on_ground(Tune::Chest, &game, &map), Tune::Chest);
+    }
+
+    /// An older pack without the variants keeps ticking on the plain walk.
+    #[test]
+    fn only_the_walk_variants_fall_back_and_only_to_walk() {
+        for tune in Tune::ALL {
+            let expected = matches!(
+                tune,
+                Tune::WalkDesert | Tune::WalkBridge | Tune::Sail | Tune::Fly
+            )
+            .then_some(Tune::Walk);
+            assert_eq!(tune.fallback(), expected, "{tune:?}");
+        }
     }
 }

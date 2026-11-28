@@ -240,6 +240,22 @@ Only C's four tunes and the victory sting duck the music (`Tune::ducks`):
 the blows land several times a second, and ducking under each would pump
 the music.
 
+## Overworld sounds: a port extension
+
+The walk tune follows how the hero travels (`audio::on_ground`, read after
+the step, from the tile ridden onto): `Fly` aloft, `Sail` afloat,
+`WalkBridge` on a bridge tile, `WalkDesert` on sand, else `Walk`. The hero
+rides, so the pack's ground variants are hoof beats. Each variant falls back
+to `Walk` when a pack lacks it (`Tune::fallback`), and all of them duck the
+music as the walk does.
+
+`Discover` plays where a chest plays `Chest`: on an artifact, an orb or a
+navigation map (`tunes_for_step`). `Buy` plays when gold falls on the same
+day inside the three spots every purchase runs through -- the town menu,
+the castle recruit screen and a prompt answer (a den's recruits, the
+alcove's lesson) -- via `session::coins_if_spent`. The same-day test keeps
+out a search or voyage whose days run into a week's upkeep.
+
 ## Components
 
 - `engine/src/resources.rs`: `ResAudio`, six `FixedStr<RES_PATH_LEN>` paths

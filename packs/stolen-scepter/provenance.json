@@ -1715,6 +1715,11 @@
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
+    "audio/tune_buy.wav": {
+      "author": "Kenney, \"RPG Audio\" (handleCoins2.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
     "audio/tune_chest.wav": {
       "author": "Kenney, \"RPG Audio\" (handleCoins.ogg), https://kenney.nl",
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
@@ -1725,9 +1730,24 @@
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
+    "audio/tune_discover.wav": {
+      "author": "Kenney, \"Music Jingles\" (jingles_PIZZI15.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_fly.wav": {
+      "author": "procedural (tools/import_tunes.py)",
+      "method": "procedural",
+      "license": "CC0-1.0"
+    },
     "audio/tune_hit.wav": {
       "author": "Kenney, \"RPG Audio\" (chop.ogg), https://kenney.nl",
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_sail.wav": {
+      "author": "procedural (tools/import_tunes.py)",
+      "method": "procedural",
       "license": "CC0-1.0"
     },
     "audio/tune_shoot.wav": {
@@ -1751,8 +1771,18 @@
       "license": "CC0-1.0"
     },
     "audio/tune_walk.wav": {
-      "author": "Kenney, \"Impact Sounds\" (footstep_grass_004.ogg), https://kenney.nl",
-      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "author": "Kenney, \"Impact Sounds\" (footstep_grass_000.ogg, footstep_grass_002.ogg), https://kenney.nl",
+      "method": "downloaded, mixed into a hoof beat (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_walk_bridge.wav": {
+      "author": "Kenney, \"Impact Sounds\" (footstep_wood_000.ogg, footstep_wood_002.ogg), https://kenney.nl",
+      "method": "downloaded, mixed into a hoof beat (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_walk_desert.wav": {
+      "author": "Kenney, \"Impact Sounds\" (footstep_snow_000.ogg, footstep_snow_002.ogg), https://kenney.nl",
+      "method": "downloaded, mixed into a hoof beat (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "palettes/palette.bin": {

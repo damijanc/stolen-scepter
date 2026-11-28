@@ -546,6 +546,7 @@ impl<'r> Session<'r> {
                     );
                 }
             } else if answer != PromptResult::None {
+                let gold = (game.stats.gold, game.stats.days_left);
                 let combat_flow = dispatch_answer(
                     game,
                     map,
@@ -558,6 +559,7 @@ impl<'r> Session<'r> {
                     dialog,
                     views,
                 );
+                coins_if_spent(audio.as_mut(), gold, game);
                 if let Some(flow) = combat_flow {
                     *combat = Some(start_combat(game, resources, flow));
                     audio.set_track(audio::Track::Combat);
@@ -677,6 +679,7 @@ impl<'r> Session<'r> {
                 Some(target) => views.town_click(target),
                 None => views.town_update(keys),
             };
+            let gold = (game.stats.gold, game.stats.days_left);
             match town {
                 TownInput::RunRow(row) if layout.touch => ask_town_row(game, resources, views, row),
                 TownInput::RunRow(row) | TownInput::RunConfirmed(row) => {
@@ -684,6 +687,7 @@ impl<'r> Session<'r> {
                 }
                 TownInput::Dismissed | TownInput::Handled | TownInput::None => {}
             }
+            coins_if_spent(audio.as_mut(), gold, game);
         } else if views.active() == Some(ViewKind::HomeCastle) {
             // Throne room / barracks: ESC pops, A opens the recruit screen, B
             // runs the audience-with-the-king flow. A click on a menu line
@@ -707,10 +711,12 @@ impl<'r> Session<'r> {
         } else if views.active() == Some(ViewKind::RecruitSoldiers) {
             // The recruit screen owns its letters, digits and Enter/ESC. A
             // click selects a troop row like its letter.
+            let gold = (game.stats.gold, game.stats.days_left);
             let close = match clicked {
                 Some(target) => views.recruit_click(game, resources, target),
                 None => views.recruit_soldiers_update(game, resources, keys),
             };
+            coins_if_spent(audio.as_mut(), gold, game);
             if close {
                 views.dismiss();
             }
@@ -1025,7 +1031,7 @@ impl<'r> Session<'r> {
                     let absorbed = step_absorbed(game);
                     let advance = consume_step(game, resources, false);
                     if let Some(tune) = audio::on_step_tune(absorbed) {
-                        audio.play_tune(tune);
+                        audio.play_tune(audio::on_ground(tune, game, map));
                     }
                     if advance.week_ended {
                         schedule_week_end(pending_week, game, resources, advance.commission_paid);
@@ -1148,11 +1154,12 @@ impl<'r> Session<'r> {
                 if walk::stops_walk(&result) {
                     *walk = None;
                 }
+                // Read the ground after the step: the tile ridden onto.
                 for tune in audio::tunes_for_step(&result, absorbed)
                     .into_iter()
                     .flatten()
                 {
-                    audio.play_tune(tune);
+                    audio.play_tune(audio::on_ground(tune, game, map));
                 }
                 if let StepResult::Moved {
                     interaction,
@@ -1933,6 +1940,18 @@ pub(crate) fn show_lose_game(views: &mut Views, resources: &Resources, game: &Ga
 /// time stop.
 fn step_absorbed(game: &Game) -> bool {
     game.stats.game_over || game.stats.time_stop > 0
+}
+
+/// The purchase sound, when an action spent gold. Every purchase -- a boat,
+/// siege weapons, a spell, recruits from a den or the castle, the alcove's
+/// lesson -- runs inside one of the three spots that call this. The only
+/// other way gold falls there is a week's upkeep, when a search or a voyage
+/// runs the calendar past a week's end; purchases never spend a day, so a
+/// day passing rules it out.
+fn coins_if_spent(audio: &mut dyn AudioOut, (gold, days_left): (i32, i32), game: &Game) {
+    if game.stats.gold < gold && game.stats.days_left == days_left {
+        audio.play_tune(audio::Tune::Buy);
+    }
 }
 
 /// Hand the three audio options to the backend, `main.c:904-906`.
@@ -4325,5 +4344,46 @@ mod tests {
             drive(&mut session, &mut list, &[], Some(at), true, &mut now),
             FrameStatus::Quit
         );
+    }
+
+    /// Records every tune it is asked to play.
+    #[derive(Default)]
+    struct Heard(Vec<crate::audio::Tune>);
+
+    impl crate::audio::AudioOut for Heard {
+        fn is_available(&self) -> bool {
+            true
+        }
+        fn set_sounds_enabled(&mut self, _: bool) {}
+        fn set_music_enabled(&mut self, _: bool) {}
+        fn set_track(&mut self, _: crate::audio::Track) {}
+        fn set_master_volume(&mut self, _: i32) {}
+        fn play_tune(&mut self, tune: crate::audio::Tune) {
+            self.0.push(tune);
+        }
+        fn tick(&mut self) {}
+    }
+
+    #[test]
+    fn spending_gold_on_the_same_day_sounds_the_coins() {
+        use crate::audio::Tune;
+        let mut game = Box::<openbounty_engine::game::Game>::default();
+        game.stats.gold = 1000;
+        game.stats.days_left = 300;
+        let before = (game.stats.gold, game.stats.days_left);
+
+        let mut heard = Heard::default();
+        super::coins_if_spent(&mut heard, before, &game);
+        assert!(heard.0.is_empty(), "nothing spent, nothing heard");
+
+        game.stats.gold = 900;
+        super::coins_if_spent(&mut heard, before, &game);
+        assert_eq!(heard.0, [Tune::Buy]);
+
+        // A search that runs into a week's upkeep is not a purchase.
+        game.stats.days_left = 290;
+        let mut heard = Heard::default();
+        super::coins_if_spent(&mut heard, before, &game);
+        assert!(heard.0.is_empty());
     }
 }

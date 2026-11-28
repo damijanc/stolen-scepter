@@ -330,7 +330,12 @@ def build():
                               chest="audio/tune_chest.wav", defeat="audio/tune_defeat.wav",
                               hit="audio/tune_hit.wav", shoot="audio/tune_shoot.wav",
                               slain="audio/tune_slain.wav", spell="audio/tune_spell.wav",
-                              victory="audio/tune_victory.wav")),
+                              victory="audio/tune_victory.wav",
+                              walk_desert="audio/tune_walk_desert.wav",
+                              walk_bridge="audio/tune_walk_bridge.wav",
+                              sail="audio/tune_sail.wav", fly="audio/tune_fly.wav",
+                              buy="audio/tune_buy.wav",
+                              discover="audio/tune_discover.wav")),
         strings=strings,
     )
     return pack

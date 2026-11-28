@@ -142,6 +142,14 @@ pub struct ResAudio {
     pub tune_slain: FixedStr<RES_PATH_LEN>,
     pub tune_spell: FixedStr<RES_PATH_LEN>,
     pub tune_victory: FixedStr<RES_PATH_LEN>,
+    /// The walk tune's variants (sand, a bridge, afloat, aloft) and the
+    /// overworld's purchase and find sounds, also port extensions.
+    pub tune_walk_desert: FixedStr<RES_PATH_LEN>,
+    pub tune_walk_bridge: FixedStr<RES_PATH_LEN>,
+    pub tune_sail: FixedStr<RES_PATH_LEN>,
+    pub tune_fly: FixedStr<RES_PATH_LEN>,
+    pub tune_buy: FixedStr<RES_PATH_LEN>,
+    pub tune_discover: FixedStr<RES_PATH_LEN>,
 }
 
 impl Default for ResSprites {
@@ -1861,6 +1869,12 @@ impl Resources {
                 ("slain", &mut self.audio.tune_slain),
                 ("spell", &mut self.audio.tune_spell),
                 ("victory", &mut self.audio.tune_victory),
+                ("walk_desert", &mut self.audio.tune_walk_desert),
+                ("walk_bridge", &mut self.audio.tune_walk_bridge),
+                ("sail", &mut self.audio.tune_sail),
+                ("fly", &mut self.audio.tune_fly),
+                ("buy", &mut self.audio.tune_buy),
+                ("discover", &mut self.audio.tune_discover),
             ] {
                 slot.copy_from_str(json_str_or(tunes, key, ""));
             }
@@ -3210,7 +3224,10 @@ mod tests {
                             "chest": "audio/chest.wav", "defeat": "audio/defeat.wav",
                             "hit": "audio/hit.wav", "shoot": "audio/shoot.wav",
                             "slain": "audio/slain.wav", "spell": "audio/spell.wav",
-                            "victory": "audio/victory.wav"}
+                            "victory": "audio/victory.wav",
+                            "walk_desert": "audio/sand.wav", "walk_bridge": "audio/planks.wav",
+                            "sail": "audio/sail.wav", "fly": "audio/fly.wav",
+                            "buy": "audio/buy.wav", "discover": "audio/discover.wav"}
                 }}"#,
         )
         .expect("fixture parses");
@@ -3227,6 +3244,12 @@ mod tests {
         assert_eq!(audio.tune_slain.as_str(), "audio/slain.wav");
         assert_eq!(audio.tune_spell.as_str(), "audio/spell.wav");
         assert_eq!(audio.tune_victory.as_str(), "audio/victory.wav");
+        assert_eq!(audio.tune_walk_desert.as_str(), "audio/sand.wav");
+        assert_eq!(audio.tune_walk_bridge.as_str(), "audio/planks.wav");
+        assert_eq!(audio.tune_sail.as_str(), "audio/sail.wav");
+        assert_eq!(audio.tune_fly.as_str(), "audio/fly.wav");
+        assert_eq!(audio.tune_buy.as_str(), "audio/buy.wav");
+        assert_eq!(audio.tune_discover.as_str(), "audio/discover.wav");
     }
 
     /// A pack that declares no audio leaves every slot empty rather than
