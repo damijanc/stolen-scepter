@@ -71,8 +71,9 @@ def cmd_render(cli):
 GROUND = (14, 22, 40)
 # Android adaptive icon: a 108 dp layer, of which a launcher shows about the
 # middle 72 dp. The picture is scaled so the medallion ring (0.885 of the
-# render's width) is just inside that circle.
-LAYER_DP, PICTURE_DP = 108, 79
+# render's width) sits inside the 66 dp safe zone with a navy margin (the
+# first cut, 79 dp, filled the circle and looked too tight on the phone).
+LAYER_DP, PICTURE_DP = 108, 70
 DENSITIES = {"mdpi": 1.0, "hdpi": 1.5, "xhdpi": 2.0, "xxhdpi": 3.0, "xxxhdpi": 4.0}
 RES = os.path.join(ROOT, "shell", "android", "res")
 # The Play listing's 512 px icon: full bleed (the staff runs off the bottom
