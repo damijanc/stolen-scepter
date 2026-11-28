@@ -104,9 +104,17 @@ cat > "$WORK/AndroidManifest.xml" <<EOF
              later SDK; at that point the game must lay out in portrait. -->
         <property android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
             android:value="true" />
+        <!-- Every configuration change is handled in place. Android
+             otherwise destroys and recreates the activity (on a dark-mode
+             switch, a font or display-size change, a new language, and
+             sometimes on the first launch after boot), and miniquad then
+             starts the game a second time in the same process, which
+             aborts in macroquad's GL teardown. The game reads none of these
+             settings, so ignoring them is safe; a resize still arrives
+             through miniquad's surface callbacks. -->
         <activity android:name=".MainActivity" android:exported="true"
             android:screenOrientation="userLandscape"
-            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|keyboard">
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|density|screenSize|smallestScreenSize|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender">
             <meta-data android:name="android.app.lib_name" android:value="$LIB" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
