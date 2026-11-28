@@ -95,6 +95,7 @@ cat > "$WORK/AndroidManifest.xml" <<EOF
     package="$PACKAGE" android:versionCode="1" android:versionName="0.1.0">
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
     <application android:label="Stolen Scepter" android:hasCode="true"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
         <!-- Android 16 ignores screenOrientation on large screens (tablets,
              foldables) for apps targeting SDK 36, which runs the game in a
@@ -116,9 +117,11 @@ cat > "$WORK/AndroidManifest.xml" <<EOF
 </manifest>
 EOF
 
-# 4. Package: manifest + assets, then dex, then the library.
+# 4. Package: resources (the launcher icon, made by tools/gen_appicon_ai.py),
+# manifest + assets, then dex, then the library.
+"$BT/aapt2" compile --dir shell/android/res -o "$WORK/res.zip"
 "$BT/aapt2" link -o "$WORK/unsigned.apk" -I "$PLATFORM" \
-  --manifest "$WORK/AndroidManifest.xml" -A "$WORK/assets" \
+  --manifest "$WORK/AndroidManifest.xml" -A "$WORK/assets" "$WORK/res.zip" \
   --min-sdk-version 26 --target-sdk-version 36
 javac -nowarn -source 8 -target 8 -bootclasspath "$PLATFORM" -classpath "$PLATFORM" \
   -d "$WORK/classes" $(find "$WORK/java" -name '*.java') 2>&1 | grep -v "^warning: \[options\]" || true
