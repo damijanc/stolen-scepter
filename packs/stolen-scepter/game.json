@@ -5703,7 +5703,7 @@
     ]
    },
    {
-    "label": "Art and sound effects by:",
+    "label": "Art by:",
     "names": [
      "Damijan Cavar"
     ]
@@ -5713,6 +5713,12 @@
     "names": [
      "DST - GrassLands Theme",
      "Emma_MA - Determined Pursuit"
+    ]
+   },
+   {
+    "label": "Sound effects (CC0):",
+    "names": [
+     "Kenney.nl"
     ]
    }
   ],

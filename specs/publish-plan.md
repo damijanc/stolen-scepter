@@ -104,7 +104,9 @@ Tasks, in order:
    "GrassLands Theme" (overworld) and Emma_MA's "Determined Pursuit" (combat),
    re-encoded to Ogg Vorbis, credited in the pack and recorded in
    `provenance.json`; the originals sit in ignored `game-assets/audio-src/`.
-   The four tunes are synthesised by `tools/gen_tunes.py`.
+   The four tunes are Kenney.nl CC0 sounds (Impact Sounds, RPG Audio, Music
+   Jingles), installed by `tools/import_tunes.py`; the downloads sit in
+   ignored `game-assets/audio-src/kenney/`.
 6. **Font** (done, differently): instead of an OFL font, `glyphs.py` holds
    our own 5x7 glyphs for all printable ASCII and `gen_font.py` packs them
    into the strip, so the font has no third-party licence at all.

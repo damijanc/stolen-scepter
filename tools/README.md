@@ -74,7 +74,7 @@ PNG I/O is `pngio.py`.
   slot, plus the palette. `gen_font.py` packs `glyphs.py`, the project's own
   8x8 glyphs, into the font strip. All write into `packs/stolen-scepter/` via
   `packart.py`, which also records each file in the pack's `provenance.json`.
-  `gen_tunes.py` synthesises the four effect tunes. `artlib.py` and
+  `import_tunes.py` installs the four effect tunes from Kenney's CC0 packs. `artlib.py` and
   `modern_proof.py` are the earlier HD experiments.
 
 ## The pack
@@ -87,7 +87,8 @@ PNG I/O is `pngio.py`.
     python3 tools/gen_worldmap.py
     python3 tools/gen_combat.py && python3 tools/gen_sprites.py
     python3 tools/gen_villains.py && python3 tools/gen_ui.py
-    python3 tools/gen_font.py && python3 tools/gen_tunes.py
+    python3 tools/gen_font.py
+    python3 tools/import_tunes.py <kenney-dir>   # needs the Kenney downloads
     python3 tools/import_troops.py   # needs the local AI runs
     python3 tools/build_pack.py --check
 

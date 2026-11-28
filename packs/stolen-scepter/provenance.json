@@ -1711,23 +1711,23 @@
       "license": "CC0-1.0"
     },
     "audio/tune_bump.wav": {
-      "author": "procedural (tools/gen_tunes.py)",
-      "method": "procedural",
+      "author": "Kenney, \"Impact Sounds\" (impactSoft_medium_000.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "audio/tune_chest.wav": {
-      "author": "procedural (tools/gen_tunes.py)",
-      "method": "procedural",
+      "author": "Kenney, \"RPG Audio\" (handleCoins.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "audio/tune_defeat.wav": {
-      "author": "procedural (tools/gen_tunes.py)",
-      "method": "procedural",
+      "author": "Kenney, \"Music Jingles\" (jingles_PIZZI14.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "audio/tune_walk.wav": {
-      "author": "procedural (tools/gen_tunes.py)",
-      "method": "procedural",
+      "author": "Kenney, \"Impact Sounds\" (footstep_grass_004.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "palettes/palette.bin": {

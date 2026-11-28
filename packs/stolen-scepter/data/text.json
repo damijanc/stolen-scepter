@@ -158,9 +158,10 @@
   "groups": [
    {"label": "Game and Rust engine:", "names": ["Damijan Cavar"]},
    {"label": "Based on OpenBounty by:", "names": ["Dan Heskett"]},
-   {"label": "Art and sound effects by:", "names": ["Damijan Cavar"]},
+   {"label": "Art by:", "names": ["Damijan Cavar"]},
    {"label": "Music (CC0, OpenGameArt):",
-    "names": ["DST - GrassLands Theme", "Emma_MA - Determined Pursuit"]}
+    "names": ["DST - GrassLands Theme", "Emma_MA - Determined Pursuit"]},
+   {"label": "Sound effects (CC0):", "names": ["Kenney.nl"]}
   ],
   "copyright": ["The Quest for a Stolen Scepter", "MIT License", "Free to play and share"]
  },
