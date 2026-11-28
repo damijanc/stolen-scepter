@@ -995,8 +995,12 @@ impl CombatLoop {
             }
         };
 
-        // Read the sounds before `combat_compact` clears the dead flags.
-        let tunes = combat_tunes(&snap_before, &CombatSnap::of(&self.combat));
+        // Read the sounds before `combat_compact` clears the dead flags. A
+        // spell sounds as the one just cast.
+        let mut tunes = combat_tunes(&snap_before, &CombatSnap::of(&self.combat));
+        if tunes[0] == Some(Tune::Spell) {
+            tunes[0] = Some(Tune::for_spell(self.cast_spell_idx));
+        }
         if tunes.iter().any(Option::is_some) {
             self.tunes = tunes;
         }
@@ -2801,6 +2805,34 @@ mod tests {
             tx.send(tunes).expect("sends");
         });
         rx.recv().expect("received")
+    }
+
+    /// Clone cast on the player's own militia sounds as Clone, not as the
+    /// generic spell.
+    #[test]
+    fn a_cast_sounds_as_its_own_spell() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        big_stack(move || {
+            let (mut l, resources, mut game) = loop_fixture();
+            mage(&mut l, &mut game);
+            let mut prompt = Prompt::default();
+            for input in [
+                click(HitTarget::CombatCell(0, 0)),
+                click(HitTarget::CombatAction(CombatAction::Cast)),
+                click(HitTarget::CombatSpell(COMBAT_SPELL_CLONE as usize)),
+                click(HitTarget::CombatCell(0, 0)),
+            ] {
+                by_pointer(&mut l, &mut game, &resources, &mut prompt, input);
+            }
+            tx.send((
+                l.take_tunes(),
+                game.spells.counts[COMBAT_SPELL_CLONE as usize],
+            ))
+            .expect("sends");
+        });
+        let (tunes, charges_left) = rx.recv().expect("received");
+        assert_eq!(charges_left, 0, "the clone was cast");
+        assert_eq!(tunes, [Some(Tune::SpellClone), None]);
     }
 
     #[test]

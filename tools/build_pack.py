@@ -335,7 +335,14 @@ def build():
                               walk_bridge="audio/tune_walk_bridge.wav",
                               sail="audio/tune_sail.wav", fly="audio/tune_fly.wav",
                               buy="audio/tune_buy.wav",
-                              discover="audio/tune_discover.wav")),
+                              discover="audio/tune_discover.wav",
+                              spell_clone="audio/tune_spell_clone.wav",
+                              spell_teleport="audio/tune_spell_teleport.wav",
+                              spell_fireball="audio/tune_spell_fireball.wav",
+                              spell_lightning="audio/tune_spell_lightning.wav",
+                              spell_freeze="audio/tune_spell_freeze.wav",
+                              spell_resurrect="audio/tune_spell_resurrect.wav",
+                              spell_turn_undead="audio/tune_spell_turn_undead.wav")),
         strings=strings,
     )
     return pack

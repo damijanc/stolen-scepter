@@ -315,7 +315,8 @@ Implemented and tested:
   extension, read from a before/after snapshot of each combat action
   (`audio::combat_tunes`); C's fights are silent but for defeat. So are
   the walk tune's ground and mount variants (`audio::on_ground`), the find
-  sound and the purchase sound (`session::coins_if_spent`).
+  sound, the purchase sound (`session::coins_if_spent`) and a sound per
+  combat spell (`Tune::for_spell`).
 - The ESC Game Menu (`shell/src/menu.rs`), a deliberate DIVERGENCE rather
   than a port: C's `VIEW_MENU` exists but nothing ever opens it
   (`specs/ingame-menu-design.md`). Bare ESC on the overworld -- checked
@@ -330,7 +331,7 @@ Implemented and tested:
   the save format carries no combat state, and fixing that means serializing
   combat, not opening the menu there.
 
-Test coverage is 370 engine unit tests, 670 shell unit tests, a click-only
+Test coverage is 370 engine unit tests, 672 shell unit tests, a click-only
 mobile playthrough (`shell/tests/touch_only.rs` over `touch_only.txt`, seed 7:
 the King, castle recruiting, a won fight, a den, a boat and a spell at the sea town beside the King, the hero menu)
 with a finger-size audit of every frame's tap regions (`playtest

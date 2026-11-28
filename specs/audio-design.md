@@ -249,6 +249,11 @@ rides, so the pack's ground variants are hoof beats. Each variant falls back
 to `Walk` when a pack lacks it (`Tune::fallback`), and all of them duck the
 music as the walk does.
 
+Each combat spell has its own sound (`Tune::for_spell`, the
+`spell_<name>` keys under `audio.tunes`), chosen by the spell just cast
+(`CombatLoop::cast_spell_idx`); a pack without one plays the generic
+`spell` tune. Like it, they do not duck the music.
+
 `Discover` plays where a chest plays `Chest`: on an artifact, an orb or a
 navigation map (`tunes_for_step`). `Buy` plays when gold falls on the same
 day inside the three spots every purchase runs through -- the town menu,

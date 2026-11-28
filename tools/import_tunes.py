@@ -1,21 +1,25 @@
-"""Install the pack's effect tunes from Kenney's CC0 sound packs.
+"""Install the pack's effect tunes from CC0 sound packs.
 
 Walk, bump, chest and defeat are the four one-shots C plays
 (`specs/audio-design.md`); they replace the square-wave beeps this pack used
 to synthesise, so the effects match the orchestral music. The rest are the
 port's own, which C does not have: the walk tune's desert, bridge, sailing
 and flying variants, buying, finding something, and the combat sounds (hit,
-shoot, slain, spell, victory).
+shoot, slain, a sound per spell, victory).
 
-The sources are four Kenney packs, all CC0 (https://kenney.nl): "Impact
-Sounds", "RPG Audio", "Interface Sounds" and "Music Jingles". Download and unzip them anywhere,
-then point this at the folder holding them; each source is found by file name
-anywhere under it:
+The sources, all CC0:
 
-    python3 tools/import_tunes.py ~/Downloads/kenney
+- Four Kenney packs (https://kenney.nl): "Impact Sounds", "RPG Audio",
+  "Interface Sounds" and "Music Jingles".
+- OpenGameArt.org items, each named with its page in `RECORDINGS` below.
 
-Each file is trimmed, faded, peak-normalised and written as 16-bit mono WAV
-to the path `game.json` names in `audio.tunes`, and provenance is recorded.
+Download and unzip them anywhere, then point this at the folders holding
+them; each source is found by file name anywhere under them:
+
+    python3 tools/import_tunes.py ~/Downloads/kenney ~/Downloads/opengameart
+
+Each file is cut, faded, peak-normalised and written as 16-bit mono WAV to
+the path `game.json` names in `audio.tunes`, and provenance is recorded.
 Needs ffmpeg.
 """
 import os
@@ -39,12 +43,13 @@ TUNES = {
     "audio/tune_chest.wav": ("handleCoins.ogg", "RPG Audio", None, 0.1, -3.0),
     "audio/tune_defeat.wav": ("jingles_PIZZI14.ogg", "Music Jingles", None, 0.1, -3.0),
     "audio/tune_hit.wav": ("chop.ogg", "RPG Audio", None, 0.05, -8.0),
-    "audio/tune_shoot.wav": ("drawKnife1.ogg", "RPG Audio", None, 0.08, -8.0),
     "audio/tune_slain.wav": ("impactPunch_heavy_000.ogg", "Impact Sounds", None, 0.1, -6.0),
     "audio/tune_spell.wav": ("glass_001.ogg", "Interface Sounds", None, 0.08, -6.0),
     "audio/tune_victory.wav": ("jingles_PIZZI10.ogg", "Music Jingles", None, 0.1, -3.0),
     "audio/tune_buy.wav": ("handleCoins2.ogg", "RPG Audio", None, 0.08, -6.0),
     "audio/tune_discover.wav": ("jingles_PIZZI15.ogg", "Music Jingles", None, 0.1, -3.0),
+    "audio/tune_spell_turn_undead.wav": (
+        "impactBell_heavy_000.ogg", "Impact Sounds", 1.5, 0.4, -6.0),
 }
 
 # The hero rides, so a step is a hoof's two-beat "clip-clop": two footsteps
@@ -58,38 +63,53 @@ HOOVES = {
     "audio/tune_walk_bridge.wav": ("footstep_wood_000.ogg", "footstep_wood_002.ogg", 0.8),
 }
 
-# Kenney has no water or wings, so these two are made here from filtered
-# noise: an oar's swell for sailing and two wing beats for flight. Pack path
-# -> ffmpeg lavfi source graph.
-NOISE = {
+# Recordings from OpenGameArt.org. Pack path -> (file, author, page, start
+# second, seconds kept, fade-out seconds, peak dBFS). Several files hold one
+# sound recorded at a few lengths, or a few wing beats; `start` picks one.
+# The sail and fly sounds play on every step, so they are short and quiet;
+# the splash is mostly quiet tail, so its peak sits higher to match the hooves.
+OGA = "https://opengameart.org/content/"
+RECORDINGS = {
+    "audio/tune_shoot.wav": (
+        "Bow.wav", "Ogrebane", "battle-sound-effects", 0.0, None, 0.08, -8.0),
+    "audio/tune_spell_clone.wav": (
+        "spell_01.ogg", "rubberduck", "80-cc0-rpg-sfx", 0.0, None, 0.1, -6.0),
+    "audio/tune_spell_teleport.wav": (
+        "teleport.wav", "Ogrebane", "teleport-spell", 0.0, 1.2, 0.3, -6.0),
+    "audio/tune_spell_fireball.wav": (
+        "105016__julien-matthey__jm-fx-fireball-01.wav", "Julien Matthey", "fireball-1",
+        0.0, 1.2, 0.3, -6.0),
+    "audio/tune_spell_lightning.wav": (
+        "electricspell.ogg", "HaelDB", "spell-sounds", 16.29, 0.9, 0.15, -6.0),
+    "audio/tune_spell_freeze.wav": (
+        "ice.wav", "bart", "ice-spells", 0.0, 0.7, 0.1, -6.0),
+    "audio/tune_spell_resurrect.wav": (
+        "healing.ogg", "HaelDB", "spell-sounds", 11.5, 1.16, 0.2, -6.0),
     "audio/tune_sail.wav": (
-        "anoisesrc=d=0.4:c=brown:a=0.9:r=44100:s=7,"
-        "bandpass=f=500:width_type=h:w=700,"
-        "afade=t=in:d=0.12:curve=qsin,afade=t=out:st=0.12:d=0.28:curve=qsin"
-    ),
+        "splash_02.ogg", "rubberduck", "40-cc0-water-splash-slime-sfx", 0.0, 0.4, 0.15, -6.0),
     "audio/tune_fly.wav": (
-        "anoisesrc=d=0.36:c=pink:a=0.9:r=44100:s=11,lowpass=f=450,"
-        "volume='if(lt(t,0.18),sin(PI*t/0.18),0.7*sin(PI*(t-0.18)/0.18))':eval=frame"
-    ),
+        "wings_flap_large.ogg", "AntumDeluge", "large-wings-flap", 0.0, 0.5, 0.1, -12.0),
 }
 
 
-def find(root, name):
-    for dirpath, _, files in os.walk(root):
-        if name in files:
-            return os.path.join(dirpath, name)
-    sys.exit(f"{name} not found under {root}")
+def find(roots, name):
+    for root in roots:
+        for dirpath, _, files in os.walk(root):
+            if name in files:
+                return os.path.join(dirpath, name)
+    sys.exit(f"{name} not found under {', '.join(roots)}")
 
 
 def run(*args):
     return subprocess.run(args, capture_output=True, text=True, check=True)
 
 
-def convert(src, dst, keep, fade, peak):
-    # First the leading silence off, mono, and the cut, so the fade can be
-    # timed against what is left.
+def convert(src, dst, keep, fade, peak, start=0.0):
+    # First the take (from `start`), the leading silence off, mono, and the
+    # cut, so the fade can be timed against what is left.
     cut = dst + ".cut.wav"
-    chain = "silenceremove=start_periods=1:start_threshold=-50dB"
+    chain = f"atrim=start={start},asetpts=PTS-STARTPTS," if start else ""
+    chain += "silenceremove=start_periods=1:start_threshold=-50dB"
     if keep is not None:
         chain += f",atrim=0:{keep}"
     run("ffmpeg", "-v", "error", "-y", "-i", src, "-af", chain, "-ac", "1", "-ar", str(RATE),
@@ -116,9 +136,9 @@ def hooves(first, second, pitch, out):
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         sys.exit(__doc__)
-    root = sys.argv[1]
+    root = sys.argv[1:]
     for rel, (name, pack, keep, fade, peak) in TUNES.items():
         convert(find(root, name), os.path.join(PACK, rel), keep, fade, peak)
         register(
@@ -139,15 +159,14 @@ def main():
             method="downloaded, mixed into a hoof beat (tools/import_tunes.py)",
         )
         print(rel)
-    for rel, graph in NOISE.items():
-        dst = os.path.join(PACK, rel)
-        raw = dst + ".raw.wav"
-        run("ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", graph, "-c:a", "pcm_s16le", raw)
-        convert(raw, dst, None, 0.03, -12.0)
-        os.remove(raw)
-        register([rel], "procedural (tools/import_tunes.py)", method="procedural")
+    for rel, (name, author, page, start, keep, fade, peak) in RECORDINGS.items():
+        convert(find(root, name), os.path.join(PACK, rel), keep, fade, peak, start)
+        register(
+            [rel],
+            f"{author} ({name}), {OGA}{page}",
+            method="downloaded, cut and normalised (tools/import_tunes.py)",
+        )
         print(rel)
-
 
 if __name__ == "__main__":
     main()

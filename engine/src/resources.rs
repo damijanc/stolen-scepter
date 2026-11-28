@@ -150,6 +150,14 @@ pub struct ResAudio {
     pub tune_fly: FixedStr<RES_PATH_LEN>,
     pub tune_buy: FixedStr<RES_PATH_LEN>,
     pub tune_discover: FixedStr<RES_PATH_LEN>,
+    /// One sound per combat spell, also a port extension.
+    pub tune_spell_clone: FixedStr<RES_PATH_LEN>,
+    pub tune_spell_teleport: FixedStr<RES_PATH_LEN>,
+    pub tune_spell_fireball: FixedStr<RES_PATH_LEN>,
+    pub tune_spell_lightning: FixedStr<RES_PATH_LEN>,
+    pub tune_spell_freeze: FixedStr<RES_PATH_LEN>,
+    pub tune_spell_resurrect: FixedStr<RES_PATH_LEN>,
+    pub tune_spell_turn_undead: FixedStr<RES_PATH_LEN>,
 }
 
 impl Default for ResSprites {
@@ -1875,6 +1883,13 @@ impl Resources {
                 ("fly", &mut self.audio.tune_fly),
                 ("buy", &mut self.audio.tune_buy),
                 ("discover", &mut self.audio.tune_discover),
+                ("spell_clone", &mut self.audio.tune_spell_clone),
+                ("spell_teleport", &mut self.audio.tune_spell_teleport),
+                ("spell_fireball", &mut self.audio.tune_spell_fireball),
+                ("spell_lightning", &mut self.audio.tune_spell_lightning),
+                ("spell_freeze", &mut self.audio.tune_spell_freeze),
+                ("spell_resurrect", &mut self.audio.tune_spell_resurrect),
+                ("spell_turn_undead", &mut self.audio.tune_spell_turn_undead),
             ] {
                 slot.copy_from_str(json_str_or(tunes, key, ""));
             }
@@ -3227,7 +3242,9 @@ mod tests {
                             "victory": "audio/victory.wav",
                             "walk_desert": "audio/sand.wav", "walk_bridge": "audio/planks.wav",
                             "sail": "audio/sail.wav", "fly": "audio/fly.wav",
-                            "buy": "audio/buy.wav", "discover": "audio/discover.wav"}
+                            "buy": "audio/buy.wav", "discover": "audio/discover.wav",
+                            "spell_fireball": "audio/fire.wav",
+                            "spell_turn_undead": "audio/bell.wav"}
                 }}"#,
         )
         .expect("fixture parses");
@@ -3250,6 +3267,9 @@ mod tests {
         assert_eq!(audio.tune_fly.as_str(), "audio/fly.wav");
         assert_eq!(audio.tune_buy.as_str(), "audio/buy.wav");
         assert_eq!(audio.tune_discover.as_str(), "audio/discover.wav");
+        assert_eq!(audio.tune_spell_fireball.as_str(), "audio/fire.wav");
+        assert_eq!(audio.tune_spell_turn_undead.as_str(), "audio/bell.wav");
+        assert!(audio.tune_spell_clone.is_empty());
     }
 
     /// A pack that declares no audio leaves every slot empty rather than

@@ -9,7 +9,11 @@
 //! NOT ported: `options[2]` walk_beep and `options[4]` cga. Both are parsed,
 //! drawn and toggleable, and C reads neither. See `specs/audio-design.md`.
 
-use openbounty_engine::combat::{Combat, COMBAT_SIDES, COMBAT_SLOTS};
+use openbounty_engine::combat::{
+    Combat, COMBAT_SIDES, COMBAT_SLOTS, COMBAT_SPELL_CLONE, COMBAT_SPELL_FIREBALL,
+    COMBAT_SPELL_FREEZE, COMBAT_SPELL_LIGHTNING, COMBAT_SPELL_RESURRECT, COMBAT_SPELL_TELEPORT,
+    COMBAT_SPELL_TURN_UNDEAD,
+};
 use openbounty_engine::game::{Game, Mount, TravelMode};
 use openbounty_engine::map::Map;
 use openbounty_engine::step::{StepInteraction, StepResult};
@@ -47,10 +51,19 @@ pub enum Tune {
     Buy,
     /// An artifact, orb or navigation map picked up.
     Discover,
+    /// Each combat spell's own sound, in `COMBAT_SPELL_*` order; any the
+    /// pack lacks plays the generic `Spell`.
+    SpellClone,
+    SpellTeleport,
+    SpellFireball,
+    SpellLightning,
+    SpellFreeze,
+    SpellResurrect,
+    SpellTurnUndead,
 }
 
 impl Tune {
-    pub const ALL: [Tune; 15] = [
+    pub const ALL: [Tune; 22] = [
         Tune::Walk,
         Tune::Bump,
         Tune::Chest,
@@ -66,6 +79,13 @@ impl Tune {
         Tune::Fly,
         Tune::Buy,
         Tune::Discover,
+        Tune::SpellClone,
+        Tune::SpellTeleport,
+        Tune::SpellFireball,
+        Tune::SpellLightning,
+        Tune::SpellFreeze,
+        Tune::SpellResurrect,
+        Tune::SpellTurnUndead,
     ];
 
     /// The tune's slot in [`Tune::ALL`].
@@ -77,7 +97,24 @@ impl Tune {
     /// combat blows land several times a second, and ducking for each would
     /// pump the music, so only the victory sting joins C's four.
     pub fn ducks(self) -> bool {
-        !matches!(self, Tune::Hit | Tune::Shoot | Tune::Slain | Tune::Spell)
+        // A variant ducks as the tune it stands in for.
+        let base = self.fallback().unwrap_or(self);
+        !matches!(base, Tune::Hit | Tune::Shoot | Tune::Slain | Tune::Spell)
+    }
+
+    /// The sound of combat spell `spell` (a `COMBAT_SPELL_*` id), or the
+    /// generic one for an id outside the stock seven.
+    pub fn for_spell(spell: i32) -> Tune {
+        match spell {
+            COMBAT_SPELL_CLONE => Tune::SpellClone,
+            COMBAT_SPELL_TELEPORT => Tune::SpellTeleport,
+            COMBAT_SPELL_FIREBALL => Tune::SpellFireball,
+            COMBAT_SPELL_LIGHTNING => Tune::SpellLightning,
+            COMBAT_SPELL_FREEZE => Tune::SpellFreeze,
+            COMBAT_SPELL_RESURRECT => Tune::SpellResurrect,
+            COMBAT_SPELL_TURN_UNDEAD => Tune::SpellTurnUndead,
+            _ => Tune::Spell,
+        }
     }
 
     /// What plays instead when the pack lacks this tune: the walk variants
@@ -85,6 +122,13 @@ impl Tune {
     pub fn fallback(self) -> Option<Tune> {
         match self {
             Tune::WalkDesert | Tune::WalkBridge | Tune::Sail | Tune::Fly => Some(Tune::Walk),
+            Tune::SpellClone
+            | Tune::SpellTeleport
+            | Tune::SpellFireball
+            | Tune::SpellLightning
+            | Tune::SpellFreeze
+            | Tune::SpellResurrect
+            | Tune::SpellTurnUndead => Some(Tune::Spell),
             _ => None,
         }
     }
@@ -730,7 +774,22 @@ mod tests {
     #[test]
     fn only_the_combat_blows_skip_the_duck() {
         let quiet: Vec<Tune> = Tune::ALL.into_iter().filter(|t| !t.ducks()).collect();
-        assert_eq!(quiet, [Tune::Hit, Tune::Shoot, Tune::Slain, Tune::Spell]);
+        assert_eq!(
+            quiet,
+            [
+                Tune::Hit,
+                Tune::Shoot,
+                Tune::Slain,
+                Tune::Spell,
+                Tune::SpellClone,
+                Tune::SpellTeleport,
+                Tune::SpellFireball,
+                Tune::SpellLightning,
+                Tune::SpellFreeze,
+                Tune::SpellResurrect,
+                Tune::SpellTurnUndead,
+            ]
+        );
     }
 
     fn snaps(edit: impl FnOnce(&mut Combat)) -> (CombatSnap, CombatSnap) {
@@ -830,16 +889,33 @@ mod tests {
         assert_eq!(on_ground(Tune::Chest, &game, &map), Tune::Chest);
     }
 
-    /// An older pack without the variants keeps ticking on the plain walk.
+    /// An older pack without the variants keeps ticking on the plain walk,
+    /// and casting on the generic spell sound.
     #[test]
     fn only_the_walk_variants_fall_back_and_only_to_walk() {
         for tune in Tune::ALL {
-            let expected = matches!(
-                tune,
-                Tune::WalkDesert | Tune::WalkBridge | Tune::Sail | Tune::Fly
-            )
-            .then_some(Tune::Walk);
+            let expected = match tune {
+                Tune::WalkDesert | Tune::WalkBridge | Tune::Sail | Tune::Fly => Some(Tune::Walk),
+                Tune::SpellClone
+                | Tune::SpellTeleport
+                | Tune::SpellFireball
+                | Tune::SpellLightning
+                | Tune::SpellFreeze
+                | Tune::SpellResurrect
+                | Tune::SpellTurnUndead => Some(Tune::Spell),
+                _ => None,
+            };
             assert_eq!(tune.fallback(), expected, "{tune:?}");
         }
+    }
+
+    /// Each stock combat spell has its own sound, in `COMBAT_SPELL_*` order;
+    /// an id past them is the generic one.
+    #[test]
+    fn each_combat_spell_has_its_own_sound() {
+        let own: Vec<Tune> = (0..7).map(Tune::for_spell).collect();
+        assert_eq!(own, Tune::ALL[15..22]);
+        assert_eq!(Tune::for_spell(7), Tune::Spell);
+        assert_eq!(Tune::for_spell(-1), Tune::Spell);
     }
 }

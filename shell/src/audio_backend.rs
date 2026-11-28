@@ -77,6 +77,13 @@ fn tune_path(audio: &ResAudio, tune: Tune) -> &str {
         Tune::Fly => audio.tune_fly.as_str(),
         Tune::Buy => audio.tune_buy.as_str(),
         Tune::Discover => audio.tune_discover.as_str(),
+        Tune::SpellClone => audio.tune_spell_clone.as_str(),
+        Tune::SpellTeleport => audio.tune_spell_teleport.as_str(),
+        Tune::SpellFireball => audio.tune_spell_fireball.as_str(),
+        Tune::SpellLightning => audio.tune_spell_lightning.as_str(),
+        Tune::SpellFreeze => audio.tune_spell_freeze.as_str(),
+        Tune::SpellResurrect => audio.tune_spell_resurrect.as_str(),
+        Tune::SpellTurnUndead => audio.tune_spell_turn_undead.as_str(),
     }
 }
 

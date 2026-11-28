@@ -1736,8 +1736,8 @@
       "license": "CC0-1.0"
     },
     "audio/tune_fly.wav": {
-      "author": "procedural (tools/import_tunes.py)",
-      "method": "procedural",
+      "author": "AntumDeluge (wings_flap_large.ogg), https://opengameart.org/content/large-wings-flap",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "audio/tune_hit.wav": {
@@ -1746,13 +1746,13 @@
       "license": "CC0-1.0"
     },
     "audio/tune_sail.wav": {
-      "author": "procedural (tools/import_tunes.py)",
-      "method": "procedural",
+      "author": "rubberduck (splash_02.ogg), https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "audio/tune_shoot.wav": {
-      "author": "Kenney, \"RPG Audio\" (drawKnife1.ogg), https://kenney.nl",
-      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "author": "Ogrebane (Bow.wav), https://opengameart.org/content/battle-sound-effects",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
     "audio/tune_slain.wav": {
@@ -1762,6 +1762,41 @@
     },
     "audio/tune_spell.wav": {
       "author": "Kenney, \"Interface Sounds\" (glass_001.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_clone.wav": {
+      "author": "rubberduck (spell_01.ogg), https://opengameart.org/content/80-cc0-rpg-sfx",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_fireball.wav": {
+      "author": "Julien Matthey (105016__julien-matthey__jm-fx-fireball-01.wav), https://opengameart.org/content/fireball-1",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_freeze.wav": {
+      "author": "bart (ice.wav), https://opengameart.org/content/ice-spells",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_lightning.wav": {
+      "author": "HaelDB (electricspell.ogg), https://opengameart.org/content/spell-sounds",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_resurrect.wav": {
+      "author": "HaelDB (healing.ogg), https://opengameart.org/content/spell-sounds",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_teleport.wav": {
+      "author": "Ogrebane (teleport.wav), https://opengameart.org/content/teleport-spell",
+      "method": "downloaded, cut and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell_turn_undead.wav": {
+      "author": "Kenney, \"Impact Sounds\" (impactBell_heavy_000.ogg), https://kenney.nl",
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
