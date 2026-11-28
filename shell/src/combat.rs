@@ -28,6 +28,7 @@ use openbounty_engine::game::Game;
 use openbounty_engine::resources::Resources;
 use openbounty_engine::tables::TROOP_ABIL_FLY;
 
+use crate::audio::{combat_tunes, CombatSnap, Tune};
 use crate::banner;
 use crate::cursor::Shape;
 use crate::draw::{DrawList, Dst, Rect, Sprite};
@@ -501,6 +502,9 @@ pub struct CombatLoop {
     /// A turn advanced on the previous step; the banner is cleared at the top
     /// of the next step so the action that ended the turn is still shown once.
     pending_banner_clear: bool,
+    /// The sounds the last action made, for the session to play
+    /// (`audio::combat_tunes`). Taken with [`CombatLoop::take_tunes`].
+    tunes: [Option<Tune>; 2],
     /// A view the player action asked for this step. C's `views_set` from
     /// inside `combat_player_action_full` (`combat_loop.c:306-312`); the
     /// action returns "not acted" and `step` reports the view.
@@ -560,6 +564,7 @@ impl CombatLoop {
             cast_dest_y: 0,
             banner: String::new(),
             pending_banner_clear: false,
+            tunes: [None; 2],
             requested_view: None,
             next_tick: 0.0,
             action_menu: false,
@@ -971,6 +976,7 @@ impl CombatLoop {
         }
 
         let log_len_before = self.combat.log.len();
+        let snap_before = CombatSnap::of(&self.combat);
         let acted = if self.cast_phase != CastPhase::None {
             self.cast_step(keys, pointer, game, resources)
         } else if self.picker_active {
@@ -988,6 +994,12 @@ impl CombatLoop {
                 false
             }
         };
+
+        // Read the sounds before `combat_compact` clears the dead flags.
+        let tunes = combat_tunes(&snap_before, &CombatSnap::of(&self.combat));
+        if tunes.iter().any(Option::is_some) {
+            self.tunes = tunes;
+        }
 
         // The engine recorded this action's line; show the latest one.
         if self.combat.log.len() > log_len_before {
@@ -1038,6 +1050,11 @@ impl CombatLoop {
             self.pending_banner_clear = true;
         }
         self.status()
+    }
+
+    /// The sounds the most recent action made, cleared as they are read.
+    pub fn take_tunes(&mut self) -> [Option<Tune>; 2] {
+        std::mem::take(&mut self.tunes)
     }
 
     fn status(&self) -> CombatStatus {
@@ -1986,6 +2003,7 @@ mod tests {
             cast_dest_y: 0,
             banner: String::new(),
             pending_banner_clear: false,
+            tunes: [None; 2],
             requested_view: None,
             next_tick: 0.0,
             action_menu: false,
@@ -2766,6 +2784,51 @@ mod tests {
             &[Key::S],
             &[click(HitTarget::CombatCell(4, 4))],
         );
+    }
+
+    /// Play one click on a fresh fixture and return the sounds it made.
+    fn tunes_after(
+        setup: fn(&mut CombatLoop, &mut Game),
+        input: PointerInput,
+    ) -> [Option<Tune>; 2] {
+        let (tx, rx) = std::sync::mpsc::channel();
+        big_stack(move || {
+            let (mut l, resources, mut game) = loop_fixture();
+            setup(&mut l, &mut game);
+            by_pointer(&mut l, &mut game, &resources, &mut Prompt::default(), input);
+            let tunes = l.take_tunes();
+            assert_eq!(l.take_tunes(), [None, None], "taking clears them");
+            tx.send(tunes).expect("sends");
+        });
+        rx.recv().expect("received")
+    }
+
+    #[test]
+    fn a_melee_blow_sounds_a_hit() {
+        let tunes = tunes_after(foe_adjacent, click(HitTarget::CombatCell(1, 1)));
+        assert_eq!(tunes, [Some(Tune::Hit), None]);
+    }
+
+    #[test]
+    fn a_shot_sounds_the_loose_not_the_landing() {
+        let tunes = tunes_after(no_setup, click(HitTarget::CombatCell(4, 4)));
+        assert_eq!(tunes, [Some(Tune::Shoot), None]);
+    }
+
+    #[test]
+    fn a_blow_that_wipes_out_a_stack_also_sounds_slain() {
+        fn last_archer(l: &mut CombatLoop, g: &mut Game) {
+            foe_adjacent(l, g);
+            l.combat.units[COMBAT_SIDE_AI][0].count = 1;
+        }
+        let tunes = tunes_after(last_archer, click(HitTarget::CombatCell(1, 1)));
+        assert_eq!(tunes, [Some(Tune::Hit), Some(Tune::Slain)]);
+    }
+
+    #[test]
+    fn a_step_is_silent() {
+        let tunes = tunes_after(no_setup, click(HitTarget::CombatCell(1, 0)));
+        assert_eq!(tunes, [None, None]);
     }
 
     /// No pathfinding in combat, and no smart fly: a far empty cell is inert.

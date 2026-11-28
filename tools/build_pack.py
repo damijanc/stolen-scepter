@@ -327,7 +327,10 @@ def build():
         credits=dict(image=art("ui", "class_select_highlight.png"), **text["credits"]),
         audio=dict(tracks=dict(openworld="audio/openworld.ogg", combat="audio/combat.ogg"),
                    tunes=dict(walk="audio/tune_walk.wav", bump="audio/tune_bump.wav",
-                              chest="audio/tune_chest.wav", defeat="audio/tune_defeat.wav")),
+                              chest="audio/tune_chest.wav", defeat="audio/tune_defeat.wav",
+                              hit="audio/tune_hit.wav", shoot="audio/tune_shoot.wav",
+                              slain="audio/tune_slain.wav", spell="audio/tune_spell.wav",
+                              victory="audio/tune_victory.wav")),
         strings=strings,
     )
     return pack

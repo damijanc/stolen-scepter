@@ -135,6 +135,13 @@ pub struct ResAudio {
     pub tune_bump: FixedStr<RES_PATH_LEN>,
     pub tune_chest: FixedStr<RES_PATH_LEN>,
     pub tune_defeat: FixedStr<RES_PATH_LEN>,
+    /// The combat one-shots, a port extension: C plays no sound in a fight
+    /// beyond the defeat tune. A pack without them stays silent there.
+    pub tune_hit: FixedStr<RES_PATH_LEN>,
+    pub tune_shoot: FixedStr<RES_PATH_LEN>,
+    pub tune_slain: FixedStr<RES_PATH_LEN>,
+    pub tune_spell: FixedStr<RES_PATH_LEN>,
+    pub tune_victory: FixedStr<RES_PATH_LEN>,
 }
 
 impl Default for ResSprites {
@@ -1849,6 +1856,11 @@ impl Resources {
                 ("bump", &mut self.audio.tune_bump),
                 ("chest", &mut self.audio.tune_chest),
                 ("defeat", &mut self.audio.tune_defeat),
+                ("hit", &mut self.audio.tune_hit),
+                ("shoot", &mut self.audio.tune_shoot),
+                ("slain", &mut self.audio.tune_slain),
+                ("spell", &mut self.audio.tune_spell),
+                ("victory", &mut self.audio.tune_victory),
             ] {
                 slot.copy_from_str(json_str_or(tunes, key, ""));
             }
@@ -3195,7 +3207,10 @@ mod tests {
                 "audio": {
                   "tracks": {"openworld": "audio/open.ogg", "combat": "audio/fight.ogg"},
                   "tunes": {"walk": "audio/walk.wav", "bump": "audio/bump.wav",
-                            "chest": "audio/chest.wav", "defeat": "audio/defeat.wav"}
+                            "chest": "audio/chest.wav", "defeat": "audio/defeat.wav",
+                            "hit": "audio/hit.wav", "shoot": "audio/shoot.wav",
+                            "slain": "audio/slain.wav", "spell": "audio/spell.wav",
+                            "victory": "audio/victory.wav"}
                 }}"#,
         )
         .expect("fixture parses");
@@ -3207,6 +3222,11 @@ mod tests {
         assert_eq!(audio.tune_bump.as_str(), "audio/bump.wav");
         assert_eq!(audio.tune_chest.as_str(), "audio/chest.wav");
         assert_eq!(audio.tune_defeat.as_str(), "audio/defeat.wav");
+        assert_eq!(audio.tune_hit.as_str(), "audio/hit.wav");
+        assert_eq!(audio.tune_shoot.as_str(), "audio/shoot.wav");
+        assert_eq!(audio.tune_slain.as_str(), "audio/slain.wav");
+        assert_eq!(audio.tune_spell.as_str(), "audio/spell.wav");
+        assert_eq!(audio.tune_victory.as_str(), "audio/victory.wav");
     }
 
     /// A pack that declares no audio leaves every slot empty rather than

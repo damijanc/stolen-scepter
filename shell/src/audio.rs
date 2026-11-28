@@ -9,15 +9,107 @@
 //! NOT ported: `options[2]` walk_beep and `options[4]` cga. Both are parsed,
 //! drawn and toggleable, and C reads neither. See `specs/audio-design.md`.
 
+use openbounty_engine::combat::{Combat, COMBAT_SIDES, COMBAT_SLOTS};
 use openbounty_engine::step::{StepInteraction, StepResult};
 
-/// The four one-shot events, C's `AudioTuneId`.
+/// The one-shot events. The first four are C's `AudioTuneId`; the combat
+/// five after them are a port extension (C's fights are silent but for the
+/// defeat tune), derived from what the engine's combat state records.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Tune {
     Walk,
     Bump,
     Chest,
     Defeat,
+    /// A blow landed: a melee strike or its retaliation.
+    Hit,
+    /// A ranged unit loosed a shot.
+    Shoot,
+    /// A stack was wiped out.
+    Slain,
+    /// A combat spell took effect.
+    Spell,
+    /// The player won the fight.
+    Victory,
+}
+
+impl Tune {
+    pub const ALL: [Tune; 9] = [
+        Tune::Walk,
+        Tune::Bump,
+        Tune::Chest,
+        Tune::Defeat,
+        Tune::Hit,
+        Tune::Shoot,
+        Tune::Slain,
+        Tune::Spell,
+        Tune::Victory,
+    ];
+
+    /// The tune's slot in [`Tune::ALL`].
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    /// Whether the music ducks under it. C ducks for every tune it has; the
+    /// combat blows land several times a second, and ducking for each would
+    /// pump the music, so only the victory sting joins C's four.
+    pub fn ducks(self) -> bool {
+        !matches!(self, Tune::Hit | Tune::Shoot | Tune::Slain | Tune::Spell)
+    }
+}
+
+/// The few combat fields that tell which sound an action made, captured
+/// before and after one action. Comparing two snapshots covers the player
+/// and the AI alike, without the engine raising anything.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CombatSnap {
+    flashes: [[i32; COMBAT_SLOTS]; COMBAT_SIDES],
+    shots: [[i32; COMBAT_SLOTS]; COMBAT_SIDES],
+    dead: usize,
+    spells: i32,
+}
+
+impl CombatSnap {
+    pub fn of(combat: &Combat) -> Self {
+        let mut snap = CombatSnap {
+            spells: combat.spells_this_round,
+            ..Default::default()
+        };
+        for side in 0..COMBAT_SIDES {
+            for slot in 0..COMBAT_SLOTS {
+                let unit = &combat.units[side][slot];
+                snap.flashes[side][slot] = unit.hit_flash;
+                snap.shots[side][slot] = unit.shots;
+                snap.dead += usize::from(unit.dead);
+            }
+        }
+        snap
+    }
+}
+
+/// The sounds one combat action made, read from the state before and after
+/// it (and before `combat_compact` clears the dead flags). Slot 0 is the
+/// action -- a spell, else a shot, else a blow -- and slot 1 a stack dying.
+/// A spell that kills reads as the spell, a shot as the loose rather than
+/// the landing, and a blow an IMMUNE target shrugs off leaves no flash and
+/// no sound.
+pub fn combat_tunes(before: &CombatSnap, after: &CombatSnap) -> [Option<Tune>; 2] {
+    let cells = || (0..COMBAT_SIDES).flat_map(|s| (0..COMBAT_SLOTS).map(move |i| (s, i)));
+    let shot = cells().any(|(s, i)| after.shots[s][i] < before.shots[s][i]);
+    // `combat_hit_unit` stamps a fresh flash of 3; the animation only
+    // decays it, so a rise is a new hit.
+    let hit = cells().any(|(s, i)| after.flashes[s][i] > before.flashes[s][i]);
+    let action = if after.spells > before.spells {
+        Some(Tune::Spell)
+    } else if shot {
+        Some(Tune::Shoot)
+    } else if hit {
+        Some(Tune::Hit)
+    } else {
+        None
+    };
+    [action, (after.dead > before.dead).then_some(Tune::Slain)]
 }
 
 /// The background music selection, C's `AudioTrack`.
@@ -553,5 +645,69 @@ mod tests {
                 start: Some(Track::Combat)
             }
         );
+    }
+
+    #[test]
+    fn the_tune_list_is_in_index_order() {
+        for (i, tune) in Tune::ALL.iter().enumerate() {
+            assert_eq!(tune.index(), i);
+        }
+    }
+
+    /// C ducks the music for its four tunes; the combat blows would pump it.
+    #[test]
+    fn only_the_combat_blows_skip_the_duck() {
+        let ducking: Vec<Tune> = Tune::ALL.into_iter().filter(|t| t.ducks()).collect();
+        assert_eq!(
+            ducking,
+            [
+                Tune::Walk,
+                Tune::Bump,
+                Tune::Chest,
+                Tune::Defeat,
+                Tune::Victory
+            ]
+        );
+    }
+
+    fn snaps(edit: impl FnOnce(&mut Combat)) -> (CombatSnap, CombatSnap) {
+        let mut combat = Box::<Combat>::default();
+        combat.units[0][0].shots = 2;
+        let before = CombatSnap::of(&combat);
+        edit(&mut combat);
+        (before, CombatSnap::of(&combat))
+    }
+
+    #[test]
+    fn nothing_changed_is_silent() {
+        let (a, b) = snaps(|_| {});
+        assert_eq!(combat_tunes(&a, &b), [None, None]);
+    }
+
+    #[test]
+    fn a_fresh_flash_is_a_hit_and_a_fading_one_is_not() {
+        let (a, b) = snaps(|c| c.units[1][2].hit_flash = 3);
+        assert_eq!(combat_tunes(&a, &b), [Some(Tune::Hit), None]);
+        let (a, b) = snaps(|c| c.units[1][2].hit_flash = 3);
+        assert_eq!(combat_tunes(&b, &a), [None, None]);
+    }
+
+    #[test]
+    fn a_spent_shot_outranks_the_flash_it_caused() {
+        let (a, b) = snaps(|c| {
+            c.units[0][0].shots = 1;
+            c.units[1][0].hit_flash = 3;
+        });
+        assert_eq!(combat_tunes(&a, &b), [Some(Tune::Shoot), None]);
+    }
+
+    #[test]
+    fn a_spell_outranks_everything_and_a_kill_adds_slain() {
+        let (a, b) = snaps(|c| {
+            c.spells_this_round = 1;
+            c.units[1][0].hit_flash = 3;
+            c.units[1][0].dead = true;
+        });
+        assert_eq!(combat_tunes(&a, &b), [Some(Tune::Spell), Some(Tune::Slain)]);
     }
 }

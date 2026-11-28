@@ -1,0 +1,5 @@
+# Test threads get Rust's 2 MB default stack, but the engine's fixed-capacity
+# structs (a whole `Resources`, `Game` or `Combat` held by value) need more in
+# a debug build. Android's game thread gets the same 16 MB (`main.rs`).
+[env]
+RUST_MIN_STACK = "16777216"

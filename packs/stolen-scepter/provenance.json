@@ -1725,6 +1725,31 @@
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
+    "audio/tune_hit.wav": {
+      "author": "Kenney, \"RPG Audio\" (chop.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_shoot.wav": {
+      "author": "Kenney, \"RPG Audio\" (drawKnife1.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_slain.wav": {
+      "author": "Kenney, \"Impact Sounds\" (impactPunch_heavy_000.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_spell.wav": {
+      "author": "Kenney, \"Interface Sounds\" (glass_001.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
+    "audio/tune_victory.wav": {
+      "author": "Kenney, \"Music Jingles\" (jingles_PIZZI10.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
     "audio/tune_walk.wav": {
       "author": "Kenney, \"Impact Sounds\" (footstep_grass_004.ogg), https://kenney.nl",
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",

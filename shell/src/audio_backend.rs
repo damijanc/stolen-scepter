@@ -35,12 +35,12 @@ struct Device {
     /// The last instance of each tune. raylib's `PlaySound` on a playing
     /// `Sound` restarts it rather than layering a second copy, so a replay
     /// stops the previous instance first.
-    playing: [Option<StaticSoundHandle>; 4],
+    playing: [Option<StaticSoundHandle>; Tune::ALL.len()],
 }
 
 pub struct KiraAudio {
     device: Option<Device>,
-    tunes: [Option<StaticSoundData>; 4],
+    tunes: [Option<StaticSoundData>; Tune::ALL.len()],
     /// The music files' bytes, kept so a restart can decode from the top.
     /// C likewise holds the pack bytes for the life of its streams.
     tracks: [Option<Arc<[u8]>>; 2],
@@ -59,12 +59,18 @@ fn tween(ms: u64) -> Tween {
     }
 }
 
-fn tune_slot(tune: Tune) -> usize {
+/// The pack path a tune loads from.
+fn tune_path(audio: &ResAudio, tune: Tune) -> &str {
     match tune {
-        Tune::Walk => 0,
-        Tune::Bump => 1,
-        Tune::Chest => 2,
-        Tune::Defeat => 3,
+        Tune::Walk => audio.tune_walk.as_str(),
+        Tune::Bump => audio.tune_bump.as_str(),
+        Tune::Chest => audio.tune_chest.as_str(),
+        Tune::Defeat => audio.tune_defeat.as_str(),
+        Tune::Hit => audio.tune_hit.as_str(),
+        Tune::Shoot => audio.tune_shoot.as_str(),
+        Tune::Slain => audio.tune_slain.as_str(),
+        Tune::Spell => audio.tune_spell.as_str(),
+        Tune::Victory => audio.tune_victory.as_str(),
     }
 }
 
@@ -112,17 +118,9 @@ impl KiraAudio {
         }
 
         let bytes = |path: &str| (!path.is_empty()).then(|| load(path)).flatten();
-        for (slot, path) in [
-            audio.tune_walk.as_str(),
-            audio.tune_bump.as_str(),
-            audio.tune_chest.as_str(),
-            audio.tune_defeat.as_str(),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            out.tunes[slot] =
-                bytes(path).and_then(|b| StaticSoundData::from_cursor(Cursor::new(b)).ok());
+        for tune in Tune::ALL {
+            out.tunes[tune.index()] = bytes(tune_path(audio, tune))
+                .and_then(|b| StaticSoundData::from_cursor(Cursor::new(b)).ok());
         }
         for (slot, path) in [audio.track_openworld.as_str(), audio.track_combat.as_str()]
             .into_iter()
@@ -179,7 +177,7 @@ impl KiraAudio {
         if !self.sounds_enabled {
             return;
         }
-        let slot = tune_slot(tune);
+        let slot = tune.index();
         let Some(data) = self.tunes[slot].as_ref() else {
             return;
         };
@@ -193,18 +191,19 @@ impl KiraAudio {
         device.playing[slot] = device.sfx_track.play(data.volume(Decibels(volume))).ok();
     }
 
-    /// The per-frame half of `audio_tick`: duck the music while any tune is
-    /// playing. kira streams on its own thread, so there is no
-    /// `UpdateMusicStream` to drive.
+    /// The per-frame half of `audio_tick`: duck the music while any tune
+    /// that ducks is playing (see [`Tune::ducks`]). kira streams on its own
+    /// thread, so there is no `UpdateMusicStream` to drive.
     pub fn tick(&mut self) {
         let Some(device) = self.device.as_mut() else {
             return;
         };
-        let any_tune = device
-            .playing
-            .iter()
-            .flatten()
-            .any(|handle| handle.state() != PlaybackState::Stopped);
+        let any_tune = Tune::ALL.iter().any(|tune| {
+            tune.ducks()
+                && device.playing[tune.index()]
+                    .as_ref()
+                    .is_some_and(|handle| handle.state() != PlaybackState::Stopped)
+        });
         if let Some(step) = self.duck.update(any_tune) {
             if let Some(stream) = device.stream.as_mut() {
                 stream.set_volume(Decibels(step.target_db), tween(step.tween_ms));
@@ -308,5 +307,22 @@ mod tests {
         audio.play_tune(Tune::Walk);
         audio.set_track(Track::Openworld);
         audio.tick();
+    }
+
+    /// Every tune the shipped pack names is in the pack and decodes. The
+    /// game skips a missing or broken file silently, so this is the only
+    /// place one would show.
+    #[test]
+    fn every_shipped_tune_decodes() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+        let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+        let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+        for tune in Tune::ALL {
+            let path = tune_path(&resources.audio, tune);
+            assert!(!path.is_empty(), "{tune:?} has no path");
+            let bytes = pack.read(path).unwrap_or_else(|| panic!("{path} missing"));
+            StaticSoundData::from_cursor(Cursor::new(bytes.into_owned()))
+                .unwrap_or_else(|e| panic!("{path} does not decode: {e}"));
+        }
     }
 }

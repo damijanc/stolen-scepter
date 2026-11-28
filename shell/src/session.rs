@@ -435,6 +435,9 @@ impl<'r> Session<'r> {
                 let status = session
                     .combat
                     .step_input(keys, input, game, resources, now, prompt);
+                for tune in session.combat.take_tunes().into_iter().flatten() {
+                    audio.play_tune(tune);
+                }
                 match status {
                     CombatStatus::Running => {}
                     CombatStatus::OpenView(view) => views.set(view),
@@ -447,8 +450,11 @@ impl<'r> Session<'r> {
                         let session = combat.take().expect("combat was Some");
                         // `combat_loop.c:696` / `705`: a loss plays the
                         // defeat tune, and either way the openworld returns.
+                        // Victory is a port extension; C's win is silent.
                         if result == CombatResult::Loss {
                             audio.play_tune(audio::Tune::Defeat);
+                        } else {
+                            audio.play_tune(audio::Tune::Victory);
                         }
                         audio.set_track(audio::Track::Openworld);
                         if let Some((header, body)) =

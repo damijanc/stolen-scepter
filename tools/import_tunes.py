@@ -1,11 +1,12 @@
-"""Install the pack's four effect tunes from Kenney's CC0 sound packs.
+"""Install the pack's effect tunes from Kenney's CC0 sound packs.
 
-The tunes are walk, bump, chest and defeat -- the four one-shots the shell
-plays (`specs/audio-design.md`). They replace the square-wave beeps this pack
-used to synthesise, so the effects match the orchestral music.
+Walk, bump, chest and defeat are the four one-shots C plays
+(`specs/audio-design.md`); they replace the square-wave beeps this pack used
+to synthesise, so the effects match the orchestral music. Hit, shoot, slain,
+spell and victory are the port's combat sounds, which C does not have.
 
-The sources are three Kenney packs, all CC0 (https://kenney.nl): "Impact
-Sounds", "RPG Audio" and "Music Jingles". Download and unzip them anywhere,
+The sources are four Kenney packs, all CC0 (https://kenney.nl): "Impact
+Sounds", "RPG Audio", "Interface Sounds" and "Music Jingles". Download and unzip them anywhere,
 then point this at the folder holding them; each source is found by file name
 anywhere under it:
 
@@ -31,12 +32,18 @@ RATE = 44100
 # The walk tick plays on every step, so it is short and quiet: the grass
 # step's sound is all in its first 50 ms and the rest is room noise. The
 # defeat sting is a descending pizzicato phrase, which suits the strings in
-# the combat track.
+# the combat track, and victory is a rising one. The combat sounds fire on
+# every blow, so they sit a little under the overworld ones.
 TUNES = {
     "audio/tune_walk.wav": ("footstep_grass_004.ogg", "Impact Sounds", 0.15, 0.06, -12.0),
     "audio/tune_bump.wav": ("impactSoft_medium_000.ogg", "Impact Sounds", None, 0.0, -6.0),
     "audio/tune_chest.wav": ("handleCoins.ogg", "RPG Audio", None, 0.1, -3.0),
     "audio/tune_defeat.wav": ("jingles_PIZZI14.ogg", "Music Jingles", None, 0.1, -3.0),
+    "audio/tune_hit.wav": ("chop.ogg", "RPG Audio", None, 0.05, -8.0),
+    "audio/tune_shoot.wav": ("drawKnife1.ogg", "RPG Audio", None, 0.08, -8.0),
+    "audio/tune_slain.wav": ("impactPunch_heavy_000.ogg", "Impact Sounds", None, 0.1, -6.0),
+    "audio/tune_spell.wav": ("glass_001.ogg", "Interface Sounds", None, 0.08, -6.0),
+    "audio/tune_victory.wav": ("jingles_PIZZI10.ogg", "Music Jingles", None, 0.1, -3.0),
 }
 
 

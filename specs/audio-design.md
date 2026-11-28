@@ -218,6 +218,28 @@ Three shape changes, none a C divergence:
   had omitted it. During combat the shell only ticks and does not push the
   options, as C's combat loop does.
 
+## Combat sounds: a port extension
+
+C's fights are silent but for the defeat tune. The port adds five tunes:
+`Hit` (a melee blow or its retaliation), `Shoot`, `Slain` (a stack wiped
+out), `Spell` (a combat spell that took effect) and `Victory` (a win). The
+pack names them under `audio.tunes` as `hit`, `shoot`, `slain`, `spell` and
+`victory`; a pack without them is silent there, as before.
+
+The engine still raises nothing. `CombatLoop::step_input` snapshots a few
+fields around each action (`audio::CombatSnap`) and `audio::combat_tunes`
+reads the difference: `spells_this_round` rising is a spell (it moves only
+on `CastResult::Ok`), a unit's `shots` falling is a shot, a `hit_flash`
+rising is a blow (`combat_hit_unit` stamps a fresh 3, an IMMUNE target gets
+none), and a new `dead` flag is a stack slain. The snapshot is taken before
+`combat_compact` clears the dead flags. One action makes at most two
+sounds: the action (spell over shot over blow) and a death. The AI's
+actions go through the same path, so they sound the same as the player's.
+
+Only C's four tunes and the victory sting duck the music (`Tune::ducks`):
+the blows land several times a second, and ducking under each would pump
+the music.
+
 ## Components
 
 - `engine/src/resources.rs`: `ResAudio`, six `FixedStr<RES_PATH_LEN>` paths
@@ -313,9 +335,10 @@ For whoever sources the files. Not built by this design.
 
 - **Authoring the audio.** Sourcing and license confirmation are the user's,
   on their own schedule. The code half ships and is testable with no files.
-- **New event types.** C has four tunes and two tracks; this ports exactly
-  those. Combat hits, spell casts, UI clicks and per-zone music are a later
-  slice, and the vocabulary in `audio.rs` is where they would be added.
+- **New event types** beyond combat. C has four tunes and two tracks; UI
+  clicks and per-zone music are still a later slice, and the vocabulary in
+  `audio.rs` is where they would be added. (Combat sounds were added after
+  this design shipped -- see the next section.)
 - **Crossfade.** C hard-cuts between tracks and so does this. kira can
   crossfade; the seam permits adding it without touching call sites.
 - **`options[2]` walk_beep and `options[4]` cga.** Both are parsed, drawn and
