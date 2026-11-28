@@ -254,6 +254,13 @@ Each combat spell has its own sound (`Tune::for_spell`, the
 (`CombatLoop::cast_spell_idx`); a pack without one plays the generic
 `spell` tune. Like it, they do not duck the music.
 
+On mobile, every tapped button plays `Tap` (`audio::tap_sounds`), heard in
+the session's frame and in `main.rs`'s start wizard. A map tile or a combat
+cell is a move or an attack with its own sound, and a sheet's blank area is
+a dead zone, so those are silent; a desktop click is silent too. The device
+opens before the wizard for this, with the pack's default Sounds and Volume
+options until a game exists. `Tap` does not duck the music.
+
 `Discover` plays where a chest plays `Chest`: on an artifact, an orb or a
 navigation map (`tunes_for_step`). `Buy` plays when gold falls on the same
 day inside the three spots every purchase runs through -- the town menu,

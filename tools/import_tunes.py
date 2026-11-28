@@ -48,6 +48,7 @@ TUNES = {
     "audio/tune_victory.wav": ("jingles_PIZZI10.ogg", "Music Jingles", None, 0.1, -3.0),
     "audio/tune_buy.wav": ("handleCoins2.ogg", "RPG Audio", None, 0.08, -6.0),
     "audio/tune_discover.wav": ("jingles_PIZZI15.ogg", "Music Jingles", None, 0.1, -3.0),
+    "audio/tune_tap.wav": ("tick_002.ogg", "Interface Sounds", None, 0.0, -14.0),
     "audio/tune_spell_turn_undead.wav": (
         "impactBell_heavy_000.ogg", "Impact Sounds", 1.5, 0.4, -6.0),
 }

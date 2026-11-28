@@ -1800,6 +1800,11 @@
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
       "license": "CC0-1.0"
     },
+    "audio/tune_tap.wav": {
+      "author": "Kenney, \"Interface Sounds\" (tick_002.ogg), https://kenney.nl",
+      "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",
+      "license": "CC0-1.0"
+    },
     "audio/tune_victory.wav": {
       "author": "Kenney, \"Music Jingles\" (jingles_PIZZI10.ogg), https://kenney.nl",
       "method": "downloaded, trimmed and normalised (tools/import_tunes.py)",

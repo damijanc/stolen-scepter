@@ -394,6 +394,11 @@ impl<'r> Session<'r> {
         let pointer_at = frame_in.pointer_at;
         let hovered = pointer_at.and_then(|(lx, ly)| hits.hit(lx, ly));
         let mut clicked = if frame_in.left { hovered } else { None };
+        // A tapped button ticks on mobile, before a sheet's page turn
+        // swallows the click below.
+        if layout.touch && clicked.is_some_and(audio::tap_sounds) {
+            audio.play_tune(audio::Tune::Tap);
+        }
         // A mobile view sheet turns its own pages; the view never sees it.
         if let Some(target) = clicked {
             let combat_paged = combat
@@ -3256,6 +3261,46 @@ mod tests {
         session.game.position.in_town.copy_from_str("millbrook");
         session.views.town_open("Millbrook", "millbrook", 13, 46);
         drive(session, list, &[], None, false, now);
+    }
+
+    /// Records every tune it is asked to play, readable after the session
+    /// has taken ownership of it.
+    struct SharedHeard(std::rc::Rc<std::cell::RefCell<Vec<crate::audio::Tune>>>);
+
+    impl crate::audio::AudioOut for SharedHeard {
+        fn is_available(&self) -> bool {
+            true
+        }
+        fn set_sounds_enabled(&mut self, _: bool) {}
+        fn set_music_enabled(&mut self, _: bool) {}
+        fn set_track(&mut self, _: crate::audio::Track) {}
+        fn set_master_volume(&mut self, _: i32) {}
+        fn play_tune(&mut self, tune: crate::audio::Tune) {
+            self.0.borrow_mut().push(tune);
+        }
+        fn tick(&mut self) {}
+    }
+
+    /// Tap the town's Info row and report whether it ticked.
+    fn town_tap_ticks(touch: bool) -> bool {
+        let mut harness = Harness::load();
+        harness.layout.touch = touch;
+        let (mut session, mut list, mut now) = touch_session(&harness);
+        in_millbrook(&mut session, &mut list, &mut now);
+        let heard = std::rc::Rc::default();
+        session.audio = Box::new(SharedHeard(std::rc::Rc::clone(&heard)));
+        let at = region_center(&session, HitTarget::TownRow(TownRow::Info));
+        drive(&mut session, &mut list, &[], Some(at), true, &mut now);
+        let ticked = heard.borrow().contains(&crate::audio::Tune::Tap);
+        ticked
+    }
+
+    #[test]
+    fn a_tapped_button_ticks_on_mobile_only() {
+        big_stack(|| {
+            assert!(town_tap_ticks(true), "mobile ticks");
+            assert!(!town_tap_ticks(false), "a desktop click is silent");
+        });
     }
 
     #[test]

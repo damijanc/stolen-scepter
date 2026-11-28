@@ -77,6 +77,7 @@ fn tune_path(audio: &ResAudio, tune: Tune) -> &str {
         Tune::Fly => audio.tune_fly.as_str(),
         Tune::Buy => audio.tune_buy.as_str(),
         Tune::Discover => audio.tune_discover.as_str(),
+        Tune::Tap => audio.tune_tap.as_str(),
         Tune::SpellClone => audio.tune_spell_clone.as_str(),
         Tune::SpellTeleport => audio.tune_spell_teleport.as_str(),
         Tune::SpellFireball => audio.tune_spell_fireball.as_str(),

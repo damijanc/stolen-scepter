@@ -336,6 +336,7 @@ def build():
                               sail="audio/tune_sail.wav", fly="audio/tune_fly.wav",
                               buy="audio/tune_buy.wav",
                               discover="audio/tune_discover.wav",
+                              tap="audio/tune_tap.wav",
                               spell_clone="audio/tune_spell_clone.wav",
                               spell_teleport="audio/tune_spell_teleport.wav",
                               spell_fireball="audio/tune_spell_fireball.wav",

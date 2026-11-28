@@ -19,6 +19,8 @@ use openbounty_engine::map::Map;
 use openbounty_engine::step::{StepInteraction, StepResult};
 use openbounty_engine::tile::Terrain;
 
+use crate::pointer::HitTarget;
+
 /// The one-shot events. The first four are C's `AudioTuneId`; the rest are
 /// a port extension, derived from what the engine returns: the combat five
 /// (C's fights are silent but for the defeat tune), the walk tune's variants
@@ -60,10 +62,12 @@ pub enum Tune {
     SpellFreeze,
     SpellResurrect,
     SpellTurnUndead,
+    /// A button tapped on mobile (`tap_sounds`).
+    Tap,
 }
 
 impl Tune {
-    pub const ALL: [Tune; 22] = [
+    pub const ALL: [Tune; 23] = [
         Tune::Walk,
         Tune::Bump,
         Tune::Chest,
@@ -86,6 +90,7 @@ impl Tune {
         Tune::SpellFreeze,
         Tune::SpellResurrect,
         Tune::SpellTurnUndead,
+        Tune::Tap,
     ];
 
     /// The tune's slot in [`Tune::ALL`].
@@ -99,7 +104,10 @@ impl Tune {
     pub fn ducks(self) -> bool {
         // A variant ducks as the tune it stands in for.
         let base = self.fallback().unwrap_or(self);
-        !matches!(base, Tune::Hit | Tune::Shoot | Tune::Slain | Tune::Spell)
+        !matches!(
+            base,
+            Tune::Hit | Tune::Shoot | Tune::Slain | Tune::Spell | Tune::Tap
+        )
     }
 
     /// The sound of combat spell `spell` (a `COMBAT_SPELL_*` id), or the
@@ -132,6 +140,16 @@ impl Tune {
             _ => None,
         }
     }
+}
+
+/// Whether a tap on `target` plays the tap tune on mobile. Every button
+/// does; a sheet's blank area is a deliberate dead zone, and a map tile or a
+/// combat cell is a move or an attack, which make their own sounds.
+pub fn tap_sounds(target: HitTarget) -> bool {
+    !matches!(
+        target,
+        HitTarget::SheetBlank | HitTarget::MapTile(..) | HitTarget::CombatCell(..)
+    )
 }
 
 /// The walk tune for how the hero travels and what they stand on. Flying
@@ -770,9 +788,9 @@ mod tests {
     }
 
     /// C ducks the music for its four tunes, and the walk's variants are the
-    /// walk; the combat blows would pump it.
+    /// walk; the combat blows and the taps would pump it.
     #[test]
-    fn only_the_combat_blows_skip_the_duck() {
+    fn only_the_combat_blows_and_taps_skip_the_duck() {
         let quiet: Vec<Tune> = Tune::ALL.into_iter().filter(|t| !t.ducks()).collect();
         assert_eq!(
             quiet,
@@ -788,6 +806,7 @@ mod tests {
                 Tune::SpellFreeze,
                 Tune::SpellResurrect,
                 Tune::SpellTurnUndead,
+                Tune::Tap,
             ]
         );
     }
@@ -917,5 +936,17 @@ mod tests {
         assert_eq!(own, Tune::ALL[15..22]);
         assert_eq!(Tune::for_spell(7), Tune::Spell);
         assert_eq!(Tune::for_spell(-1), Tune::Spell);
+    }
+
+    /// Buttons tick; the sheet's dead zone, a map tile and a combat cell
+    /// do not (the last two make their own sounds).
+    #[test]
+    fn buttons_tick_and_moves_do_not() {
+        assert!(tap_sounds(HitTarget::PromptYes));
+        assert!(tap_sounds(HitTarget::SheetNext));
+        assert!(tap_sounds(HitTarget::DialogDismiss));
+        assert!(!tap_sounds(HitTarget::SheetBlank));
+        assert!(!tap_sounds(HitTarget::MapTile(3, 4)));
+        assert!(!tap_sounds(HitTarget::CombatCell(1, 1)));
     }
 }

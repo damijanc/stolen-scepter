@@ -277,6 +277,19 @@ async fn run() {
     let keys = MacroquadKeys;
     let pointer = MacroquadPointer;
 
+    // Open the device and load the pack's audio, porting `main.c`'s
+    // `audio_init` block. A machine with no device plays nothing and grays
+    // the audio rows. Files come through the pack, as C's `LoadAssetBytes`
+    // does, so a `.openbounty` archive plays as a directory does. It opens
+    // before the wizard so the wizard's taps tick on mobile; until a game
+    // exists, the pack's default Sounds and Volume options govern them.
+    let mut audio = KiraAudio::new(&resources.audio, |path| {
+        pack.read(path).map(|bytes| bytes.into_owned())
+    });
+    let defaults = &resources.world.default_options;
+    audio.set_sounds_enabled(defaults[audio::OPTION_SOUNDS] != 0);
+    audio.set_master_volume(defaults[audio::OPTION_VOLUME]);
+
     // Pre-game wizard: class select, then name/difficulty. It blocks on the
     // player, exactly as C's `startup_flow` does before the game exists.
     let mut startup = Startup::new(&resources);
@@ -287,6 +300,9 @@ async fn run() {
         let hovered = at.and_then(|(lx, ly)| hits.hit(lx, ly));
         startup.set_hover(hovered);
         let clicked = hovered.filter(|_| pointer.pressed(Button::Left));
+        if layout.touch && clicked.is_some_and(audio::tap_sounds) {
+            audio.play_tune(audio::Tune::Tap);
+        }
         let outcome = match clicked {
             Some(target) => startup.click(target, &resources, &save_paths, get_time()),
             None => startup.update(&keys, &resources, &save_paths, get_time()),
@@ -321,13 +337,6 @@ async fn run() {
         palette: backend.palette(),
         save_paths: &save_paths,
     };
-    // Open the device and load the pack's audio, porting `main.c`'s
-    // `audio_init` block. A machine with no device plays nothing and grays
-    // the audio rows. Files come through the pack, as C's `LoadAssetBytes`
-    // does, so a `.openbounty` archive plays as a directory does.
-    let audio = KiraAudio::new(&resources.audio, |path| {
-        pack.read(path).map(|bytes| bytes.into_owned())
-    });
     let mut session = match Session::start(ctx, present, Box::new(audio), &choice, seed_index) {
         Ok(session) => session,
         Err(err) => {
