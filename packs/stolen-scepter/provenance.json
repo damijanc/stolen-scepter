@@ -1705,9 +1705,9 @@
       "method": "downloaded, re-encoded to Ogg Vorbis",
       "license": "CC0-1.0"
     },
-    "audio/openworld.ogg": {
-      "author": "DST, \"GrassLands Theme\", https://opengameart.org/content/grasslands-theme",
-      "method": "downloaded, re-encoded to Ogg Vorbis",
+    "audio/openworld.flac": {
+      "author": "RandomMind, \"Medieval: The Bard's Tale\" (loop version), https://opengameart.org/content/medieval-the-bards-tale",
+      "method": "downloaded, encoded to FLAC",
       "license": "CC0-1.0"
     },
     "audio/tune_bump.wav": {

@@ -5711,7 +5711,7 @@
    {
     "label": "Music (CC0, OpenGameArt):",
     "names": [
-     "DST - GrassLands Theme",
+     "RandomMind - The Bard's Tale",
      "Emma_MA - Determined Pursuit"
     ]
    },
@@ -5730,7 +5730,7 @@
  },
  "audio": {
   "tracks": {
-   "openworld": "audio/openworld.ogg",
+   "openworld": "audio/openworld.flac",
    "combat": "audio/combat.ogg"
   },
   "tunes": {

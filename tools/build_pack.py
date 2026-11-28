@@ -325,7 +325,7 @@ def build():
                     throne_backdrop=art("ui", "end_lose_screen.png")),
         colors=rules["colors"],
         credits=dict(image=art("ui", "class_select_highlight.png"), **text["credits"]),
-        audio=dict(tracks=dict(openworld="audio/openworld.ogg", combat="audio/combat.ogg"),
+        audio=dict(tracks=dict(openworld="audio/openworld.flac", combat="audio/combat.ogg"),
                    tunes=dict(walk="audio/tune_walk.wav", bump="audio/tune_bump.wav",
                               chest="audio/tune_chest.wav", defeat="audio/tune_defeat.wav",
                               hit="audio/tune_hit.wav", shoot="audio/tune_shoot.wav",

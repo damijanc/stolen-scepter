@@ -100,9 +100,10 @@ Tasks, in order:
    write to `packs/stolen-scepter/` through `packart.py`; `gen_ui.py` is new
    for the 43 interface slots), and our own palette. A shell test checks the
    pack ships every path the shell loads. Upgraded in Phase 5.
-5. **Audio** (done): the two tracks are CC0 from OpenGameArt -- DST's
-   "GrassLands Theme" (overworld) and Emma_MA's "Determined Pursuit" (combat),
-   re-encoded to Ogg Vorbis, credited in the pack and recorded in
+5. **Audio** (done): the two tracks are CC0 from OpenGameArt -- RandomMind's
+   "Medieval: The Bard's Tale" loop (overworld, FLAC; it replaced DST's
+   "GrassLands Theme", which sounded like Christmas music) and Emma_MA's
+   "Determined Pursuit" (combat, re-encoded to Ogg Vorbis), credited in the pack and recorded in
    `provenance.json`; the originals sit in ignored `game-assets/audio-src/`.
    The effect tunes are CC0 recordings from Kenney.nl (Impact Sounds, RPG
    Audio, Interface Sounds, Music Jingles) and OpenGameArt.org (each file's

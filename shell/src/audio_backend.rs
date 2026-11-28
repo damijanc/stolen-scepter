@@ -344,4 +344,23 @@ mod tests {
                 .unwrap_or_else(|e| panic!("{path} does not decode: {e}"));
         }
     }
+
+    /// Both shipped music tracks are in the pack and open as streams, the
+    /// way `KiraAudio::new` probes them: a format kira cannot stream would
+    /// silently leave the slot empty.
+    #[test]
+    fn every_shipped_track_streams() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/stolen-scepter");
+        let pack = crate::pack::Pack::open(&dir).expect("the pack opens");
+        let resources = crate::pack::load_resources(&pack).expect("the pack loads");
+        for path in [
+            resources.audio.track_openworld.as_str(),
+            resources.audio.track_combat.as_str(),
+        ] {
+            let bytes = pack.read(path).unwrap_or_else(|| panic!("{path} missing"));
+            let bytes: Arc<[u8]> = Arc::from(bytes.into_owned());
+            StreamingSoundData::from_cursor(Cursor::new(bytes))
+                .unwrap_or_else(|e| panic!("{path} does not stream: {e}"));
+        }
+    }
 }
